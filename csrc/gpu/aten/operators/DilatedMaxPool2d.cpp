@@ -10,11 +10,6 @@
 #include "comm/RegisterUtils.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
-#ifdef USE_OVERRIDE_OP
-#include <ATen/DeviceGuard.h>
-#include <ATen/core/op_registration/adaption.h>
-#include "utils/CustomOperatorRegistration.h"
-#endif
 
 #include <tuple>
 
@@ -1044,22 +1039,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
 
 } // namespace impl
 
-#ifdef USE_OVERRIDE_OP
-std::tuple<Tensor, Tensor> max_pool2d_with_indices(
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode) {
-  Tensor output;
-  Tensor indices;
-  impl::max_pool2d_with_indices_out_template(
-      output, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
-  return std::tuple<Tensor&, Tensor&>(output, indices);
-}
-#endif
-
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
     const Tensor& input,
     IntArrayRef kernel_size,
@@ -1080,32 +1059,6 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
       ceil_mode);
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
-
-#ifdef USE_OVERRIDE_OP
-Tensor max_pool2d_with_indices_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef stride,
-    IntArrayRef padding,
-    IntArrayRef dilation,
-    bool ceil_mode,
-    const Tensor& indices) {
-  Tensor grad_input;
-  max_pool2d_with_indices_backward_out(
-      grad_output,
-      self,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      indices,
-      grad_input);
-
-  return grad_input;
-}
-#endif
 
 Tensor& max_pool2d_with_indices_backward_out(
     const Tensor& grad_output_,
@@ -1153,157 +1106,3 @@ Tensor& max_pool2d_with_indices_backward_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
-#ifdef USE_OVERRIDE_OP
-
-::std::tuple<at::Tensor, at::Tensor> wrapper_XPU_max_pool2d_with_indices(
-    const at::Tensor& self,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device,
-      self,
-      "wrapper_XPU_out_max_pool2d_with_indices_out",
-      "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices(
-      self, kernel_size, stride, padding, dilation, ceil_mode);
-}
-namespace {
-::std::tuple<at::Tensor&, at::Tensor&>
-wrapper_XPU_out_max_pool2d_with_indices_out(
-    const at::Tensor& self,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode,
-    at::Tensor& out,
-    at::Tensor& indices) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device, out, "wrapper_XPU_out_max_pool2d_with_indices_out", "out");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      indices,
-      "wrapper_XPU_out_max_pool2d_with_indices_out",
-      "indices");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      self,
-      "wrapper_XPU_out_max_pool2d_with_indices_out",
-      "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices_out(
-      self, kernel_size, stride, padding, dilation, ceil_mode, out, indices);
-}
-
-at::Tensor wrapper_XPU_max_pool2d_with_indices_backward(
-    const at::Tensor& grad_output,
-    const at::Tensor& self,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode,
-    const at::Tensor& indices) {
-  std::optional<Device> common_device = std::nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device,
-      grad_output,
-      "wrapper_XPU_max_pool2d_with_indices_backward",
-      "grad_output");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      self,
-      "wrapper_XPU_max_pool2d_with_indices_backward",
-      "self");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      indices,
-      "wrapper_XPU_max_pool2d_with_indices_backward",
-      "indices");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices_backward(
-      grad_output,
-      self,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      indices);
-}
-
-at::Tensor& wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out(
-    const at::Tensor& grad_output,
-    const at::Tensor& self,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef stride,
-    at::IntArrayRef padding,
-    at::IntArrayRef dilation,
-    bool ceil_mode,
-    const at::Tensor& indices,
-    at::Tensor& grad_input) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device,
-      grad_input,
-      "wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out",
-      "grad_input");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      grad_output,
-      "wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out",
-      "grad_output");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      self,
-      "wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out",
-      "self");
-  c10::impl::check_and_update_common_device(
-      common_device,
-      indices,
-      "wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out",
-      "indices");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::max_pool2d_with_indices_backward_out(
-      grad_output,
-      self,
-      kernel_size,
-      stride,
-      padding,
-      dilation,
-      ceil_mode,
-      indices,
-      grad_input);
-}
-IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl(
-      "max_pool2d_with_indices",
-      TORCH_FN((&wrapper_XPU_max_pool2d_with_indices)));
-  m.impl(
-      "max_pool2d_with_indices.out",
-      TORCH_FN((&wrapper_XPU_out_max_pool2d_with_indices_out)));
-  m.impl(
-      "max_pool2d_with_indices_backward",
-      TORCH_FN((&wrapper_XPU_max_pool2d_with_indices_backward)));
-  m.impl(
-      "max_pool2d_with_indices_backward.grad_input",
-      TORCH_FN((&wrapper_XPU_grad_input_max_pool2d_with_indices_backward_out)));
-}
-
-} // namespace
-#endif
