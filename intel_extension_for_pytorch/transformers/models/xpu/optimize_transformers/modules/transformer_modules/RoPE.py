@@ -436,14 +436,12 @@ class LlamaRotaryEmbeddingRef(torch.nn.Module):
 
 
 class LlamaRotaryEmbedding(PositionalEmbedding):
-    cos_cached = None
-    sin_cached = None
-    max_position_embedding = 2048
-
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
+        self.cos_cached = None
+        self.sin_cached = None
         self.dim = int(config.embedding_dim / config.num_attention_head)
-        LlamaRotaryEmbedding.max_position_embedding = config.max_positions
+        self.max_seq_len_cached = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
         self.dtype = dtype
@@ -456,19 +454,14 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
             self.short_factor = config.rope_scaling["short_factor"]
             self.long_factor = config.rope_scaling["long_factor"]
             self.max_seq_len = config.max_positions
-            LlamaRotaryEmbedding.max_position_embedding = (
-                config.original_max_position_embeddings
-            )
+            self.max_seq_len_cached = config.original_max_position_embeddings
             self.original_max_position_embeddings = (
                 config.original_max_position_embeddings
             )
             self.create_sin_cos_cache_long_scaled_rope(
                 self.original_max_position_embeddings
             )
-        elif (
-            LlamaRotaryEmbedding.sin_cached is None
-            or LlamaRotaryEmbedding.cos_cached is None
-        ):
+        elif self.sin_cached is None or self.cos_cached is None:
             inv_freq = 1.0 / (
                 self.base
                 ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim)
@@ -476,7 +469,7 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
             if self.rope_type == "llama3":
                 inv_freq = self.compute_llama3_parameters(inv_freq, config)
             self.register_buffer("inv_freq", inv_freq, persistent=False)
-            self.create_sin_cos_cache(LlamaRotaryEmbedding.max_position_embedding)
+            self.create_sin_cos_cache(self.max_seq_len_cached)
 
     def compute_llama3_parameters(self, inv_freq, config: IPEXTransformerConfig):
         factor = config.rope_scaling["factor"]
@@ -541,16 +534,16 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         emb = torch.cat((freqs, freqs), dim=-1)
 
-        LlamaRotaryEmbedding.cos_cached = emb.cos().to(self.dtype) * scaling_factor
-        LlamaRotaryEmbedding.sin_cached = emb.sin().to(self.dtype) * scaling_factor
+        self.cos_cached = emb.cos().to(self.dtype) * scaling_factor
+        self.sin_cached = emb.sin().to(self.dtype) * scaling_factor
 
     def create_sin_cos_cache(self, pos):
         t = torch.arange(pos, device=self.device, dtype=self.inv_freq.dtype)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
-        LlamaRotaryEmbedding.cos_cached = emb.cos().to(self.dtype)
-        LlamaRotaryEmbedding.sin_cached = emb.sin().to(self.dtype)
+        self.cos_cached = emb.cos().to(self.dtype)
+        self.sin_cached = emb.sin().to(self.dtype)
 
     def apply_rotary_pos_emb(
         self,
@@ -590,13 +583,13 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         key.copy_(k_embed)
 
     def update_cache_if_needed(self, kv_seq_len):
-        if kv_seq_len >= LlamaRotaryEmbedding.max_position_embedding:
+        if kv_seq_len >= self.max_seq_len_cached:
             new_cache_length = kv_seq_len + self.dynamic_cache_stride
             if self.rope_type == "su" or self.rope_type == "longrope":
                 self.create_sin_cos_cache_long_scaled_rope(new_cache_length)
             else:
                 self.create_sin_cos_cache(new_cache_length)
-            LlamaRotaryEmbedding.max_position_embedding = new_cache_length
+            self.max_seq_len_cached = new_cache_length
 
     def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len, cache_format):
         self.update_cache_if_needed(kv_seq_len)
