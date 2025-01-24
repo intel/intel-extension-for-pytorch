@@ -147,6 +147,7 @@ supported:
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
   - std.correction_out
+  - geometric_
 #  - to_sparse.sparse_dim
 #  - _adaptive_avg_pool3d
 #  - _adaptive_avg_pool3d_backward
@@ -312,7 +313,6 @@ supported:
 #  - fractional_max_pool3d_backward
 #  - fractional_max_pool3d_backward.grad_input
 #  - frexp.Tensor_out
-#  - geometric_
 #  - glu_backward_jvp
 #  - glu_jvp
 #  - grid_sampler_3d
