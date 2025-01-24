@@ -132,11 +132,10 @@ class TestIpexLLMOptimizeBase(TestCase):
         model = ipex.llm.optimize(
             model.eval(), dtype=dtype, device=device, inplace=True
         )
-        print("Model after optimized: ", model, flush=True)
         if use_static_cache:
             generate_kwargs.update({"cache_implementation": "static"})
         with torch.inference_mode(), torch.no_grad(), torch.xpu.amp.autocast(
-            enabled=True, dtype=dtype
+            enabled=False, dtype=dtype
         ):
             ipex_res = model.generate(
                 input_ids,

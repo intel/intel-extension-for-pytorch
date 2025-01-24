@@ -1,0 +1,33 @@
+{
+    "alibi": false,
+    "apply_residual_connection_post_layernorm": false,
+    "architectures": [
+      "FalconForCausalLM"
+    ],
+    "attention_dropout": 0.0,
+    "auto_map": {
+      "AutoConfig": "configuration_falcon.FalconConfig",
+      "AutoModel": "modeling_falcon.FalconModel",
+      "AutoModelForSequenceClassification": "modeling_falcon.FalconForSequenceClassification",
+      "AutoModelForTokenClassification": "modeling_falcon.FalconForTokenClassification",
+      "AutoModelForQuestionAnswering": "modeling_falcon.FalconForQuestionAnswering",
+      "AutoModelForCausalLM": "modeling_falcon.FalconForCausalLM"
+    },
+    "bias": false,
+    "bos_token_id": 11,
+    "eos_token_id": 11,
+    "hidden_dropout": 0.0,
+    "hidden_size": 4544,
+    "initializer_range": 0.02,
+    "layer_norm_epsilon": 1e-05,
+    "model_type": "falcon",
+    "multi_query": true,
+    "new_decoder_architecture": false,
+    "num_attention_heads": 71,
+    "num_hidden_layers": 8,
+    "parallel_attn": true,
+    "torch_dtype": "bfloat16",
+    "transformers_version": null,
+    "use_cache": true,
+    "vocab_size": 65024
+}

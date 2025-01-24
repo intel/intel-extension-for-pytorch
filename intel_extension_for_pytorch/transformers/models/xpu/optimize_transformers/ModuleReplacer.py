@@ -142,7 +142,14 @@ class ModuleReplacer:
             if hasattr(config, "n_head"):
                 config.num_key_value_heads = config.n_head
             elif hasattr(config, "num_kv_heads"):
-                config.num_key_value_heads = config.num_kv_heads
+                if hasattr(config, "new_decoder_architecture") and hasattr(
+                    config, "multi_query"
+                ):
+                    config.num_key_value_heads = (
+                        config.num_kv_heads
+                        if (config.new_decoder_architecture or not config.multi_query)
+                        else 1
+                    )
             elif hasattr(config, "multi_query_group_num"):
                 config.num_key_value_heads = config.multi_query_group_num
             else:
@@ -172,7 +179,6 @@ class ModuleReplacer:
                 transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer,
             ]:
                 decoder_kwargs["layer_idx"] = child.self_attn.layer_idx
-
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
                     child,
