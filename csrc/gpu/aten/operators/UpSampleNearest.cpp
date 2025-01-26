@@ -261,64 +261,6 @@ void upsample_nearest2d_channels_last_kernel(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-Tensor& _upsample_nearest_exact3d_out(
-    const Tensor& input,
-    IntArrayRef output_size,
-    c10::optional<double> scales_d,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w,
-    Tensor& output) {
-  torch_ipex::xpu::oneDNN::resample(
-      input,
-      output,
-      output_size,
-      algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
-  return output;
-}
-
-Tensor _upsample_nearest_exact3d(
-    const Tensor& input,
-    c10::OptionalIntArrayRef output_size,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto output = at::empty({0}, input.options());
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scale_d = get_scale_value(scale_factors, 0);
-  auto scale_h = get_scale_value(scale_factors, 1);
-  auto scale_w = get_scale_value(scale_factors, 2);
-  torch_ipex::xpu::oneDNN::resample(
-      input,
-      output,
-      osize,
-      algorithm::resampling_nearest,
-      scale_w.has_value() ? static_cast<double>(scale_w.value()) : 0.0f,
-      scale_h.has_value() ? static_cast<double>(scale_h.value()) : 0.0f,
-      scale_d.has_value() ? static_cast<double>(scale_d.value()) : 0.0f);
-  return output;
-}
-
-Tensor& _upsample_nearest_exact3d_backward_out(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    c10::optional<double> scales_d,
-    c10::optional<double> scales_h,
-    c10::optional<double> scales_w,
-    Tensor& grad_input) {
-  torch_ipex::xpu::oneDNN::resample_backward(
-      grad_input,
-      grad_output,
-      input_size,
-      output_size,
-      algorithm::resampling_nearest,
-      scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
-      scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f,
-      scales_d.has_value() ? static_cast<double>(scales_d.value()) : 0.0f);
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
