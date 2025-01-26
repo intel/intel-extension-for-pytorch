@@ -19,8 +19,6 @@ Tensor dequantize_tensor_per_channel_affine(
     const Tensor& zero_points,
     int64_t axis);
 
-Tensor dequantize(const Tensor& self);
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

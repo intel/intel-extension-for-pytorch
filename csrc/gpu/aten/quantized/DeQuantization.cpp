@@ -74,14 +74,6 @@ Tensor dequantize_tensor_per_channel_affine(
   return rtensor_;
 }
 
-Tensor dequantize(const Tensor& self) {
-  if (!self.is_quantized()) {
-    return self;
-  }
-  auto qtensor = static_cast<QTensorImpl*>(self.unsafeGetTensorImpl());
-  return qtensor->quantizer()->dequantize(self);
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

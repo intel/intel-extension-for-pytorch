@@ -462,98 +462,6 @@ void fractional_max_pool3d_out_frame_cl(
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-template <typename scalar_t>
-struct FractionalMaxPool3dBackwardOutFrameKernelFunctor {
-  void operator()(sycl::nd_item<3> item) const {
-    int ourOutputPoint = item.get_global_id()[2];
-    int plane = item.get_group()[1];
-    int batch = item.get_group()[0];
-
-    if (ourOutputPoint < gradOutputPlaneSize) {
-      int64_t outputT = ourOutputPoint / gradOutputSizeH / gradOutputSizeW;
-      int64_t outputH = ourOutputPoint / gradOutputSizeW % gradOutputSizeH;
-      int64_t outputW = ourOutputPoint % gradOutputSizeW;
-
-      int64_t index = indices[batch][plane][outputT][outputH][outputW];
-      assert(index >= 0);
-      int64_t inputW = index % gradInputSizeW;
-      int64_t inputH = (index / gradInputSizeW % gradInputSizeH);
-      int64_t inputT = index / (gradInputSizeH * gradInputSizeW);
-      assert(inputT < gradInput.size(2));
-      atomicAdd(
-          (dpcpp_global_ptr_pt<scalar_t>)&gradInput[batch][plane][inputT]
-                                                   [inputH][inputW],
-          gradOutput[batch][plane][outputT][outputH][outputW]);
-    }
-  }
-  FractionalMaxPool3dBackwardOutFrameKernelFunctor(
-      PackedTensorAccessor64<scalar_t, 5> gradInput_,
-      PackedTensorAccessor64<scalar_t, 5> gradOutput_,
-      PackedTensorAccessor64<int64_t, 5> indices_,
-      int gradOutputSizeH_,
-      int gradOutputSizeW_,
-      int gradInputSizeH_,
-      int gradInputSizeW_,
-      int gradOutputPlaneSize_)
-      : gradInput(gradInput_),
-        gradOutput(gradOutput_),
-        indices(indices_),
-        gradOutputSizeH(gradOutputSizeH_),
-        gradOutputSizeW(gradOutputSizeW_),
-        gradInputSizeH(gradInputSizeH_),
-        gradInputSizeW(gradInputSizeW_),
-        gradOutputPlaneSize(gradOutputPlaneSize_) {}
-
- private:
-  PackedTensorAccessor64<scalar_t, 5> gradInput;
-  PackedTensorAccessor64<scalar_t, 5> gradOutput;
-  PackedTensorAccessor64<int64_t, 5> indices;
-  int gradOutputSizeH;
-  int gradOutputSizeW;
-  int gradInputSizeH;
-  int gradInputSizeW;
-  int gradOutputPlaneSize;
-};
-
-template <typename scalar_t>
-void fractional_max_pool3d_backward_out_frame(
-    PackedTensorAccessor64<scalar_t, 5> gradInput,
-    PackedTensorAccessor64<scalar_t, 5> gradOutput,
-    PackedTensorAccessor64<int64_t, 5> indices) {
-  auto numBatch = gradInput.size(0);
-  auto numPlane = gradInput.size(1);
-  auto gradOutputSizeT = gradOutput.size(2);
-  auto gradOutputSizeH = gradOutput.size(3);
-  auto gradOutputSizeW = gradOutput.size(4);
-  auto gradInputSizeT = gradInput.size(2);
-  auto gradInputSizeH = gradInput.size(3);
-  auto gradInputSizeW = gradInput.size(4);
-  auto& queue = dpcppGetCurrentQueue();
-  int gradOutputPlaneSize = gradOutputSizeT * gradOutputSizeH * gradOutputSizeW;
-  int work_group_size = gradOutputPlaneSize > 256 ? 256 : gradOutputPlaneSize;
-  int work_group_num =
-      (gradOutputPlaneSize + work_group_size - 1) / work_group_size;
-
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    FractionalMaxPool3dBackwardOutFrameKernelFunctor<scalar_t> kfn(
-        gradInput,
-        gradOutput,
-        indices,
-        gradOutputSizeH,
-        gradOutputSizeW,
-        gradInputSizeH,
-        gradInputSizeW,
-        gradOutputPlaneSize);
-    cgh.parallel_for<decltype(kfn)>(
-        sycl::nd_range<3>(
-            sycl::range<3>(
-                numBatch, numPlane, work_group_size * work_group_num),
-            sycl::range<3>(1, 1, work_group_size)),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
-}
-
 void fractional_max_pool3d_out_template(
     Tensor& output,
     Tensor& indices,
@@ -685,101 +593,7 @@ void fractional_max_pool3d_out_template(
       });
 }
 
-void fractional_max_pool3d_backward_out_template(
-    Tensor& gradInput,
-    const Tensor& gradOutput,
-    const Tensor& input,
-    IntArrayRef pool_size /* unused */,
-    IntArrayRef output_size,
-    const Tensor& indices) {
-  int64_t dimt = 1;
-  int64_t dimh = 2;
-  int64_t dimw = 3;
-
-  int64_t outputT = output_size[0];
-  int64_t outputH = output_size[1];
-  int64_t outputW = output_size[2];
-
-  int64_t ndims = input.ndimension();
-  if (ndims == 5) {
-    dimt++;
-    dimh++;
-    dimw++;
-  }
-
-  /* sizes */
-  int64_t inputT = input.size(dimt);
-  int64_t inputH = input.size(dimh);
-  int64_t inputW = input.size(dimw);
-
-  TORCH_CHECK(
-      outputT == gradOutput.size(dimt),
-      "fractional_max_pool3d_backward_out_template(): ",
-      "gradOutput time unexpected");
-  TORCH_CHECK(
-      outputH == gradOutput.size(dimh),
-      "fractional_max_pool3d_backward_out_template(): ",
-      "gradOutput height unexpected");
-  TORCH_CHECK(
-      outputW == gradOutput.size(dimw),
-      "fractional_max_pool3d_backward_out_template(): ",
-      "gradOutput width unexpected");
-
-  /* resize */
-  gradInput.resize_as_(input);
-  gradInput.zero_();
-
-  auto gradInput_ = gradInput;
-  auto gradOutput_ = gradOutput;
-  auto indices_ = indices;
-
-  if (ndims == 4) {
-    gradInput_ =
-        gradInput_.reshape({1, gradInput.size(0), inputT, inputH, inputW});
-    gradOutput_ =
-        gradOutput_.reshape({1, gradOutput.size(0), outputT, outputH, outputW});
-    indices_ =
-        indices_.reshape({1, indices.size(0), outputT, outputH, outputW});
-  }
-
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      gradOutput.scalar_type(),
-      "fractional_max_pool3d_backward_out_frame",
-      [&] {
-        fractional_max_pool3d_backward_out_frame<scalar_t>(
-            gradInput_.packed_accessor64<scalar_t, 5>(),
-            gradOutput_.packed_accessor64<scalar_t, 5>(),
-            indices_.packed_accessor64<int64_t, 5>());
-      });
-}
-
 } // namespace impl
-
-std::tuple<Tensor&, Tensor&> fractional_max_pool3d_out(
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& random_samples,
-    Tensor& output,
-    Tensor& indices) {
-  impl::fractional_max_pool3d_out_template(
-      output, indices, self, kernel_size, output_size, random_samples);
-  return std::tuple<Tensor&, Tensor&>(output, indices);
-}
-
-Tensor& fractional_max_pool3d_backward_out(
-    const Tensor& grad_output,
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& indices,
-    Tensor& grad_input) {
-  impl::fractional_max_pool3d_backward_out_template(
-      grad_input, grad_output, self, kernel_size, output_size, indices);
-  return grad_input;
-}
 
 #ifdef USE_OVERRIDE_OP
 void fractional_max_pool3d_meta(
@@ -919,18 +733,6 @@ std::tuple<Tensor, Tensor> fractional_max_pool3d(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 #endif
-
-Tensor fractional_max_pool3d_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    IntArrayRef kernel_size,
-    IntArrayRef output_size,
-    const Tensor& indices) {
-  Tensor grad_input = at::empty({0}, self.options());
-  impl::fractional_max_pool3d_backward_out_template(
-      grad_input, grad_output, self, kernel_size, output_size, indices);
-  return grad_input;
-}
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
