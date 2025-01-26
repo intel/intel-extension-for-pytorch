@@ -51,7 +51,7 @@ class TrainingArguments(transformers.TrainingArguments):
         })    
 
 # loading dataset
-dataset = load_dataset("financial_phrasebank", "sentences_allagree")
+dataset = load_dataset("financial_phrasebank", "sentences_allagree", trust_remote_code=True)
 dataset = dataset["train"].train_test_split(test_size=0.1)
 dataset["validation"] = dataset["test"]
 del dataset["test"]
