@@ -15,11 +15,8 @@
 #include <ATen/native/ForeachUtils.h>
 #include <aten/operators/MemoryAccess.h>
 #include "ATen/OpMathType.h"
-#include "ForeachFunctors.h"
-#include "FusedFunctors.h"
 #include "Loops.h"
 #include "LoopsTemplates.h"
-#include "MultiTensorApply.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "utils/CustomOperatorRegistration.h"
