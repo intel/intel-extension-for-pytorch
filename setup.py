@@ -183,6 +183,15 @@ def get_build_type():
     )
 
 
+def get_build_aot():
+    if _get_build_target() in ["develop", "python", "bdist_wheel"]:
+        return os.environ.get(
+            "USE_AOT_DEVLIST", ",".join(arch for arch in torch.xpu.get_arch_list())
+        )
+    else:
+        return os.environ.get("USE_AOT_DEVLIST", "")
+
+
 def create_if_not_exist(path_dir):
     if not os.path.exists(path_dir):
         try:
@@ -370,7 +379,7 @@ def create_version_files(
         base_dir, PACKAGE_NAME, "..", "csrc", "utils", "version.h"
     )
     build_type_str = get_build_type()
-    build_aot = os.environ.get("USE_AOT_DEVLIST", "")
+    build_aot = get_build_aot()
     # Check code fingerprint to avoid non-modify rebuild.
     current_code_fingerprint = get_code_fingerprint(
         ipex_build_version, ipex_git_sha, torch_git_sha, build_type_str
@@ -758,6 +767,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 # To skip oneMKL's dependence on TBB if oneAPI version >= 2024.0
                 # IPEX GPU will not use TBB-related MKL primitives.
                 "MKL_SYCL_THREADING": "intel_thread",
+                "USE_AOT_DEVLIST": get_build_aot(),
             }
 
             if get_build_type() == "Debug":
