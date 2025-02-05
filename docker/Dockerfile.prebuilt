@@ -40,7 +40,8 @@ ARG TORCHCCL_VERSION=2.5.0
 ARG PYTORCH_VERSION=2.5.0
 ARG TORCHAUDIO_VERSION=2.5.0
 ARG TORCHVISION_VERSION=0.20.0
-RUN . ./venv/bin/activate && \
+RUN python -m venv venv && \
+    . ./venv/bin/activate && \
     python -m pip --no-cache-dir install --upgrade \
     pip \
     setuptools \
