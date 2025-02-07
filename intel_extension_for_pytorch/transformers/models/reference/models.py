@@ -5883,7 +5883,7 @@ def Deepseek_MoEGate_forward(self, hidden_states):
             self.topk_group,
             self.n_routed_experts,
             self.top_k,
-            torch.tensor(self.e_score_correction_bias),
+            torch.tensor(self.e_score_correction_bias, dtype=torch.float32),
         )
 
     # norm gate to sum 1
