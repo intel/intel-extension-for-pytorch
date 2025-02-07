@@ -97,7 +97,8 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate(
     const int64_t n_group,
     const int64_t topk_group,
     const int64_t n_routed_experts,
-    const int64_t top_k);
+    const int64_t top_k,
+    c10::optional<at::Tensor> e_score_cbias);
 using mixtral_moe_tpp_kernel_fn = at::Tensor (*)(
     const at::Tensor& hidden_states,
     const at::Tensor& top_x,
@@ -179,7 +180,8 @@ using deepseek_moegate_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     const int64_t n_group,
     const int64_t topk_group,
     const int64_t n_routed_experts,
-    const int64_t top_k);
+    const int64_t top_k,
+    c10::optional<at::Tensor> e_score_cbias);
 IPEX_DECLARE_DISPATCH(mixtral_moe_tpp_kernel_fn, mixtral_moe_tpp_kernel_stub);
 IPEX_DECLARE_DISPATCH(deepseek_moe_tpp_kernel_fn, deepseek_moe_tpp_kernel_stub);
 IPEX_DECLARE_DISPATCH(mixtral_moe_woq_kernel_fn, mixtral_moe_woq_kernel_stub);

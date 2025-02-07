@@ -292,7 +292,6 @@ at::Tensor mixtral_moe_woq_kernl_impl(
 
 template <typename T>
 std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel(
-    const at::Tensor& hidden_states,
     const at::Tensor& scores,
     const at::Tensor& routed_scaling_factor,
     const int64_t n_group,
@@ -302,7 +301,7 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel(
   auto group_size = n_routed_experts / n_group;
   auto n = scores.size(0);
   auto h = scores.size(1);
-  auto group_scores = at::empty({n, n_group}, hidden_states.options());
+  auto group_scores = at::empty({n, n_group}, scores.options());
   auto group_scores_ptr = group_scores.data_ptr<T>();
   auto scores_ptr = scores.data_ptr<T>();
 #pragma omp parallel for collapse(2)
@@ -319,7 +318,7 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel(
   }
 
   auto group_idx = std::get<1>(group_scores.topk(topk_group, -1, true, false));
-  auto tmp_scores = at::zeros_like(scores, hidden_states.options());
+  auto tmp_scores = at::zeros_like(scores, scores.options());
   auto group_idx_ptr = group_idx.data_ptr<int64_t>();
   auto tmp_scores_ptr = tmp_scores.data_ptr<T>();
   T scale = routed_scaling_factor.item<T>();
@@ -339,6 +338,57 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel(
   return std::make_tuple(topk, topk_weight);
 }
 
+template <typename T>
+std::tuple<at::Tensor, at::Tensor> deepseekv3_moegate_kernel(
+    const at::Tensor& scores,
+    const at::Tensor& routed_scaling_factor,
+    const int64_t n_group,
+    const int64_t topk_group,
+    const int64_t n_routed_experts,
+    const int64_t top_k,
+    const at::Tensor& e_score_cbias) {
+  auto group_size = n_routed_experts / n_group;
+  auto n = scores.size(0);
+  auto h = scores.size(1);
+  auto scores_for_choice = at::empty({n, n_group, group_size}, at::kFloat);
+  auto scores_ptr = scores.data_ptr<T>();
+  auto scores_for_choice_ptr = scores_for_choice.data_ptr<float>();
+  auto scores_for_choice_stride0 = scores_for_choice.stride(0);
+  auto e_score_cbias_ptr = e_score_cbias.data_ptr<float>();
+#pragma omp parallel for collapse(2)
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < n_group; j++) {
+      auto k_start = j * group_size;
+      auto k_end = k_start + group_size;
+      for (auto k = k_start; k < k_end; k++) {
+        scores_for_choice_ptr[i * scores_for_choice_stride0 + k] =
+            scores_ptr[i * h + k] + e_score_cbias_ptr[k];
+      }
+    }
+  }
+  auto group_scores =
+      std::get<0>(scores_for_choice.topk(2, -1, true, false)).sum(-1);
+  auto group_idx = std::get<1>(group_scores.topk(topk_group, -1, true, false));
+  auto tmp_scores = at::zeros_like(scores, at::kFloat);
+  auto group_idx_ptr = group_idx.data_ptr<int64_t>();
+  auto tmp_scores_ptr = tmp_scores.data_ptr<float>();
+#pragma omp parallel for collapse(2)
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < topk_group; j++) {
+      auto selected_idx = group_idx_ptr[i * topk_group + j];
+      auto k_start = selected_idx * group_size;
+      auto k_end = k_start + group_size;
+      for (auto k = k_start; k < k_end; k++) {
+        tmp_scores_ptr[i * h + k] =
+            scores_for_choice_ptr[i * scores_for_choice_stride0 + k];
+      }
+    }
+  }
+  auto topk = std::get<1>(tmp_scores.topk(top_k, -1, true, false));
+  auto topk_weight = scores.gather(1, topk);
+  return std::make_tuple(topk, topk_weight);
+}
+
 std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel_impl(
     const at::Tensor& hidden_states,
     const at::Tensor& scores,
@@ -346,10 +396,59 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel_impl(
     const int64_t n_group,
     const int64_t topk_group,
     const int64_t n_routed_experts,
-    const int64_t top_k) {
+    const int64_t top_k,
+    c10::optional<at::Tensor> e_score_cbias) {
+  if (e_score_cbias.has_value()) { // deepseekv3
+    if (hidden_states.scalar_type() == at::ScalarType::Float) {
+      return deepseekv3_moegate_kernel<float>(
+          scores,
+          routed_scaling_factor,
+          n_group,
+          topk_group,
+          n_routed_experts,
+          top_k,
+          e_score_cbias.value());
+    } else if (hidden_states.scalar_type() == at::ScalarType::BFloat16) {
+      return deepseekv3_moegate_kernel<at::BFloat16>(
+          scores,
+          routed_scaling_factor,
+          n_group,
+          topk_group,
+          n_routed_experts,
+          top_k,
+          e_score_cbias.value());
+    } else if (hidden_states.scalar_type() == at::ScalarType::Half) {
+      return deepseekv3_moegate_kernel<at::Half>(
+          scores,
+          routed_scaling_factor,
+          n_group,
+          topk_group,
+          n_routed_experts,
+          top_k,
+          e_score_cbias.value());
+    }
+    auto n = hidden_states.size(0);
+    auto group_size = n_routed_experts / n_group;
+    auto scores_for_choice =
+        scores.view({n, -1}) + e_score_cbias.value().unsqueeze(0);
+    auto group_scores = std::get<0>(
+        scores_for_choice.view({n, n_group, -1}).topk(2, -1, true, false));
+    group_scores = group_scores.sum(-1);
+    auto group_idx =
+        std::get<1>(group_scores.topk(topk_group, -1, true, false));
+    auto group_mask = at::zeros_like(group_scores);
+    group_mask.scatter_(1, group_idx, 1);
+    auto score_mask = group_mask.unsqueeze(-1)
+                          .expand({n, n_group, group_size})
+                          .reshape({n, -1});
+    auto tmp_scores =
+        scores_for_choice.masked_fill(~score_mask.to(at::kBool), 0.0);
+    auto topk = std::get<1>(tmp_scores.topk(top_k, -1, true, false));
+    auto topk_weight = scores.gather(1, topk);
+    return std::make_tuple(topk, topk_weight.to(hidden_states.scalar_type()));
+  }
   if (hidden_states.scalar_type() == at::ScalarType::Float) {
     return deepseek_moegate_kernel<float>(
-        hidden_states,
         scores,
         routed_scaling_factor,
         n_group,
@@ -358,7 +457,14 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel_impl(
         top_k);
   } else if (hidden_states.scalar_type() == at::ScalarType::BFloat16) {
     return deepseek_moegate_kernel<at::BFloat16>(
-        hidden_states,
+        scores,
+        routed_scaling_factor,
+        n_group,
+        topk_group,
+        n_routed_experts,
+        top_k);
+  } else if (hidden_states.scalar_type() == at::ScalarType::Half) {
+    return deepseek_moegate_kernel<at::Half>(
         scores,
         routed_scaling_factor,
         n_group,
