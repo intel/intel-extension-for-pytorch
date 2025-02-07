@@ -142,7 +142,7 @@ elif _get_build_target() in ["develop", "python"]:
 
 
 def _check_env_flag(name, default=""):
-    return os.getenv(name, default).upper() in ON_ENV_VAL
+    return os.getenv(name, default).upper().strip() in ON_ENV_VAL
 
 
 def get_build_type():
@@ -718,6 +718,7 @@ class IPEXCPPLibBuild(build_clib, object):
         my_env = os.environ.copy()
 
         for var, val in my_env.items():
+            val = val.strip()
             if var.startswith(("BUILD_", "USE_", "CMAKE_")):
                 if var == "CMAKE_PREFIX_PATH":
                     # XXX: Do NOT overwrite CMAKE_PREFIX_PATH. Append into the list, instead!
