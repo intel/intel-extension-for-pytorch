@@ -441,6 +441,8 @@ elif re.search("deepseekv2", config.architectures[0], re.IGNORECASE):
     model = DeepseekV2Config(args.model_id)
 elif re.search("deepseekv3", config.architectures[0], re.IGNORECASE):
     model = DeepseekV3Config(args.model_id)
+    if "deepseek-r1" in args.model_id.lower() or "deepseekr1" in args.model_id.lower():
+        model.name = "deepseekr1"
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

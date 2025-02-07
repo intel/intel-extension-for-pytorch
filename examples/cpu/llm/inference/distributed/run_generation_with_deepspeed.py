@@ -294,8 +294,10 @@ def get_repo_root(model_name_or_path):
 def get_checkpoint_files(model_name_or_path):
     cached_repo_dir = get_repo_root(model_name_or_path)
     glob_pattern = "*.[bp][it][n]"
-    if re.search("deepseek-v2", model_name_or_path, re.IGNORECASE) or re.search(
-        "deepseek-v3", model_name_or_path, re.IGNORECASE
+    if (
+        re.search("deepseek-v2", model_name_or_path, re.IGNORECASE)
+        or re.search("deepseek-v3", model_name_or_path, re.IGNORECASE)
+        or re.search("deepseek-r1", model_name_or_path, re.IGNORECASE)
     ):
         glob_pattern = "*.[sbp][ait][fn][e][t][e][n][s][o][r][s]"
     # extensions: .bin | .pt
@@ -328,7 +330,7 @@ print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
-if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
     model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
