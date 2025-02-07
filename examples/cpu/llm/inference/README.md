@@ -4,88 +4,89 @@
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |   | 🟩 |   |
-|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |   | 🟩 | 🟩 |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 | 🟩 |
-|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
-|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟩 |   |
-|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|Maira| microsoft/maira-2 | 🟩 | 🟩 |   | 🟩 |   |
-|Jamba| ai21labs/Jamba-v0.1 | 🟩 | 🟩 |   | 🟩 |   |
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ |   | ✅ | ✅ |
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-7b  | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-11b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-30b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Bloom| bigscience/bloom-1b7 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm2-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ✅ | ✅ | ✅ |
+|T5| google/flan-t5-xl | ✅ | ✅ | ✅ | ✅ | ✅ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
+|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ |   | ✅ | ✅ |
+|GIT| microsoft/git-base | ✅ | ✅ |   | ✅ | ✅ |
+|Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ |   | ✅ |   |
+|Phi| microsoft/phi-2 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Maira| microsoft/maira-2 | ✅ | ✅ |   | ✅ | ✅ |
+|Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
+|DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |   | ✅ | ✅ |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | BF16 | Weight only quantization INT8 |
 |:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |
-|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 |
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟩 | 🟩 |
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 |
-|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 |
-|CodeGen| Salesforce/codegen-2B-multi |  🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
-|Mistral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |
-|MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 |
-|GIT| microsoft/git-base | 🟩 | 🟩 |
-|Phi| microsoft/phi-2 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ |
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ |
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ |
+|FALCON| tiiuae/falcon-11b | ✅ | ✅ |
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ |
+|OPT| facebook/opt-30b | ✅ | ✅ |
+|OPT| facebook/opt-1.3b | ✅ | ✅ |
+|Bloom| bigscience/bloom-1b7 | ✅ | ✅ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ |
+|T5| google/flan-t5-xl | ✅ | ✅ |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ |
+|Mistral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ |
+|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ |
+|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ |
+|Qwen| Qwen/Qwen2-7B | ✅ | ✅ |
+|GIT| microsoft/git-base | ✅ | ✅ |
+|Phi| microsoft/phi-2 | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ |
+|Whisper| openai/whisper-large-v2 | ✅ | ✅ |
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family)
 are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels.

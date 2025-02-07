@@ -102,7 +102,7 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/llm
-bash ./tools/env_setup.sh 8
+bash ./tools/env_setup.sh 11
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages
