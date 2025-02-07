@@ -113,6 +113,7 @@ python run.py --help # for more detailed usages
 | token latency |  enable "--token-latency" to print out the first or next token latency |
 | generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
 | streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
+| KV Cache dtype |   default: auto, use "--kv-cache-dtype=fp8_e5m2" to enable e5m2 KV Cache. More information refer to [vLLM FP8 E5M2 KV Cache](https://docs.vllm.ai/en/v0.6.6/quantization/fp8_e5m2_kvcache.html) |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
