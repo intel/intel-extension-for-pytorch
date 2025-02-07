@@ -72,7 +72,7 @@ conda install gperftools -y
 python -m pip install transformers==4.38.1 accelerate
 
 # Set the environment variables for performance on Xeon
-export LD_PRELOAD=$(bash ../../../llm/tools/get_libstdcpp_lib.sh):${CONDA_PREFIX}/lib/libiomp.so:${CONDA_PREFIX}/lib/libtcmalloc.so:${LD_PRELOAD}
+export LD_PRELOAD=$(bash ../../../llm/tools/get_libstdcpp_lib.sh):${CONDA_PREFIX}/lib/libiomp5.so:${CONDA_PREFIX}/lib/libtcmalloc.so:${LD_PRELOAD}
 export KMP_BLOCKTIME=1
 export KMP_TPAUSE=0
 export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
