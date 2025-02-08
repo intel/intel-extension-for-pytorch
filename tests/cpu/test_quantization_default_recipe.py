@@ -2387,6 +2387,7 @@ class WeightOnlyQuantizationTester(TestCase):
         shape_list = [
             [4, 1024, 1024],
             [1024, 512, 512],
+            [4, 256, 272],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]

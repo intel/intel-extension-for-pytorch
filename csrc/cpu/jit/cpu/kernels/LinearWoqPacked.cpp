@@ -329,6 +329,7 @@ ContextLinearWoq create(
         lowp_mode,
         weight_format);
   }
+  std::unique_ptr<ContextLinearWoq> context_ptr;
   auto packed_shape = packed_weight.sizes();
   // If OC is not a multiple of BLOCK_N, it may be padded.
   bool oc_is_padded = (packed_shape.size() == 4 && is_4bit &&
@@ -336,11 +337,11 @@ ContextLinearWoq create(
       (packed_shape.size() == 4 && !is_4bit &&
        packed_shape[0] * packed_shape[3] != N) ||
       (packed_shape.size() == 2 && packed_shape[0] != N);
+  int64_t padded_N = packed_shape.size() == 4
+      ? (is_4bit ? packed_shape[0] * packed_shape[3] * 2
+                 : packed_shape[0] * packed_shape[3])
+      : packed_shape[0];
   if (oc_is_padded) {
-    int64_t padded_N = packed_shape.size() == 4
-        ? (is_4bit ? packed_shape[0] * packed_shape[3] * 2
-                   : packed_shape[0] * packed_shape[3])
-        : packed_shape[0];
     std::vector<int64_t> pad_vec = scales.dim() == 1
         ? std::vector<int64_t>({0, padded_N - N})
         : std::vector<int64_t>({0, 0, 0, padded_N - N});
@@ -358,7 +359,7 @@ ContextLinearWoq create(
           at::pad(bias.value(), {0, padded_N - N}, "constant", 0.f);
       bias_padded = c10::make_optional(bias_tensor_padded);
     }
-    return ContextLinearWoq(
+    context_ptr = std::make_unique<ContextLinearWoq>(
         std::move(packed_weight),
         weight_dtype,
         std::move(weight_shape),
@@ -370,31 +371,37 @@ ContextLinearWoq create(
         lowp_mode,
         act_quant_mode,
         cache_weight_for_large_batch);
+  } else {
+    c10::optional<at::Tensor> zero_points_float = c10::nullopt;
+    if (zero_points.has_value() && zero_points.value().defined()) {
+      zero_points_float =
+          c10::make_optional(zero_points.value().to(c10::kFloat));
+    }
+    context_ptr = std::make_unique<ContextLinearWoq>(
+        std::move(packed_weight),
+        weight_dtype,
+        std::move(weight_shape),
+        std::move(scales),
+        std::move(zero_points_float),
+        std::move(bias),
+        std::move(g_idx),
+        group_size,
+        lowp_mode,
+        act_quant_mode,
+        cache_weight_for_large_batch,
+        handle_g_idx_in_kernel);
   }
-  c10::optional<at::Tensor> zero_points_float = c10::nullopt;
-  if (zero_points.has_value() && zero_points.value().defined()) {
-    zero_points_float = c10::make_optional(zero_points.value().to(c10::kFloat));
-  }
-  auto context = ContextLinearWoq(
-      std::move(packed_weight),
-      weight_dtype,
-      std::move(weight_shape),
-      std::move(scales),
-      std::move(zero_points_float),
-      std::move(bias),
-      std::move(g_idx),
-      group_size,
-      lowp_mode,
-      act_quant_mode,
-      cache_weight_for_large_batch,
-      handle_g_idx_in_kernel);
   if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
+    auto padded_weight = weight;
+    if (oc_is_padded) {
+      padded_weight = at::pad(weight, {0, 0, 0, padded_N - N}, "constant", 0);
+    }
     auto compensation = woq_linear_compute_compensation(
-        weight, weight_dtype, group_size, lowp_mode);
-    context.cached_compensation_ =
+        padded_weight, weight_dtype, group_size, lowp_mode);
+    context_ptr->cached_compensation_ =
         c10::make_optional<at::Tensor>(std::move(compensation));
   }
-  return context;
+  return std::move(*context_ptr);
 }
 
 static at::Tensor _shuffle_input_channels_if_needed(
