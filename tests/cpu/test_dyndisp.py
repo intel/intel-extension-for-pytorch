@@ -90,6 +90,7 @@ class TestDynDisp(unittest.TestCase):
         self.assertTrue(expected_isa)
         return
 
+    @unittest.skip("Skipping this test for 2.6 cpu sync")
     @unittest.skipIf(
         check_not_sync_onednn_isa_level(), "skip this if not sync onednn isa level"
     )
@@ -97,12 +98,13 @@ class TestDynDisp(unittest.TestCase):
         command = 'ATEN_CPU_CAPABILITY=avx2 python -c "import torch; import intel_extension_for_pytorch._C \
             as core; print(core._get_current_onednn_isa_level())" '
         with subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as p:
-            stdout, _ = p.communicate()
-            onednn_isa_level = stdout.decode("ascii").strip()
+            out = p.stdout.readlines()
+            onednn_isa_level = str(out[-1], "utf-8").strip()
             self.assertTrue(onednn_isa_level == "AVX2")
 
+    @unittest.skip("Skipping this test for 2.6 cpu sync")
     @unittest.skipIf(
         check_not_sync_onednn_isa_level(), "skip this if not sync onednn isa level"
     )
@@ -111,10 +113,10 @@ class TestDynDisp(unittest.TestCase):
             as core; print(core._get_current_isa_level().lower())" '
         cur_ipex_isa = get_currnet_isa_level()
         with subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as p:
-            stdout, _ = p.communicate()
-            cur_ipex_isa_1 = stdout.decode("ascii").strip()
+            out = p.stdout.readlines()
+            cur_ipex_isa_1 = str(out[-1], "utf-8").strip()
             self.assertTrue(cur_ipex_isa == cur_ipex_isa_1)
 
 

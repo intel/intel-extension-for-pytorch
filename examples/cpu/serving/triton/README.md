@@ -1,4 +1,4 @@
-# Serving BERT models with Triton Server and Intel® Extension for PyTorch optimizations
+# Serving BERT models with Triton Server and Intel® Extension for PyTorch optimizations (Deprecated)
 
 ## Description
 This sample provide code to integrate Intel® Extension for PyTorch with Triton Inference Server framework. This project provides custom Python backend for Intel® Extension for PyTorch and additional dynamic batching algorithm to improve the performance. This code can be used as performance benchmark for Bert-Base and Bert-Large models.

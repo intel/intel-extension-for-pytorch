@@ -64,12 +64,11 @@ def is_distributed(m, ds_layers):
     for _, sub_m in m.named_children():
         if isinstance(
             sub_m,
-            ds_layers[0],
-        ) or isinstance(
-            sub_m,
-            ds_layers[1],
+            ds_layers,
         ):
             global distributed
+            global is_deepspeed
+            is_deepspeed = True
             distributed = True
             return
         is_distributed(sub_m, ds_layers)
@@ -97,7 +96,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.45.0"
+    validated_version = "4.46.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -155,7 +154,10 @@ def model_convert_reference(_model):
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
-    from .models.reference.modules.decoder import _IPEXDecoderLayerRef
+    from .models.reference.modules.decoder import (
+        _IPEXDecoderLayerRef,
+        _IPEXEncoderLayerRef,
+    )
 
     # generation length or model forward order
     from .models.reference.models import (
@@ -184,6 +186,7 @@ def model_convert_reference(_model):
         T5ForConditionalGeneration_forward,
         T5DenseGatedActDense_forward,
         T5DenseActDense_forward,
+        T5Stack_forward,
         MistralForCausalLM_forward,
         MistralModel_forward,
         MptForCausalLM_forward,
@@ -209,6 +212,13 @@ def model_convert_reference(_model):
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
+        LlavaForConditionalGeneration_forward,
+        JambaModel_forward,
+        JambaMambaMixer_forward,
+        JambaForCausalLM_forward,
+        DeepseekV2ForCausalLM_forward,
+        DeepseekV2Model_forward,
+        Deepseek_MoEGate_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -218,9 +228,14 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_chatglm,
         prepare_inputs_for_generation_gptneox,
         prepare_inputs_for_generation_git,
+        prepare_inputs_for_generation_llava,
+        prepare_inputs_for_generation_opt_mpt,
+        prepare_inputs_for_generation_t5,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
+        prepare_inputs_for_generation_jamba,
+        _update_causal_mask,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -273,6 +288,7 @@ def model_convert_reference(_model):
             "forward",
             GPTJForCausalLM_forward,
         )
+
         convert_function(
             _model.transformer,
             "forward",
@@ -360,6 +376,11 @@ def model_convert_reference(_model):
             "forward",
             OPTForCausalLM_forward,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_opt_mpt,
+        )
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -409,6 +430,12 @@ def model_convert_reference(_model):
         == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
     ):
         convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_functions(
+            _model,
+            transformers.models.t5.modeling_t5.T5Stack,
+            "forward",
+            T5Stack_forward,
+        )
         convert_function(
             _model,
             "_prepare_encoder_decoder_kwargs_for_generation",
@@ -431,12 +458,16 @@ def model_convert_reference(_model):
             "forward",
             T5DenseGatedActDense_forward,
         )
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_t5
+        )
 
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
+        from intel_extension_for_pytorch.nn.modules import IpexWoqLinearAllreduce
 
-        ds_layers = [LinearAllreduce, LinearLayer]
+        ds_layers = (LinearAllreduce, LinearLayer, IpexWoqLinearAllreduce)
         is_distributed(_model, ds_layers)
     except ImportError:
         # distributed uses default False
@@ -450,7 +481,8 @@ def model_convert_reference(_model):
             rank = ipex_comm.get_rank() if ipex_comm.has_ccl else 0
             if world_size > 1:
                 global distributed
-                if distributed:
+                global is_deepspeed
+                if is_deepspeed:
                     need_ipex_tp = False
                 else:
                     need_ipex_tp = True
@@ -576,6 +608,21 @@ def model_convert_reference(_model):
             _model,
             supported_decoder_class,
             _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    mllama_encoder_layers = (
+        [
+            transformers.models.mllama.modeling_mllama.MllamaVisionEncoderLayer,
+        ]
+        if hasattr(transformers.models, "mllama")
+        else []
+    )
+    for supported_encoder_class in mllama_encoder_layers:
+        convert_class(
+            _model,
+            supported_encoder_class,
+            _IPEXEncoderLayerRef,
             _model.config,
             distributed=distributed,
         )
@@ -989,13 +1036,103 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-
+    elif _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_llava
+        )
+        convert_function(_model, "forward", LlavaForConditionalGeneration_forward)
+        if hasattr(_model, "vision_tower") and hasattr(_model.vision_tower, "vit"):
+            convert_class(
+                _model,
+                type(_model.vision_tower.vit.blocks[0]),
+                _IPEXDecoderLayerRef,
+                _model.config,
+                distributed=distributed,
+            )
+        convert_class(
+            _model,
+            type(_model.multi_modal_projector),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "JambaForCausalLM":
+        convert_function(_model, "forward", JambaForCausalLM_forward)
+        convert_function(_model.model, "forward", JambaModel_forward)
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_jamba
+        )
+        for i in range(_model.config.num_hidden_layers):
+            if hasattr(_model.model.layers[i], "mamba"):
+                convert_function(
+                    _model.model.layers[i].mamba, "forward", JambaMambaMixer_forward
+                )
+                _model.model.layers[i].mamba.register_buffer(
+                    "conv1d_weight", _model.model.layers[i].mamba.conv1d.weight.clone()
+                )
+                _model.model.layers[i].mamba.A_log = torch.nn.Parameter(
+                    _model.model.layers[i].mamba.A_log.transpose(-1, -2).contiguous()
+                )
+        convert_function(_model.model, "_update_causal_mask", _update_causal_mask)
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[_model.config.attn_layer_offset]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[_model.config.attn_layer_offset].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] in [
+        "DeepseekV2ForCausalLM",
+        "DeepseekV3ForCausalLM",
+    ]:
+        convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
+        convert_function(_model.model, "forward", DeepseekV2Model_forward)
+        convert_functions(
+            _model,
+            type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
+            "forward",
+            Deepseek_MoEGate_forward,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
 def get_dummy_input(_model, return_dict=False):
     sample_inputs = None
 
+    if hasattr(_model.config, "kv_cache_dtype"):
+        kv_cache_dtype = _model.config.kv_cache_dtype
+    elif hasattr(_model, "dtype"):
+        kv_cache_dtype = _model.dtype
+    else:
+        kv_cache_dtype = torch.float
     if hasattr(_model.config, "n_layer"):
         model_num_layers = _model.config.n_layer
     elif hasattr(_model.config, "num_hidden_layers"):
@@ -1013,14 +1150,16 @@ def get_dummy_input(_model, return_dict=False):
             False,
             "Cannot support the dummy sample_inputs for your model, please use your sample_inputs as the inputs and run again",
         )
+
+    batch_size = _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
     if _model.config.architectures[0] == "T5ForConditionalGeneration":
         past_key_values = tuple(
             [
                 (
                     (
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                         torch.zeros(
@@ -1063,8 +1202,8 @@ def get_dummy_input(_model, return_dict=False):
                 (
                     (
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                     )
                     if i not in _model.config.text_config.cross_attention_layers
@@ -1076,7 +1215,11 @@ def get_dummy_input(_model, return_dict=False):
                 for i in range(model_num_layers)
             ]
         )
-    else:
+    elif _model.config.architectures[0] == "JambaForCausalLM":
+        intermediate_size = _model.config.mamba_expand * _model.config.hidden_size
+        conv_kernel_size = _model.config.mamba_d_conv
+        ssm_state_size = _model.config.mamba_d_state
+        dtype = _model.config.dtype if hasattr(_model.config, "dtype") else _model.dtype
         past_key_values = tuple(
             [
                 (
@@ -1084,6 +1227,37 @@ def get_dummy_input(_model, return_dict=False):
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                         torch.zeros([1, 1, 1, 1]).contiguous(),
                         torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    if i % _model.config.attn_layer_period
+                    == _model.config.attn_layer_offset
+                    else (
+                        torch.zeros(
+                            batch_size,
+                            intermediate_size,
+                            ssm_state_size,
+                            dtype=dtype,
+                        ).contiguous(),
+                        torch.zeros(
+                            batch_size,
+                            intermediate_size,
+                            conv_kernel_size,
+                            dtype=dtype,
+                        ).contiguous(),
+                        torch.tensor(False).contiguous(),
+                    )
+                )
+                for i in range(_model.config.num_hidden_layers)
+            ]
+        )
+    else:
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                     )
                 )
@@ -1196,9 +1370,6 @@ def get_dummy_input(_model, return_dict=False):
             else (input_ids, attention_mask, past_key_values)
         )
     if _model.config.architectures[0] == "GitForCausalLM":
-        batch_size = (
-            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
-        )
         num_head = _model.git.encoder.layer[0].attention.self.num_attention_heads
         head_dim = int(
             _model.git.encoder.layer[0].attention.self.hidden_size / num_head
@@ -1273,6 +1444,31 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids, attention_mask, position_ids, past_key_values)
         )
+    if _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+        input_ids = torch.ones(1448).to(torch.long).unsqueeze(0)
+        input_ids[:, 31:1400] = _model.config.image_token_index
+        attention_mask = torch.ones_like(input_ids)
+        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+        if return_dict:
+            sample_inputs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+                "past_key_values": past_key_values,
+            }
+        else:
+            sample_inputs = (
+                input_ids,
+                attention_mask,
+                position_ids,
+                past_key_values,
+            )
+    if _model.config.architectures[0] == "JambaForCausalLM":
+        if return_dict:
+            sample_inputs["output_router_logits"] = torch.tensor(False)
+            sample_inputs["num_logits_to_keep"] = torch.tensor(1)
+        else:
+            sample_inputs = sample_inputs + (torch.tensor(False), torch.tensor(1))
     if "return_last_logit" in model_inputs:
         if return_dict:
             sample_inputs["return_last_logit"] = torch.tensor(True)
@@ -1288,7 +1484,11 @@ def get_dummy_input(_model, return_dict=False):
 
 
 def ipex_quantization_flow(
-    _model, dtype, sample_inputs, qconfig, static_qconfig_file=None
+    _model,
+    dtype,
+    sample_inputs,
+    qconfig,
+    static_qconfig_file=None,
 ):
     from intel_extension_for_pytorch.quantization import prepare, convert
 
@@ -1380,12 +1580,18 @@ def model_convert_lowering(
     cache_weight_for_large_batch=False,
 ):
     from .models.reference.modules.attentions import _IPEXAttentionRef
-    from .models.reference.modules.decoder import _IPEXDecoderLayerRef
+    from .models.reference.modules.decoder import (
+        _IPEXDecoderLayerRef,
+        _IPEXEncoderLayerRef,
+    )
 
     if device == "cpu":
         from .models.cpu.modules.attentions import _IPEXAttentionCPU
         from .models.cpu.fusions.mha_fusion import _IPEXRMSNormCPU
-        from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
+        from .models.cpu.modules.decoder import (
+            _IPEXDecoderLayerCPU,
+            _IPEXEncoderLayerCPU,
+        )
 
         _disable_tpp()
         if not is_quantization:
@@ -1453,6 +1659,15 @@ def model_convert_lowering(
                 supported_classes.append(
                     transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm
                 )
+            if _model.config.architectures[0] == "JambaForCausalLM":
+                supported_classes.append(
+                    type(_model.model.layers[0].mamba.dt_layernorm)
+                )
+            if _model.config.architectures[0] in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
+                supported_classes.append(type(_model.model.layers[0].input_layernorm))
             for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
@@ -1485,7 +1700,15 @@ def model_convert_lowering(
                 tpp=True if _using_tpp() else False,
                 woq=woq,
             )
-
+        for supported_mlp_class in [_IPEXEncoderLayerRef]:
+            lowering_class_cpu(
+                _model,
+                supported_mlp_class,
+                _IPEXEncoderLayerCPU,
+                _model.config,
+                tpp=True if _using_tpp() else False,
+                woq=woq,
+            )
         for supported_mha_class in [_IPEXAttentionRef]:
             lowering_class_cpu(
                 _model,
@@ -1541,7 +1764,7 @@ def model_convert_lowering(
                         first_token_optimized_model=trace_model_first,
                     )
 
-                if _model.config.architectures[0] == "YuanForCausalLM":
+                elif _model.config.architectures[0] == "YuanForCausalLM":
                     sample_inputs.pop("past_key_values", None)
                     batch_size = (
                         _model.config.batch_size
@@ -1569,10 +1792,64 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
+                elif _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+                    pixel_values = torch.zeros(1, 3, 518, 518)
+                    sample_inputs["pixel_values"] = pixel_values
+                    trace_model_first = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_first = torch.jit.freeze(trace_model_first)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model,
+                        first_token_optimized_model=trace_model_first,
+                    )
+                elif _model.config.architectures[0] == "JambaForCausalLM":
+                    input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
+                    sample_inputs["input_ids"] = input_ids
+                    sample_inputs["attention_mask"] = torch.ones_like(input_ids)
+                    sample_inputs["position_ids"] = torch.arange(
+                        input_ids.shape[-1]
+                    ).unsqueeze(0)
+                    sample_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                sample_inputs["past_key_values"][i]
+                                if i % _model.config.attn_layer_period
+                                == _model.config.attn_layer_offset
+                                else (
+                                    sample_inputs["past_key_values"][i][0][
+                                        0, ...
+                                    ].unsqueeze(0),
+                                    sample_inputs["past_key_values"][i][1][
+                                        0, ...
+                                    ].unsqueeze(0),
+                                    torch.tensor(True).contiguous(),
+                                )
+                            )
+                            for i in range(_model.config.num_hidden_layers)
+                        ]
+                    )
+                    trace_model_next = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_next = torch.jit.freeze(trace_model_next)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model_next,
+                        first_token_optimized_model=trace_model,
+                    )
                 else:
                     _model = _set_optimized_model_for_generation(
                         _model, optimized_model=trace_model
                     )
+
     elif device == "xpu":
         print("xpu optimize_transformers function is activated")
         from .models.xpu.optimize_transformers.Converter import Converter
@@ -1666,14 +1943,39 @@ def check_xpu_diffusers_support(device, model):
 # On CPU platform, ipex.optimize_transformers supports GPT-J, Llama, gptneox, OPT, Falcon, rw
 #   , bloom, codegen, baichuan, chatglm, gptbigcode, t5, mistral, mixtral, mpt, stablelm, qwenlmhead, git, llava
 def check_cpu_llm_support(model):
-    cpu_supported_pattern = (
-        r"GPTJ|llama|Mllama|gptneox|OPT|falcon|rw|bloom|codegen|baichuan|chatglm"
-        r"|gptbigcode|t5|mistral|mixtral|mpt|stablelm|qwenlmhead|git|llava"
-        r"|yuan|phi|phi3"
-    )
-    cpu_supported_model = re.search(
-        cpu_supported_pattern, model.config.architectures[0], re.IGNORECASE
-    )
+    cpu_supported_model = False
+    if hasattr(model, "config") and hasattr(model.config, "architectures"):
+        cpu_supported_model = model.config.architectures[0] in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
+            "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+            "MptForCausalLM",
+            "StableLmForCausalLM",
+            "QWenLMHeadModel",
+            "Qwen2ForCausalLM",
+            "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
+            "PhiForCausalLM",
+            "Phi3ForCausalLM",
+            "WhisperForConditionalGeneration",
+            "Maira2ForConditionalGeneration",
+            "JambaForCausalLM",
+            "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
+        ]
     if not cpu_supported_model:
         warnings.warn(
             "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
@@ -1784,7 +2086,14 @@ def optimize(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family: Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon.
+
+    Well supported model family with full functionalities:
+    Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper, Maira2, Jamba, DeepSeekV2.
+
+    For the model that is not in the scope of supported model family above, will try to
+    apply default ipex.optimize transparently to get benifits (not include quantizations,
+    only works for dtypes of torch.bfloat16 and torch.half and torch.float).
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -1880,9 +2189,54 @@ def optimize(
 
         well_supported_model, xpu_supported_model = check_model_support(device, model)
 
-        if not (well_supported_model or xpu_supported_model):
+        if device == "cpu":
+            if well_supported_model:
+                check_transformers_for_llm_support()
+                if model.config.architectures[
+                    0
+                ] == "Maira2ForConditionalGeneration" and hasattr(
+                    model, "language_model"
+                ):
+                    model.language_model = optimize(
+                        model.language_model,
+                        optimizer=optimizer,
+                        dtype=dtype,
+                        inplace=inplace,
+                        device=device,
+                        quantization_config=quantization_config,
+                        qconfig_summary_file=qconfig_summary_file,
+                        low_precision_checkpoint=low_precision_checkpoint,
+                        sample_inputs=sample_inputs,
+                        deployment_mode=False,
+                        cache_weight_for_large_batch=cache_weight_for_large_batch,
+                    )
+            else:
+                if quantization_config is not None:
+                    logger.warning(
+                        "ipex.llm.optimize supports quantizations on Llama, MLlama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
+                        + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
+                        + " Phi, Whisper, Maira2, Jamba and Deepseek, fallback to origin model"
+                    )
+                    return model
+
+                if dtype is torch.float:
+                    _model = ipex.optimize(
+                        model.eval(),
+                        dtype=dtype,
+                        inplace=inplace,
+                        auto_kernel_selection=(
+                            True
+                            if ipex.get_fp32_math_mode() == ipex.FP32MathMode.BF32
+                            else False
+                        ),
+                    )
+                elif dtype in [torch.bfloat16, torch.half]:
+                    _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
+
+                return _model
+        elif device == "xpu" and not xpu_supported_model:
             warnings.warn(
-                "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
+                "The compatibility of ipex.optimize_transformers depends on the platform "
                 " and the transformer model. Here are the general rules: "
                 " If the XPU platform does not have XMX, such as PVC1550vg, "
                 " ipex.optimize_transformers is not supported. "
@@ -1894,8 +2248,6 @@ def optimize(
                 " and BasicTransformerBlock of diffusers. "
                 " If the XPU platform has no XMX and no 2D load instructions, such as MTL,"
                 " ipex.optimize_transformers supports Llama/QWen, "
-                " If the platform is CPU, "
-                " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
             )
             return model
 
@@ -1930,7 +2282,7 @@ def optimize(
 
             # Load low precision checkpoint (generated by GPTQ, etc.) for WOQ before any conversion
             if is_woq and low_precision_checkpoint is not None:
-                state_dict, quantization_method = None, None
+                state_dict, quant_config = None, None
                 if isinstance(low_precision_checkpoint, tuple):
                     assert (
                         len(low_precision_checkpoint) == 2
@@ -1938,7 +2290,7 @@ def optimize(
                         and isinstance(low_precision_checkpoint[1], dict)
                     ), "Invalid low_precision_checkpoint"
                     state_dict = low_precision_checkpoint[0]
-                    quantization_method = low_precision_checkpoint[1]["quant_method"]
+                    quant_config = low_precision_checkpoint[1]
                 else:
                     assert isinstance(
                         low_precision_checkpoint, dict
@@ -1948,9 +2300,12 @@ def optimize(
                         "ipex.llm.optimize is loading low_precision_checkpoint state_dict"
                         " without quaquantization_method specified, using `gptq` by default."
                     )
-                    quantization_method = "gptq"
+                    quant_config = {
+                        "quant_method": "gptq",
+                        "group_size": None,
+                    }
                 _model = _convert_woq_with_low_precision_checkpoint(
-                    _model, quantization_config, state_dict, quantization_method
+                    _model, quantization_config, state_dict, quant_config
                 )
 
         xpu_woq = False
@@ -1989,6 +2344,7 @@ def optimize(
                         "ipex.llm.optimize will skip static quantizations on MLlama ..."
                     )
                     return model
+
                 deployment_mode = False
 
                 if qconfig_summary_file is not None:

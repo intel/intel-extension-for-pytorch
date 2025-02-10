@@ -7,22 +7,26 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 
 # 2. Environment Setup
 
+**Note**: Please be aware that in order to enable the latest optimizations for MoE models (DeepSeek, Mixtral, etc.) in `DeepSpeed`,
+we are setting a different argument for `env_setup.sh` in IPEX v2.6.0+cpu comparing with previous versions,
+in order to build `DeepSpeed` from source code with a recent commit.
+
 ## 2.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.5.0+cpu
+git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
 # To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/llm/Dockerfile --build-arg PORT_SSH=2345 -t ipex-llm:2.5.0 .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/llm/Dockerfile --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.5.0 bash
+docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -38,7 +42,7 @@ source ./tools/env_activate.sh [inference|fine-tuning]
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.5.0+cpu
+git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
@@ -49,7 +53,7 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/llm
-bash ./tools/env_setup.sh 7
+bash ./tools/env_setup.sh 15
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages
@@ -62,16 +66,16 @@ source ./tools/env_activate.sh [inference|fine-tuning]
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.5.0+cpu
+git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
 # To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:2.5.0 .
+docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.5.0 bash
+docker run --rm -it --net host --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -87,7 +91,7 @@ source ./tools/env_activate.sh [inference|fine-tuning]
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.5.0+cpu
+git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
@@ -98,12 +102,48 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/llm
-bash ./tools/env_setup.sh
+bash ./tools/env_setup.sh 8
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
+
+## 2.3 [Optional] Setup for Running Jupyter Notebooks
+
+After setting up your docker or conda environment, you may follow these additional steps to setup and run Jupyter Notebooks. The port number can be changed.
+
+### 2.3.1 Jupyter Notebooks for Docker-based Environments
+
+```bash
+# Install dependencies
+pip install notebook matplotlib
+
+# Launch Jupyter Notebook
+jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
+```
+
+1. Open up a web browser with the given URL and token.
+2. Open the notebook.
+3. Run all cells. 
+
+### 2.3.2 Jupyter Notebooks for Conda-based Environments
+
+```bash
+# Install dependencies
+pip install notebook ipykernel matplotlib
+
+# Register ipykernel with Conda
+python -m ipykernel install --user --name=IPEX-LLM
+
+# Launch Jupyter Notebook
+jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
+```
+
+1. Open up a web browser with the given URL and token.
+2. Open the notebook.
+3. Change your Jupyter Notebook kernel to IPEX-LLM.
+4. Run all cells. 
 
 <br>
 

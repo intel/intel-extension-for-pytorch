@@ -56,6 +56,10 @@ class FrozenBNTester(TestCase):
         self.assertTrue(x2.grad.is_contiguous(memory_format=torch.channels_last))
         self.assertEqual(x2.grad, x1.grad)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     @skipIfNoTorchVision
     def test_frozen_batch_norm_bfloat16(self):
         m = FrozenBatchNorm2d(100)

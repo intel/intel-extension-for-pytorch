@@ -17,7 +17,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.45.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.46.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -30,7 +30,7 @@ torch.manual_seed(128)
 curpath = os.path.abspath(os.path.dirname(__file__))
 
 
-def _get_gptj_example_inputs(batch_size=8):
+def _get_gptj_example_inputs(batch_size=8, kv_cache_dtype=torch.float):
     input_ids = torch.ones(batch_size).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
@@ -38,8 +38,8 @@ def _get_gptj_example_inputs(batch_size=8):
         [
             (
                 torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                 torch.zeros(1, 4, dtype=torch.long),
             )
             for i in range(1)
@@ -161,7 +161,9 @@ class OptimizeTransformersTester(TestCase):
             self.assertEqual(key_hf[0], key_ipex[0], prec=0.1, message=error_message)
 
     def test_model_replacement(self):
-        dtypes = [torch.bfloat16]
+        dtypes = []
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         enable_torchcompile = [False, True]
@@ -223,7 +225,7 @@ class OptimizeTransformersTester(TestCase):
             )
         # Ensure model can run without errors
         with torch.no_grad():
-            example_inputs = _get_gptj_example_inputs()
+            example_inputs = _get_gptj_example_inputs(kv_cache_dtype=model.dtype)
             y = model(*example_inputs)
             y_ref = orig_woq_model(
                 input_ids=example_inputs[0],
@@ -294,7 +296,9 @@ class OptimizeTransformersTester(TestCase):
                 model.transformer.h[0].linear_gelu.linear,
             ]
             with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
-                example_inputs = _get_gptj_example_inputs(batch_size=128)
+                example_inputs = _get_gptj_example_inputs(
+                    batch_size=128, kv_cache_dtype=model.dtype
+                )
                 y = model(*example_inputs)
                 y_ref = model_ref(*example_inputs)
                 for l in linear_list:
@@ -314,7 +318,7 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
         quant_m = copy.deepcopy(m)
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-        example_inputs = _get_gptj_example_inputs()
+        example_inputs = _get_gptj_example_inputs(kv_cache_dtype=m.dtype)
         quant_m = ipex.llm.optimize(
             quant_m, dtype=torch.float, quantization_config=qconfig, inplace=True
         )
@@ -405,7 +409,7 @@ class OptimizeTransformersTester(TestCase):
 
             # Ensure model can run without errors
             with torch.no_grad():
-                example_inputs = _get_gptj_example_inputs()
+                example_inputs = _get_gptj_example_inputs(kv_cache_dtype=ipex_m.dtype)
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
@@ -469,7 +473,7 @@ class OptimizeTransformersTester(TestCase):
 
             # Ensure model can run without errors
             with torch.no_grad():
-                example_inputs = _get_gptj_example_inputs()
+                example_inputs = _get_gptj_example_inputs(kv_cache_dtype=ipex_m.dtype)
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
@@ -477,7 +481,9 @@ class OptimizeTransformersTester(TestCase):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
-        dtypes = [torch.bfloat16]
+        dtypes = []
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         for dtype in dtypes:
@@ -531,6 +537,10 @@ class OptimizeTransformersTester(TestCase):
                     )
                     self.assertEqual(ipex_res_dict.sequences, ref_res_dict.sequences)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_cache_weight_for_large_batch(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
@@ -556,7 +566,9 @@ class OptimizeTransformersTester(TestCase):
             model.transformer.h[0].linear_gelu.linear,
         ]
         with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
-            example_inputs = _get_gptj_example_inputs(batch_size=512)
+            example_inputs = _get_gptj_example_inputs(
+                batch_size=512, kv_cache_dtype=model.dtype
+            )
             y = model(*example_inputs)
             y_ref = model_ref(*example_inputs)
             assert all(hasattr(l, "weight_for_large_batch") for l in linear_list)

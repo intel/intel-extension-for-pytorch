@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import Optional
+from typing import Optional, Callable
 
 
 class _IPEXlinearFusionXPU(nn.Module):
@@ -150,6 +150,11 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         renormalize: bool,
         topk_group: Optional[int] = None,
         num_expert_group: Optional[int] = None,
+        custom_routing_function: Optional[Callable] = None,
+        scoring_func: Optional[str] = None,
+        e_score_correction_bias: Optional[
+            torch.Tensor
+        ] = None,  # todo, last three arguments not implement here. tmply added for frontend alignment with CPU
     ) -> torch.Tensor:
         """
         Args:

@@ -134,7 +134,8 @@ at::Tensor woq_linear_pack_weight(
     int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     int64_t group_size,
-    int64_t lowp_mode);
+    int64_t lowp_mode,
+    int64_t weight_format);
 
 at::Tensor woq_linear_compute_compensation(
     const at::Tensor& weight,
@@ -157,7 +158,8 @@ at::Tensor woq_linear_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
@@ -172,7 +174,8 @@ at::Tensor woq_linear_unary_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
@@ -186,7 +189,8 @@ at::Tensor woq_linear_binary_kernel(
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 namespace {
 void woq_gemm_kernel_impl(
@@ -232,10 +236,38 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     int64_t,
     int64_t,
     int64_t,
+    const c10::optional<at::Tensor>&,
+    const c10::optional<at::Tensor>&);
+
+using woq_gemm_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const int,
+    int64_t,
+    const std::vector<at::Tensor>&,
+    int64_t,
+    int64_t,
+    const c10::optional<at::Tensor>&);
+
+using woq_int8_gemm_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const int,
+    int64_t,
+    const std::vector<at::Tensor>&,
+    int64_t,
+    int64_t,
+    int64_t,
     const c10::optional<at::Tensor>&);
 
 using woq_tpp_gemm_packB_fn =
-    at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t);
+    at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t, int64_t);
 
 using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, int, int64_t);
 
@@ -247,32 +279,34 @@ using woq_dequant_int4_to_int8_packed_fn = at::Tensor (*)(
     int64_t,
     at::Tensor&);
 
+using dequant_nf4_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    int64_t,
+    c10::ScalarType);
+
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_fp32_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_fp16_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_bf16_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_tensor_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_k_block_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_m_block_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_m_k_block_kernel_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 IPEX_DECLARE_DISPATCH(
     woq_dequant_int4_to_int8_packed_fn,
     woq_dequant_int4_to_int8_packed_stub);
-
-// Fusion types
-#define WOQ_FUSE_NONE 0x0
-// Unary post ops
-#define WOQ_FUSE_GELU_ERF 0x1
-#define WOQ_FUSE_GELU_TANH 0x2
-#define WOQ_FUSE_RELU 0x3
-#define WOQ_FUSE_SILU 0x4
-// Binary post ops
-#define WOQ_FUSE_ADD 0x10
-#define WOQ_FUSE_ADD_ADD 0x20
-#define WOQ_FUSE_MUL 0x30
-
-// weight quant mode
-#define QUANT_W_PER_CHANNEL 0
-#define QUANT_W_PER_K_BLOCK 1
-#define QUANT_W_PER_CHANNEL_SYM 2
-#define QUANT_W_PER_K_BLOCK_SYM 3
-
-#define WOQ_N_BLOCK_SIZE 32
+IPEX_DECLARE_DISPATCH(dequant_nf4_fn, dequant_nf4_stub);
 
 #endif
 

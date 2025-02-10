@@ -18,6 +18,8 @@ try:
         _get_cached_module_file,
         _get_imports,
         _pad,
+        load_low_precision_checkpoint,
+        shard_low_precision_checkpoint,
     )
     import transformers
 
@@ -27,6 +29,7 @@ try:
     transformers.dynamic_module_utils.get_class_from_dynamic_module = (
         _get_class_from_dynamic_module
     )
+
     from packaging import version
 
     if version.parse(transformers.__version__) < version.parse("4.36"):

@@ -1,7 +1,6 @@
 import sys
 import os
 import itertools
-import unittest
 import tempfile
 import torch
 import torch.nn as nn
@@ -420,10 +419,6 @@ class TestIpexOps(JitLlgaTestCase):
         self.assertEqual(ori_out, out)
         self.assertGraphContainsExactly(graph, "quantized::add", 1)
 
-    # TODO: The test fails starting from oneDNN commit 5fbfba3ac6cdbe3ce85d79c75568589e7332690e.
-    # Re-enable the test after fixing it.
-    # This test case will be enabled after LSTM int8->fp32 works
-    @unittest.skip("Fails starting from oneDNN v3.6")
     def test_lstm(self):
         class M(nn.Module):
             def __init__(
@@ -540,9 +535,6 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(model, [seq, hid, mask])
         self.assertGraphContainsExactly(graph, "aten::lstm", 1)
 
-    # TODO: The test fails starting from oneDNN commit 5fbfba3ac6cdbe3ce85d79c75568589e7332690e.
-    # Re-enable the test after fixing it.
-    @unittest.skip("Fails starting from oneDNN v3.6")
     def test_linear_lstm(self):
         class M(nn.Module):
             def __init__(self):
@@ -1008,7 +1000,11 @@ class TestDictInput(JitLlgaTestCase):
                 x3 = self.linear3(x3)
                 return x1 + x2 + x3
 
-        int8_bf16_list = [True, False]
+        int8_bf16_list = [
+            False,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            int8_bf16_list.append(True)
         for qconfig, int8_bf16 in itertools.product(static_qconfig, int8_bf16_list):
             # Step1: Test model with tuple(x1, x2, x3) input.
             m = M().eval()

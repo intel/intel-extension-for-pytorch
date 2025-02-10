@@ -14,6 +14,18 @@ from ...utils._logger import logger, WarningType
 
 try:
     import transformers
+
+    transformers_orig_is_tensor = transformers.file_utils.is_tensor
+
+    def is_tensor(x):
+        """Tests if ``x`` is a :obj:`torch.Tensor`, :obj:`tf.Tensor` or :obj:`np.ndarray`."""
+        if transformers_orig_is_tensor(x):
+            return True
+        if isinstance(x, BlockedTensor):
+            return True
+        return False
+
+    transformers.file_utils.is_tensor = is_tensor
 except ImportError:
     pass
 USE_BF16_PARAMS = True
@@ -1238,7 +1250,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.6.0"
-    max_version = "4.45.0"
+    max_version = "4.46.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "Please installed the transformers with version: between {} and {}".format(

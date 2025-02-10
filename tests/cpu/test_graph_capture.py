@@ -101,6 +101,9 @@ class TestGraphCapture(TestCase):
                 y2 = model(x)
         self.assertEqual(y1, y2)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_inference_graph_mode_jit_autocast(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last).eval()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)
@@ -113,6 +116,9 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y1, y2_bf16, prec=0.01)
         self.assertTrue(y2_bf16.dtype == torch.bfloat16)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_inference_graph_mode_torchdynamo_autocast(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last).eval()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)
@@ -341,6 +347,9 @@ class TestGraphCapture(TestCase):
         y = model(x)
         self.assertEqual(y, y_bench)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_throughput_benchmark_graph_mode_jit_autocast(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last)
         model.eval()
@@ -360,6 +369,9 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y, y_bench)
         self.assertTrue(y_bench.dtype == torch.bfloat16)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_throughput_benchmark_graph_mode_torchdynamo_autocast(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last)
         model.eval()
@@ -394,6 +406,9 @@ class TestGraphCapture(TestCase):
                 y = model(data)
         self.assertTrue(y.dtype == torch.float32)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     @skipIfNoTorchVision
     def test_resnet50_autocast(self):
         model = torchvision.models.resnet50(pretrained=False)
@@ -441,6 +456,9 @@ class TestGraphCapture(TestCase):
         self.assertEqual(y1, y2)
         self.assertEqual(x1.grad, x2.grad)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_training_graph_mode_jit_autocast(self):
         model = Conv_Bn_Relu().to(memory_format=torch.channels_last).train()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)
@@ -461,6 +479,9 @@ class TestGraphCapture(TestCase):
         self.assertEqual(x1.grad, x2.grad, prec=0.01)
         self.assertTrue(y2.dtype == torch.bfloat16)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(), "not supported bf16"
+    )
     def test_training_graph_mode_fallback_autocast(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last).train()
         x = torch.randn(3, 6, 10, 10).to(memory_format=torch.channels_last)

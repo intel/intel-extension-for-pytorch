@@ -156,7 +156,7 @@ class HuggingFaceModel(BaseLM):
         elif dtype in ["int8", "int4", "nf4"]:
             load_dtype = torch.float32
             infer_dtype = torch.int8
-
+        self.load_dtype = load_dtype
         model_type = next(
             (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
         )
@@ -178,6 +178,8 @@ class HuggingFaceModel(BaseLM):
                 torchscript=with_jit,
                 trust_remote_code=True,
             )
+        if model_type == "jamba":
+            self.config.use_mamba_kernels = False
         if self._dtype in ("int8", "int4", "nf4") and not re.search(
             "yuan", self.config.architectures[0], re.IGNORECASE
         ):
@@ -312,6 +314,40 @@ class HuggingFaceModel(BaseLM):
                     for i in range(num_hidden_layers)
                 ]
             )
+        if re.search("jamba", self.config.architectures[0], re.IGNORECASE):
+            intermediate_size = self.config.mamba_expand * self.config.hidden_size
+            conv_kernel_size = self.config.mamba_d_conv
+            ssm_state_size = self.config.mamba_d_state
+            past_key_values = tuple(
+                [
+                    (
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                        if i % self.config.attn_layer_period
+                        == self.config.attn_layer_offset
+                        else (
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                ssm_state_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                conv_kernel_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.tensor(False).contiguous(),
+                        )
+                    )
+                    for i in range(self.config.num_hidden_layers)
+                ]
+            )
         return past_key_values
 
     def _model_call(
@@ -384,13 +420,17 @@ class HuggingFaceModel(BaseLM):
             inputs, attention_mask=attention_mask_batched
         )
         has_position_ids = model_inputs.get("position_ids", None) is not None
-        if self._with_jit:
+        if self._with_ipex:
             example_dict["attention_mask"] = attention_mask_batched
             example_dict["past_key_values"] = past_key_values
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
         if "return_last_logit" in model_inputs and self._with_ipex:
             example_dict["return_last_logit"] = torch.tensor(True)
+        if "output_router_logits" in model_inputs:
+            example_dict["output_router_logits"] = torch.tensor(
+                model_inputs["output_router_logits"]
+            )
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,
@@ -872,6 +912,22 @@ class LMMS(lmms):
                 torch_dtype=load_dtype,
                 trust_remote_code=True,
             )
+        elif re.search("llama", pretrained, re.IGNORECASE):
+            model_class = MODEL_CLASSES["mllama"]
+            self._config = AutoConfig.from_pretrained(
+                pretrained if config is None else config,
+                torchscript=with_jit,
+                trust_remote_code=True,
+            )
+            self._model = model_class[0].from_pretrained(
+                pretrained,
+                low_cpu_mem_usage=True,
+                config=self.config,
+                torch_dtype=load_dtype,
+                trust_remote_code=True,
+            )
+            self._image_processor = model_class[1].from_pretrained(pretrained)
+            self._tokenizer = self._image_processor.tokenizer
         self._config = self._model.config
         self._config.torchscript = self._with_jit
         self._model.eval()
@@ -907,19 +963,44 @@ class LMMS(lmms):
         if self._with_jit:
             input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
             attention_mask = torch.ones_like(input_ids)
-            past_key_values = tuple(
-                [
-                    (
+            if self._model.config.architectures[0] == "MllamaForConditionalGeneration":
+                head_dim = self._model.config.text_config.hidden_size // (
+                    self._model.config.text_config.num_hidden_layers
+                    - len(self._model.config.text_config.cross_attention_layers)
+                )
+                past_key_values = tuple(
+                    [
                         (
-                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros(1, 4, dtype=torch.long),
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros(1, 4, dtype=torch.long),
+                            )
+                            if i
+                            not in self._model.config.text_config.cross_attention_layers
+                            else (
+                                torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                            )
                         )
-                    )
-                    for i in range(self.model.config.num_hidden_layers)
-                ]
-            )
+                        for i in range(self._model.config.text_config.num_hidden_layers)
+                    ]
+                )
+            else:
+                past_key_values = tuple(
+                    [
+                        (
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros(1, 4, dtype=torch.long),
+                            )
+                        )
+                        for i in range(self.model.config.num_hidden_layers)
+                    ]
+                )
             sample_inputs = {
                 "attention_mask": attention_mask,
                 "past_key_values": past_key_values,
@@ -950,10 +1031,54 @@ class LMMS(lmms):
                     ]
                 )
                 sample_inputs["past_key_values"] = past_key_values
+            elif (
+                self._model.config.architectures[0] == "MllamaForConditionalGeneration"
+            ):
+                input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+                position_ids = torch.arange(len(input_ids)).unsqueeze(0)
+                attention_mask = torch.ones_like(input_ids).unsqueeze(0)
+                cross_attention_mask = torch.ones(1, 32, 1, 4)
+                pixel_values = torch.rand(
+                    1,
+                    1,
+                    4,
+                    3,
+                    self._model.config.vision_config.image_size,
+                    self._model.config.vision_config.image_size,
+                )
+                aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
+                aspect_ratio_ids = torch.tensor([[6]])
+                sample_inputs = {
+                    "input_ids": input_ids,
+                    "attention_mask": attention_mask,
+                    "position_ids": position_ids,
+                    "past_key_values": past_key_values,
+                    "cross_attention_mask": cross_attention_mask,
+                    "pixel_values": pixel_values,
+                    "aspect_ratio_mask": aspect_ratio_mask,
+                    "aspect_ratio_ids": aspect_ratio_ids,
+                }
+                sample_inputs["cross_attention_mask"] = cross_attention_mask
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True if self.amp_dtype == torch.bfloat16 else False,
             ):
                 if self._dtype != "int8":
+                    if (
+                        self._model.config.architectures[0]
+                        == "MllamaForConditionalGeneration"
+                    ):
+                        traced_model_first = torch.jit.trace(
+                            self._model.eval(),
+                            example_kwarg_inputs=sample_inputs,
+                            strict=False,
+                            check_trace=False,
+                        )
+                        traced_model_first = torch.jit.freeze(traced_model_first.eval())
+                        traced_model_first(**sample_inputs)
+                        traced_model_first(**sample_inputs)
+                        sample_inputs.pop("pixel_values", None)
+                        sample_inputs.pop("aspect_ratio_mask", None)
+                        sample_inputs.pop("aspect_ratio_ids", None)
                     traced_model = torch.jit.trace(
                         self._model.eval(),
                         example_kwarg_inputs=sample_inputs,
@@ -962,14 +1087,34 @@ class LMMS(lmms):
                     )
                     traced_model = torch.jit.freeze(traced_model.eval())
                 else:
+                    if (
+                        self._model.config.architectures[0]
+                        == "MllamaForConditionalGeneration"
+                    ):
+                        traced_model_first = torch.jit.load(
+                            args.quantized_model_path + "2"
+                        )
+                        traced_model_first = torch.jit.freeze(traced_model_first.eval())
+                        traced_model_first(**sample_inputs)
+                        traced_model_first(**sample_inputs)
+                        sample_inputs.pop("pixel_values", None)
+                        sample_inputs.pop("aspect_ratio_mask", None)
+                        sample_inputs.pop("aspect_ratio_ids", None)
                     traced_model = torch.jit.load(args.quantized_model_path)
                     traced_model = torch.jit.freeze(traced_model.eval())
 
                 traced_model(**sample_inputs)
                 traced_model(**sample_inputs)
-            ipex._set_optimized_model_for_generation(
-                self._model, optimized_model=traced_model
-            )
+            if self._model.config.architectures[0] == "MllamaForConditionalGeneration":
+                ipex._set_optimized_model_for_generation(
+                    self._model,
+                    optimized_model=traced_model,
+                    first_token_optimized_model=traced_model_first,
+                )
+            else:
+                ipex._set_optimized_model_for_generation(
+                    self._model, optimized_model=traced_model
+                )
 
     @property
     def config(self):
@@ -1298,6 +1443,22 @@ class LMMS(lmms):
                     "pixel_values": input_ids.to(self.amp_dtype),
                     **gen_kwargs,
                 }
+            elif re.search("mllama", self.model.config.architectures[0], re.IGNORECASE):
+                prompts = [
+                    "<|begin_of_text|><|start_header_id|>user<|end_header_id|><|image|>"
+                    + context
+                    + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+                    for context in contexts
+                ]
+                inputs = self._image_processor(
+                    text=prompts, images=visuals, return_tensors="pt"
+                )
+                input_ids = inputs["input_ids"]
+                gen_kwargs.pop("until", None)
+                input_dict = {
+                    **inputs,
+                    **gen_kwargs,
+                }
             try:
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True if self.amp_dtype == torch.bfloat16 else False,
@@ -1308,6 +1469,11 @@ class LMMS(lmms):
                             cont[:, input_ids.shape[1] :]
                             if re.search(
                                 "llava",
+                                self.model.config.architectures[0],
+                                re.IGNORECASE,
+                            )
+                            or re.search(
+                                "mllama",
                                 self.model.config.architectures[0],
                                 re.IGNORECASE,
                             )

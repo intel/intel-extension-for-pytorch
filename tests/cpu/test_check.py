@@ -147,6 +147,10 @@ class Tester(TestCase):
             "Check the shapes of mat1 and mat2, they cannot be multiplied!",
         )
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_linear_bf16(self):
         self._test_linear_check(
             Linear(16, 33).to(torch.bfloat16),

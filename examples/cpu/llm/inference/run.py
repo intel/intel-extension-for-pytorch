@@ -300,6 +300,17 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " In other cases, this feature is always turned on regardless of this argument and it does not"
         " conflict with the accuracy test.",
     )
+    parser.add_argument(
+        "--kv-cache-dtype",
+        type=str,
+        choices=[
+            "auto",
+            "fp8_e5m2",
+        ],
+        default="auto",
+        help='Data type for kv cache storage. If "auto", will use model '
+        "data type. fp8 type now supports e5m2.",
+    )
     args = parser.parse_args(args_in)
 
     parent_path = Path(__file__).parent.absolute()
@@ -335,6 +346,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
+            infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
             if args.vision_text_model:
                 infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
@@ -579,6 +591,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "phi-3": ("/phi-3_local_shard"),
                 "phi": ("/phi_local_shard"),
                 "whisper": ("/whisper_local_shard"),
+                "maira": ("/maira2_local_shard"),
+                "jamba": ("/jamba_local_shard"),
+                "deepseek-v2": ("/deepseekv2_local_shard"),
+                "deepseek-v3": ("/deepseekv3_local_shard"),
             }
             model_type = next(
                 (
@@ -629,6 +645,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--num-iter", str(args.num_iter)])
         infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
         infer_cmd.extend(["--batch-size", str(args.batch_size)])
+        infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
         if args.local_rank is not None:
             infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:
@@ -655,6 +672,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--prompt", str(args.prompt)])
         if args.config_file is not None:
             infer_cmd.extend(["--config-file", str(args.config_file)])
+        if args.low_precision_checkpoint != "":
+            infer_cmd.extend(
+                ["--low-precision-checkpoint", str(args.low_precision_checkpoint)]
+            )
 
         if args.ipex_weight_only_quantization:
             infer_cmd.extend(["--ipex-weight-only-quantization"])

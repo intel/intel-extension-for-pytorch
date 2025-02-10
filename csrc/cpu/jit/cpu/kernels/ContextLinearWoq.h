@@ -30,6 +30,7 @@ struct ContextLinearWoq final {
   // Compensation for INT8 GEMM.
   // Compensation = Σ(k)(W[k][n] - ZP[n]) for each block.
   c10::optional<at::Tensor> cached_compensation_ = c10::nullopt;
+  bool handle_g_idx_in_kernel_ = false;
 
   ContextLinearWoq() = delete;
 
@@ -44,7 +45,8 @@ struct ContextLinearWoq final {
       int64_t group_size = -1,
       int64_t lowp_mode = 0,
       int64_t act_quant_mode = 0,
-      bool cache_weight_for_large_batch = false)
+      bool cache_weight_for_large_batch = false,
+      bool handle_g_idx_in_kernel = false)
       : at_weight_(std::move(at_weight)),
         weight_dtype_(weight_dtype),
         weight_shape_(std::move(weight_shape)),
@@ -53,7 +55,8 @@ struct ContextLinearWoq final {
         group_size_(group_size),
         lowp_mode_(lowp_mode),
         act_quant_mode_(act_quant_mode),
-        cache_weight_for_large_batch_(cache_weight_for_large_batch) {
+        cache_weight_for_large_batch_(cache_weight_for_large_batch),
+        handle_g_idx_in_kernel_(handle_g_idx_in_kernel) {
     is_4bit_ =
         (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4);
     // Make three dtype versions of scale, zp and bias

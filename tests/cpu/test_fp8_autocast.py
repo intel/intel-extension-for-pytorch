@@ -44,7 +44,7 @@ class TestFP8Cases(TestCase):
         inp2 = inp.clone().requires_grad_(True)
 
         origin_optimizer = SGD(my_linear.parameters(), lr=0.01, momentum=0.9)
-        fp8_linear, ipex_optimizer = prepare_fp8(my_linear, origin_optimizer, device="cpu")
+        fp8_linear, ipex_optimizer = prepare_fp8(my_linear, origin_optimizer)
 
         with fp8_autocast(
             enabled=True,
@@ -191,9 +191,9 @@ class TestFP8Cases(TestCase):
 
         # FP8 model with calibration
         fp8_linear_with_calibration = MyModel()
-        fp8_linear_with_calibration = prepare_fp8(fp8_linear_with_calibration, device="cpu")
+        fp8_linear_with_calibration = prepare_fp8(fp8_linear_with_calibration)
         fp8_linear_with_calibration.load_state_dict(
-            torch.load("fp8_linear_inference.pt")
+            torch.load("fp8_linear_inference.pt", weights_only=False)
         )
         fp8_linear_with_calibration.eval()
 

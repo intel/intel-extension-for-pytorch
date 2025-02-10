@@ -6,6 +6,7 @@
 #include "WeightPack.h"
 #include "autocast/autocast_mode.h"
 #include "ideep/IDeepConversions.h"
+#include "utils/woq_defines.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -362,7 +363,7 @@ static size_t get_block_k(
     int64_t lowp_mode,
     int64_t group_size,
     int64_t K) {
-  size_t default_block_k = lowp_mode == 3 ? 128 : 64;
+  size_t default_block_k = lowp_mode == LOWP_MODE_INT8 ? 128 : 64;
   size_t block_k = group_size > 0
       ? std::min((size_t)group_size, default_block_k)
       : default_block_k;
@@ -379,7 +380,8 @@ at::Tensor woq_linear_pack_weight(
     int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     int64_t group_size,
-    int64_t lowp_mode) {
+    int64_t lowp_mode,
+    int64_t weight_format) {
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
   auto N = weight_shape[0], K = weight_shape[1];
@@ -388,7 +390,7 @@ at::Tensor woq_linear_pack_weight(
     size_t block_n = WOQ_N_BLOCK_SIZE;
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
-      if (block_k % 4 && lowp_mode == 3) {
+      if (block_k % 4 && lowp_mode == LOWP_MODE_INT8) {
         // This case is not supported by kernel
         return weight;
       }
@@ -401,13 +403,34 @@ at::Tensor woq_linear_pack_weight(
       at::Tensor weight_int4 =
           at::pad(weight, {0, 0, 0, N_int4 - N}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight_int4,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
     if (N % block_n) {
-      return weight;
+      at::Tensor weight_padded =
+          at::pad(weight, {0, 0, 0, block_n - N % block_n}, "constant", 0);
+      return woq_tpp_gemm_packB_stub(
+          kCPU,
+          weight_padded,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     } else {
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
   }
   return weight;
@@ -424,7 +447,7 @@ at::Tensor woq_linear_compute_compensation(
   TORCH_CHECK(weight.dim() == 2);
   auto N = weight.size(0), K = weight.size(1);
   if (N % WOQ_N_BLOCK_SIZE == 0 && weight_dtype == WOQ_DTYPE_INT8 &&
-      lowp_mode == 3) {
+      lowp_mode == LOWP_MODE_INT8) {
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     int64_t Nc = N / WOQ_N_BLOCK_SIZE, Kc = K / block_k;
     auto weight_reshaped = weight.reshape({Nc, WOQ_N_BLOCK_SIZE, Kc, block_k});
@@ -441,7 +464,7 @@ at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
     int64_t lowp_mode) {
-  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
     // Unpack weight for INT8 GEMM.
     // weight is packed in 5d (Nc, Kc, block_k / 4, block_n, 4)
     // but viewd as 4d (Nc, Kc, block_k, block_n)
@@ -482,7 +505,8 @@ at::Tensor woq_linear_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t quant_w_mode = zps_list[0].defined()
       ? (group_size > 0 ? QUANT_W_PER_K_BLOCK : QUANT_W_PER_CHANNEL)
       : (group_size > 0 ? QUANT_W_PER_K_BLOCK_SYM : QUANT_W_PER_CHANNEL_SYM);
@@ -510,7 +534,8 @@ at::Tensor woq_linear_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);
@@ -549,7 +574,8 @@ at::Tensor woq_linear_forward_v2(
       WOQ_DTYPE_MAP.find(weight_dtype) != WOQ_DTYPE_MAP.end(),
       "Unsupported weight dtype: ",
       weight_dtype);
-  if (WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_INT8 &&
+      lowp_mode == LOWP_MODE_INT8) {
     TORCH_CHECK(compensation.has_value() && compensation.value().defined());
   }
   static const at::Tensor empty_tensor = at::Tensor();
@@ -597,7 +623,8 @@ at::Tensor woq_linear_unary_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
@@ -637,7 +664,8 @@ at::Tensor woq_linear_unary_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);
@@ -692,7 +720,8 @@ at::Tensor woq_linear_binary_kernel(
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "add") {
     post_op_fusion_type = WOQ_FUSE_ADD;
@@ -728,7 +757,8 @@ at::Tensor woq_linear_binary_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);
@@ -762,6 +792,15 @@ at::Tensor woq_linear_mul_forward(
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_binary(input, "mul", others);
+}
+
+IPEX_DEFINE_DISPATCH(dequant_nf4_stub);
+at::Tensor dequantize_nf4(
+    const at::Tensor& t,
+    const at::Tensor& scales,
+    int64_t group_size,
+    c10::ScalarType out_dtype) {
+  return dequant_nf4_stub(kCPU, t, scales, group_size, out_dtype);
 }
 #endif
 
@@ -1065,6 +1104,10 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_forward_v2);
+  m.def(
+      "dequantize_nf4(Tensor t, Tensor scales, int group_size, ScalarType out_dtype) -> Tensor");
+  m.impl(
+      "dequantize_nf4", c10::DispatchKey::CPU, torch_ipex::cpu::dequantize_nf4);
 #endif
   // fuse eltwise
   m.def(

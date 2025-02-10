@@ -43,7 +43,7 @@ COPY . ./intel-extension-for-pytorch
 RUN . ~/miniforge3/bin/activate && conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     cd intel-extension-for-pytorch/examples/cpu/llm && \
     export CC=gcc && export CXX=g++ && \
-    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi && \
+    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 14; else bash tools/env_setup.sh 10; fi && \
     unset CC && unset CXX
 
 FROM base AS deploy
@@ -60,7 +60,7 @@ COPY --from=dev /root/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh ./l
 RUN . ~/miniforge3/bin/activate && conda create -y -n py310 python=3.10 && conda activate py310 && \
     cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     cd ./llm && \
-    bash tools/env_setup.sh 1 && \
+    bash tools/env_setup.sh 9 && \
     python -m pip cache purge && \
     mv ./oneCCL_release /opt/oneCCL && \
     chown -R root:root /opt/oneCCL && \
@@ -75,13 +75,12 @@ RUN mkdir /var/run/sshd && \
 EXPOSE ${PORT_SSH}
 RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
     echo "#!/bin/bash" > ${ENTRYPOINT} && \
-    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\$1); shift; done;" >> ${ENTRYPOINT} && \
-    echo "CMD=\"\"; for i in \${!CMDS[@]}; do CMD=\"\${CMD} \${CMDS[\$i]}\"; done;" >> ${ENTRYPOINT} && \
+    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\"\$1\"); shift; done;" >> ${ENTRYPOINT} && \
     echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
     echo "conda activate py310" >> ${ENTRYPOINT} && \
     echo "TMP=\$(python -c \"import torch; import os; print(os.path.abspath(os.path.dirname(torch.__file__)))\")" >> ${ENTRYPOINT} && \
     echo ". \${TMP}/../oneccl_bindings_for_pytorch/env/setvars.sh" >> ${ENTRYPOINT} && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ${ENTRYPOINT} && \
-    echo "exec \${CMD}" >> ${ENTRYPOINT} && \
+    echo "\"\${CMDS[@]}\"" >> ${ENTRYPOINT} && \
     chmod +x ${ENTRYPOINT}
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
