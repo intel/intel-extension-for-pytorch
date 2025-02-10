@@ -19,9 +19,6 @@ using namespace torch_ipex::xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-IPEX_OUT_ALL_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
-IPEX_OUT_ALL_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
-
 IPEX_OUT_ALL_CALLABLE_1_UNARY_OPS(fmod_out, TensorFmodOp);
 
 Tensor fmod(const Tensor& self, const Scalar& other) {
