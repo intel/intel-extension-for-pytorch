@@ -18,8 +18,8 @@ class LLAMAConfig(LLMConfig):
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
 
-    def get_user_model(self, config, benchmark):
-        if benchmark:
+    def get_user_model(self, config, load_to_meta_device):
+        if load_to_meta_device:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = LlamaForCausalLM._from_config(config)

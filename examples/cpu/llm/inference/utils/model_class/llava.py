@@ -20,7 +20,7 @@ class LlavaConfig(LLMConfig):
             self.model_id
         )
 
-    def get_user_model(self, config, benchmark):
+    def get_user_model(self, config, load_to_meta_device):
         self.model.config = config
         return self.model
 

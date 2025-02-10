@@ -15,7 +15,7 @@ class GitConfig(LLMConfig):
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
 
-    def get_user_model(self, config, benchmark):
+    def get_user_model(self, config, load_to_meta_device):
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_id,
             torch_dtype=torch.float,

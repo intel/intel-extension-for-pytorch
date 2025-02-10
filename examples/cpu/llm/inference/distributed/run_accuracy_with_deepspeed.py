@@ -226,31 +226,44 @@ from transformers import BatchEncoding
 import transformers
 
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
-
-low_precision_checkpoint = None
-quant_config = None
-if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
-    pathname = args.low_precision_checkpoint
-    low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
-
-tp_grain_size = 64
 ds_init_inf_kwargs = {}
-# Need to check if this attr is available. Old DeepSpeep does not have it.
-if (
-    "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig())
-    and quant_config is not None
-):
-    assert "group_size" in quant_config
-    group_size = quant_config["group_size"]
-    if group_size > 0:
-        tp_grain_size = group_size
-    ds_init_inf_kwargs.update(
-        {
-            "tensor_parallel": deepspeed.inference.config.DeepSpeedTPConfig(
-                tp_grain_size=tp_grain_size
-            )
-        }
-    )
+
+
+def get_low_precision_checkpoint(args, model_config):
+    low_precision_checkpoint = None
+    quant_config = None
+    # Users gives the model by path to int4 checkpoint directory
+    if (
+        not args.low_precision_checkpoint
+        and hasattr(model_config, "quantization_config")
+        and os.path.isdir(args.model)
+    ):
+        args.low_precision_checkpoint = args.model
+    if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
+        pathname = args.low_precision_checkpoint
+        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+    return low_precision_checkpoint, quant_config
+
+
+def maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs):
+    tp_grain_size = 64
+    # Need to check if this attr is available. Old DeepSpeep does not have it.
+    if (
+        "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig())
+        and quant_config is not None
+    ):
+        assert "group_size" in quant_config
+        group_size = quant_config["group_size"]
+        if group_size > 0:
+            tp_grain_size = group_size
+        ds_init_inf_kwargs.update(
+            {
+                "tensor_parallel": deepspeed.inference.config.DeepSpeedTPConfig(
+                    tp_grain_size=tp_grain_size
+                )
+            }
+        )
+    return tp_grain_size
 
 
 class HuggingFaceModel(BaseLM):
@@ -427,12 +440,17 @@ class HuggingFaceModel(BaseLM):
         repo_root = get_repo_root(model_id)
         write_checkpoints_json()
         dist.barrier()
+        low_precision_checkpoint, quant_config = get_low_precision_checkpoint(
+            args, self.config
+        )
+        tp_grain_size = maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs)
+        if not args.ipex_weight_only_quantization or low_precision_checkpoint is None:
+            ds_init_inf_kwargs.update({"checkpoint": checkpoints_json})
         self.model = deepspeed.init_inference(
             self.model,
             mp_size=tp_number,
             base_dir=repo_root,
             dtype=infer_dtype,
-            checkpoint=checkpoints_json,
             **ds_init_inf_kwargs,
         )
 
@@ -464,7 +482,10 @@ class HuggingFaceModel(BaseLM):
                 elif args.lowp_mode == "BF16":
                     lowp_mode = ipex.quantization.WoqLowpMode.BF16
                 else:  # AUTO
-                    if weight_dtype == WoqWeightDtype.INT4:
+                    if (
+                        weight_dtype == WoqWeightDtype.INT4
+                        or low_precision_checkpoint is not None
+                    ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
                         lowp_mode = ipex.quantization.WoqLowpMode.BF16
@@ -1299,12 +1320,17 @@ class LMMS(lmms):
         repo_root = get_repo_root(pretrained)
         write_checkpoints_json()
         dist.barrier()
+        low_precision_checkpoint, quant_config = get_low_precision_checkpoint(
+            args, self.config
+        )
+        tp_grain_size = maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs)
+        if not args.ipex_weight_only_quantization or low_precision_checkpoint is None:
+            ds_init_inf_kwargs.update({"checkpoint": checkpoints_json})
         self._model = deepspeed.init_inference(
             self._model,
             mp_size=tp_number,
             base_dir=repo_root,
             dtype=infer_dtype,
-            checkpoint=checkpoints_json,
             **ds_init_inf_kwargs,
         )
 
@@ -1334,7 +1360,10 @@ class LMMS(lmms):
                 elif args.lowp_mode == "BF16":
                     lowp_mode = ipex.quantization.WoqLowpMode.BF16
                 else:  # AUTO
-                    if weight_dtype == WoqWeightDtype.INT4:
+                    if (
+                        weight_dtype == WoqWeightDtype.INT4
+                        or low_precision_checkpoint is not None
+                    ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
                         lowp_mode = ipex.quantization.WoqLowpMode.BF16
@@ -2092,12 +2121,17 @@ class LibriSpeech:
         repo_root = get_repo_root(model_id)
         write_checkpoints_json()
         dist.barrier()
+        low_precision_checkpoint, quant_config = get_low_precision_checkpoint(
+            args, self.config
+        )
+        tp_grain_size = maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs)
+        if not args.ipex_weight_only_quantization or low_precision_checkpoint is None:
+            ds_init_inf_kwargs.update({"checkpoint": checkpoints_json})
         self.model = deepspeed.init_inference(
             self.model,
             mp_size=tp_number,
             base_dir=repo_root,
             dtype=infer_dtype,
-            checkpoint=checkpoints_json,
             **ds_init_inf_kwargs,
         )
 
@@ -2129,7 +2163,10 @@ class LibriSpeech:
                 elif args.lowp_mode == "BF16":
                     lowp_mode = ipex.quantization.WoqLowpMode.BF16
                 else:  # AUTO
-                    if weight_dtype == WoqWeightDtype.INT4:
+                    if (
+                        weight_dtype == WoqWeightDtype.INT4
+                        or low_precision_checkpoint is not None
+                    ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
                         lowp_mode = ipex.quantization.WoqLowpMode.BF16

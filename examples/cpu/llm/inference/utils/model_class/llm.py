@@ -41,8 +41,8 @@ class LLMConfig(ABC):
         """
         self.model_id = model_id
 
-    def get_user_model(self, config, benchmark):
-        if benchmark:
+    def get_user_model(self, config, load_to_meta_device):
+        if load_to_meta_device:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = AutoModelForCausalLM.from_config(

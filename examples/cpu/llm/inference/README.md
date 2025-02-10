@@ -161,7 +161,8 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 #### 2.1.1.6 Run in weight-only quantization INT4 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT4  --gptq --quant-with-amp --output-dir "saved_results" 
+huggingface-cli download TheBloke/Llama-2-7B-GPTQ --revision gptq-4bit-128g-actorder_True --local-dir ./Llama-2-7B-GPTQ
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m ./Llama-2-7B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4  --lowp-mode BF16 --quant-with-amp --output-dir "saved_results" 
 ```
 
 #### 2.1.1.7 Run in BF16 with ipex.llm in distributed way
@@ -174,6 +175,13 @@ deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf -
 
 ```bash
 deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
+```
+
+#### 2.1.1.9 Run in weight-only quantization INT4 with ipex.llm in distributed way
+
+```bash
+huggingface-cli download TheBloke/Llama-2-7B-GPTQ --revision gptq-4bit-128g-actorder_True --local-dir ./Llama-2-7B-GPTQ
+deepspeed --bind_cores_to_rank  run.py --benchmark -m ./Llama-2-7B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp  --autotp --output-dir "saved_results"
 ```
 
 ### 2.1.2 To run generation task and test accuracy
@@ -312,14 +320,24 @@ If you would like to generate qconfig summary files (due to changes on model var
 
 #### 2.2.1.4 Weight-only quantization INT8:
 
-By default, for Weight-only Quantization (WoQ), we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
+Weights are quantized by round-to-nearest (RTN).
 
-- Command for WoQ INT8:
+**Command for WoQ INT8:**
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
 ```
 
-The command above works for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
+**An example for Llama-2-7b:**
+```bash
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization  --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
+```
+
+Notes:
+- Please note that `<MODEL_ID>` should be the ID of a non-quantized model instead of any quantized version on HuggingFace.
+- [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) (AMP) is recommended to get peak performance and fair accuracy. It is turned on by `--quant-with-amp` or off by removing the option.
+- By default, computation is done in bfloat16 no matter AMP is turned on or not. Computation dtype can be specified by `--lowp-mode`. Available options are `FP32`, `FP16`, `BF16`, and `INT8`.
+- By default, weights are quantized per channel. Use `--group-size` for group-wise quantization.
+- The command above works fine for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
 
 | Model ID | Changes to command |
 | - | - |
@@ -333,88 +351,75 @@ The command above works for most models we listed. However, to get better accura
 | stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
 | meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
-- An WoQ INT8 example of llama2 7b model:
-```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization  --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
-```
-
 #### 2.2.1.5 Weight-only quantization INT4:
 
+For WOQ INT4, weights are quantized into int4 by different quantization algorithms. Among them, we support RTN, GPTQ, AWQ and [intel/auto-round](https://github.com/intel/auto-round).
+
+To run with RTN, the command is similar as WOQ INT8 and you need to provide the ID of a non-quantized model:
+```bash
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results" 
+```
+
+To run with GPTQ, AWQ, and intel/auto-round, you need to download or generate quantized weights beforehand.
+
 If the INT4 quantized weight checkpoint files of the desired model can be found in [HuggingFace Models](https://huggingface.co/models),
-you can download and benchmark with the following commands.
-
-- Command for downloading and running WoQ INT4 models from huggingface:
+you can download them and benchmark with the following commands:
 ```bash
-huggingface-cli download <INT4_MODEL_ID> --local-dir <LOCAL_SAVE_PATH_FOR_INT4_CKPT>
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <ORIGINAL_MODEL_ID> --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <LOCAL_SAVE_PATH_FOR_INT4_CKPT>
+huggingface-cli download <INT4_MODEL_ID> --local-dir <INT4_CKPT_SAVE_PATH>
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <INT4_CKPT_SAVE_PATH> --ipex-weight-only-quantization --quant-with-amp --lowp-mode [INT8|BF16]
 ```
 
-- Example with GPTQ INT4 llama3.1 8b model provided by huggingface:
+Here is an example to run Llama-3.1-8B with GPTQ:
 ```bash
-huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir "./llama_int4_checkpoint"
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint "./llama_int4_checkpoint"
+huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m ./Llama-3.1-8B-GPTQ --ipex-weight-only-quantization --quant-with-amp --lowp-mode BF16
 ```
+
+Note:
+- You cannot use the ID of a quantized model on HuggingFace directly for benchmarking. Please download them and provide the local path.
+- By default, computation is done in INT8 for WOQ INT4 if `--lowp-mode` is not specified.
+- For GPTQ with `desc_act=True`, INT8 computation is not available. You have to set `--lowp-mode BF16` explicitly.
 
 If the quantized INT4 checkpoint of the desired model is not available in HuggingFace Models,
 you can quantize the model using [Intel® Neural Compressor (INC)](https://github.com/intel/neural-compressor).
-INC supports WoQ INT4 quantization with GPTQ, AWQ and [AutoRound](https://github.com/intel/auto-round) algorithms.
+INC supports WoQ INT4 quantization with GPTQ, AWQ and [intel/auto-round](https://github.com/intel/auto-round) algorithms.
 
-Please refer to [the WoQ weight generation guide](https://github.com/intel/neural-compressor/tree/9c3d4a1243d7ea7f0843454c37851b1f03fe695b/examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation#quantization-for-cpu-device)
-to generate the INT4 weight checkpoint files. Be aware that some dependent packages are incompatible for INT4 weight generation stage in INC and LLM benchmarking stage in IPEX,
-therefore you need to **create a new environment** for the process within INC.
+Please refer to [INC's tutorial](https://github.com/intel/neural-compressor/tree/9c3d4a1243d7ea7f0843454c37851b1f03fe695b/examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation#quantization-for-cpu-device)
+to generate the INT4 weight checkpoint files. Be aware that you need a different environment for the process with INC because INC's dependencies have conflicts with latest IPEX.
 
 Here is an example of a typical INT4 checkpoint generation process using INC for your reference:
 
-- Step 1: Create an environment and install INC with its dependencies
+- Step 1: Set up the environment
 ```bash
-# In the new environment
+conda create --name inc python=3.10 -y
+conda activate inc
 git clone https://github.com/intel/neural-compressor.git
 cd neural-compressor
 git checkout 9c3d4a1243d7ea7f0843454c37851b1f03fe695b
 pip install -r requirements.txt
 python setup.py install
 pip install -r requirements_pt.txt
-```
-
-- Step 2: Access the LLM WoQ folder and run the script
-```bash
 cd examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation/
 pip install -r requirements_cpu_woq.txt
+```
+
+- Step 2: Generate int4 checkpoints
+```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_generation_cpu_woq.py  \
     --model meta-llama/Meta-Llama-3.1-8B-Instruct \
     --woq \
     --woq_algo GPTQ \  # or Awq, AutoRound
     --output_dir ./llama_3_1_8B_INT4_GPTQ \  # Default is "./saved_results"
-
-# It may take several hours to complete the quantization process.
 ```
 
-The generated checkpoint files are in the same format with Huggingface INT4 checkpoints,
-so they can also be benchmarked with IPEX `run.py` command.
-
-- Command for benchmarking the WoQ INT4 model from INC:
-```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <ORIGINAL_MODEL_ID> --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <INC_GENERATED_INT4_CKPT>
-```
-
-- Example with GPTQ INT4 llama3.1 8b model from INC:
+It may take several hours to complete the quantization process. When it finishes, use the same command to run the model:
 ```bash
 # Switch back to IPEX environment first.
-# Assuming the checkpoint files generated from INC is saved at "./llama_3_1_8B_INT4_GPTQ"
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint "./llama_3_1_8B_INT4_GPTQ"
+conda activate llm
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m ./llama_3_1_8B_INT4_GPTQ --ipex-weight-only-quantization --quant-with-amp --lowp-mode BF16
 ```
 
-Alternatively, you can use the `run.py` script in IPEX to get the WoQ INT4 model with RTN quantization.
-
-- Command for WoQ INT4 quantization with RTN algorithm for huggingface models:
-```bash
-python run.py -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"
-```
-
-- Example with INT4 quantization with RTN algorithm for llama3.1 8b model:
-```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization  --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"
-```
+If your int4 checkpoints are not from HuggingFace or INC, please make sure the directory has the same structure as those on HuggingFace.
 
 #### 2.2.1.6 Notes:
 
@@ -465,7 +470,8 @@ deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf -
 
 #### 2.2.2.4 Weight-only quantization INT8:
 
-By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
+More details about WOQ INT8 can be found in [the section above](#2214-weight-only-quantization-int8).
+
 For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won't be saved.
 
 - Command:
@@ -499,17 +505,16 @@ We can either download a quantized weight checkpoint from Huggingface Models,
 or quantize the model using INC with GPTQ/AWQ/AutoRound algorithms,
 or quantize the model with RTN algorithm within IPEX. Please refer
 [the instructions](#2215-weight-only-quantization-int4) for details.
-For WoQ GPTQ INT4 benchmarking with DeepSpeed, we need to set `--weight-dtype INT4` and `--lowp-mode BF16`
-as well as the path of the INT4 checkpoint files for `--low-precision-checkpoint` explicitly.
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp  --autotp --shard-model --low-precision-checkpoint <INT4_CKPT_PATH> --output-dir "saved_results"
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <INT4_CKPT_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp  --autotp --output-dir "saved_results"
 ```
 
-- Example with GPTQ INT4 llama3.1 8b model:
+- Example with GPTQ INT4 Llama-3.1-8B model:
 ```bash
-deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --low-precision-checkpoint <INT4_CKPT_PATH> --autotp --shard-model --output-dir "saved_results"
+huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
+deepspeed --bind_cores_to_rank run.py --benchmark -m ./Llama-3.1-8B-GPTQ --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --autotp --output-dir "saved_results"
 ```
 
 ### 2.2.3 Additional configuration for specific models
@@ -725,12 +730,13 @@ Then we can use similar commands for WoQ INT4 model accuracy test.
 
 - Command:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --low-precision-checkpoint <INT4_CKPT_PATH> --tasks <TASK_NAME>
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <INT4_CKPT_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
-- An example with a pre-sharded INT4 llama model:
+- An example to run Llama-3.1-8B:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --low-precision-checkpoint <INT4_CKPT_PATH> --tasks lambada_openai
+huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ./Llama-3.1-8B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks lambada_openai
 ```
 
 <br>

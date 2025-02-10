@@ -498,6 +498,13 @@ else:
 
 low_precision_checkpoint = None
 quant_config = None
+# Users gives the model by path to int4 checkpoint directory
+if (
+    not args.low_precision_checkpoint
+    and hasattr(config, "quantization_config")
+    and os.path.isdir(args.model_id)
+):
+    args.low_precision_checkpoint = args.model_id
 if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
     pathname = args.low_precision_checkpoint
     low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
@@ -520,12 +527,15 @@ if (
         }
     )
 
+# don't load orignal model weights if loading int4 checkpoints
+if not args.ipex_weight_only_quantization or low_precision_checkpoint is None:
+    kwargs.update({"checkpoint": checkpoints_json})
+
 model = deepspeed.init_inference(
     model,
     mp_size=world_size,
     base_dir=repo_root,
     dtype=infer_dtype,
-    checkpoint=checkpoints_json,
     **kwargs,
 )
 
@@ -565,7 +575,10 @@ if use_ipex:
         elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
         else:  # AUTO
-            if weight_dtype == WoqWeightDtype.INT4:
+            if (
+                weight_dtype == WoqWeightDtype.INT4
+                or low_precision_checkpoint is not None
+            ):
                 lowp_mode = ipex.quantization.WoqLowpMode.INT8
             else:
                 lowp_mode = ipex.quantization.WoqLowpMode.BF16

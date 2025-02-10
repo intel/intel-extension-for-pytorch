@@ -87,12 +87,14 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
         checkpoint_config
     )
     w_key = attr_name + "." + weight_key
+    fw_key = attr_name + ".weight"
     s_key = attr_name + "." + scales_key
     z_key = attr_name + "." + zeros_key
     b_key = attr_name + "." + bias_key
     g_key = attr_name + "." + g_idx_key
     # all are tensors
     qweight = state_dict.get(w_key, None)
+    weight = state_dict.get(fw_key, None)
     scales = state_dict.get(s_key, None)
     qzeros = state_dict.get(z_key, None)
     bias = state_dict.get(b_key, None)
@@ -101,7 +103,7 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     weight_format = Int4WeightFormat.PLAIN_FORMAT
 
     if qweight is None:
-        return qweight, scales, qzeros, bias, group_size, g_idx, weight_format
+        return weight, scales, qzeros, bias, group_size, g_idx, weight_format
 
     if checkpoint_config["name"] == "gptq":
         # weight shape = [K // 8, N]
@@ -230,16 +232,27 @@ def _convert_woq_with_low_precision_checkpoint(
         # lm_head is not quantized in int4 checkpoint, LmHeadLinearAllReduce is not handled here
         if isinstance(mod, linear_modules):
             mod.qconfig = qconfig_mapping.global_qconfig
-            qweight, scales, qzeros, bias, group_size, g_idx, w_format = (
+            weight, scales, qzeros, bias, group_size, g_idx, w_format = (
                 _get_linear_parameters(attr_name, state_dict, checkpoint_config)
             )
             if quant_group_size is not None:
                 group_size = quant_group_size
-            if any(i is None for i in [qweight, scales, qzeros]):
+            if scales is None:
+                # lm_head
+                if weight is not None and weight.dtype in [
+                    torch.float,
+                    torch.bfloat16,
+                    torch.half,
+                ]:
+                    mod.weight = torch.nn.Parameter(weight)
+                    if hasattr(mod, "bias") and isinstance(
+                        mod.bias, torch.nn.Parameter
+                    ):
+                        mod.bias = torch.nn.Parameter(bias)
                 return mod
             mod_new = q_op_map[type(mod)].from_float_and_int4_weight(
                 mod,
-                qweight,
+                weight,
                 scales,
                 qzeros,
                 bias,
@@ -249,9 +262,11 @@ def _convert_woq_with_low_precision_checkpoint(
             )
             return mod_new
         elif hasattr(mod, "weight") and isinstance(mod.weight, torch.nn.Parameter):
-            mod.weight.data = state_dict.get(attr_name + ".weight", mod.weight.data)
+            new_w = state_dict.get(attr_name + ".weight", mod.weight.data)
+            mod.weight = torch.nn.Parameter(new_w)
             if hasattr(mod, "bias") and isinstance(mod.bias, torch.nn.Parameter):
-                mod.bias.data = state_dict.get(attr_name + ".bias", mod.bias.data)
+                new_b = state_dict.get(attr_name + ".bias", mod.bias.data)
+                mod.bias = torch.nn.Parameter(new_b)
             return mod
 
         mod_new = mod

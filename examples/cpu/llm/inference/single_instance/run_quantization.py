@@ -16,6 +16,7 @@ from intel_extension_for_pytorch.llm.utils import (
 )
 from ast import literal_eval
 import sys
+import os
 
 sys.path.append(sys.path[0] + "/../../../")
 
@@ -472,7 +473,18 @@ if args.lm_head_generation and not hasattr(config, "lm_head_generation"):
 if model.name == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
 
-user_model = model.get_user_model(config, args.benchmark)
+# Users gives the model by path to int4 checkpoint directory
+if (
+    not args.low_precision_checkpoint
+    and hasattr(config, "quantization_config")
+    and os.path.isdir(args.model_id)
+):
+    args.low_precision_checkpoint = args.model_id
+
+load_to_meta_device = args.benchmark or (
+    args.ipex_weight_only_quantization and args.low_precision_checkpoint != ""
+)
+user_model = model.get_user_model(config, load_to_meta_device)
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
