@@ -27,15 +27,17 @@ def test_layer_norm(batch, seq_len, channels, dtype):
     vals = torch.randn((batch, seq_len, channels), dtype=dtype, device=ipex_device)
     gamma = torch.randn((channels), dtype=dtype, device=ipex_device)
     beta = torch.rand((channels), dtype=dtype, device=ipex_device)
+
+    vals_cpu = vals.to("cpu")
+    gamma_cpu = gamma.to("cpu")
+    beta_cpu = beta.to("cpu")
     epsilon = 1e-5
 
-    ref_output = ref_implementation(vals, gamma, beta, epsilon, channels, dtype)
-    new_output = ds_implementation(vals, gamma, beta, epsilon)
+    ref_output_cpu = ref_implementation(vals_cpu, gamma_cpu, beta_cpu, epsilon, channels, dtype)
+    new_output = ds_implementation(vals, gamma, beta, epsilon).to("cpu")
+    new_output_cpu = new_output.to("cpu")
 
-    if not allclose(new_output, ref_output):
-        #print(new_output - ref_output)
-        assert allclose(new_output, ref_output)
-
+    assert allclose(ref_output_cpu, new_output_cpu)
 
 def residual_ref_implementation(vals, bias, res, gamma, beta, epsilon, channels, dtype):
     vals_f = vals.to(torch.float32)
@@ -64,14 +66,19 @@ def test_layer_norm_residual(batch, seq_len, channels, dtype):
     bias = torch.randn((channels), dtype=dtype, device=ipex_device)
     gamma = torch.randn((channels), dtype=dtype, device=ipex_device)
     beta = torch.rand((channels), dtype=dtype, device=ipex_device)
+    
+    vals_cpu = vals.to("cpu")
+    residual_cpu = residual.to("cpu")
+    bias_cpu = bias.to("cpu")
+    gamma_cpu = gamma.to("cpu")
+    beta_cpu = beta.to("cpu")
     epsilon = 1e-5
 
     new_output = residual_ds_implementation(vals, bias, residual, gamma, beta, epsilon)
 
-    ref_output = residual_ref_implementation(vals, bias, residual, gamma, beta, epsilon, channels, dtype)
-
-    assert allclose(new_output, ref_output)
-
+    ref_output_cpu = residual_ref_implementation(vals_cpu, bias_cpu, residual_cpu, gamma_cpu, beta_cpu, epsilon, channels, dtype)
+    new_output_cpu = new_output.to("cpu")
+    assert allclose(ref_output_cpu, new_output_cpu)
 
 def residual_store_ref_implementation(vals, bias, res, gamma, beta, epsilon, channels, dtype):
     vals_f = vals.to(torch.float32)
@@ -100,13 +107,20 @@ def test_layer_norm_residual_store_pre_ln_res(batch, seq_len, channels, dtype):
     bias = torch.randn((channels), dtype=dtype, device=ipex_device)
     gamma = torch.randn((channels), dtype=dtype, device=ipex_device)
     beta = torch.rand((channels), dtype=dtype, device=ipex_device)
+
+    vals_cpu = vals.to("cpu")
+    residual_cpu = residual.to("cpu")
+    bias_cpu = bias.to("cpu")
+    gamma_cpu = gamma.to("cpu")
+    beta_cpu = beta.to("cpu")
     epsilon = 1e-5
 
-    # Need to run the reference first since there's an in-place component to ours
-    ref_norm_output, norm_res_output = residual_store_ref_implementation(vals, bias, residual, gamma, beta, epsilon,
-                                                                         channels, dtype)
+    ref_norm_output_cpu, norm_res_output_cpu = residual_store_ref_implementation(vals_cpu, bias_cpu, residual_cpu, gamma_cpu, beta_cpu,
+                                                                                 epsilon, channels, dtype)
 
     ds_norm_output, ds_res_output = residual_store_ds_implementation(vals, bias, residual, gamma, beta, epsilon)
+    ds_norm_output_cpu = ds_norm_output.to("cpu")
+    ds_res_output_cpu = ds_res_output.to("cpu")
 
-    assert allclose(ds_res_output, norm_res_output)
-    assert allclose(ds_norm_output, ref_norm_output)
+    assert allclose(ds_res_output_cpu, norm_res_output_cpu)
+    assert allclose(ds_norm_output_cpu, ref_norm_output_cpu)
