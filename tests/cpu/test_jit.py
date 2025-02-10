@@ -72,6 +72,12 @@ import torch.nn.functional as F
 
 from common_utils import TestCase
 
+dtypes_mkldnn_bf16_fp16 = []
+if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+    dtypes_mkldnn_bf16_fp16.append(torch.bfloat16)
+if torch.ops.mkldnn._is_mkldnn_fp16_supported():
+    dtypes_mkldnn_bf16_fp16.append(torch.float16)
+
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -84,6 +90,10 @@ try:
 except ImportError:
     HAS_TORCHVISION = False
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+skipIfNoBF16Supported = unittest.skipIf(
+    not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+    "mkldnn bf16 is not supported on this device",
+)
 
 device = "cpu:0"
 SIZE = 100
@@ -1770,12 +1780,15 @@ class Tester(TestCase):
         if use_te is None:
             use_te = [True, False]
         if dtype is None:
-            dtype = [torch.bfloat16, torch.float16]
+            dtype = dtypes_mkldnn_bf16_fp16
         modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te, dtype)
         for level, use_channels_last, use_te, dtype in options:
             if dtype == torch.float16 and not ipex._C.onednn_has_fp16_support():
                 # skip float16 test while not supported
+                continue
+            if dtype == torch.bfloat16 and not ipex._C.onednn_has_bf16_support():
+                # skip bfloat16 test while not supported
                 continue
             with self._texpr_enable(use_te):
                 ipex.enable_onednn_fusion(True)
@@ -1958,21 +1971,28 @@ class Tester(TestCase):
             linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
             self.assertEqual(linear_count_ori, 2)
 
-        model = ipex.optimize(origin_model, concat_linear=False, dtype=torch.bfloat16)
-        test_val1 = test_val1.bfloat16()
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            ori_res = model(test_val1)
-            model_jit = torch.jit.trace(model, (test_val1))
-            graph_ori = str(model_jit.graph_for(test_val1))
-            linear_count_ori = check_op_count(graph_ori, ["ipex_prepack::linear_run"])
-            self.assertEqual(linear_count_ori, 4)
-            model_jit = torch.jit.freeze(model_jit)
-            model_jit(test_val1)
-            graph_opt = str(model_jit.graph_for(test_val1))
-            jit_res = model_jit(test_val1)
-            self.assertEqual(ori_res[1], jit_res[1])
-            linear_count_ori = check_op_count(graph_opt, ["ipex_prepack::linear_run"])
-            self.assertEqual(linear_count_ori, 2)
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            model = ipex.optimize(
+                origin_model, concat_linear=False, dtype=torch.bfloat16
+            )
+            test_val1 = test_val1.bfloat16()
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                ori_res = model(test_val1)
+                model_jit = torch.jit.trace(model, (test_val1))
+                graph_ori = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_ori, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+                model_jit = torch.jit.freeze(model_jit)
+                model_jit(test_val1)
+                graph_opt = str(model_jit.graph_for(test_val1))
+                jit_res = model_jit(test_val1)
+                self.assertEqual(ori_res[1], jit_res[1])
+                linear_count_ori = check_op_count(
+                    graph_opt, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 2)
 
         origin_model_v1 = ModMultLinearWithOrWithoutBias().eval()
 
@@ -1998,26 +2018,27 @@ class Tester(TestCase):
             )
             self.assertEqual(linear_count_ori_v1, 2)
 
-        model_v1 = ipex.optimize(
-            origin_model_v1, concat_linear=False, dtype=torch.bfloat16
-        )
-        test_val1 = test_val1.bfloat16()
-        with torch.cpu.amp.autocast(), torch.no_grad():
-            ori_res_v1 = model_v1(test_val1)
-            model_jit_v1 = torch.jit.trace(model_v1, (test_val1))
-            graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
-            linear_count_ori_v1 = check_op_count(
-                graph_ori_v1, ["ipex_prepack::linear_run"]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            model_v1 = ipex.optimize(
+                origin_model_v1, concat_linear=False, dtype=torch.bfloat16
             )
-            self.assertEqual(linear_count_ori_v1, 4)
-            model_jit_v1 = torch.jit.freeze(model_jit_v1)
-            jit_res_v1 = model_jit_v1(test_val1)
-            self.assertEqual(ori_res_v1, jit_res_v1)
-            graph_opt_v1 = str(model_jit_v1.graph_for(test_val1))
-            linear_count_ori_v1 = check_op_count(
-                graph_opt_v1, ["ipex_prepack::linear_run"]
-            )
-            self.assertEqual(linear_count_ori_v1, 2)
+            test_val1 = test_val1.bfloat16()
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                ori_res_v1 = model_v1(test_val1)
+                model_jit_v1 = torch.jit.trace(model_v1, (test_val1))
+                graph_ori_v1 = str(model_jit_v1.graph_for(test_val1))
+                linear_count_ori_v1 = check_op_count(
+                    graph_ori_v1, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori_v1, 4)
+                model_jit_v1 = torch.jit.freeze(model_jit_v1)
+                jit_res_v1 = model_jit_v1(test_val1)
+                self.assertEqual(ori_res_v1, jit_res_v1)
+                graph_opt_v1 = str(model_jit_v1.graph_for(test_val1))
+                linear_count_ori_v1 = check_op_count(
+                    graph_opt_v1, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori_v1, 2)
 
         # Test disable concat linear
         origin_model = ModMultLinear(50, 60).eval()
@@ -2082,26 +2103,26 @@ class Tester(TestCase):
                     graph_opt, ["ipex_prepack::linear_run"]
                 )
                 self.assertEqual(linear_count_ori, 4)
-
-            model = ipex.optimize(origin_model, dtype=torch.bfloat16)
-            test_val1 = test_val1.bfloat16()
-            with torch.cpu.amp.autocast(), torch.no_grad():
-                ori_res = model(test_val1)
-                model_jit = torch.jit.trace(model, (test_val1))
-                graph_ori = str(model_jit.graph_for(test_val1))
-                linear_count_ori = check_op_count(
-                    graph_ori, ["ipex_prepack::linear_run"]
-                )
-                self.assertEqual(linear_count_ori, 4)
-                model_jit = torch.jit.freeze(model_jit)
-                model_jit(test_val1)
-                graph_opt = str(model_jit.graph_for(test_val1))
-                jit_res = model_jit(test_val1)
-                self.assertEqual(ori_res[1], jit_res[1])
-                linear_count_ori = check_op_count(
-                    graph_opt, ["ipex_prepack::linear_run"]
-                )
-                self.assertEqual(linear_count_ori, 4)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                model = ipex.optimize(origin_model, dtype=torch.bfloat16)
+                test_val1 = test_val1.bfloat16()
+                with torch.cpu.amp.autocast(), torch.no_grad():
+                    ori_res = model(test_val1)
+                    model_jit = torch.jit.trace(model, (test_val1))
+                    graph_ori = str(model_jit.graph_for(test_val1))
+                    linear_count_ori = check_op_count(
+                        graph_ori, ["ipex_prepack::linear_run"]
+                    )
+                    self.assertEqual(linear_count_ori, 4)
+                    model_jit = torch.jit.freeze(model_jit)
+                    model_jit(test_val1)
+                    graph_opt = str(model_jit.graph_for(test_val1))
+                    jit_res = model_jit(test_val1)
+                    self.assertEqual(ori_res[1], jit_res[1])
+                    linear_count_ori = check_op_count(
+                        graph_opt, ["ipex_prepack::linear_run"]
+                    )
+                    self.assertEqual(linear_count_ori, 4)
 
     def test_add_layernorm(self):
         for dim in [768, 100]:
@@ -2165,7 +2186,7 @@ class Tester(TestCase):
                 self.assertEqual(jit_res, ori_res)
 
                 # input bf16/fp16, weight fp32
-                for dtype in [torch.bfloat16, torch.float16]:
+                for dtype in dtypes_mkldnn_bf16_fp16:
                     model = AddLayerNorm(dim)
                     prec = 5e-2 if dtype == torch.bfloat16 else 5e-3
                     a_lowp = a.to(dtype)
@@ -2209,9 +2230,13 @@ class Tester(TestCase):
     def test_concat_bn_relu(self):
         batch_size = 3
         image_size = 16
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
             [2, 3],
             [[32, 32, 32], [60, 60, 60], [17, 27, 32], [16, 32, 48]],
@@ -2310,7 +2335,7 @@ class Tester(TestCase):
             prec=3e-2,
             node="ipex::mha_scores_calc",
         ):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 mat1_lowp = mat1.to(dtype)
                 mat2_lowp = mat2.to(dtype)
                 bias_lowp = bias.to(dtype)
@@ -2485,7 +2510,7 @@ class Tester(TestCase):
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
         def _test_pure_lowp(model, trace_model, mat1, mat2, mask, prec=3e-2):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 mat1_lowp = mat1.to(dtype)
                 mat2_lowp = mat2.to(dtype)
                 mask_lowp = mask.to(dtype)
@@ -2495,7 +2520,7 @@ class Tester(TestCase):
                 _check_match_mha(trace_model, mat1, mat2, mask)
 
         def _test_pure_lowp_parts(model, trace_model, qk, mask, prec=3e-2):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 qk_lowp = qk.to(dtype)
                 mask_lowp = mask.to(dtype)
                 res_ref = model(qk_lowp, mask_lowp)
@@ -2581,7 +2606,8 @@ class Tester(TestCase):
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_amp_bf16(mha_v1, mat1, mat2, mask)
+                if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                    _test_amp_bf16(mha_v1, mat1, mat2, mask)
 
             mha_v2 = VitMHAScoresCalculation_v2(64).eval()
             with torch.no_grad():
@@ -2986,8 +3012,13 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 16
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             [True, False],
             [ConvBatchNorm_Fixed, ConvBatchNorm_Fixed3],
         )
@@ -4350,6 +4381,7 @@ class Tester(TestCase):
                         any(n.kind() == "aten::linear" for n in trace_graph.nodes())
                     )
 
+    @skipIfNoBF16Supported
     def test_linear_auto_kernel_selection_bf16(self):
         x = torch.rand(32, 3)
         options = itertools.product(["O0", "O1"], [True, False])
@@ -4944,8 +4976,6 @@ class Tester(TestCase):
         ]
 
         model = TransposedMatmulDiv().eval()
-        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
-        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
         for i in range(len(x1)):
             for j in range(len(y1)):
                 with torch.no_grad():
@@ -4957,17 +4987,23 @@ class Tester(TestCase):
                         any(n.kind() == "ipex::matmul_mul" for n in fused_mod.nodes())
                     )
                     self.assertEqual(out, expected, prec=1e-4)
-                with torch.cpu.amp.autocast(), torch.no_grad():
-                    traced_mod = torch.jit.trace(
-                        model, (x1[i].bfloat16(), y1[j].bfloat16())
-                    )
-                    fused_mod = traced_mod.graph_for(x1[i].bfloat16(), y1[j].bfloat16())
-                    out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
-                    expected = model(x1[i].bfloat16(), y1[j].bfloat16())
-                    self.assertTrue(
-                        any(n.kind() == "ipex::matmul_mul" for n in fused_mod.nodes())
-                    )
-                    self.assertEqual(out, expected, prec=1e-1)
+                if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                    with torch.cpu.amp.autocast(), torch.no_grad():
+                        traced_mod = torch.jit.trace(
+                            model, (x1[i].bfloat16(), y1[j].bfloat16())
+                        )
+                        fused_mod = traced_mod.graph_for(
+                            x1[i].bfloat16(), y1[j].bfloat16()
+                        )
+                        out = traced_mod(x1[i].bfloat16(), y1[j].bfloat16())
+                        expected = model(x1[i].bfloat16(), y1[j].bfloat16())
+                        self.assertTrue(
+                            any(
+                                n.kind() == "ipex::matmul_mul"
+                                for n in fused_mod.nodes()
+                            )
+                        )
+                        self.assertEqual(out, expected, prec=1e-1)
 
     def test_bmm_add(self):
         M = torch.randn(60, 30, 50)
@@ -4985,8 +5021,6 @@ class Tester(TestCase):
         ]
 
         model = BmmAdd().eval()
-        model_fp32 = ipex.optimize(model, dtype=torch.float32, level="O1")
-        model_bf16 = ipex.optimize(model, dtype=torch.bfloat16, level="O1")
         for i in range(len(x1)):
             for j in range(len(y1)):
                 with torch.no_grad():
@@ -4998,21 +5032,24 @@ class Tester(TestCase):
                         any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes())
                     )
                     self.assertEqual(out, expected, prec=1e-4)
-                with torch.cpu.amp.autocast(), torch.no_grad():
-                    traced_mod = torch.jit.trace(
-                        model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
-                    )
-                    fused_mod = traced_mod.graph_for(
-                        M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()
-                    )
-                    out = traced_mod(M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
-                    expected = torch.baddbmm(
-                        M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()
-                    )
-                    self.assertTrue(
-                        any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes())
-                    )
-                    self.assertEqual(out, expected, prec=1e-1)
+                if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                    with torch.cpu.amp.autocast(), torch.no_grad():
+                        traced_mod = torch.jit.trace(
+                            model, (M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16())
+                        )
+                        fused_mod = traced_mod.graph_for(
+                            M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()
+                        )
+                        out = traced_mod(
+                            M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()
+                        )
+                        expected = torch.baddbmm(
+                            M.bfloat16(), x1[i].bfloat16(), y1[j].bfloat16()
+                        )
+                        self.assertTrue(
+                            any(n.kind() == "ipex::bmm_add" for n in fused_mod.nodes())
+                        )
+                        self.assertEqual(out, expected, prec=1e-1)
 
     def test_einsum_add(self):
         def _test_fp32(
@@ -5332,7 +5369,7 @@ class Tester(TestCase):
                 return self.pool(x)
 
         model = Model().eval()
-        for dtype in [torch.bfloat16, torch.float16]:
+        for dtype in dtypes_mkldnn_bf16_fp16:
             x = torch.randn(1, 3, 24, 24, dtype=dtype)
             with torch.no_grad():
                 ref_out = model(x)
@@ -5568,6 +5605,7 @@ class Tester(TestCase):
             result = model(input)
             self.assertEqual(tresult, result)
 
+    @skipIfNoBF16Supported
     def test_disable_linear_repack(self):
         base = LinearRelu(10, 10).eval()
         input = torch.rand(10, 10).bfloat16()

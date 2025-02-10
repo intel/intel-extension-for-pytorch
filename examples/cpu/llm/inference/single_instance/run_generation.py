@@ -105,6 +105,17 @@ parser.add_argument(
     action="store_true",
     help="whether or not it is vision-text multi-model structure",
 )
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=[
+        "auto",
+        "fp8_e5m2",
+    ],
+    default="auto",
+    help='Data type for kv cache storage. If "auto", will use model '
+    "data type. fp8 type now supports e5m2.",
+)
 
 args = parser.parse_args()
 print(args)
@@ -129,6 +140,8 @@ model_type = next(
 )
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+    model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 if args.config_file is None:
     if model_type == "chatglm":
@@ -152,22 +165,33 @@ else:
         trust_remote_code=True,
         torch_dtype=amp_dtype,
     )
+
+if args.kv_cache_dtype == "auto":
+    kv_cache_dtype = None
+elif args.kv_cache_dtype == "fp8_e5m2":
+    kv_cache_dtype = torch.float8_e5m2
+config.kv_cache_dtype = kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
+if model_type == "jamba":
+    config.use_mamba_kernels = False
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
+if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
+    config.text_config.lm_head_generation = True
 
 if model_type != "llava":
     model = model_class[0].from_pretrained(
         args.model_id,
         torch_dtype=amp_dtype,
         config=config,
-        low_cpu_mem_usage=True,
+        low_cpu_mem_usage=True if model_type != "maira2" else False,
         trust_remote_code=True,
     )
     tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
@@ -228,6 +252,14 @@ elif re.search("mllama", model.config.architectures[0], re.IGNORECASE):
             raw_image = Image.open(image_file)
         return raw_image
 
+elif re.search("maira2", model.config.architectures[0], re.IGNORECASE):
+    from PIL import Image
+    import requests
+
+    def download_and_open(url: str) -> Image.Image:
+        response = requests.get(url, headers={"User-Agent": "MAIRA-2"}, stream=True)
+        return Image.open(response.raw)
+
 
 if re.search("llava", model.config.architectures[0], re.IGNORECASE):
     model_name = get_model_name_from_path(args.model_id)
@@ -244,7 +276,9 @@ if re.search("llava", model.config.architectures[0], re.IGNORECASE):
         roles = ("user", "assistant")
     else:
         roles = conv.roles
-if re.search("yuan", model.config.architectures[0], re.IGNORECASE):
+if re.search("yuan", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "jamba", model.config.architectures[0], re.IGNORECASE
+):
     model.config.batch_size = int(args.batch_size) * num_beams
 if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
     import librosa
@@ -305,6 +339,14 @@ if args.benchmark:
     elif model_type == "whisper":
         prompt = sample[0]
         generate_kwargs.pop("min_new_tokens", None)
+    elif model_type == "maira2":
+        prompt = args.prompt
+        sample = download_and_open(args.image_url)
+        process_input_func = (
+            tokenizer.process_reporting_input
+            if hasattr(tokenizer, "process_reporting_input")
+            else tokenizer.format_and_preprocess_reporting_input
+        )
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -375,12 +417,30 @@ if args.benchmark:
                 inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"]
                 output = model.generate(**inputs, **generate_kwargs)
+            elif model_type == "maira2":
+                processed_inputs = process_input_func(
+                    current_frontal=sample,
+                    current_lateral=None,
+                    prior_frontal=None,
+                    indication=None,
+                    technique=None,
+                    comparison=None,
+                    prior_report=None,
+                    return_tensors="pt",
+                    get_grounding=False,
+                )
+                input_ids = processed_inputs["input_ids"]
+                output = model.generate(**processed_inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(
-                gen_ids[:, input_ids.shape[1] :] if model_type == "llava" else gen_ids,
+                (
+                    gen_ids[:, input_ids.shape[1] :]
+                    if model_type in ["llava", "maira2"]
+                    else gen_ids
+                ),
                 skip_special_tokens=True,
             )
             toc = time.time()
@@ -441,6 +501,19 @@ if args.benchmark:
                         raw_image = [load_image(args.image_url)] * args.batch_size
                         inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                         output = model.generate(**inputs, **generate_kwargs)
+                    elif model_type == "maira2":
+                        processed_inputs = process_input_func(
+                            current_frontal=sample,
+                            current_lateral=None,
+                            prior_frontal=None,
+                            indication=None,
+                            technique=None,
+                            comparison=None,
+                            prior_report=None,
+                            return_tensors="pt",
+                            get_grounding=False,
+                        )
+                        output = model.generate(**processed_inputs, **generate_kwargs)
                     else:
                         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                         output = model.generate(input_ids, **generate_kwargs)

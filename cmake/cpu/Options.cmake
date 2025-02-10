@@ -23,7 +23,6 @@ if(BUILD_CFG_HABANA)
   set(USE_DNNL_GRAPH_COMPILER OFF)
 endif()
 
-
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
   get_target_property(CPU_NATIVE_DEFINITIONS intel-ext-pt-cpu COMPILE_DEFINITIONS)

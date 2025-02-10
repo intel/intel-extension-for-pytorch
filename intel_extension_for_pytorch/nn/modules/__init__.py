@@ -10,4 +10,8 @@ if has_cpu():
     from .merged_embeddingbag import DistMergeEmbeddingBagWithAdaGrad
     from ...cpu.nn.linear_fuse_eltwise import IPEXLinearEltwise
 
-from .weight_only_quantization import WeightOnlyQuantizedLinear
+from .weight_only_quantization import (
+    WeightOnlyQuantizedLinear,
+    IpexWoqLinearAllreduce,
+    Int4WeightFormat,
+)

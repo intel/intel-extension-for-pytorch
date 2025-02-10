@@ -36,8 +36,13 @@ class TestCompile(TestCase):
             2,
         ]:
             input_shapes = {1: (4,), 2: (4, 4), 3: (4, 4, 4)}
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["torchscript", "inductor"],
                 [True, False],
                 [True, False],
@@ -103,8 +108,13 @@ class TestCompile(TestCase):
             2,
         ]:
             input_shapes = {1: (4,), 2: (4, 4), 3: (4, 4, 4)}
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["inductor"],
                 [True, False],
                 [True, False],

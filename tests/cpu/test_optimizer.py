@@ -11,6 +11,14 @@ import bench.custom_op_bench.optimizer
 from torch.optim import Adadelta, AdamW, Adamax, ASGD, RMSprop, Rprop
 import copy
 
+dtypes = [
+    torch.float32,
+]
+if core.onednn_has_bf16_support():
+    dtypes.append(torch.bfloat16)
+if core.onednn_has_fp16_support():
+    dtypes.append(torch.float16)
+
 
 class TestOptimizers(TestCase):
     def _test_update(
@@ -74,9 +82,6 @@ class TestOptimizers(TestCase):
 
     def test_sgd(self):
         M = TestModule()
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -121,9 +126,6 @@ class TestOptimizers(TestCase):
     def test_sgd_fallback(self):
         # for sparse grad with weight_decay/momentum !=0, stock pytorch will also failed
         M = TestModule(has_sparse_grad=True)
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -156,9 +158,6 @@ class TestOptimizers(TestCase):
 
     def test_adagrad(self):
         M = TestModule()
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -199,9 +198,6 @@ class TestOptimizers(TestCase):
 
     def test_adagrad_fallback(self):
         M = TestModule(has_sparse_grad=True)
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -234,9 +230,6 @@ class TestOptimizers(TestCase):
 
     def test_lamb(self):
         M = TestModule()
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -269,9 +262,6 @@ class TestOptimizers(TestCase):
 
     def test_adam(self):
         M = TestModule()
-        dtypes = [torch.float, torch.bfloat16]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
         options = itertools.product(
             [True, False],
             [True, False],
@@ -1231,6 +1221,10 @@ class TestFusedSteps(TestCase):
 
 
 class TestPatchedMethod(TestCase):
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_zero_grad(self):
         def count_zero_grad(evt_list):
             count = 0

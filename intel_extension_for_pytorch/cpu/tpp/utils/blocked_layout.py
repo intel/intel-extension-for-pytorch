@@ -78,7 +78,11 @@ class BlockingManager(object):
         assert input.shape == self.orig_shape
         output = input.view(self.view_shape)
         if self.permute:
-            output = output.permute(self.permute).contiguous()
+            # contiguous() creates a copy of the tensor, potentially leading to increased memory usage.
+            # we performed an in-place operation here to avoid the extra memory overhead.
+            permuted = output.permute(self.permute).contiguous()
+            output.resize_(permuted.shape).copy_(permuted)
+            del permuted
         return output
 
     def unblock(self, input):

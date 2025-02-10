@@ -119,7 +119,7 @@ class TensorParallelTester(TestCase):
         input_dict["position_ids"] = position_ids.unsqueeze(0)
         ref_m = copy.deepcopy(model)
         for dtype in [torch.float32, torch.bfloat16]:
-            ipex_model = ipex.optimize_transformers(model, dtype=dtype)
+            ipex_model = ipex.llm.optimize(model, dtype=dtype)
             with torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True if dtype is torch.bfloat16 else False
             ):

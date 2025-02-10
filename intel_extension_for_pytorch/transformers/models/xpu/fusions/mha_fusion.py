@@ -380,9 +380,11 @@ class _IPEXPagedAttentionXPU:
     PARTITION_SIZE = 512
 
     @classmethod
-    def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
+    def reshape_and_cache(
+        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+    ):  # todo, k_scale and v_scale not implement here. tmply add arguments for frontend alignment with CPU
         torch.ops.torch_ipex.reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping
+            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
         )
 
     @classmethod
@@ -405,6 +407,8 @@ class _IPEXPagedAttentionXPU:
         block_size,
         max_context_len,
         alibi_slopes,
+        k_scale=1.0,
+        v_scale=1.0,
     ):
         num_queries_per_tokens = (head_mapping == 0).sum()
         query = query.contiguous()

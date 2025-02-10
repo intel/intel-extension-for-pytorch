@@ -383,7 +383,7 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
     auto weight_dtype_ = this->get_context().weight_dtype_;
     auto weight_shape_ = this->get_weight_shape();
-    auto orig_bias_ = this->get_context().at_bias_;
+    auto orig_bias_ = this->get_at_bias();
     auto scales = this->get_scales();
     auto zero_points = this->get_zero_points();
     auto g_idx = this->get_g_idx();
@@ -510,7 +510,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       int64_t group_size,
       int64_t lowp_mode,
       int64_t act_quant_mode,
-      bool cache_weight_for_large_batch);
+      bool cache_weight_for_large_batch,
+      int64_t weight_format);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;

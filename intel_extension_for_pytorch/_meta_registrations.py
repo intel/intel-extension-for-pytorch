@@ -130,7 +130,9 @@ def is_channels_last_3d(ten):
 
 
 @register_meta("reshape_and_cache")
-def meta_reshape_and_cache(key, value, key_cache, value_cache, slot_mapping):
+def meta_reshape_and_cache(
+    key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+):
     return None
 
 
@@ -147,6 +149,8 @@ def meta_single_query_cached_kv_attention(
     block_size,
     max_context_len,
     alibi_slopes,
+    k_scale,
+    v_scale,
 ):
     return None
 

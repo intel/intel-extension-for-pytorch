@@ -564,7 +564,7 @@ def shard_mha_weights(
                         rank,
                         world_size,
                         shard_by_head=True,
-                        value_with_share_qk=True,
+                        value_with_share_qk=value_with_share_qk,
                     )
                     # del sub_m.__dict__["_modules"][l_name]
                     setattr(sub_m, l_name, TPLinear)

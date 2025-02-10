@@ -290,6 +290,276 @@ class MixtralMoE(torch.nn.Module):
         return final_hidden_states.view(num_tokens, hidden_dim)
 
 
+class Deepseekv2MoE(torch.nn.Module):
+
+    def __init__(
+        self, n_routed_experts, num_experts_per_tok, hidden_size, intermediate_size
+    ):
+        super().__init__()
+        self.num_total_experts = n_routed_experts
+        self.top_k = num_experts_per_tok
+        self.n_routed_experts = n_routed_experts
+
+        self.gate = torch.nn.Linear(hidden_size, self.n_routed_experts, bias=False)
+        self.gate.weight = torch.nn.Parameter(
+            torch.rand(self.n_routed_experts, hidden_size),
+            requires_grad=False,
+        )
+        self.w1_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w3_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w2_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, hidden_size, intermediate_size),
+            requires_grad=False,
+        )
+
+        self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=False,
+        )
+        self.ipex_moe_with_prepack = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=True,
+        )
+        self.act_fn = torch.nn.SiLU()
+        self.n_group = 8
+        self.topk_group = 3
+
+    def forward_mlp(self, hidden_states: torch.Tensor, expert_id: int) -> torch.Tensor:
+        w1_out = torch.nn.functional.linear(hidden_states, self.w1_weight[expert_id])
+        w1_out = self.act_fn(w1_out)
+        w3_out = torch.nn.functional.linear(hidden_states, self.w3_weight[expert_id])
+        current_hidden_states = w1_out * w3_out
+        current_hidden_states = torch.nn.functional.linear(
+            current_hidden_states, self.w2_weight[expert_id]
+        )
+        return current_hidden_states
+
+    def forward(
+        self, hidden_states: torch.Tensor, use_ipex_api=False, use_ipex_prepack=False
+    ) -> torch.Tensor:
+        num_tokens, hidden_dim = hidden_states.shape
+        hidden_states = hidden_states.view(-1, hidden_dim)
+        # router_logits: (num_tokens, n_experts)
+        router_logits = self.gate(hidden_states)
+        if not use_ipex_api:
+            router_logits = router_logits.softmax(dim=-1, dtype=torch.float32)
+            group_scores = (
+                router_logits.view(num_tokens, self.n_group, -1).max(dim=-1).values
+            )  # [n, n_group]
+            group_idx = torch.topk(
+                group_scores, k=self.topk_group, dim=-1, sorted=False
+            )[
+                1
+            ]  # [n, top_k_group]
+            group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(num_tokens, self.n_group, self.n_routed_experts // self.n_group)
+                .reshape(num_tokens, -1)
+            )  # [n, e]
+            tmp_scores = router_logits.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
+            routing_weights, selected_experts = torch.topk(
+                tmp_scores, k=self.top_k, dim=-1, sorted=False
+            )
+
+            routing_weights = routing_weights.to(hidden_states.dtype)
+            final_hidden_states = torch.zeros(
+                (num_tokens, hidden_dim),
+                dtype=hidden_states.dtype,
+                device=hidden_states.device,
+            )
+            expert_mask = torch.nn.functional.one_hot(
+                selected_experts, num_classes=self.num_total_experts
+            ).permute(2, 1, 0)
+            for expert_idx in range(self.num_total_experts):
+                idx, top_x = torch.where(expert_mask[expert_idx])
+                current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
+                current_hidden_states = (
+                    self.forward_mlp(current_state, expert_idx)
+                    * routing_weights[top_x, idx, None]
+                )
+                final_hidden_states.index_add_(
+                    0, top_x, current_hidden_states.to(hidden_states.dtype)
+                )
+        else:
+            if use_ipex_prepack:
+                final_hidden_states = self.ipex_moe_with_prepack(
+                    hidden_states,
+                    True,
+                    self.top_k,
+                    router_logits,
+                    False,
+                    self.topk_group,
+                    self.n_group,
+                )
+            else:
+                final_hidden_states = self.ipex_moe(
+                    hidden_states,
+                    True,
+                    self.top_k,
+                    router_logits,
+                    False,
+                    self.topk_group,
+                    self.n_group,
+                )
+
+        return final_hidden_states.view(num_tokens, hidden_dim)
+
+
+class Deepseekv3MoE(torch.nn.Module):
+
+    def __init__(
+        self, n_routed_experts, num_experts_per_tok, hidden_size, intermediate_size
+    ):
+        super().__init__()
+        self.num_total_experts = n_routed_experts
+        self.top_k = num_experts_per_tok
+        self.n_routed_experts = n_routed_experts
+
+        self.gate = torch.nn.Linear(hidden_size, self.n_routed_experts, bias=False)
+        self.gate.weight = torch.nn.Parameter(
+            torch.rand(self.n_routed_experts, hidden_size),
+            requires_grad=False,
+        )
+        self.w1_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w3_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w2_weight = torch.nn.Parameter(
+            torch.rand(n_routed_experts, hidden_size, intermediate_size),
+            requires_grad=False,
+        )
+
+        self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=False,
+        )
+        self.ipex_moe_with_prepack = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=True,
+        )
+        self.act_fn = torch.nn.SiLU()
+        self.n_group = 8
+        self.topk_group = 4
+        self.e_score_correction_bias = torch.nn.Parameter(
+            torch.ones((n_routed_experts))
+        )
+
+    def forward_mlp(self, hidden_states: torch.Tensor, expert_id: int) -> torch.Tensor:
+        w1_out = torch.nn.functional.linear(hidden_states, self.w1_weight[expert_id])
+        w1_out = self.act_fn(w1_out)
+        w3_out = torch.nn.functional.linear(hidden_states, self.w3_weight[expert_id])
+        current_hidden_states = w1_out * w3_out
+        current_hidden_states = torch.nn.functional.linear(
+            current_hidden_states, self.w2_weight[expert_id]
+        )
+        return current_hidden_states
+
+    def forward(
+        self, hidden_states: torch.Tensor, use_ipex_api=False, use_ipex_prepack=False
+    ) -> torch.Tensor:
+        num_tokens, hidden_dim = hidden_states.shape
+        hidden_states = hidden_states.view(-1, hidden_dim)
+        # router_logits: (num_tokens, n_experts)
+        router_logits = self.gate(hidden_states)
+        if not use_ipex_api:
+            scores = router_logits.sigmoid()
+            scores_for_choice = scores.view(
+                num_tokens, -1
+            ) + self.e_score_correction_bias.unsqueeze(0)
+            group_scores = (
+                scores_for_choice.view(num_tokens, self.n_group, -1)
+                .topk(2, dim=-1)[0]
+                .sum(dim=-1)
+            )  # [n, n_group]
+            group_idx = torch.topk(
+                group_scores, k=self.topk_group, dim=-1, sorted=False
+            )[
+                1
+            ]  # [n, top_k_group]
+            group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(num_tokens, self.n_group, self.n_routed_experts // self.n_group)
+                .reshape(num_tokens, -1)
+            )  # [n, e]
+            tmp_scores = scores_for_choice.masked_fill(
+                ~score_mask.bool(), 0.0
+            )  # [n, e]
+            _, selected_experts = torch.topk(
+                tmp_scores, k=self.top_k, dim=-1, sorted=False
+            )
+            routing_weights = scores.gather(1, selected_experts)
+
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+            routing_weights = routing_weights.to(hidden_states.dtype)
+            final_hidden_states = torch.zeros(
+                (num_tokens, hidden_dim),
+                dtype=hidden_states.dtype,
+                device=hidden_states.device,
+            )
+            expert_mask = torch.nn.functional.one_hot(
+                selected_experts, num_classes=self.num_total_experts
+            ).permute(2, 1, 0)
+            for expert_idx in range(self.num_total_experts):
+                idx, top_x = torch.where(expert_mask[expert_idx])
+                current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
+                current_hidden_states = (
+                    self.forward_mlp(current_state, expert_idx)
+                    * routing_weights[top_x, idx, None]
+                )
+                final_hidden_states.index_add_(
+                    0, top_x, current_hidden_states.to(hidden_states.dtype)
+                )
+        else:
+            if use_ipex_prepack:
+                final_hidden_states = self.ipex_moe_with_prepack(
+                    hidden_states,
+                    True,
+                    self.top_k,
+                    router_logits,
+                    True,
+                    self.topk_group,
+                    self.n_group,
+                    scoring_func="sigmoid",
+                    e_score_correction_bias=self.e_score_correction_bias,
+                )
+            else:
+                final_hidden_states = self.ipex_moe(
+                    hidden_states,
+                    True,
+                    self.top_k,
+                    router_logits,
+                    True,
+                    self.topk_group,
+                    self.n_group,
+                    scoring_func="sigmoid",
+                    e_score_correction_bias=self.e_score_correction_bias,
+                )
+
+        return final_hidden_states.view(num_tokens, hidden_dim)
+
+
 class TestLLMModules(TestCase):
     def test_linearfusion_args0(self):
         x1 = torch.rand(1, 4, 4096)
@@ -308,7 +578,11 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearRelu,
             ipex.llm.modules.Linear2SiluMul,
         ]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -353,7 +627,11 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearAdd,
             ipex.llm.modules.LinearSiluMul,
         ]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -390,7 +668,11 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_scope = [Linear_add_add]
         ipex_scope = [ipex.llm.modules.LinearAddAdd]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -560,17 +842,37 @@ class TestLLMModules(TestCase):
             self.assertEqual(ref_out, ipex_out)
 
     def test_moe_fusion(self):
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        moe_modules = [MixtralMoE, Deepseekv2MoE, Deepseekv3MoE]
         with torch.no_grad():
-            for dtype in [torch.float, torch.bfloat16]:
-                for prepack in [True, False]:
-                    moe_module = MixtralMoE(4, 2, 1024, 4096).eval().to(dtype)
-                    x = torch.rand(1, 1024).to(dtype)
-                    x_ = copy.deepcopy(x)
-                    ref_out = moe_module(x)
-                    ipex_out = moe_module(
-                        x_, use_ipex_api=True, use_ipex_prepack=prepack
-                    )
-                    self.assertEqual(ref_out, ipex_out)
+            for moe_id in range(3):
+                for dtype in dtypes:
+                    for prepack in [True, False]:
+                        if moe_id == 0:
+                            moe_module = (
+                                moe_modules[moe_id](4, 2, 1024, 4096).eval().to(dtype)
+                            )
+                            x = torch.rand(1, 1024).to(dtype)
+                        elif moe_id == 1:
+                            moe_module = (
+                                moe_modules[moe_id](16, 6, 5120, 4096).eval().to(dtype)
+                            )
+                            x = torch.rand(1, 5120).to(dtype)
+                        elif moe_id == 2:
+                            moe_module = (
+                                moe_modules[moe_id](16, 8, 7168, 4096).eval().to(dtype)
+                            )
+                            x = torch.rand(1, 7168).to(dtype)
+                        x_ = copy.deepcopy(x)
+                        ref_out = moe_module(x)
+                        ipex_out = moe_module(
+                            x_, use_ipex_api=True, use_ipex_prepack=prepack
+                        )
+                        self.assertEqual(ref_out, ipex_out)
 
 
 if __name__ == "__main__":

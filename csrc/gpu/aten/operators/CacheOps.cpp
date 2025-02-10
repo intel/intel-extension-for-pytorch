@@ -365,7 +365,9 @@ void reshape_and_cache(
     at::Tensor&
         key_cache, // [num_blocks, num_heads, head_size/x, block_size, x]
     at::Tensor& value_cache, // [num_blocks, num_heads, head_size, block_size]
-    at::Tensor& slot_map) // [num_tokens]
+    at::Tensor& slot_map, // [num_tokens]
+    const double k_scale=1.0, // align signature with cpu op, no implementation
+    const double v_scale=1.0) // align signature with cpu op, no implementation
 {
   at::DeviceGuard device_guard(key.device());
   int num_tokens = key.size(0);

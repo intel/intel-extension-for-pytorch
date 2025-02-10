@@ -113,6 +113,10 @@ class Linear_tpp_fallback_dnnl_v2(torch.nn.Module):
 
 
 class TestTPPlinear(TestCase):
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_tpp_linear_fallback_env_set(self):
         fallback_ic_shape = [13824, 11008]
         fallback_oc_shape = [4096, 5120]
@@ -146,11 +150,16 @@ class TestTPPlinear(TestCase):
                             assert model.mlp.use_tpp is True
                         self.assertEqual(out, ref_out)
                         _disable_tpp()
+            os.environ["BF16_OPTIMIZED_THROUGHPUT"] = "0"
 
     def test_tpp_linear_fallback_flag(self):
         x1 = torch.rand(1, 1, 4097)
         x2 = copy.deepcopy(x1)
-        dtypes = [torch.float, torch.bfloat16]
+        dtypes = [
+            torch.float,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         for dtype in dtypes:
@@ -175,7 +184,11 @@ class TestTPPlinear(TestCase):
     def test_tpp_linear_fallback(self):
         x1 = torch.rand(1, 1, 4097)
         x2 = copy.deepcopy(x1)
-        dtypes = [torch.float, torch.bfloat16]
+        dtypes = [
+            torch.float,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         for dtype in dtypes:
@@ -200,9 +213,13 @@ class TestTPPlinear(TestCase):
     def test_tpp_linear(self):
         x1 = torch.rand(1, 1, 4096)
         x2 = copy.deepcopy(x1)
-        dtypes = [torch.float, torch.bfloat16]
+        dtypes = [
+            torch.float,
+        ]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         for dtype in dtypes:
             model = Linear_with_bias().eval()
             model_nb = Linear_without_bias().eval()
@@ -234,7 +251,11 @@ class TestTPPlinear(TestCase):
 
         x = torch.randn(1, 4, in_feature)
         x_tpp = copy.deepcopy(x)
-        dtypes = [torch.float, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         if core.isa_has_amx_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -286,9 +307,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_gelu().eval()
                 if dtype is torch.bfloat16:
@@ -318,9 +343,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_silu().eval()
                 if dtype is torch.bfloat16:
@@ -353,9 +382,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_relu().eval()
                 if dtype is torch.bfloat16:
@@ -380,9 +413,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_mul().eval()
                 if dtype is torch.bfloat16:
@@ -409,9 +446,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_add().eval()
                 if dtype is torch.bfloat16:
@@ -441,9 +482,13 @@ class TestTPPlinear(TestCase):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
         with torch.no_grad():
-            dtypes = [torch.float, torch.bfloat16]
+            dtypes = [
+                torch.float,
+            ]
             if core.isa_has_amx_fp16_support():
                 dtypes.append(torch.float16)
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             for dtype in dtypes:
                 model = Linear_add_add().eval()
                 if dtype is torch.bfloat16:

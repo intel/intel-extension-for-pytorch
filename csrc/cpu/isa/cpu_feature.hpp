@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Macros.h>
-
 #define MICRO_CLASS_MEMBER_DECL(feature_name) bool m_##feature_name = false
 #define MICRO_CLASS_MEMBER(feature_name) m_##feature_name
 #define MICRO_CLASS_CHECK_FUNC(feature_name) \
@@ -13,7 +11,7 @@
 
 namespace torch_ipex {
 namespace cpu {
-class IPEX_API CPUFeature {
+class CPUFeature {
  private:
   CPUFeature();
 

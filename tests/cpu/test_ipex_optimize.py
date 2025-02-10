@@ -36,6 +36,10 @@ skipIfNoTransformers = unittest.skipIf(not HAS_TRANSFORMERS, "no transformers")
 
 curpath = os.path.abspath(os.path.dirname(__file__))
 
+dtypes = [torch.float32]
+if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+    dtypes.append(torch.bfloat16)
+
 
 class ConvBatchNorm(torch.nn.Module):
     def __init__(
@@ -165,7 +169,7 @@ class TestOptimizeCases(TestCase):
                         any(
                             n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()
                         ),
-                        not (linear_bn_folding),
+                        not (linear_bn_folding or (dim == 1 and level == "O1")),
                     )
 
     def test_optimize_conv_bn_linear_bn_parameters_behavior(self):
@@ -196,6 +200,10 @@ class TestOptimizeCases(TestCase):
                         max_num_folding - (conv_bn_folding + linear_bn_folding),
                     )
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_optimize_bf16_model(self):
         model = ConvBatchNorm()
         optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
@@ -257,8 +265,7 @@ class TestOptimizeCases(TestCase):
             Rprop,
             SGD,
         ]
-
-        options = itertools.product([torch.float, torch.bfloat16], optimizer_options)
+        options = itertools.product(dtypes, optimizer_options)
         for dtype, optimizer in options:
             model = ConvBatchNorm().to(memory_format=torch.channels_last).train()
             model.conv.weight.requires_grad_(False)
@@ -346,8 +353,11 @@ class TestOptimizeCases(TestCase):
 
         model = Conv()
         if not core.onednn_has_bf16_support():
-            msg = r"BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, \
-                please set dtype to torch.float or set weights_prepack to False."
+            msg = (
+                r"BF16 weight prepack needs the cpu support avx_ne_convert or avx512bw, "
+                r"avx512vl and avx512dq, but the desired instruction sets are not available. "
+                r"Please set dtype to torch.float or set weights_prepack to False."
+            )
             with self.assertRaisesRegex(AssertionError, msg):
                 optimized_model = ipex.optimize(model.eval(), dtype=torch.bfloat16)
 
@@ -362,7 +372,7 @@ class TestOptimizeCases(TestCase):
 
     def test_optimize_inplace_behavior_eval_mode(self):
         M_ori = TestModule()
-        options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
+        options = itertools.product(dtypes, ["O0", "O1"])
         for dtype, level in options:
             # non-inplace
             M = copy.deepcopy(M_ori).eval()
@@ -394,7 +404,7 @@ class TestOptimizeCases(TestCase):
 
     def test_optimize_inplace_behavior_training_mode_with_optimizer(self):
         M_ori = TestModule()
-        options = itertools.product([torch.float32, torch.bfloat16], ["O0", "O1"])
+        options = itertools.product(dtypes, ["O0", "O1"])
         for dtype, level in options:
             # non-inplace
             M = copy.deepcopy(M_ori).train()
@@ -462,9 +472,7 @@ class TestOptimizeCases(TestCase):
 
     def test_module_conversion(self):
         M_ori = TestModule()
-        options = itertools.product(
-            [torch.bfloat16, torch.float32], ["O0", "O1"], [True, False]
-        )
+        options = itertools.product(dtypes, ["O0", "O1"], [True, False])
         for dtype, level, auto_kernel_selection in options:
             sgd = torch.optim.SGD(M_ori.parameters(), lr=0.1)
             opt_M, _ = ipex.optimize(
@@ -508,7 +516,7 @@ class TestOptimizeCases(TestCase):
 
     def test_traced_model_serialization(self):
         for module in [ConvBatchNorm, OneLayerMLP, ConvTranspose2d]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in dtypes:
                 M = module().eval()
                 input = M.input1.to(dtype)
                 opt_M = ipex.optimize(M, dtype=dtype, auto_kernel_selection=True)
@@ -521,7 +529,7 @@ class TestOptimizeCases(TestCase):
 
     def test_optimized_model_with_fx(self):
         for module in [ConvBatchNorm, OneLayerMLP, ConvTranspose2d]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in dtypes:
                 M = module().eval()
                 input = M.input1.to(dtype)
                 opt_M = ipex.optimize(M, dtype=dtype, auto_kernel_selection=True)
@@ -573,6 +581,10 @@ class TestOptimizeCases(TestCase):
                     opt_model = ipex.optimize(model, sample_input=input)
                     self.assertEqual(opt_model(input), model(input))
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_partial_model_update(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -819,7 +831,7 @@ class TestOptimizeCases(TestCase):
                 )
 
         params_dict = {
-            "dtype": [torch.float, torch.bfloat16],
+            "dtype": dtypes,
             "optimizer": [
                 Lamb,
                 Adadelta,
@@ -902,7 +914,7 @@ class TestOptimizeCases(TestCase):
                 optimizer.step()
 
         params_dict = {
-            "dtype": [torch.float32, torch.bfloat16],
+            "dtype": dtypes,
             "level": ["O1"],
             "inplace": [True, False],
             "weights_prepack": [True, False],

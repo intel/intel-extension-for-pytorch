@@ -61,6 +61,41 @@ torch.library.define(
 )
 
 
+def yarn_find_correction_dim(
+    num_rotations, dim, base=10000, max_position_embeddings=2048
+):
+    return (dim * math.log(max_position_embeddings / (num_rotations * 2 * math.pi))) / (
+        2 * math.log(base)
+    )
+
+
+def yarn_linear_ramp_mask(min, max, dim):
+    if min == max:
+        max += 0.001  # Prevent singularity
+
+    linear_func = (torch.arange(dim, dtype=torch.float32) - min) / (max - min)
+    ramp_func = torch.clamp(linear_func, 0, 1)
+    return ramp_func
+
+
+def yarn_get_mscale(scale=1, mscale=1):
+    if scale <= 1:
+        return 1.0
+    return 0.1 * mscale * math.log(scale) + 1.0
+
+
+def yarn_find_correction_range(
+    low_rot, high_rot, dim, base=10000, max_position_embeddings=2048
+):
+    low = math.floor(
+        yarn_find_correction_dim(low_rot, dim, base, max_position_embeddings)
+    )
+    high = math.ceil(
+        yarn_find_correction_dim(high_rot, dim, base, max_position_embeddings)
+    )
+    return max(low, 0), min(high, dim - 1)  # Clamp values just in case
+
+
 class RotaryEmbedding(torch.nn.Module):
     def __init__(
         self,
@@ -146,6 +181,32 @@ class RotaryEmbedding(torch.nn.Module):
             inv_freq = torch.tensor(
                 new_freqs, dtype=inv_freq.dtype, device=inv_freq.device
             )
+        if kwargs is not None and "type" in kwargs and kwargs["type"] == "yarn":
+            freq_extra = inv_freq
+            if "factor" in kwargs:
+                self.scaling_factor = kwargs["factor"]
+            freq_inter = 1.0 / (
+                self.scaling_factor * base ** (torch.arange(0, dim, 2).float() / dim)
+            )
+            self.beta_fast = kwargs["beta_fast"]
+            self.beta_slow = kwargs["beta_slow"]
+            self.original_max_position_embeddings = kwargs[
+                "original_max_position_embeddings"
+            ]
+            self.mscale = kwargs["mscale"]
+            self.mscale_all_dim = kwargs["mscale_all_dim"]
+            low, high = yarn_find_correction_range(
+                self.beta_fast,
+                self.beta_slow,
+                dim,
+                base,
+                self.original_max_position_embeddings,
+            )
+            inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high, dim // 2).to(
+                dtype=torch.float32
+            )
+            inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
+
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         if backbone == "Phi3ForCausalLM" and "long_factor" not in kwargs:
             self.max_seq_len_cached = self.max_seq_len_cached + 256
@@ -164,6 +225,25 @@ class RotaryEmbedding(torch.nn.Module):
             self.emb = torch.cat((freqs, freqs), dim=-1).float()
             self.cos_cached = self.emb.cos()[None, :, :]
             self.sin_cached = self.emb.sin()[None, :, :]
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
+            _mscale = float(
+                yarn_get_mscale(self.scaling_factor, self.mscale)
+                / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)
+            )
+            self.emb = torch.cat((freqs, freqs), dim=-1)
+            self.sin_cos = (
+                torch.cat((torch.sin(self.emb), torch.cos(self.emb)), dim=1) * _mscale
+            )
+            self.register_buffer(
+                "cos_cached",
+                self.emb.cos() * _mscale,
+                persistent=False,
+            )
+            self.register_buffer(
+                "sin_cached",
+                self.emb.sin() * _mscale,
+                persistent=False,
+            )
         else:
             self.sin_cos = (
                 torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)

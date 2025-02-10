@@ -58,6 +58,10 @@ inline libxsmm_datatype XsmmDtype<uint8_t>() {
   return LIBXSMM_DATATYPE_U8;
 }
 template <>
+inline libxsmm_datatype XsmmDtype<double>() {
+  return LIBXSMM_DATATYPE_F64;
+}
+template <>
 inline libxsmm_datatype XsmmDtype<float>() {
   return LIBXSMM_DATATYPE_F32;
 }

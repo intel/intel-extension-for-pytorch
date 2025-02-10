@@ -9,6 +9,7 @@ import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import torch.autograd.functional as autogradF
 from copy import deepcopy
+import intel_extension_for_pytorch._C as core
 
 try:
     import torchvision
@@ -1652,6 +1653,619 @@ class CPUOPsTester(TestCase):
                         self.assertEqual(output, output_ref)
                     except ImportError:
                         pass
+
+    def _clone_inputs(self, inputs, dtype):
+        inputs = [x.clone().to(dtype) for x in inputs]
+        return inputs
+
+    def test_causal_conv1d_update(self):
+        def causal_conv1d_update(
+            hidden_states, conv_states, conv_weights, conv_bias, activation
+        ):
+            conv_state = torch.roll(conv_states, shifts=-1, dims=-1)
+            conv_state[..., -1] = hidden_states[:, :, 0]
+            hidden_states = torch.sum(conv_state * conv_weights, dim=-1)
+            hidden_states += conv_bias
+            hidden_states = activation(hidden_states).unsqueeze(-1)
+            return hidden_states, conv_state
+
+        conv = nn.Conv1d(
+            in_channels=8192,
+            out_channels=8192,
+            kernel_size=4,
+            stride=1,
+            padding=3,
+            groups=8192,
+        )
+        act = torch.nn.SiLU()
+        conv_state = torch.rand(1, 8192, 4)
+        hidden_states = torch.rand(1, 8192, 1)
+        conv_weights = conv.weight.view(conv.weight.shape[0], conv.weight.shape[2])
+        conv_bias = conv.bias
+        example_inputs = (hidden_states, conv_state, conv_weights, conv_bias)
+
+        with torch.no_grad():
+            inputs_ref_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            output_fp32_ref, conv_output_fp32_ref = causal_conv1d_update(
+                *inputs_ref_fp32, act
+            )
+            input_ipex_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            output_fp32_ipex, conv_state_ipex = (
+                torch.ops.torch_ipex.causal_conv1d_update(*input_ipex_fp32, True)
+            )
+            self.assertEqual(output_fp32_ref, output_fp32_ipex)
+            self.assertEqual(conv_output_fp32_ref, conv_state_ipex)
+
+        dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+
+        for dtype in dtypes:
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+                dtype=dtype,
+            ):
+                input_ref = self._clone_inputs(example_inputs, dtype)
+                output_ref, conv_output_ref = causal_conv1d_update(
+                    *input_ref,
+                    act,
+                )
+                input_ipex = self._clone_inputs(example_inputs, dtype)
+                output_ipex, conv_output_ipex = (
+                    torch.ops.torch_ipex.causal_conv1d_update(*input_ipex, True)
+                )
+                self.assertEqual(
+                    output_ipex,
+                    output_fp32_ref,
+                    torch.max(torch.abs(output_ref - output_fp32_ref)),
+                )
+                self.assertEqual(conv_output_ref, conv_output_ipex)
+
+    def test_selective_scan(self):
+        def selective_scan_ref(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            delta_bias=None,
+            delta_softplus=False,
+            return_last_state=False,
+        ):
+            """
+            u: r(B D L)
+            delta: r(B D L)
+            A: c(D N) or r(D N)
+            B: c(D N) or r(B N L) or r(B N 2L) or r(B G N L) or (B G N L)
+            C: c(D N) or r(B N L) or r(B N 2L) or r(B G N L) or (B G N L)
+            D: r(D)
+            z: r(B D L)
+            delta_bias: r(D), fp32
+
+            out: r(B D L)
+            last_state (optional): r(B D dstate) or c(B D dstate)
+            """
+            dtype_in = u.dtype
+            u = u.float()
+            delta = delta.float()
+            if delta_bias is not None:
+                delta = delta + delta_bias[..., None].float()
+            if delta_softplus:
+                delta = F.softplus(delta)
+            batch, dim, dstate = u.shape[0], A.shape[0], A.shape[1]
+            is_variable_B = B.dim() >= 3
+            is_variable_C = C.dim() >= 3
+            if A.is_complex():
+                if is_variable_B:
+                    B = torch.view_as_complex(B.float().view(*B.shape[:-1], -1, 2))
+                if is_variable_C:
+                    C = torch.view_as_complex(C.float().view(*C.shape[:-1], -1, 2))
+            else:
+                B = B.float()
+                C = C.float()
+            x = A.new_zeros((batch, dim, dstate))
+            ys = []
+            deltaA = torch.exp(torch.einsum("bdl,dn->bdln", delta, A))
+            if not is_variable_B:
+                deltaB_u = torch.einsum("bdl,dn,bdl->bdln", delta, B, u)
+            else:
+                if B.dim() == 3:
+                    deltaB_u = torch.einsum("bdl,bnl,bdl->bdln", delta, B, u)
+                else:
+                    B = B.repeat(1, dim // B.shape[1], 1, 1)
+                    deltaB_u = torch.einsum("bdl,bdnl,bdl->bdln", delta, B, u)
+            if is_variable_C and C.dim() == 4:
+                C = C.repeat(1, dim // C.shape[1], 1, 1)
+            last_state = None
+            for i in range(u.shape[2]):
+                x = deltaA[:, :, i] * x + deltaB_u[:, :, i]
+                if not is_variable_C:
+                    y = torch.einsum("bdn,dn->bd", x, C)
+                else:
+                    if C.dim() == 3:
+                        y = torch.einsum("bdn,bn->bd", x, C[:, :, i])
+                    else:
+                        y = torch.einsum("bdn,bdn->bd", x, C[:, :, :, i])
+                if i == u.shape[2] - 1:
+                    last_state = x
+                if y.is_complex():
+                    y = y.real * 2
+                ys.append(y)
+            y = torch.stack(ys, dim=2)  # (batch dim L)
+            out = y if D is None else y + u * D.unsqueeze(-1)
+            if z is not None:
+                out = out * F.silu(z)
+            out = out.to(dtype=dtype_in)
+            return out if not return_last_state else (out, last_state)
+
+        hidden_states = torch.rand(1, 8192, 1)
+        discrete_time_step = torch.rand(1, 8192, 1)
+        A = torch.rand(8192, 16)
+        B = torch.rand(1, 1, 16)
+        C = torch.rand(1, 1, 16)
+        D = torch.ones(8192)
+        gate = torch.rand(1, 8192, 1)
+        time_proj_bias = torch.rand(8192)
+        example_inputs = (
+            hidden_states,
+            discrete_time_step,
+            A,
+            B.transpose(1, 2),
+            C.transpose(1, 2),
+            D,
+            gate,
+            time_proj_bias,
+        )
+        with torch.no_grad():
+            input_ref_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            scan_outputs_fp32_ref, ssm_state_fp32_ref = selective_scan_ref(
+                *input_ref_fp32,
+                delta_softplus=True,
+                return_last_state=True,
+            )
+            input_ipex_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            scan_outputs_fp32_ipex, ssm_state_fp32_ipex = (
+                torch.ops.torch_ipex.selective_scan_fn(
+                    *input_ipex_fp32,
+                    delta_softplus=True,
+                    return_last_state=True,
+                )
+            )
+            self.assertEqual(scan_outputs_fp32_ref, scan_outputs_fp32_ipex)
+            self.assertEqual(ssm_state_fp32_ref, ssm_state_fp32_ipex)
+
+        dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+
+        for dtype in dtypes:
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+                dtype=dtype,
+            ):
+                input_ref = self._clone_inputs(example_inputs, dtype)
+                scan_outputs_ref, ssm_state_ref = selective_scan_ref(
+                    *input_ref,
+                    delta_softplus=True,
+                    return_last_state=True,
+                )
+                input_ipex = self._clone_inputs(example_inputs, dtype)
+                scan_outputs_ipex, ssm_state_ipex = (
+                    torch.ops.torch_ipex.selective_scan_fn(
+                        *input_ipex,
+                        delta_softplus=True,
+                        return_last_state=True,
+                    )
+                )
+                self.assertEqual(
+                    scan_outputs_fp32_ref,
+                    scan_outputs_ipex,
+                    torch.max(torch.abs(scan_outputs_ref - scan_outputs_fp32_ref)),
+                )
+                self.assertEqual(
+                    ssm_state_ref,
+                    ssm_state_ipex,
+                    torch.max(torch.abs(ssm_state_ref - ssm_state_fp32_ref)),
+                )
+
+    def test_selective_state_update(self):
+        def selective_state_update_ref(
+            state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+        ):
+            """
+            Argument:
+                state: (batch, dim, dstate) or (batch, nheads, dim, dstate)
+                x: (batch, dim) or (batch, nheads, dim)
+                dt: (batch, dim) or (batch, nheads, dim)
+                A: (dim, dstate) or (nheads, dim, dstate)
+                B: (batch, dstate) or (batch, ngroups, dstate)
+                C: (batch, dstate) or (batch, ngroups, dstate)
+                D: (dim,) or (nheads, dim)
+                z: (batch, dim) or (batch, nheads, dim)
+                dt_bias: (dim,) or (nheads, dim)
+            Return:
+                out: (batch, dim) or (batch, nheads, dim)
+            """
+            has_heads = state.dim() > 3
+            if state.dim() == 3:
+                state = state.unsqueeze(1)
+            if x.dim() == 2:
+                x = x.unsqueeze(1)
+            if dt.dim() == 2:
+                dt = dt.unsqueeze(1)
+            if A.dim() == 2:
+                A = A.unsqueeze(0)
+            if B.dim() == 2:
+                B = B.unsqueeze(1)
+            if C.dim() == 2:
+                C = C.unsqueeze(1)
+            if D is not None and D.dim() == 1:
+                D = D.unsqueeze(0)
+            if z is not None and z.dim() == 2:
+                z = z.unsqueeze(1)
+            if dt_bias is not None and dt_bias.dim() == 1:
+                dt_bias = dt_bias.unsqueeze(0)
+            batch, nheads, dim, dstate = state.shape
+            assert x.shape == (batch, nheads, dim)
+            assert dt.shape == x.shape
+            assert A.shape == (nheads, dim, dstate)
+            ngroups = B.shape[1]
+            assert nheads % ngroups == 0, "nheads must be divisible by ngroups"
+            assert B.shape == (batch, ngroups, dstate)
+            assert C.shape == B.shape
+            if D is not None:
+                assert D.shape == (nheads, dim)
+            if z is not None:
+                assert z.shape == x.shape
+            if dt_bias is not None:
+                assert dt_bias.shape == (nheads, dim)
+                dt = dt + dt_bias
+            dt = F.softplus(dt) if dt_softplus else dt
+            dA = torch.exp(dt[:, :, :, None] * A)  # (batch, nheads, dim, dstate)
+            B = B.repeat(1, nheads // ngroups, 1)  # (batch, nheads, dstate)
+            C = C.repeat(1, nheads // ngroups, 1)  # (batch, nheads, dstate)
+            dB = dt[:, :, :, None] * B[:, :, None, :]  # (batch, nheads, dim, dstate)
+            state.copy_(state * dA + dB * x[:, :, :, None])  # (batch, dim, dstate
+            out = torch.einsum("bhdn,bhn->bhd", state.to(C.dtype), C)
+            if D is not None:
+                out += (x * D).to(out.dtype)
+            out = (out if z is None else out * F.silu(z)).to(x.dtype)
+            if not has_heads:
+                out = out.squeeze(1)
+            return out
+
+        ssm_state = torch.rand(1, 8192, 16)
+        hidden_states = torch.rand(1, 8192)
+        discrete_time_step = torch.rand(1, 8192)
+        A = torch.rand(8192, 16)
+        B = torch.rand(1, 16)
+        C = torch.rand(1, 16)
+        D = torch.ones(8192)
+        gate = torch.rand(1, 8192)
+        time_proj_bias = torch.rand(8192)
+        example_inputs = (
+            ssm_state,
+            hidden_states,
+            discrete_time_step,
+            A,
+            B,
+            C,
+            D,
+            gate,
+            time_proj_bias,
+        )
+        with torch.no_grad():
+            input_ref_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            output_fp32_ref = selective_state_update_ref(
+                *input_ref_fp32, dt_softplus=True
+            )
+            input_ipex_fp32 = self._clone_inputs(example_inputs, torch.float32)
+            output_fp32_ipex = torch.ops.torch_ipex.selective_state_update(
+                *input_ipex_fp32, True
+            )
+            self.assertEqual(output_fp32_ref, output_fp32_ipex)
+        dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+
+        for dtype in dtypes:
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+                dtype=dtype,
+            ):
+                input_ref = self._clone_inputs(example_inputs, dtype)
+                output_ref = selective_state_update_ref(*input_ref, dt_softplus=True)
+                input_ipex = self._clone_inputs(example_inputs, dtype)
+                output_ipex = torch.ops.torch_ipex.selective_state_update(
+                    *input_ipex, True
+                )
+                self.assertEqual(
+                    output_ref,
+                    output_ipex,
+                    torch.max(torch.abs(output_ref - output_fp32_ref)),
+                )
+
+    def test_deepseek_moe(self):
+        class DeepseekV2MLP(nn.Module):
+            def __init__(self, hidden_size=5120, intermediate_size=12288):
+                super().__init__()
+                self.hidden_size = hidden_size
+                self.intermediate_size = intermediate_size
+
+                self.gate_proj = nn.Linear(
+                    self.hidden_size, self.intermediate_size, bias=False
+                )
+                self.up_proj = nn.Linear(
+                    self.hidden_size, self.intermediate_size, bias=False
+                )
+                self.down_proj = nn.Linear(
+                    self.intermediate_size, self.hidden_size, bias=False
+                )
+                self.act_fn = nn.SiLU()
+
+            def forward(self, x):
+                down_proj = self.down_proj(
+                    self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                )
+                return down_proj
+
+        class MoETest(nn.Module):
+            def __init__(
+                self,
+                num_experts,
+                hidden_size,
+                intermediate_size,
+                moe_linear_type=0,
+                use_ipex=False,
+            ):
+                super().__init__()
+                self.experts = nn.ModuleList(
+                    [
+                        DeepseekV2MLP(hidden_size, intermediate_size)
+                        for _ in range(num_experts)
+                    ]
+                )
+                self.use_ipex = use_ipex
+                if use_ipex:
+                    self.moe_linear_type = moe_linear_type
+                    self.distributed = False
+                    # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
+                    if self.moe_linear_type == 1:
+                        from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+                            _enable_tpp,
+                            _disable_tpp,
+                        )
+
+                        _enable_tpp()
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.bfloat16
+                        )
+                        _disable_tpp()
+                    if self.moe_linear_type == 2:
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.bfloat16
+                        )
+                    if self.moe_linear_type == 3:
+                        ipex._disable_dnnl()
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.float32, level="O1"
+                        )
+                    if self.moe_linear_type == 4:
+                        qconfig_mapping = (
+                            ipex.quantization.get_weight_only_quant_qconfig_mapping()
+                        )
+                        from intel_extension_for_pytorch.quantization import (
+                            prepare,
+                            convert,
+                        )
+
+                        self.experts = copy.deepcopy(self.experts)
+                        self.experts = prepare(
+                            self.experts, qconfig_mapping, inplace=True
+                        )
+                        self.experts = convert(self.experts, inplace=True)
+                    self.gate_weights = []
+                    self.up_weights = []
+                    self.down_weights = []
+                    self.gate_ctx = []
+                    self.up_ctx = []
+                    self.down_ctx = []
+                    for expert_idx in range(len(self.experts)):
+                        expert_layer = self.experts[expert_idx]
+                        if self.moe_linear_type in [0, 1]:
+                            self.gate_weights.append(expert_layer.gate_proj.weight)
+                            self.up_weights.append(expert_layer.up_proj.weight)
+                            self.down_weights.append(expert_layer.down_proj.weight)
+                        elif self.moe_linear_type in [2, 3]:
+                            self.gate_weights.append(
+                                expert_layer.gate_proj._get_forward_weight()
+                            )
+                            self.up_weights.append(
+                                expert_layer.up_proj._get_forward_weight()
+                            )
+                            self.down_weights.append(
+                                expert_layer.down_proj._get_forward_weight()
+                            )
+                            self.gate_ctx.append(expert_layer.gate_proj.ctx)
+                            self.up_ctx.append(expert_layer.up_proj.ctx)
+                            self.down_ctx.append(expert_layer.down_proj.ctx)
+                        else:
+                            self.gate_ctx.append(expert_layer.gate_proj._op_context)
+                            self.up_ctx.append(expert_layer.up_proj._op_context)
+                            self.down_ctx.append(expert_layer.down_proj._op_context)
+
+            def forward(self, x, topk_ids, topk_weight):
+                if self.use_ipex:
+                    return self.moe_infer_ipex(x, topk_ids, topk_weight)
+                return self.moe_infer_ref(x, topk_ids, topk_weight)
+
+            def moe_infer_ref(self, x, topk_ids, topk_weight):
+                cnts = topk_ids.new_zeros((topk_ids.shape[0], len(self.experts)))
+                cnts.scatter_(1, topk_ids, 1)
+                tokens_per_expert = cnts.sum(dim=0)
+                idxs = topk_ids.view(-1).argsort()
+                sorted_tokens = x[idxs // topk_ids.shape[1]]
+                tokens_per_expert = tokens_per_expert.cpu().numpy()
+
+                outputs = []
+                start_idx = 0
+                for i, num_tokens in enumerate(tokens_per_expert):
+                    end_idx = start_idx + num_tokens
+                    if num_tokens == 0:
+                        continue
+                    expert = self.experts[i]
+                    tokens_for_this_expert = sorted_tokens[start_idx:end_idx]
+                    expert_out = expert(tokens_for_this_expert)
+                    outputs.append(expert_out)
+                    start_idx = end_idx
+
+                outs = (
+                    torch.cat(outputs, dim=0)
+                    if len(outputs)
+                    else sorted_tokens.new_empty(0)
+                )
+                new_x = torch.empty_like(outs)
+                new_x[idxs] = outs
+                final_out = (
+                    new_x.view(*topk_ids.shape, -1)
+                    .type(topk_weight.dtype)
+                    .mul_(topk_weight.unsqueeze(dim=-1))
+                    .sum(dim=1)
+                    .type(new_x.dtype)
+                )
+                return final_out
+
+            def moe_infer_ipex(self, x, topk_ids, topk_weight):
+                if self.moe_linear_type in [0, 1]:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
+                        x,
+                        topk_ids,
+                        self.gate_weights,
+                        self.up_weights,
+                        self.down_weights,
+                        self.moe_linear_type == 0,
+                        topk_weight,
+                        self.distributed,
+                    )
+                elif self.moe_linear_type == 2:
+                    final_out = torch.ops.torch_ipex.deepseek_moe(
+                        x,
+                        topk_ids,
+                        self.gate_weights,
+                        self.gate_ctx,
+                        self.up_weights,
+                        self.up_ctx,
+                        self.down_weights,
+                        self.down_ctx,
+                        topk_weight,
+                        self.distributed,
+                    )
+                elif self.moe_linear_type == 3:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
+                        x,
+                        topk_ids,
+                        self.gate_weights,
+                        self.gate_ctx,
+                        self.up_weights,
+                        self.up_ctx,
+                        self.down_weights,
+                        self.down_ctx,
+                        topk_weight,
+                        self.distributed,
+                    )
+                else:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_woq(
+                        x,
+                        topk_ids,
+                        self.gate_ctx,
+                        self.up_ctx,
+                        self.down_ctx,
+                        topk_weight,
+                        self.distributed,
+                    )
+                return final_out
+
+        tokens = 1
+        hidden_size = 64
+        intermediate_size = 1024
+        num_experts = 8
+        selected_experts = 2
+        x = torch.rand(tokens, hidden_size)
+        topk_weight = torch.rand(tokens, selected_experts)
+        topk_ids = torch.randint(0, num_experts, (tokens, selected_experts))
+        with torch.no_grad():
+            model_ref = MoETest(num_experts, hidden_size, intermediate_size).eval()
+            output_ref = model_ref(x.clone(), topk_ids.clone(), topk_weight.clone())
+            for moe_linear_type in [0, 1, 2, 3, 4]:
+                amp_enabled = False if moe_linear_type == 3 else True
+                dtype = torch.float32 if moe_linear_type == 3 else torch.bfloat16
+                x_clone = x.clone().to(dtype)
+                topk_ids_clone = topk_ids.clone()
+                topk_weight_clone = topk_weight.clone().to(dtype)
+                with torch.cpu.amp.autocast(enabled=amp_enabled):
+                    model_ipex = MoETest(
+                        num_experts,
+                        hidden_size,
+                        intermediate_size,
+                        moe_linear_type,
+                        True,
+                    ).eval()
+                    output_ipex = model_ipex(x_clone, topk_ids_clone, topk_weight_clone)
+                    self.assertEqual(output_ref, output_ipex, prec=0.1)
+
+    def test_deepseek_moegate(self):
+        n_group = 8
+        topk_group = 3
+        n_routed_experts = 16
+        top_k = 6
+        routed_scaling_factor = 16.0
+
+        def moe_gate(scores):
+            n, h = scores.shape
+            group_scores = (
+                scores.view(n, n_group, -1).max(dim=-1).values
+            )  # [n, n_group]
+            group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+                1
+            ]  # [n, top_k_group]
+            group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(n, n_group, n_routed_experts // n_group)
+                .reshape(n, -1)
+            )  # [n, e]
+            tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
+            topk_weight, topk_idx = torch.topk(
+                tmp_scores, k=top_k, dim=-1, sorted=False
+            )
+
+            topk_weight = topk_weight * routed_scaling_factor
+            return topk_idx, topk_weight
+
+        for dtype in [torch.float32, torch.bfloat16]:
+            hidden_states = torch.rand(10, 2560, dtype=dtype)
+            weight = torch.rand(16, 2560, dtype=dtype)
+            logits = torch.nn.functional.linear(
+                hidden_states.type(torch.float32), weight.type(torch.float32), None
+            )
+            scores = logits.softmax(dim=-1, dtype=dtype)
+            enable_autocast = dtype == torch.bfloat16
+            with torch.no_grad(), torch.cpu.amp.autocast(enabled=enable_autocast):
+                topk_idx_ref, topk_weight_ref = moe_gate(scores)
+                topk_idx_ipex, topk_weight_ipex = torch.ops.torch_ipex.deepseek_moegate(
+                    hidden_states,
+                    scores,
+                    torch.tensor(routed_scaling_factor),
+                    n_group,
+                    topk_group,
+                    n_routed_experts,
+                    top_k,
+                )
+                self.assertEqual(topk_idx_ref, topk_idx_ipex)
+                self.assertEqual(topk_weight_ref, topk_weight_ipex)
 
 
 if __name__ == "__main__":

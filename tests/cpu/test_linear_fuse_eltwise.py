@@ -25,7 +25,11 @@ class TestLinearFuseEltwise(TestCase):
     def test_linear_fuse_eltwise(self):
         x1 = torch.rand(5, 10).requires_grad_()
         x2 = copy.deepcopy(x1)
-        dtypes = [torch.float, torch.bfloat16]
+        dtypes = [
+            torch.float,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         for dtype in dtypes:

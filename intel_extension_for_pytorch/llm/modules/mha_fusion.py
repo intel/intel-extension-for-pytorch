@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple
 from .utils import IPEXRuntimeCustomOps, IPEXCustomOpType
-import warnings
 
 
 class RotaryEmbedding(nn.Module):
@@ -491,7 +490,7 @@ class PagedAttention:
     The block tables are used to map the logical block of sequence into the physical block.
 
     [class method]: reshape_and_cache
-    ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+    ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
     This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
 
     Args:
@@ -504,6 +503,8 @@ class PagedAttention:
         slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
             The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
             can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
 
     [class method]: single_query_cached_kv_attention
 
@@ -521,7 +522,9 @@ class PagedAttention:
                                                             context_lens,
                                                             block_size,
                                                             max_context_len,
-                                                            alibi_slopes
+                                                            alibi_slopes,
+                                                            k_scale,
+                                                            v_scale,
                                                             )
 
     This operator is used to be calculated the scale-dot-product based on the paged attention.
@@ -544,6 +547,8 @@ class PagedAttention:
         context_lens (torch.Tensor):  The sequence length for every sequence. The size is [num_seqs].
         block_size (int): The block size which means the number of token in every block.
         max_context_len (int): The max sequence length.
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
 
     [class method]: single_query_kv_attention
@@ -604,7 +609,9 @@ class PagedAttention:
         scale,
         is_cusal,
         block_tables,
-        alibi_slopes
+        alibi_slopes,
+        key_cache,
+        val_cache,
     )
 
     Args:
@@ -624,6 +631,9 @@ class PagedAttention:
         block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
             to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
+
     """
 
     runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
@@ -636,10 +646,14 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
-        ).reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+        ).reshape_and_cache(
+            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+        )
 
     @classmethod
     def reshape_and_cache_flash(
@@ -680,13 +694,9 @@ class PagedAttention:
         block_size: int,
         max_context_len: int,
         alibi_slopes: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
-        warnings.warn(
-            """
-            intel_extension_for_pytorch.llm.PagedAttention.single_query_cached_kv_attention is going to be deprecated.
-            Please use intel_extension_for_pytorch.llm.PagedAttention.single_query_kv_attention instead.
-            """
-        )
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).single_query_cached_kv_attention(
@@ -701,6 +711,8 @@ class PagedAttention:
             block_size,
             max_context_len,
             alibi_slopes,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -749,6 +761,8 @@ class PagedAttention:
         is_cusal: bool,
         block_tables: torch.Tensor,
         alibi_slopes: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -765,6 +779,8 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
+            k_scale,
+            v_scale,
         )
 
 

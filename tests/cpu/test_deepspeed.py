@@ -3,6 +3,10 @@ import os
 import tempfile
 import unittest
 
+from intel_extension_for_pytorch.llm.utils import (
+    load_low_precision_checkpoint,
+    shard_low_precision_checkpoint,
+)
 import torch
 import torch.nn as nn
 from torch.testing._internal.jit_utils import JitTestCase
@@ -26,6 +30,7 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
 )
 
 from test_weight_prepack import module_found
+import json
 
 try:
     import transformers
@@ -34,7 +39,7 @@ except ImportError:
     import subprocess
 
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.45.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.46.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -192,12 +197,7 @@ class DeepspeedTester(JitTestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
-            check_lm_head = False
-            if len(deepspeed_modules) == 3:
-                check_lm_head = True
-                LmHeadLinearAllreduce = deepspeed_modules[2]
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
@@ -206,16 +206,7 @@ class DeepspeedTester(JitTestCase):
             ds_model = self._get_ds_model(m_linear)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
-
-            # TODO: [Notes: LmHeadLinearAllreduce replacement test]
-            # On the public master of deepspeed,
-            # LmHeadLinearAllreduce replacement will only happen if checkpoint has been loaded:
-            # github.com/microsoft/DeepSpeed/blob/16c265c0ce103147d027d9cae32dd7680766af21/deepspeed/module_inject/replace_module.py
-            # #L352
-            # Need to figure out a way to use checkpoint in the UT to test LmHeadLinearAllreduce replacement.
-            # Disable the check for now.
-            if False:  # if check_lm_head:
-                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
+            self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             optimized = ipex.optimize(
                 ds_model.eval(),
@@ -232,10 +223,7 @@ class DeepspeedTester(JitTestCase):
                 jit_optimized = torch.jit.freeze(jit_optimized)
                 self.assertTrue(module_found(optimized, _IPEXLinear))
                 self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
-
-                # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-                if False:  # if check_lm_head:
-                    self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
+                self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
 
                 jit_optimized(x)
                 graph = jit_optimized.graph_for(x)
@@ -253,23 +241,18 @@ class DeepspeedTester(JitTestCase):
     ):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
-            check_lm_head = False
-            if len(deepspeed_modules) == 3:
-                check_lm_head = True
-                LmHeadLinearAllreduce = deepspeed_modules[2]
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)
+            y_ds = ds_model(x)
+            self.assertEqual(y, y_ds, atol=atol, rtol=rtol)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
-            # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-            if False:  # if check_lm_head:
-                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
+            self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             prepared_model = prepare(
                 ds_model,
@@ -282,19 +265,26 @@ class DeepspeedTester(JitTestCase):
             self.assertTrue(
                 all(module_found(converted, qmodule) for qmodule in qmodules)
             )
+            prepared_model_ref = prepare(
+                m_linear,
+                dynamic_qconfig,
+                example_inputs=(x),
+                inplace=True,
+                bn_folding=False,
+            )
+            converted_ref = convert(prepared_model_ref, inplace=True)
 
-            # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-            if False:  # if check_lm_head
-                self.assertTrue(
-                    all(
-                        module_found(converted, lm_head_qmodule)
-                        for lm_head_qmodule in lm_head_qmodules
-                    )
+            self.assertTrue(
+                all(
+                    module_found(converted, lm_head_qmodule)
+                    for lm_head_qmodule in lm_head_qmodules
                 )
+            )
 
             with torch.no_grad():
                 y_quantized = converted(x)
-                self.assertEqual(y, y_quantized, atol=atol, rtol=rtol)
+                y_ref = converted_ref(x)
+                self.assertEqual(y_ref, y_quantized, atol=atol, rtol=rtol)
 
                 converted = torch.jit.trace(converted, x)
                 traced = torch.jit.freeze(converted)
@@ -305,7 +295,7 @@ class DeepspeedTester(JitTestCase):
                     FileCheck().check(graph_string).run(graph)
 
                 y_traced = traced(x)
-                self.assertEqual(y, y_traced, atol=atol, rtol=rtol)
+                self.assertEqual(y_ref, y_traced, atol=atol, rtol=rtol)
 
                 with tempfile.TemporaryDirectory() as tmp:
                     path = os.path.join(tmp, "ds_model.pt")
@@ -319,7 +309,7 @@ class DeepspeedTester(JitTestCase):
                         FileCheck().check(graph_string).run(graph_loaded)
 
                     y_loaded = loaded(x)
-                    self.assertEqual(y, y_loaded, atol=atol, rtol=rtol)
+                    self.assertEqual(y_ref, y_loaded, atol=atol, rtol=rtol)
 
     def test_dynamic_quantization(self):
         self._test_quantization(
@@ -422,6 +412,282 @@ class DeepspeedTester(JitTestCase):
         )
         with torch.no_grad():
             model(*example_inputs)
+
+    def test_shard_awq_low_precision_checkpoint(self):
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        ds_world_size = int(os.getenv("WORLD_SIZE", "1"))
+        if ds_world_size != 2:
+            print("Warning: Expect ds_world_size to be 2.")
+            return
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        with tempfile.TemporaryDirectory() as work_dir:
+            # Generate dummy checkpoint
+            checkpoint_file_name = work_dir + "/checkpoint.pt"
+            state_dict = model.state_dict()
+            linear_keys = []
+            for k, v in state_dict.items():
+                if any(
+                    k.endswith(suffix)
+                    for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
+                ):
+                    linear_keys.append(k[:-7])
+            group_size = 128
+            comp_ratio = 8
+            for k in linear_keys:
+                N = state_dict[k + ".weight"].shape[0]
+                K = state_dict[k + ".weight"].shape[1]
+                del state_dict[k + ".weight"]
+                n_groups = K // group_size
+                stored_weight_shape = (K, N // comp_ratio)
+                stored_scales_shape = (n_groups, N)
+                stored_zeros_shape = (n_groups, N // comp_ratio)
+                state_dict[k + ".qweight"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                )
+                state_dict[k + ".scales"] = torch.randn(
+                    stored_scales_shape, dtype=torch.half
+                )
+                state_dict[k + ".qzeros"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                )
+
+            torch.save(state_dict, checkpoint_file_name)
+            quantization_config = {
+                "quant_method": "awq",
+                "group_size": group_size,
+                "desc_act": False,
+            }
+            config_dict = {"quantization_config": quantization_config}
+            config_file_name = work_dir + "/config.json"
+            with open(config_file_name, "w", encoding="utf-8") as file:
+                json.dump(config_dict, file, ensure_ascii=False, indent=4)
+            low_precision_checkpoint, quant_config = load_low_precision_checkpoint(
+                work_dir
+            )
+            quantization_method = quant_config["quant_method"]
+            group_size = quant_config["group_size"]
+            quantization_method = "awq"
+            sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
+                low_precision_checkpoint,
+                config,
+                local_rank,
+                ds_world_size,
+                quantization_method,
+                group_size,
+                False,
+            )
+            sharded_low_precision_checkpoint = (
+                sharded_low_precision_checkpoint,
+                quant_config,
+            )
+        shard_dict = {
+            "self_attn.q_proj.qweight": [4096, 256],
+            "self_attn.q_proj.scales": [32, 2048],
+            "self_attn.q_proj.zeros": [32, 256],
+            "self_attn.k_proj.qweight": [4096, 256],
+            "self_attn.k_proj.scales": [32, 2048],
+            "self_attn.k_proj.zeros": [32, 256],
+            "self_attn.v_proj.qweight": [4096, 256],
+            "self_attn.v_proj.scales": [32, 2048],
+            "self_attn.v_proj.zeros": [32, 256],
+            "self_attn.o_proj.qweight": [2048, 512],
+            "self_attn.o_proj.scales": [16, 4096],
+            "self_attn.o_proj.zeros": [16, 512],
+            "mlp.up_proj.qweight": [4096, 688],
+            "mlp.up_proj.scales": [32, 5504],
+            "mlp.up_proj.zeros": [32, 688],
+            "mlp.gate_proj.qweight": [4096, 688],
+            "mlp.gate_proj.scales": [32, 5504],
+            "mlp.gate_proj.zeros": [32, 688],
+            "mlp.down_proj.qweight": [5504, 512],
+            "mlp.down_proj.scales": [43, 4096],
+            "mlp.down_proj.zeros": [43, 512],
+            "lm_head.weight": [32000, 2048],
+        }
+        assert quantization_method == "awq"
+        low_precision_checkpoint_dict = sharded_low_precision_checkpoint[0].copy()
+        for key in low_precision_checkpoint_dict.keys():
+            for layer in shard_dict:
+                if layer not in key:
+                    continue
+                if "bias" in key:
+                    continue
+                assert (
+                    low_precision_checkpoint_dict[key].shape[0] == shard_dict[layer][0]
+                    and low_precision_checkpoint_dict[key].shape[1]
+                    == shard_dict[layer][1]
+                ), "shape after shard does not match"
+
+    def test_shard_gptq_low_precision_checkpoint(self):
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        ds_world_size = int(os.getenv("WORLD_SIZE", "1"))
+        if ds_world_size != 2:
+            print("Warning: Expect ds_world_size to be 2.")
+            return
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        for desc_act in {True, False}:
+            with tempfile.TemporaryDirectory() as work_dir:
+                # Generate dummy checkpoint
+                checkpoint_file_name = work_dir + "/checkpoint.pt"
+                state_dict = model.state_dict()
+                linear_keys = []
+                for k, v in state_dict.items():
+                    if any(
+                        k.endswith(suffix)
+                        for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
+                    ):
+                        linear_keys.append(k[:-7])
+                group_size = 32
+                comp_ratio = 8
+                for k in linear_keys:
+                    N = state_dict[k + ".weight"].shape[0]
+                    K = state_dict[k + ".weight"].shape[1]
+                    del state_dict[k + ".weight"]
+                    n_groups = K // group_size
+                    stored_weight_shape = (K, N // comp_ratio)
+                    stored_scales_shape = (n_groups, N)
+                    stored_zeros_shape = (n_groups, N // comp_ratio)
+                    stored_g_idx_shape = (K * 8,)
+                    state_dict[k + ".qweight"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                    )
+                    state_dict[k + ".scales"] = torch.randn(
+                        stored_scales_shape, dtype=torch.half
+                    )
+                    state_dict[k + ".qzeros"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                    )
+                    state_dict[k + ".g_idx"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_g_idx_shape, dtype=torch.int32
+                    )
+
+                torch.save(state_dict, checkpoint_file_name)
+                quantization_config = {
+                    "quant_method": "gptq",
+                    "group_size": group_size,
+                    "desc_act": desc_act,
+                }
+                config_dict = {"quantization_config": quantization_config}
+                config_file_name = work_dir + "/config.json"
+                with open(config_file_name, "w", encoding="utf-8") as file:
+                    json.dump(config_dict, file, ensure_ascii=False, indent=4)
+                low_precision_checkpoint, quant_config = load_low_precision_checkpoint(
+                    work_dir
+                )
+                quantization_method = quant_config["quant_method"]
+                group_size = quant_config["group_size"]
+                sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
+                    low_precision_checkpoint,
+                    config,
+                    local_rank,
+                    ds_world_size,
+                    quantization_method,
+                    group_size,
+                    desc_act,
+                )
+                sharded_low_precision_checkpoint = (
+                    sharded_low_precision_checkpoint,
+                    quant_config,
+                )
+            desc_true_shard_dict = {
+                "self_attn.q_proj.qweight": [4096, 256],
+                "self_attn.q_proj.scales": [128, 2048],
+                "self_attn.q_proj.zeros": [128, 256],
+                "self_attn.q_proj.g_idx": [32768],
+                "self_attn.k_proj.qweight": [4096, 256],
+                "self_attn.k_proj.scales": [128, 2048],
+                "self_attn.k_proj.zeros": [128, 256],
+                "self_attn.k_proj.g_idx": [32768],
+                "self_attn.v_proj.qweight": [4096, 256],
+                "self_attn.v_proj.scales": [128, 2048],
+                "self_attn.v_proj.zeros": [128, 256],
+                "self_attn.v_proj.g_idx": [32768],
+                "self_attn.o_proj.qweight": [2048, 512],
+                "self_attn.o_proj.scales": [128, 4096],
+                "self_attn.o_proj.zeros": [128, 512],
+                "self_attn.o_proj.g_idx": [16384],
+                "mlp.up_proj.qweight_0": [4096, 704],
+                "mlp.up_proj.qweight_1": [4096, 672],
+                "mlp.up_proj.scales": [128, 5504],
+                "mlp.up_proj.zeros_0": [128, 704],
+                "mlp.up_proj.zeros_1": [128, 672],
+                "mlp.up_proj.g_idx": [32768],
+                "mlp.gate_proj.qweight_0": [4096, 704],
+                "mlp.gate_proj.qweight_1": [4096, 672],
+                "mlp.gate_proj.scales": [128, 5504],
+                "mlp.gate_proj.zeros_0": [128, 704],
+                "mlp.gate_proj.zeros_1": [128, 672],
+                "mlp.gate_proj.g_idx": [32768],
+                "mlp.down_proj.qweight": [5504, 512],
+                "mlp.down_proj.scales": [344, 4096],
+                "mlp.down_proj.zeros": [344, 512],
+                "mlp.down_proj.g_idx": [44032],
+                "lm_head.weight": [32000, 2048],
+            }
+            desc_false_shard_dict = {
+                "self_attn.q_proj.qweight": [4096, 256],
+                "self_attn.q_proj.scales": [128, 2048],
+                "self_attn.q_proj.zeros": [128, 256],
+                "self_attn.k_proj.qweight": [4096, 256],
+                "self_attn.k_proj.scales": [128, 2048],
+                "self_attn.k_proj.zeros": [128, 256],
+                "self_attn.v_proj.qweight": [4096, 256],
+                "self_attn.v_proj.scales": [128, 2048],
+                "self_attn.v_proj.zeros": [128, 256],
+                "self_attn.o_proj.qweight": [2048, 512],
+                "self_attn.o_proj.scales": [64, 4096],
+                "self_attn.o_proj.zeros": [64, 512],
+                "mlp.up_proj.qweight_0": [4096, 704],
+                "mlp.up_proj.qweight_1": [4096, 672],
+                "mlp.up_proj.scales": [128, 5504],
+                "mlp.up_proj.zeros_1": [128, 704],
+                "mlp.up_proj.zeros_0": [128, 672],
+                "mlp.gate_proj.qweight_0": [4096, 704],
+                "mlp.gate_proj.qweight_1": [4096, 672],
+                "mlp.gate_proj.scales": [128, 5504],
+                "mlp.gate_proj.zeros_0": [128, 704],
+                "mlp.gate_proj.zeros_1": [128, 672],
+                "mlp.down_proj.qweight": [5504, 512],
+                "mlp.down_proj.scales": [172, 4096],
+                "mlp.down_proj.zeros": [172, 512],
+                "lm_head.weight": [32000, 2048],
+            }
+            if desc_act is True:
+                shard_dict = desc_true_shard_dict
+            else:
+                shard_dict = desc_false_shard_dict
+            assert quantization_method == "gptq"
+            low_precision_checkpoint_dict = sharded_low_precision_checkpoint[0].copy()
+            for key in low_precision_checkpoint_dict.keys():
+                for layer in shard_dict:
+                    if layer not in key:
+                        continue
+                    if "bias" in key:
+                        continue
+                    if "g_idx" in key:
+                        assert (
+                            low_precision_checkpoint_dict[key].shape[0]
+                            == shard_dict[layer][0]
+                        ), "shape after shard does not match"
+                    else:
+                        if ("up_proj" in layer or "gate_proj" in layer) and (
+                            "qweight" in key or "zeros" in key
+                        ):
+                            layer = layer + "_" + str(local_rank)
+                        assert (
+                            low_precision_checkpoint_dict[key].shape[0]
+                            == shard_dict[layer][0]
+                            and low_precision_checkpoint_dict[key].shape[1]
+                            == shard_dict[layer][1]
+                        ), "shape after shard does not match"
 
 
 if __name__ == "__main__":

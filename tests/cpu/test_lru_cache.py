@@ -43,10 +43,14 @@ class Tester(TestCase):
         conv = Conv2d().eval()
         conv = ipex.optimize(conv, dtype=torch.float32)
         conv(torch.randn(3, 64, 56, 56))
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            linear_dtype = torch.bfloat16
+        else:
+            linear_dtype = torch.float32
         # Linear
         linear = Linear().eval()
-        linear = ipex.optimize(linear, dtype=torch.bfloat16)
-        linear(torch.randn((100, 64), dtype=torch.bfloat16))
+        linear = ipex.optimize(linear, dtype=linear_dtype)
+        linear(torch.randn((100, 64), dtype=linear_dtype))
         # Matmul
         matmul = MatmulDiv().eval()
         x = torch.randn(10, 3, 4)

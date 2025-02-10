@@ -12,6 +12,12 @@ from bench.custom_op_bench.merged_embeddingbag import (
 import intel_extension_for_pytorch as ipex
 import copy
 
+dtypes = [torch.float64, torch.float32]
+if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+    dtypes.append(torch.bfloat16)
+if torch.ops.mkldnn._is_mkldnn_fp16_supported():
+    dtypes.append(torch.float16)
+
 
 class TestMergedEmbedding(TestCase):
     multi_hot = [
@@ -128,12 +134,7 @@ class TestMergedEmbedding(TestCase):
                         ).to(index_type)
                         for i in range(NUM_TABLE)
                     ]
-                    for dtype in [
-                        torch.float64,
-                        torch.float32,
-                        torch.bfloat16,
-                        torch.float16,
-                    ]:
+                    for dtype in dtypes:
                         for NUM_DIM in [128, 129]:
                             # 128 for fast path, 129 for general path
                             emb_list = EmbeddingBagList(
@@ -177,12 +178,7 @@ class TestMergedEmbedding(TestCase):
                         ).to(index_type)
                         for i in range(NUM_TABLE)
                     ]
-                    for dtype in [
-                        torch.bfloat16,
-                        torch.float32,
-                        torch.float16,
-                        torch.float64,
-                    ]:
+                    for dtype in dtypes:
                         for NUM_DIM in [128, 129]:
                             # 128 for fast path, 129 for general path
                             # test merged emb return dense grad

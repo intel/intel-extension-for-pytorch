@@ -210,6 +210,10 @@ class TestOp(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     @llga_fp32_bf16_test_env
     def test_softmax_different_output_dtype(self):
         class M(nn.Module):

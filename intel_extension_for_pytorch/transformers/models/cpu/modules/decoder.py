@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 from ...cpu.fusions.linear_fusion import (
     _IPEXlinearAddCPU,
     _IPEXlinearAddAddCPU,
@@ -58,6 +59,10 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "QWenLMHeadModel",
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
+            "Maira2ForConditionalGeneration",
+            "JambaForCausalLM",
+            "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "linear_add"):
@@ -75,6 +80,10 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 if hasattr(module, "mlp_linear_add"):
                     self.mlp_linear_add = _IPEXlinearAddCPU(
                         module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "shared_linear_add_add"):
+                    self.shared_linear_add_add = _IPEXlinearAddAddCPU(
+                        module.shared_linear_add_add.linear, tpp=tpp, woq=woq
                     )
                 if hasattr(module, "mlp_linear_add_add"):
                     self.mlp_linear_add = _IPEXlinearAddAddCPU(
@@ -114,6 +123,109 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if hasattr(module, "linear_relu"):
                 self.linear_relu = _IPEXlinearReluCPU(
                     module.linear_relu.linear, tpp=tpp, woq=woq
+                )
+            if hasattr(module, "linear_gelus"):
+                linear_gelus = [
+                    _IPEXlinearGeluCPU(linear_gelu.linear, tpp=tpp, woq=woq)
+                    for linear_gelu in module.linear_gelus
+                ]
+                self.linear_gelus = nn.Sequential(*linear_gelus)
+            if hasattr(module, "mlp_linear_silu_mul"):
+                self.mlp_linear_silu_mul = _IPEXlinearSiluMulCPU(
+                    module.mlp_linear_silu_mul.linear_s,
+                    module.mlp_linear_silu_mul.linear_m,
+                    tpp=tpp,
+                    woq=woq,
+                )
+            if hasattr(module, "shared_linear_silu_mul"):
+                self.shared_linear_silu_mul = _IPEXlinearSiluMulCPU(
+                    module.shared_linear_silu_mul.linear_s,
+                    module.shared_linear_silu_mul.linear_m,
+                    tpp=tpp,
+                    woq=woq,
+                )
+            if self.model_backbone in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
+                if hasattr(self.mlp, "experts"):
+                    # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
+                    self.moe_linear_type = 0
+                    if self.mlp.experts[0].gate_proj.weight.dtype in [
+                        torch.qint8,
+                        torch.int8,
+                        torch.uint8,
+                    ]:
+                        self.moe_linear_type = 4
+                    elif (
+                        hasattr(self.mlp.experts[0].gate_proj, "use_tpp")
+                        and self.mlp.experts[0].gate_proj.use_tpp
+                    ):
+                        if not self.mlp.experts[0].gate_proj.tpp_fallback:
+                            self.moe_linear_type = 1
+                    elif hasattr(self.mlp.experts[0].gate_proj, "use_dnnl"):
+                        if self.mlp.experts[0].gate_proj.use_dnnl:
+                            self.moe_linear_type = 2
+                        else:
+                            self.moe_linear_type = 3
+                    self.gate_weights = []
+                    self.up_weights = []
+                    self.down_weights = []
+                    self.gate_ctx = []
+                    self.up_ctx = []
+                    self.down_ctx = []
+                    offset = self.mlp.ep_rank * self.mlp.experts_per_rank
+                    for expert_idx in range(len(self.mlp.experts)):
+                        expert_layer = self.mlp.experts[expert_idx + offset]
+                        if self.moe_linear_type in [0, 1]:
+                            self.gate_weights.append(expert_layer.gate_proj.weight)
+                            self.up_weights.append(expert_layer.up_proj.weight)
+                            self.down_weights.append(expert_layer.down_proj.weight)
+                        elif self.moe_linear_type in [2, 3]:
+                            self.gate_weights.append(
+                                expert_layer.gate_proj._get_forward_weight()
+                            )
+                            self.up_weights.append(
+                                expert_layer.up_proj._get_forward_weight()
+                            )
+                            self.down_weights.append(
+                                expert_layer.down_proj._get_forward_weight()
+                            )
+                            self.gate_ctx.append(expert_layer.gate_proj.ctx)
+                            self.up_ctx.append(expert_layer.up_proj.ctx)
+                            self.down_ctx.append(expert_layer.down_proj.ctx)
+                        else:
+                            self.gate_ctx.append(expert_layer.gate_proj._op_context)
+                            self.up_ctx.append(expert_layer.up_proj._op_context)
+                            self.down_ctx.append(expert_layer.down_proj._op_context)
+        else:
+            AssertionError(False, "Do not support the optimization of your model yet")
+
+
+class _IPEXEncoderLayerCPU(nn.Module):
+    def __init__(self, module, config, tpp=False, woq=False):
+        super().__init__()
+        for k, v in module.__dict__.items():
+            setattr(self, k, v)
+        for k, v in module.__class__.__dict__.items():
+            if k.startswith("__"):
+                continue
+            setattr(self.__class__, k, getattr(module.__class__, k))
+        if self.model_backbone in [
+            "MllamaForConditionalGeneration",
+        ]:
+            if not self.distributed:
+                if hasattr(module, "mlp_linear_add"):
+                    self.mlp_linear_add = _IPEXlinearAddCPU(
+                        module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "mlp_linear_mul"):
+                    self.mlp_linear_mul = _IPEXlinearMulCPU(
+                        module.mlp_linear_mul.linear, tpp=tpp, woq=woq
+                    )
+            if hasattr(module, "linear_gelu"):
+                self.linear_silu = _IPEXlinearGeluCPU(
+                    module.linear_gelu.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

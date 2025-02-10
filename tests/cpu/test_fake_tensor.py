@@ -109,6 +109,11 @@ class TestFakeCases(TestCase):
                 channels_last = torch.channels_last
             elif dim == 3:
                 channels_last = torch.channels_last_3d
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             if dim == 1:
                 options = itertools.product(
                     [True, False],
@@ -116,7 +121,7 @@ class TestFakeCases(TestCase):
                     [1, 4],
                     [True, False],
                     [torch.contiguous_format],
-                    [torch.float32, torch.bfloat16],
+                    dtypes,
                 )
             else:
                 options = itertools.product(
@@ -125,7 +130,7 @@ class TestFakeCases(TestCase):
                     [1, 4],
                     [True, False],
                     [torch.contiguous_format, channels_last],
-                    [torch.float32, torch.bfloat16],
+                    dtypes,
                 )
             for (
                 bias,
@@ -182,12 +187,17 @@ class TestFakeCases(TestCase):
         in_features = torch.randint(3, 10, (1,)).item()
 
         input_shapes = [(8, in_features), (2, 4, in_features), (2, 2, 2, in_features)]
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
             [True, False],
             input_shapes,
             [True, False],
             [True, False],
-            [torch.float32, torch.bfloat16],
+            dtypes,
         )
         for bias, x_shape, feed_sample_input, auto_kernel_selection, dtype in options:
             x = torch.randn(x_shape, dtype=torch.float32)
@@ -235,6 +245,11 @@ class TestFakeCases(TestCase):
             input_channel_per_group = 15
             output_channel_per_group = 3
             kernel_size = 3
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             options = itertools.product(
                 [True, False],
                 [1, 2],
@@ -243,7 +258,7 @@ class TestFakeCases(TestCase):
                 [1, 2],
                 [True, False],
                 [torch.contiguous_format, channels_last],
-                [torch.float32, torch.bfloat16],
+                dtypes,
             )
             for (
                 bias,
