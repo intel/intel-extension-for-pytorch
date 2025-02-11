@@ -21,8 +21,6 @@ class TestFalconOptimize(TestIpexLLMOptimizeBase):
     @parametrize("input_tokens_length", common_params["input_tokens_length"])
     @parametrize("max_new_tokens", common_params["max_new_tokens"])
     def test_falcon_model_generate(self, **params):
-        if params["use_static_cache"] == False and params["input_tokens_length"] == 1024:
-            pytest.skip("Skipping this test temporarily.")
         self.run_generate_test(**params)
 
 

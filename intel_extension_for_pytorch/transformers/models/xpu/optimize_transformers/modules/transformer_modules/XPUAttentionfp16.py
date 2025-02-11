@@ -155,9 +155,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         else:
             prev_len = 0
             if isinstance(past_key_value, List) or isinstance(past_key_value, Tuple):
-                prev_len = past_key_value[0].shape[-2]
+                if len(past_key_value) > layer_id:
+                    prev_len = past_key_value[layer_id].shape[-2]
+                else:
+                    prev_len = 0
             elif isinstance(past_key_value, Cache):
-                prev_len = past_key_value.get_seq_length()
+                prev_len = past_key_value.get_seq_length(layer_id)
             self.seq_len = curr_len + prev_len
             if hasattr(self, "position_embed") and self.position_embed is not None:
                 query, key = self.position_embed(
