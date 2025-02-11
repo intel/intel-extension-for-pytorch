@@ -29,6 +29,11 @@ need_recover_models_list = {
 }
 
 
+def get_module_structure(model) -> str:
+    structure = sorted((name, type(module).__name__) for name, module in model.named_modules())
+    return str(structure).encode('utf-8')
+
+
 def cache_module(model_list):
     module_cache = {}
     for model_type, recovery_str in model_list.items():
@@ -129,9 +134,17 @@ class TestIpexLLMOptimizeBase(TestCase):
             f"max_new_tokens={max_new_tokens}, use_static_cache={use_static_cache}"
         )
 
+        original_model_structure = get_module_structure(model)
         model = ipex.llm.optimize(
             model.eval(), dtype=dtype, device=device, inplace=True
         )
+        optimized_model_structure = get_module_structure(model)
+        self.assertNotEqual(
+            original_model_structure,
+            optimized_model_structure,
+            "Model structure does not change, indicating no submodule replacement occurred."
+        )
+
         if use_static_cache:
             generate_kwargs.update({"cache_implementation": "static"})
         with torch.inference_mode(), torch.no_grad(), torch.xpu.amp.autocast(
