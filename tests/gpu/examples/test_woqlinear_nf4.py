@@ -143,13 +143,20 @@ class Test4bitDequant(TestCase):
 
         return out
 
-    def test_nf4_dequant_woqlinear(self):
-        shapes = [(4096, 4096), (4096, 11008), (11008, 4096)]
+    def test_nf4_dequant(self):
+        shapes = [
+            (4096, 4096),
+            (4096, 11008),
+            (11008, 4096),
+            (4096, 2048),
+            (1024, 2048),
+            (14336, 2048),
+            (4096, 7168),
+        ]
         blocksize = 128
-        for dtype in [torch.bfloat16, torch.float16]:
+        for dtype in [torch.bfloat16, torch.float16, torch.float32]:
             for shape in shapes:
                 weight = torch.randn(shape, dtype=dtype, device="xpu")
-                input = torch.randn((8, shape[1]), dtype=dtype, device="xpu")
 
                 # quantize
                 quant_weight, state = self.quantize_nf4(
@@ -158,7 +165,6 @@ class Test4bitDequant(TestCase):
 
                 # dequantize ref
                 dequant_ref = self.dequantize_nf4(quant_weight, state, quant_type="nf4")
-                linear_ref = torch.nn.functional.linear(input, dequant_ref)
 
                 # nf4 dequantize
                 dequant_output = torch.ops.torch_ipex.dequantize_4bit(
@@ -170,25 +176,61 @@ class Test4bitDequant(TestCase):
                     state["blocksize"],
                 )
 
-                # nf4 woq linear
-                linear_output = torch.ops.torch_ipex.woq_linear(
-                    input,
-                    quant_weight.reshape([weight.shape[0], weight.shape[1] // 2]),
-                    "nf4",
-                    weight.shape,
-                    state["absmax"].view(weight.shape[0], weight.shape[1] // blocksize),
-                    None,
-                    None,
-                    None,
-                    blocksize,
-                    0,
-                    -1,
-                    None,
-                )
-
                 self.assertEqual(
                     dequant_ref, dequant_output, atol=checking_atol, rtol=checking_rtol
                 )
-                self.assertEqual(
-                    linear_ref, linear_output, atol=checking_atol, rtol=checking_rtol
-                )
+
+    def test_nf4_dequant_woqlinear(self):
+        shapes = [
+            (4096, 4096),
+            (4096, 11008),
+            (11008, 4096),
+            (4096, 2048),
+            (1024, 2048),
+            (14336, 2048),
+            (4096, 7168),
+        ]
+        blocksize = 128
+        for weight_dtype in [torch.bfloat16, torch.float16, torch.float32]:
+            for input_dtype in [torch.bfloat16, torch.float16, torch.float32]:
+                for shape in shapes:
+                    weight = torch.randn(shape, dtype=weight_dtype, device="xpu")
+                    input = torch.randn((8, shape[1]), dtype=input_dtype, device="xpu")
+
+                    # quantize
+                    quant_weight, state = self.quantize_nf4(
+                        weight, blocksize=blocksize, quant_type="nf4"
+                    )
+
+                    # dequantize ref
+                    dequant_ref = self.dequantize_nf4(
+                        quant_weight, state, quant_type="nf4"
+                    )
+                    linear_ref = torch.nn.functional.linear(
+                        input, dequant_ref.to(input.dtype)
+                    )
+
+                    # nf4 woq linear
+                    linear_output = torch.ops.torch_ipex.woq_linear(
+                        input,
+                        quant_weight.reshape([weight.shape[0], weight.shape[1] // 2]),
+                        "nf4",
+                        weight.shape,
+                        state["absmax"].view(
+                            weight.shape[0], weight.shape[1] // blocksize
+                        ),
+                        None,
+                        None,
+                        None,
+                        blocksize,
+                        0,
+                        -1,
+                        None,
+                    )
+
+                    self.assertEqual(
+                        linear_ref,
+                        linear_output,
+                        atol=checking_atol,
+                        rtol=checking_rtol,
+                    )
