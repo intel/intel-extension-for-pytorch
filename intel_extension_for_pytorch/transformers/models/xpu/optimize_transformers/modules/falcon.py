@@ -137,7 +137,11 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                 transpose_attn_fused_qkv_params, self.attn
             )
 
-        self.mlp = FalconMLP(config)
+        self.mlp = (
+            FalconMLP(config)
+            if not self.new_decoder_architecture
+            else self.build_mlp_from_config("Falcon")
+        )
 
         if not self.parallel_attn:
             self.post_attention_layernorm = nn.LayerNorm(
@@ -221,8 +225,13 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         )
 
     def port_mlp_parameter(self):
-        self.mlp.dense_h_to_4h = self.module.mlp.dense_h_to_4h
-        self.mlp.dense_4h_to_h = self.module.mlp.dense_4h_to_h
+        if self.new_decoder_architecture:
+            self.mlp.load_parameter(
+                self.module.mlp.dense_h_to_4h, self.module.mlp.dense_4h_to_h
+            )
+        else:
+            self.mlp.dense_h_to_4h = self.module.mlp.dense_h_to_4h
+            self.mlp.dense_4h_to_h = self.module.mlp.dense_4h_to_h
 
     def port_norm_parameter(self):
         if not self.parallel_attn:
@@ -245,6 +254,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                 self.input_layernorm.bias = self.module.input_layernorm.bias
 
     def transpose_parameter(self):
+        if self.new_decoder_architecture:
+            self.mlp.transpose_parameter()
+
         if not self.grouped:
             dtype = self.ipex_config.dtype
             self.attn.transpose_parameter(dtype=dtype)
