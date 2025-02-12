@@ -117,6 +117,10 @@ parser.add_argument("--acc-iter", default=-1, type=int)
 parser.add_argument("--use-static-cache", default=False, action="store_true", help="use static kv cache")
 parser.add_argument("--use-hf-code", default=True, action="store_false", help="use hf transformers code")
 parser.add_argument("--disable-auto-cast", default=False, action="store_true", help="whether to disable auto-mixed-precision feature")
+parser.add_argument("--torch-compile", action="store_true")
+parser.add_argument(
+    "--backend", default="inductor", type=str, help="backend of torch.compile"
+)
 args = parser.parse_args()
 print(args)
 
@@ -211,6 +215,10 @@ if args.ipex:
             model = ipex.llm.optimize(model.eval(), dtype=amp_dtype, **woq_config)
     get_memory_usage("Ipex", args)
 
+if (args.torch_compile and not args.ipex) or \
+   (args.torch_compile and args.disable_optimize_transformers):
+    model.forward = torch.compile(model.forward, dynamic=True, backend=args.backend)
+    print("---- enable compile")
 
 num_beams = 1 if args.greedy else args.num_beams
 # generate args
