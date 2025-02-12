@@ -226,8 +226,10 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
             qkv_proj, query_weight_size + key_weight_size, qkv_proj.weight.shape[0], 1
         )
 
-        del qkv_proj.weight
-        del qkv_proj.bias
+        if qkv_proj.weight is not None:
+            del qkv_proj.weight
+        if qkv_proj.bias is not None:
+            del qkv_proj.bias
 
         self.qkv_proj.weight = torch.concat([wq, wk, wv], dim=1).contiguous()
         if bq is not None:
