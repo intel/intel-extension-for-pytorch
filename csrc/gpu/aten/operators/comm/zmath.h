@@ -42,42 +42,6 @@ inline double zabs<c10::complex<double>, double>(c10::complex<double> z) {
   return std::abs(z);
 }
 
-// This overload corresponds to non-complex dtypes.
-// The function is consistent with its NumPy equivalent
-// for non-complex dtypes where `pi` is returned for
-// negative real numbers and `0` is returned for 0 or positive
-// real numbers.
-// Note: `nan` is propagated.
-template <typename SCALAR_TYPE, typename VALUE_TYPE = SCALAR_TYPE>
-inline VALUE_TYPE angle_impl(SCALAR_TYPE z) {
-  if (at::_isnan(z)) {
-    return z;
-  }
-  return z < 0 ? c10::pi<double> : 0;
-}
-
-template <>
-inline c10::complex<float> angle_impl<c10::complex<float>>(
-    c10::complex<float> z) {
-  return c10::complex<float>(std::arg(z), 0.0);
-}
-
-template <>
-inline float angle_impl<c10::complex<float>, float>(c10::complex<float> z) {
-  return std::arg(z);
-}
-
-template <>
-inline c10::complex<double> angle_impl<c10::complex<double>>(
-    c10::complex<double> z) {
-  return c10::complex<double>(std::arg(z), 0.0);
-}
-
-template <>
-inline double angle_impl<c10::complex<double>, double>(c10::complex<double> z) {
-  return std::arg(z);
-}
-
 template <typename SCALAR_TYPE, typename VALUE_TYPE = SCALAR_TYPE>
 constexpr VALUE_TYPE real_impl(SCALAR_TYPE z) {
   return z; // No-Op
