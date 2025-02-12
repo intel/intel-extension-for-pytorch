@@ -21,7 +21,7 @@ Troubleshooting
   - **Cause**: Intel® Extension for PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is
     compiled with `_GLIBCXX_USE_CXX11_ABI=0`.
   - **Solution**: Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels
-    in [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/) to avoid this issue.
+    in [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/us/) to avoid this issue.
 - **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ Graphics family.
   - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ Graphics GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
     Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is working in progress to allow Intel® Arc™ Graphics GPUs to support more AI models.
