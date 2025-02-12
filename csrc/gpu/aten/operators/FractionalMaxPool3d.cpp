@@ -484,7 +484,7 @@ void fractional_max_pool3d_out_template(
 
   int64_t ndims = input.ndimension();
   TORCH_CHECK(
-      input.numel() != 0 && (ndims == 4 || ndims == 5),
+      (ndims == 4 || ndims == 5),
       "fractional_max_pool3d_out_template(): ",
       "non-empty 4D or 5D (batch mode) tensor expected for input, but got: ",
       ndims);
