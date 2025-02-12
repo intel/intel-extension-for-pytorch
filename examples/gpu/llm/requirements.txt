@@ -1,5 +1,4 @@
 py-cpuinfo
-cpuid
 accelerate
 unzip
 datasets
