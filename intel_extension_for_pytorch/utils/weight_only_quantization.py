@@ -267,6 +267,12 @@ def _convert_woq_with_low_precision_checkpoint(
             if hasattr(mod, "bias") and isinstance(mod.bias, torch.nn.Parameter):
                 new_b = state_dict.get(attr_name + ".bias", mod.bias.data)
                 mod.bias = torch.nn.Parameter(new_b)
+            if hasattr(mod, "e_score_correction_bias"):
+                new_b = state_dict.get(
+                    attr_name + ".e_score_correction_bias",
+                    mod.e_score_correction_bias.data,
+                )
+                mod.e_score_correction_bias = torch.nn.Parameter(new_b)
             return mod
 
         mod_new = mod
