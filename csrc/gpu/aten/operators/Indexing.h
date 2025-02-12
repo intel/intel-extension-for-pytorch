@@ -396,7 +396,7 @@ static inline void _index_copy_kernel(
           src_info,
           dst_info,
           index_info,
-          0,
+          scalar_t{},
           dim,
           true,
           IndexCopyOperator<scalar_t>());
