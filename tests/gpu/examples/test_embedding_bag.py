@@ -82,4 +82,4 @@ if __name__ == '__main__':
     run_tests()
         """
         )
-        self.assertIn("Assertion `vec_idx < num_row` failed", stderr)
+        self.assertIn("Assertion `vec_idx < num_row_` failed", stderr)
