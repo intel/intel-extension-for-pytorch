@@ -108,10 +108,10 @@ class MultiObjective(object):
             if HYPERTUNE_TOKEN in s:
                 try:
                     objectives.append(float(output[i + 1]))
-                except BaseException:
+                except BaseException as e:
                     raise RuntimeError(
                         f"Extracting objective {output[i]} failed for {self.program} file. \
                             Make sure to print an int/float value after the @hypertune token as \
                             the objective value to be minimized or maximized."
-                    )
+                    ) from e
         return objectives

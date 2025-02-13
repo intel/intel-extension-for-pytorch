@@ -269,13 +269,12 @@ def patch_load_state_dict(optimizer):
             )
 
         # Update the state
-        id_map = {
-            old_id: p
-            for old_id, p in zip(
+        id_map = dict(
+            zip(
                 chain.from_iterable((g["params"] for g in saved_groups)),
                 chain.from_iterable((g["params"] for g in groups)),
             )
-        }
+        )
 
         # Copy state assigned to params (and cast tensors to appropriate types).
         # State that is not assigned to params is copied as is (needed for

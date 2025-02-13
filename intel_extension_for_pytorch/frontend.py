@@ -349,7 +349,7 @@ def optimize(
     device_type = "cpu"
     model_parameters_list = list(model.parameters())
     if len(model_parameters_list) and model_parameters_list[0].device.type == "xpu":
-        if not all([param.device.type == "xpu" for param in model_parameters_list]):
+        if not all((param.device.type == "xpu" for param in model_parameters_list)):
             raise RuntimeError("The model is mixed with different device type")
         else:
             device_type = "xpu"

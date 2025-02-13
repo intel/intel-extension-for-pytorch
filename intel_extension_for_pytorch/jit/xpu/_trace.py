@@ -40,7 +40,7 @@ def need_to_disable_check_trace_for_XPU(*args, **kwargs):
         else:
             pass
 
-    is_xpu = all([elm == "xpu" for elm in device_type_list])
+    is_xpu = all((elm == "xpu" for elm in device_type_list))
     if (
         is_xpu
         and ("check_trace" not in kwargs)

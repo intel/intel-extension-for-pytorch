@@ -121,7 +121,7 @@ def _gptq(
     print("Ready.")
 
     for i in range(len(layers)):
-        print(f"Quantizing layer {i+1}/{len(layers)}..")
+        print(f"Quantizing layer {i + 1}/{len(layers)}..")
 
         layer = layers[i]
         layer_name = names[i]
