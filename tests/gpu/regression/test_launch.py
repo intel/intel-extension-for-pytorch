@@ -8,5 +8,5 @@ class TestUXMethod(TestCase):
         import intel_extension_for_pytorch  # noqa F401
 
         end = time.time()
-        print(f"[ INFO ] Intel Extension for Pytorch Launch Time: {end-start}s")
+        print(f"[ INFO ] Intel Extension for Pytorch Launch Time: {end - start}s")
         self.assertLess((end - start), 10, "launch time great than 10s!")

@@ -404,7 +404,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     concat_zeros = torch.concat(zeros_list, 0)
                 else:
                     concat_zeros = None
-                use_bias = all([b is not None for b in bias_list])
+                use_bias = all((b is not None for b in bias_list))
                 concat_bias = torch.concat(bias_list, 0) if use_bias else None
                 mod = nn.Linear(
                     concat_weight.shape[1], concat_weight.shape[0], use_bias

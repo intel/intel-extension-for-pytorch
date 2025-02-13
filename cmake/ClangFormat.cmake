@@ -3,6 +3,11 @@ if(BUILD_NO_CLANGFORMAT)
   return()
 endif()
 
+# Skip for WIN32 to avoid potential issue 
+if(WIN32)
+  return()
+endif()
+
 if(CLANGFORMAT_enabled)
   return()
 endif()

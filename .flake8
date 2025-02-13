@@ -12,6 +12,16 @@ ignore =
     B007,B008,
     # these ignores are from flake8-comprehensions; please fix!
     C400,C401,C402,C403,C404,C405,C407,C411,C413,C414,C415
+    # Ignore due to that we need decision,
+    # B907: https://peps.python.org/pep-3101/#explicit-conversion-flag
+    # B023: https://docs.astral.sh/ruff/rules/function-uses-loop-variable/
+    # B905: https://docs.astral.sh/ruff/rules/zip-without-explicit-strict/
+    B907, B023, B905
+    # B028 is for stack level of warning. We don't want it because we only
+    # want 1 level of stack.
+    B028,
+    # Mostly on CPU side, need CPU team to fix it.
+    B031, C419
 per-file-ignores = __init__.py: F401,F403
 optional-ascii-coding = True
 exclude =
