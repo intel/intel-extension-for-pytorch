@@ -14,6 +14,7 @@
 #include "aten/operators/torch-xpu-ops/sycl/Loops.h"
 #include "aten/operators/torch-xpu-ops/sycl/Reduce.h"
 #include "aten/operators/torch-xpu-ops/sycl/ResizeKernel.h"
+#include "aten/operators/torch-xpu-ops/sycl/WelfordNorm.h"
 
 #include "aten/operators/ReduceOpStdVar.h"
 
@@ -25,6 +26,8 @@ namespace xpu {
 
 #define SIMD32 32
 #define SIMD16 16
+#define PREFERRED_VEC_SIZE \
+  2 // To reduce register spill, we should not allocate too many
 
 // ========================== batch_norm utils ==========================
 
@@ -363,14 +366,14 @@ inline int div_up(int a, int b) {
 
 constexpr int ELEMENTS_PER_ITER =
     4; // enables concurrency within each thread to hide latency
-constexpr int ELEMENTS_PER_WORK_ITEM = 16;
+constexpr int ELEMENTS_PER_WORK_ITEM = 4;
 
 std::tuple<sycl::range<2>, sycl::range<2>> get_adaptive_launch_config(
+    const int max_wg_size,
     const int reduction,
     const int stride,
     const bool coop_flag = false,
     const int loops_per_item = 1) {
-  int max_wg_size = syclMaxWorkItemsPerEU();
   int group_x = std::min(last_pow2(stride), 32);
   int group_y = std::min(
       last_pow2(div_up(reduction, loops_per_item)), max_wg_size / group_x);
@@ -387,7 +390,7 @@ std::tuple<sycl::range<2>, sycl::range<2>> get_adaptive_launch_config(
   if (coop_flag) {
     // it's not worth having a grid reduction if the reduction dimension is not
     // big enough
-    nwg_y = nwg_y < 8 ? 1 : nwg_y;
+    nwg_y = nwg_y < 4 ? 1 : nwg_y;
   }
 
   sycl::range<2> local_range(group_y, group_x);
@@ -1068,42 +1071,127 @@ void batch_norm_stats_channels_last_template(
   TORCH_INTERNAL_ASSERT(
       out_mean.dim() == 1 && out_mean.is_contiguous() && out_mean.sizes()[0]);
 
-  auto config = get_adaptive_launch_config(
-      reduction_size, stride, true, ELEMENTS_PER_WORK_ITEM);
-  auto global_range = std::get<0>(config);
-  auto local_range = std::get<1>(config);
-
   at::Tensor staging_data;
   at::Tensor semaphores;
-  auto wg_size_y = local_range[0];
-  auto wg_size_x = local_range[1];
-  auto nwg_y = global_range[0] / wg_size_y;
-  auto nwg_x = global_range[1] / wg_size_x;
-  if (nwg_y > 1) {
-    staging_data = at::empty({(long)(4 * stride * nwg_y)}, out_mean.options());
-    semaphores = at::zeros({(long)nwg_x}, input.options().dtype(at::kInt));
-  }
-  accscalar_t* staging_data_ptr =
-      nwg_y > 1 ? staging_data.mutable_data_ptr<accscalar_t>() : nullptr;
-  int* semaphores_ptr =
-      nwg_y > 1 ? semaphores.mutable_data_ptr<int>() : nullptr;
 
-  auto kfn = BatchNormCollectStatisticsChannelsLastKernelFunctor<
+  using VecKernel = WelfordBatchNormStatChannelsLastVecKernelFunctor<
       VarTransform,
       scalar_t,
       accscalar_t,
-      ELEMENTS_PER_ITER>(
-      input.const_data_ptr<scalar_t>(),
-      out_mean.mutable_data_ptr<accscalar_t>(),
-      out_invstd.mutable_data_ptr<accscalar_t>(),
-      staging_data_ptr,
-      semaphores_ptr,
-      reduction_size,
-      stride,
-      epsilon,
-      wg_size_y * wg_size_x);
+      PREFERRED_VEC_SIZE>;
+  auto input_ptr = input.const_data_ptr<scalar_t>();
+  auto out_mean_ptr = out_mean.mutable_data_ptr<accscalar_t>();
+  auto out_invstd_ptr = out_invstd.mutable_data_ptr<accscalar_t>();
+  bool use_vec_kernel = false;
 
-  sycl_kernel_submit(global_range, local_range, getCurrentSYCLQueue(), kfn);
+  if (VecKernel::valid(
+          reduction_size, stride, input_ptr, out_mean_ptr, out_invstd_ptr)) {
+    auto kfn = VecKernel(
+        input_ptr,
+        out_mean_ptr,
+        out_invstd_ptr,
+        reduction_size,
+        stride,
+        nullptr,
+        nullptr,
+        epsilon);
+    kfn.init();
+
+    staging_data = at::empty({(long)(kfn.staging_size())}, out_mean.options());
+    semaphores = at::zeros(
+        {(long)(kfn.semaphores_size())}, input.options().dtype(at::kInt));
+    accscalar_t* staging_data_ptr = kfn.num_cooperative_groups() > 1
+        ? staging_data.mutable_data_ptr<accscalar_t>()
+        : nullptr;
+    int* semaphores_ptr = kfn.num_cooperative_groups() > 1
+        ? semaphores.mutable_data_ptr<int>()
+        : nullptr;
+
+    use_vec_kernel = kfn.set_staging_data_check(staging_data_ptr);
+
+    if (use_vec_kernel) {
+      kfn.set_semaphores(semaphores_ptr);
+      sycl_kernel_submit(
+          kfn.global_range(), kfn.local_range(), getCurrentSYCLQueue(), kfn);
+      return;
+    }
+  }
+
+  if (!use_vec_kernel) {
+    using KernelT = BatchNormCollectStatisticsChannelsLastKernelFunctor<
+        VarTransform,
+        scalar_t,
+        accscalar_t,
+        ELEMENTS_PER_ITER>;
+
+    auto config = get_adaptive_launch_config(
+        syclMaxWorkGroupSize<KernelT>(),
+        reduction_size,
+        stride,
+        true,
+        ELEMENTS_PER_WORK_ITEM);
+    auto global_range = std::get<0>(config);
+    auto local_range = std::get<1>(config);
+
+    auto wg_size_y = local_range[0];
+    auto wg_size_x = local_range[1];
+    auto nwg_y = global_range[0] / wg_size_y;
+    auto nwg_x = global_range[1] / wg_size_x;
+    if (nwg_y > 1) {
+      staging_data =
+          at::empty({(long)(4 * stride * nwg_y)}, out_mean.options());
+      semaphores = at::zeros({(long)nwg_x}, input.options().dtype(at::kInt));
+    }
+    accscalar_t* staging_data_ptr =
+        nwg_y > 1 ? staging_data.mutable_data_ptr<accscalar_t>() : nullptr;
+    int* semaphores_ptr =
+        nwg_y > 1 ? semaphores.mutable_data_ptr<int>() : nullptr;
+
+    auto kfn = KernelT(
+        input_ptr,
+        out_mean_ptr,
+        out_invstd_ptr,
+        staging_data_ptr,
+        semaphores_ptr,
+        reduction_size,
+        stride,
+        epsilon,
+        wg_size_y * wg_size_x);
+
+    sycl_kernel_submit(global_range, local_range, getCurrentSYCLQueue(), kfn);
+  }
+}
+
+std::tuple<Tensor, Tensor> batch_norm_stats_kernel(
+    const Tensor& self,
+    double epsilon) {
+  auto options =
+      self.options().dtype(at::toAccumulateType(self.scalar_type(), true));
+  auto n_channels = self.size(1);
+  auto save_mean = at::empty({n_channels}, options);
+  auto save_invstd = at::empty({n_channels}, options);
+
+  bool use_channels_last_kernel = batch_norm_use_channels_last_kernels(self);
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "batch_norm_stats_xpu",
+      [&] {
+        if (canUse32BitIndexMath(self)) {
+          if (use_channels_last_kernel) {
+            batch_norm_stats_channels_last_template<scalar_t, InvStd>(
+                save_mean, save_invstd, self, epsilon);
+          } else {
+            batch_norm_stats_template<scalar_t, int32_t, InvStd>(
+                save_mean, save_invstd, self, epsilon);
+          }
+        } else {
+          batch_norm_stats_template<scalar_t, int64_t, InvStd>(
+              save_mean, save_invstd, self, epsilon);
+        }
+      });
+  return std::tuple<Tensor, Tensor>(save_mean, save_invstd);
 }
 
 // ========================== batch_norm_elemt ==========================
@@ -1273,15 +1361,16 @@ struct BatchNormTransformInputVectorizedKernelFunctor {
            feature_vec_begin < fs;
            feature_vec_begin += VEC_SIZE * item.get_local_range(1)) {
         using vec_t = memory::aligned_vector<input_scalar_t, VEC_SIZE>;
-        vec_t vec;
+        auto i_vec = *reinterpret_cast<vec_t*>(
+            const_cast<input_scalar_t*>(&i[feature_vec_begin]));
+        vec_t o_vec;
 #pragma unroll
         for (int vt = 0; vt < VEC_SIZE; ++vt) {
-          index_t feature = feature_vec_begin + vt;
-          vec[vt] = static_cast<input_scalar_t>(
-              gamma * (i[feature] - mean) * invstd + beta);
+          o_vec[vt] = static_cast<input_scalar_t>(
+              gamma * (i_vec[vt] - mean) * invstd + beta);
         }
         input_scalar_t* write_ptr = &o[feature_vec_begin];
-        *(reinterpret_cast<vec_t*>(write_ptr)) = vec;
+        *(reinterpret_cast<vec_t*>(write_ptr)) = o_vec;
       }
     }
   }
@@ -1417,12 +1506,16 @@ void batch_norm_elemt_template(
   nwg_y = std::min<int>(nwg_y, syclMaxWorkItemsPerTile() / (tf * tb));
   sycl::range<2> global_range(nwg_y * tb, nwg_x * tf);
 
-  auto output_ptr = (char*)output_reshaped.data_ptr();
-  if (output_reshaped.is_contiguous() &&
-      memory::can_vectorize_up_to<input_scalar_t>(output_ptr) >= 4 &&
-      sizeof(input_scalar_t) < sizeof(float) && input.size(2) % 4 == 0) {
+  auto input_ptr = (char*)input_reshaped.const_data_ptr();
+  auto output_ptr = (char*)output_reshaped.mutable_data_ptr();
+  if (input_reshaped.is_contiguous() && output_reshaped.is_contiguous() &&
+      memory::can_vectorize_up_to<input_scalar_t>(input_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      memory::can_vectorize_up_to<input_scalar_t>(output_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      input.size(2) % PREFERRED_VEC_SIZE == 0) {
     auto kfn = BatchNormTransformInputVectorizedKernelFunctor<
-        4,
+        PREFERRED_VEC_SIZE,
         input_scalar_t,
         stat_scalar_t,
         stat_accscalar_t,
@@ -1528,6 +1621,139 @@ struct BatchNormTransformInputChannelsLastKernelFunctor {
   const bool fuse_relu_;
 };
 
+template <
+    typename scalar_t,
+    typename accscalar_t,
+    typename layerscalar_t,
+    int VEC_SIZE,
+    int PARALLEL_LOADS>
+struct BatchNormTransformInputChannelsLastVectorizedKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    // tensor dimension (m,c)
+    // loop along m dimension
+    int inner_loop_stride = item.get_local_range(0) * item.get_group_range(0);
+
+    // offset along m dimension
+    int m_offset = item.get_global_id(0);
+    int c_vec_offset = item.get_global_id(1) * VEC_SIZE;
+
+    if (c_vec_offset >= stride_ || m_offset >= reduction_size_) {
+      return;
+    }
+
+    int loop_count =
+        1 + (reduction_size_ - 1) / (inner_loop_stride * PARALLEL_LOADS);
+    int address_base = m_offset * stride_ + c_vec_offset;
+    int address_increment = inner_loop_stride * stride_;
+
+    for (int i = 0; i < loop_count; i++) {
+#pragma unroll
+      for (int j = 0; j < PARALLEL_LOADS; j++) {
+        if (m_offset < reduction_size_) {
+          using vec_t = memory::aligned_vector<scalar_t, VEC_SIZE>;
+          using layerscalar_vec_t =
+              memory::aligned_vector<layerscalar_t, VEC_SIZE>;
+          auto input_vec = *reinterpret_cast<vec_t*>(
+              const_cast<scalar_t*>(&input_[address_base]));
+          vec_t output_vec, z_vec;
+          layerscalar_vec_t weight_vec, shift_vec;
+
+          if (z_ != nullptr) {
+            z_vec = *reinterpret_cast<vec_t*>(
+                const_cast<scalar_t*>(&z_[address_base]));
+          }
+          if (weight_ != nullptr) {
+            weight_vec = *reinterpret_cast<layerscalar_vec_t*>(
+                const_cast<layerscalar_t*>(&weight_[c_vec_offset]));
+          }
+          if (shift_ != nullptr) {
+            shift_vec = *reinterpret_cast<layerscalar_vec_t*>(
+                const_cast<layerscalar_t*>(&shift_[c_vec_offset]));
+          }
+
+#pragma unroll
+          for (int vt = 0; vt < VEC_SIZE; ++vt) {
+            auto c_offset = c_vec_offset + vt;
+            auto m_c = mean_[c_offset];
+            auto inv_std_c = static_cast<accscalar_t>(inv_std_[c_offset]);
+            auto w_c = weight_ == nullptr
+                ? accscalar_t(1.0)
+                : static_cast<accscalar_t>(weight_vec[vt]);
+            auto s_c = shift_ == nullptr
+                ? accscalar_t(0.0)
+                : static_cast<accscalar_t>(shift_vec[vt]);
+            auto tmp = w_c * (static_cast<accscalar_t>(input_vec[vt]) - m_c) *
+                    inv_std_c +
+                s_c;
+            if (z_ != nullptr) {
+              tmp += z_vec[vt];
+            }
+            output_vec[vt] =
+                (fuse_relu_ && tmp <= accscalar_t(0.0)
+                     ? scalar_t(0.0)
+                     : static_cast<scalar_t>(tmp));
+          }
+          *reinterpret_cast<vec_t*>(&out_[address_base]) = output_vec;
+        }
+        m_offset += inner_loop_stride;
+        address_base += address_increment;
+      }
+    }
+  }
+
+  BatchNormTransformInputChannelsLastVectorizedKernelFunctor(
+      const scalar_t* RESTRICT input,
+      const scalar_t* RESTRICT z,
+      const accscalar_t* RESTRICT mean,
+      const accscalar_t* RESTRICT inv_std,
+      const layerscalar_t* RESTRICT weight,
+      const layerscalar_t* RESTRICT shift,
+      scalar_t* RESTRICT out,
+      const int reduction_size,
+      const int stride,
+      const bool fuse_relu)
+      : input_(input),
+        z_(z),
+        mean_(mean),
+        inv_std_(inv_std),
+        weight_(weight),
+        shift_(shift),
+        out_(out),
+        reduction_size_(reduction_size),
+        stride_(stride),
+        fuse_relu_(fuse_relu) {}
+
+ private:
+  const scalar_t* RESTRICT input_;
+  const scalar_t* RESTRICT z_;
+  const accscalar_t* RESTRICT mean_;
+  const accscalar_t* RESTRICT inv_std_;
+  const layerscalar_t* RESTRICT weight_;
+  const layerscalar_t* RESTRICT shift_;
+  scalar_t* RESTRICT out_;
+  const int reduction_size_;
+  const int stride_;
+  const bool fuse_relu_;
+};
+
+template <typename scalar_t, typename weight_t, int VEC_SIZE>
+bool can_use_batch_norm_cnl_vec_kernel(
+    char* input,
+    char* output,
+    char* z,
+    char* weight,
+    char* shift,
+    int stride) {
+  return memory::can_vectorize_up_to<scalar_t>(input) >= VEC_SIZE &&
+      memory::can_vectorize_up_to<scalar_t>(output) >= VEC_SIZE &&
+      (z == nullptr || memory::can_vectorize_up_to<scalar_t>(z) >= VEC_SIZE) &&
+      (weight == nullptr ||
+       memory::can_vectorize_up_to<weight_t>(weight) >= VEC_SIZE) &&
+      (shift == nullptr ||
+       memory::can_vectorize_up_to<weight_t>(shift) >= VEC_SIZE) &&
+      (stride % VEC_SIZE == 0);
+}
+
 void batch_norm_elemt_channels_last_template(
     const at::Tensor& output,
     const at::Tensor& input,
@@ -1539,35 +1765,88 @@ void batch_norm_elemt_channels_last_template(
     const bool fuse_relu = false) {
   const auto stride = input.sizes()[1];
   const auto reduction_size = input.numel() / stride;
-  auto config = get_adaptive_launch_config(
-      reduction_size, stride, false, ELEMENTS_PER_WORK_ITEM);
-  auto global_range = std::get<0>(config);
-  auto local_range = std::get<1>(config);
   auto& queue = getCurrentSYCLQueue();
   const auto second_dtype = weight.defined()
       ? weight.scalar_type()
       : (shift.defined() ? shift.scalar_type() : input.scalar_type());
+  constexpr int VEC_SIZE = PREFERRED_VEC_SIZE;
 
   if (input.scalar_type() != second_dtype) {
     AT_DISPATCH_FLOATING_TYPES_AND2(
         kHalf, kBFloat16, input.scalar_type(), "batchnorm_forward_xpu", [&] {
           using accscalar_t = at::acc_type_device<scalar_t, kXPU>;
-          auto kfn = BatchNormTransformInputChannelsLastKernelFunctor<
-              scalar_t,
-              accscalar_t,
-              accscalar_t,
-              ELEMENTS_PER_ITER>(
-              input.const_data_ptr<scalar_t>(),
-              z.has_value() ? z.value().const_data_ptr<scalar_t>() : nullptr,
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.defined() ? weight.const_data_ptr<accscalar_t>() : nullptr,
-              shift.defined() ? shift.const_data_ptr<accscalar_t>() : nullptr,
-              output.mutable_data_ptr<scalar_t>(),
-              reduction_size,
-              stride,
-              fuse_relu);
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+
+          auto input_data_ptr = input.const_data_ptr<scalar_t>();
+          auto output_data_ptr = output.mutable_data_ptr<scalar_t>();
+          auto z_data_ptr =
+              z.has_value() ? z.value().const_data_ptr<scalar_t>() : nullptr;
+          auto weight_data_ptr =
+              weight.defined() ? weight.const_data_ptr<accscalar_t>() : nullptr;
+          auto shift_data_ptr =
+              shift.defined() ? shift.const_data_ptr<accscalar_t>() : nullptr;
+
+          if (can_use_batch_norm_cnl_vec_kernel<
+                  scalar_t,
+                  accscalar_t,
+                  VEC_SIZE>(
+                  (char*)input_data_ptr,
+                  (char*)output_data_ptr,
+                  (char*)z_data_ptr,
+                  (char*)weight_data_ptr,
+                  (char*)shift_data_ptr,
+                  stride)) {
+            auto kfn =
+                BatchNormTransformInputChannelsLastVectorizedKernelFunctor<
+                    scalar_t,
+                    accscalar_t,
+                    accscalar_t,
+                    VEC_SIZE,
+                    ELEMENTS_PER_ITER / VEC_SIZE>(
+                    input_data_ptr,
+                    z_data_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight_data_ptr,
+                    shift_data_ptr,
+                    output_data_ptr,
+                    reduction_size,
+                    stride,
+                    fuse_relu);
+            auto config_vec = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range_vec = std::get<0>(config_vec);
+            auto local_range_vec = std::get<1>(config_vec);
+            sycl_kernel_submit(global_range_vec, local_range_vec, queue, kfn);
+          } else {
+            auto kfn = BatchNormTransformInputChannelsLastKernelFunctor<
+                scalar_t,
+                accscalar_t,
+                accscalar_t,
+                ELEMENTS_PER_ITER>(
+                input_data_ptr,
+                z_data_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight_data_ptr,
+                shift_data_ptr,
+                output_data_ptr,
+                reduction_size,
+                stride,
+                fuse_relu);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         });
   } else {
     if (weight.defined()) {
@@ -1581,22 +1860,75 @@ void batch_norm_elemt_channels_last_template(
     AT_DISPATCH_FLOATING_TYPES_AND2(
         kHalf, kBFloat16, input.scalar_type(), "batchnorm_forward_xpu", [&] {
           using accscalar_t = at::acc_type_device<scalar_t, kXPU>;
-          auto kfn = BatchNormTransformInputChannelsLastKernelFunctor<
-              scalar_t,
-              accscalar_t,
-              scalar_t,
-              ELEMENTS_PER_ITER>(
-              input.const_data_ptr<scalar_t>(),
-              z.has_value() ? z.value().const_data_ptr<scalar_t>() : nullptr,
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr,
-              shift.defined() ? shift.const_data_ptr<scalar_t>() : nullptr,
-              output.mutable_data_ptr<scalar_t>(),
-              reduction_size,
-              stride,
-              fuse_relu);
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+
+          auto input_data_ptr = input.const_data_ptr<scalar_t>();
+          auto output_data_ptr = output.mutable_data_ptr<scalar_t>();
+          auto z_data_ptr =
+              z.has_value() ? z.value().const_data_ptr<scalar_t>() : nullptr;
+          auto weight_data_ptr =
+              weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr;
+          auto shift_data_ptr =
+              shift.defined() ? shift.const_data_ptr<scalar_t>() : nullptr;
+
+          if (can_use_batch_norm_cnl_vec_kernel<scalar_t, scalar_t, VEC_SIZE>(
+                  (char*)input_data_ptr,
+                  (char*)output_data_ptr,
+                  (char*)z_data_ptr,
+                  (char*)weight_data_ptr,
+                  (char*)shift_data_ptr,
+                  stride)) {
+            auto kfn =
+                BatchNormTransformInputChannelsLastVectorizedKernelFunctor<
+                    scalar_t,
+                    accscalar_t,
+                    scalar_t,
+                    VEC_SIZE,
+                    ELEMENTS_PER_ITER / VEC_SIZE>(
+                    input_data_ptr,
+                    z_data_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight_data_ptr,
+                    shift_data_ptr,
+                    output_data_ptr,
+                    reduction_size,
+                    stride,
+                    fuse_relu);
+            auto config_vec = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range_vec = std::get<0>(config_vec);
+            auto local_range_vec = std::get<1>(config_vec);
+            sycl_kernel_submit(global_range_vec, local_range_vec, queue, kfn);
+          } else {
+            auto kfn = BatchNormTransformInputChannelsLastKernelFunctor<
+                scalar_t,
+                accscalar_t,
+                scalar_t,
+                ELEMENTS_PER_ITER>(
+                input_data_ptr,
+                z_data_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight_data_ptr,
+                shift_data_ptr,
+                output_data_ptr,
+                reduction_size,
+                stride,
+                fuse_relu);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         });
   }
 }
@@ -1613,6 +1945,103 @@ struct BatchNormElementwiseLoopsFunctor {
     return res;
   }
 };
+
+void batch_norm_elemt_kernel(
+    Tensor& out,
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    const Tensor& mean_,
+    const Tensor& invstd_) {
+  switch (batch_norm_choose_impl(self)) {
+    case Impl::Contiguous: {
+      c10::MaybeOwned<Tensor> weight =
+          at::borrow_from_optional_tensor(weight_opt);
+      c10::MaybeOwned<Tensor> bias = at::borrow_from_optional_tensor(bias_opt);
+      at::native::resize_output(out, self.sizes());
+      AT_DISPATCH_FLOATING_TYPES_AND2(
+          kBFloat16,
+          kHalf,
+          self.scalar_type(),
+          "batch_norm_elementwise_xpu",
+          [&] {
+            using accscalar_t = acc_type_device<scalar_t, kXPU>;
+            const bool mixed_type = is_mixed_type(self, *weight, *bias);
+            if (mixed_type) {
+              batch_norm_elemt_template<scalar_t, accscalar_t, int32_t>(
+                  out, self, *weight, *bias, mean_, invstd_);
+            } else {
+              batch_norm_elemt_template<scalar_t, scalar_t, int32_t>(
+                  out, self, *weight, *bias, mean_, invstd_);
+            }
+          });
+      return;
+    }
+    case Impl::ChannelsLast: {
+      auto weight = at::borrow_from_optional_tensor(weight_opt);
+      auto bias = at::borrow_from_optional_tensor(bias_opt);
+
+      if (resize_output_check(out, self.sizes())) {
+        resize_impl_xpu_(
+            out.unsafeGetTensorImpl(), self.sizes(), self.strides());
+      }
+      if ((out.strides() == self.strides()) &&
+          (!weight->defined() || weight->is_contiguous()) &&
+          (!bias->defined() || bias->is_contiguous()) &&
+          (!mean_.defined() || mean_.is_contiguous()) &&
+          (!invstd_.defined() || invstd_.is_contiguous())) {
+        batch_norm_elemt_channels_last_template(
+            out, self, *weight, *bias, mean_, invstd_);
+        return;
+      }
+      [[fallthrough]];
+    }
+    case Impl::General: {
+      const int64_t ndim = self.dim();
+      DimVector sizes(ndim, 1), strides(ndim, 0);
+      // Helper to convert 1d tensors to an nd tensor that broadcasts with
+      // input All elements go into the channel dimension
+      auto as_nd = [&](const Tensor& t) {
+        TORCH_INTERNAL_ASSERT(t.defined() && t.dim() == 1);
+        sizes[1] = t.sizes()[0];
+        strides[1] = t.strides()[0];
+        return t.as_strided(sizes, strides);
+      };
+
+      auto weight = weight_opt.has_value() && weight_opt->defined()
+          ? as_nd(*weight_opt)
+          : at::scalar_tensor(1, mean_.options());
+      auto bias = bias_opt.has_value() && bias_opt->defined()
+          ? as_nd(*bias_opt)
+          : at::scalar_tensor(0, mean_.options());
+      auto mean = as_nd(mean_);
+      auto invstd = as_nd(invstd_);
+
+      auto iter = TensorIteratorConfig()
+                      .add_output(out)
+                      .add_input(self)
+                      .add_input(weight)
+                      .add_input(bias)
+                      .add_input(mean)
+                      .add_input(invstd)
+                      .check_all_same_dtype(false)
+                      .promote_inputs_to_common_dtype(false)
+                      .build();
+
+      AT_DISPATCH_FLOATING_TYPES_AND2(
+          kBFloat16,
+          kHalf,
+          self.scalar_type(),
+          "batch_norm_elementwise_xpu",
+          [&] {
+            using acc_t = acc_type_device<scalar_t, kXPU>;
+            auto f = BatchNormElementwiseLoopsFunctor<scalar_t, acc_t>();
+            gpu_kernel(iter, f);
+          });
+      return;
+    }
+  }
+}
 
 // ====================== batch_norm_backward_reduce ======================
 
@@ -2126,7 +2555,11 @@ batch_norm_backward_reduce_channels_last_template(
   }
 
   auto config = get_adaptive_launch_config(
-      reduction_size, stride, false, ELEMENTS_PER_WORK_ITEM);
+      syclMaxWorkItemsPerEU() * 2,
+      reduction_size,
+      stride,
+      false,
+      ELEMENTS_PER_WORK_ITEM);
   auto global_range = std::get<0>(config);
   auto local_range = std::get<1>(config);
   auto wg_size_y = local_range[0];
@@ -2473,6 +2906,168 @@ struct BatchNormBackwardElemtKernelFunctor {
   const int world_size_;
 };
 
+template <
+    int VEC_SIZE,
+    typename input_scalar_t,
+    typename stat_scalar_t,
+    typename stat_accscalar_t,
+    typename index_t,
+    bool USE_COUNTS = false>
+struct BatchNormBackwardElemtVectorizedKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    stat_accscalar_t norm_fct;
+    if constexpr (USE_COUNTS) {
+      int64_t total_numel = 0;
+      for (int i = 0; i < world_size_; i++) {
+        total_numel += numel_[i];
+      }
+      norm_fct = static_cast<stat_accscalar_t>(1) /
+          static_cast<stat_accscalar_t>(total_numel);
+    } else {
+      norm_fct = norm_fct_;
+    }
+
+    index_t plane = item.get_group(1);
+
+    if (plane >= input_.size(1)) {
+      return;
+    }
+
+    stat_accscalar_t m_c = mean_[plane];
+    stat_accscalar_t m_dy_c = sum_dy_[plane] * norm_fct;
+    stat_accscalar_t factor_1_c = invstd_[plane];
+    stat_accscalar_t factor_2_c = weight_.size(0) > 0
+        ? static_cast<stat_accscalar_t>(weight_[plane])
+        : stat_accscalar_t(1);
+    factor_2_c *= factor_1_c;
+    factor_1_c = factor_1_c * factor_1_c * sum_dy_xmu_[plane] * norm_fct;
+
+    index_t bs = input_.size(0);
+    index_t fs = input_.size(2);
+
+    index_t bstep = item.get_local_range(0) * item.get_group_range(0);
+    for (index_t batch = item.get_global_id(0); batch < bs; batch += bstep) {
+      auto g_i = grad_input_[batch][plane];
+      auto g_o = grad_output_[batch][plane];
+      auto i = input_[batch][plane];
+
+      for (index_t feature_vec_begin = item.get_local_id(1) * VEC_SIZE;
+           feature_vec_begin < fs;
+           feature_vec_begin += VEC_SIZE * item.get_local_range(1)) {
+        using vec_t = memory::aligned_vector<input_scalar_t, VEC_SIZE>;
+        auto g_o_vec = *reinterpret_cast<vec_t*>(&g_o[feature_vec_begin]);
+        auto i_vec = *reinterpret_cast<vec_t*>(&i[feature_vec_begin]);
+        vec_t g_i_vec;
+#pragma unroll
+        for (int vt = 0; vt < VEC_SIZE; ++vt) {
+          g_i_vec[vt] = static_cast<input_scalar_t>(
+              (g_o_vec[vt] - m_dy_c - (i_vec[vt] - m_c) * factor_1_c) *
+              factor_2_c);
+        }
+        input_scalar_t* write_ptr = &g_i[feature_vec_begin];
+        *(reinterpret_cast<vec_t*>(write_ptr)) = g_i_vec;
+      }
+    }
+  }
+  BatchNormBackwardElemtVectorizedKernelFunctor(
+      const GenericPackedTensorAccessor<
+          input_scalar_t,
+          3,
+          DefaultPtrTraits,
+          index_t> input,
+      const GenericPackedTensorAccessor<
+          input_scalar_t,
+          3,
+          DefaultPtrTraits,
+          index_t> grad_output,
+      const GenericPackedTensorAccessor<
+          stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> mean,
+      const GenericPackedTensorAccessor<
+          stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> invstd,
+      const GenericPackedTensorAccessor<
+          stat_scalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> weight,
+      const GenericPackedTensorAccessor<
+          stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> sum_dy,
+      const GenericPackedTensorAccessor<
+          stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> sum_dy_xmu,
+      GenericPackedTensorAccessor<input_scalar_t, 3, DefaultPtrTraits, index_t>
+          grad_input,
+      const stat_accscalar_t norm_fct,
+      const int* RESTRICT numel = nullptr,
+      const int world_size = 0)
+      : input_(input),
+        grad_output_(grad_output),
+        mean_(mean),
+        invstd_(invstd),
+        weight_(weight),
+        sum_dy_(sum_dy),
+        sum_dy_xmu_(sum_dy_xmu),
+        grad_input_(grad_input),
+        norm_fct_(norm_fct),
+        numel_(numel),
+        world_size_(world_size) {}
+
+ private:
+  const GenericPackedTensorAccessor<
+      input_scalar_t,
+      3,
+      DefaultPtrTraits,
+      index_t>
+      input_;
+  const GenericPackedTensorAccessor<
+      input_scalar_t,
+      3,
+      DefaultPtrTraits,
+      index_t>
+      grad_output_;
+  const GenericPackedTensorAccessor<
+      stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      mean_;
+  const GenericPackedTensorAccessor<
+      stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      invstd_;
+  const GenericPackedTensorAccessor<stat_scalar_t, 1, DefaultPtrTraits, index_t>
+      weight_;
+  const GenericPackedTensorAccessor<
+      stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      sum_dy_;
+  const GenericPackedTensorAccessor<
+      stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      sum_dy_xmu_;
+  GenericPackedTensorAccessor<input_scalar_t, 3, DefaultPtrTraits, index_t>
+      grad_input_;
+  const stat_accscalar_t norm_fct_;
+  const int* RESTRICT numel_;
+  const int world_size_;
+};
+
 template <typename input_scalar_t, typename stat_scalar_t, typename index_t>
 Tensor batch_norm_backward_elemt_template(
     const Tensor& grad_out_,
@@ -2534,22 +3129,51 @@ Tensor batch_norm_backward_elemt_template(
   sycl::range<2> local_range(tb, tf);
   sycl::range<2> global_range(nwg_y * tb, nwg_x * tf);
 
-  auto kfn = BatchNormBackwardElemtKernelFunctor<
-      input_scalar_t,
-      stat_scalar_t,
-      stat_accscalar_t,
-      index_t>(
-      input,
-      grad_output,
-      mean,
-      invstd,
-      weight,
-      sum_dy,
-      sum_dy_xmu,
-      grad_input,
-      norm_fct);
-  sycl_kernel_submit(global_range, local_range, queue, kfn);
-
+  auto input_ptr = (char*)input_reshaped.const_data_ptr();
+  auto grad_input_ptr = (char*)grad_input_reshaped.mutable_data_ptr();
+  auto grad_output_ptr = (char*)grad_output_reshaped.const_data_ptr();
+  if (input_reshaped.is_contiguous() && grad_input_reshaped.is_contiguous() &&
+      grad_output_reshaped.is_contiguous() &&
+      memory::can_vectorize_up_to<input_scalar_t>(input_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      memory::can_vectorize_up_to<input_scalar_t>(grad_input_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      memory::can_vectorize_up_to<input_scalar_t>(grad_output_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      input.size(2) % PREFERRED_VEC_SIZE == 0) {
+    auto kfn = BatchNormBackwardElemtVectorizedKernelFunctor<
+        PREFERRED_VEC_SIZE,
+        input_scalar_t,
+        stat_scalar_t,
+        stat_accscalar_t,
+        index_t>(
+        input,
+        grad_output,
+        mean,
+        invstd,
+        weight,
+        sum_dy,
+        sum_dy_xmu,
+        grad_input,
+        norm_fct);
+    sycl_kernel_submit(global_range, local_range, queue, kfn);
+  } else {
+    auto kfn = BatchNormBackwardElemtKernelFunctor<
+        input_scalar_t,
+        stat_scalar_t,
+        stat_accscalar_t,
+        index_t>(
+        input,
+        grad_output,
+        mean,
+        invstd,
+        weight,
+        sum_dy,
+        sum_dy_xmu,
+        grad_input,
+        norm_fct);
+    sycl_kernel_submit(global_range, local_range, queue, kfn);
+  }
   return grad_input_reshaped.view(input_.sizes());
 }
 
@@ -2613,24 +3237,57 @@ Tensor batch_norm_backward_elemt_template(
   sycl::range<2> local_range(tb, tf);
   sycl::range<2> global_range(nwg_y * tb, nwg_x * tf);
 
-  auto kfn = BatchNormBackwardElemtKernelFunctor<
-      input_scalar_t,
-      stat_scalar_t,
-      stat_accscalar_t,
-      index_t,
-      true>(
-      input,
-      grad_output,
-      mean,
-      invstd,
-      weight,
-      sum_dy,
-      sum_dy_xmu,
-      grad_input,
-      0,
-      count.const_data_ptr<int>(),
-      count.numel());
-  sycl_kernel_submit(global_range, local_range, queue, kfn);
+  auto input_ptr = (char*)input_reshaped.const_data_ptr();
+  auto grad_input_ptr = (char*)grad_input_reshaped.mutable_data_ptr();
+  auto grad_output_ptr = (char*)grad_output_reshaped.const_data_ptr();
+  if (input_reshaped.is_contiguous() && grad_input_reshaped.is_contiguous() &&
+      grad_output_reshaped.is_contiguous() &&
+      memory::can_vectorize_up_to<input_scalar_t>(input_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      memory::can_vectorize_up_to<input_scalar_t>(grad_input_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      memory::can_vectorize_up_to<input_scalar_t>(grad_output_ptr) >=
+          PREFERRED_VEC_SIZE &&
+      input.size(2) % PREFERRED_VEC_SIZE == 0) {
+    auto kfn = BatchNormBackwardElemtVectorizedKernelFunctor<
+        PREFERRED_VEC_SIZE,
+        input_scalar_t,
+        stat_scalar_t,
+        stat_accscalar_t,
+        index_t,
+        true>(
+        input,
+        grad_output,
+        mean,
+        invstd,
+        weight,
+        sum_dy,
+        sum_dy_xmu,
+        grad_input,
+        0,
+        count.const_data_ptr<int>(),
+        count.numel());
+    sycl_kernel_submit(global_range, local_range, queue, kfn);
+  } else {
+    auto kfn = BatchNormBackwardElemtKernelFunctor<
+        input_scalar_t,
+        stat_scalar_t,
+        stat_accscalar_t,
+        index_t,
+        true>(
+        input,
+        grad_output,
+        mean,
+        invstd,
+        weight,
+        sum_dy,
+        sum_dy_xmu,
+        grad_input,
+        0,
+        count.const_data_ptr<int>(),
+        count.numel());
+    sycl_kernel_submit(global_range, local_range, queue, kfn);
+  }
 
   return grad_input_reshaped.view(input_.sizes());
 }
@@ -2741,6 +3398,144 @@ struct BatchNormBackwardElemtChannelsLastKernelFunctor {
   const int64_t world_size_;
 };
 
+template <
+    int PARALLEL_LOADS,
+    int VEC_SIZE,
+    typename scalar_t,
+    typename accscalar_t,
+    typename layerscalar_t,
+    bool USE_COUNTS = false>
+struct BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    accscalar_t norm_fct;
+    if constexpr (USE_COUNTS) {
+      int64_t total_numel = 0;
+      for (int i = 0; i < world_size_; i++) {
+        total_numel += numel_[i];
+      }
+      norm_fct =
+          static_cast<accscalar_t>(1) / static_cast<accscalar_t>(total_numel);
+    } else {
+      norm_fct = norm_fct_;
+    }
+
+    // tensor dimension (m,c)
+    // loop along m dimension
+    int inner_loop_stride = item.get_local_range(0) * item.get_group_range(0);
+
+    // offset along m dimension
+    int m_offset = item.get_global_id(0);
+    int c_vec_offset = item.get_global_id(1) * VEC_SIZE;
+
+    if (c_vec_offset >= stride_ || m_offset >= reduction_size_) {
+      return;
+    }
+
+    int loop_count =
+        1 + (reduction_size_ - 1) / (inner_loop_stride * PARALLEL_LOADS);
+    int address_base = m_offset * stride_ + c_vec_offset;
+    int address_increment = inner_loop_stride * stride_;
+
+    for (int i = 0; i < loop_count; i++) {
+#pragma unroll
+      for (int j = 0; j < PARALLEL_LOADS; j++) {
+        if (m_offset < reduction_size_) {
+          using vec_t = memory::aligned_vector<scalar_t, VEC_SIZE>;
+          auto grad_output_vec = *reinterpret_cast<vec_t*>(
+              const_cast<scalar_t*>(&grad_output_[address_base]));
+          auto input_vec = *reinterpret_cast<vec_t*>(
+              const_cast<scalar_t*>(&input_[address_base]));
+          vec_t grad_input_vec;
+
+#pragma unroll
+          for (int v = 0; v < VEC_SIZE; ++v) {
+            int c_offset = c_vec_offset + v;
+
+            auto m_c = mean_[c_offset];
+            auto m_dy_c = sum_dy_[c_offset] * norm_fct;
+            auto factor_1_c = inv_std_[c_offset];
+            auto factor_2_c =
+                (weight_ == nullptr
+                     ? accscalar_t(1.0)
+                     : static_cast<accscalar_t>(weight_[c_offset])) *
+                factor_1_c;
+            factor_1_c =
+                factor_1_c * factor_1_c * sum_dy_xmu_[c_offset] * norm_fct;
+
+            grad_input_vec[v] = static_cast<scalar_t>(
+                (static_cast<accscalar_t>(grad_output_vec[v]) - m_dy_c -
+                 (static_cast<accscalar_t>(input_vec[v]) - m_c) * factor_1_c) *
+                factor_2_c);
+          }
+
+          *reinterpret_cast<vec_t*>(&grad_input_[address_base]) =
+              grad_input_vec;
+        }
+        m_offset += inner_loop_stride;
+        address_base += address_increment;
+      }
+    }
+  }
+
+  BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor(
+      const scalar_t* RESTRICT grad_output,
+      const scalar_t* RESTRICT input,
+      const accscalar_t* RESTRICT mean,
+      const accscalar_t* RESTRICT inv_std,
+      const layerscalar_t* RESTRICT weight,
+      const accscalar_t* RESTRICT sum_dy,
+      const accscalar_t* RESTRICT sum_dy_xmu,
+      scalar_t* RESTRICT grad_input,
+      const accscalar_t norm_fct,
+      const int reduction_size,
+      const int stride,
+      const int* RESTRICT numel = nullptr,
+      const int64_t world_size = 0)
+      : grad_output_(grad_output),
+        input_(input),
+        mean_(mean),
+        inv_std_(inv_std),
+        weight_(weight),
+        sum_dy_(sum_dy),
+        sum_dy_xmu_(sum_dy_xmu),
+        grad_input_(grad_input),
+        norm_fct_(norm_fct),
+        reduction_size_(reduction_size),
+        stride_(stride),
+        numel_(numel),
+        world_size_(world_size) {}
+
+ private:
+  const scalar_t* RESTRICT grad_output_;
+  const scalar_t* RESTRICT input_;
+  const accscalar_t* RESTRICT mean_;
+  const accscalar_t* RESTRICT inv_std_;
+  const layerscalar_t* RESTRICT weight_;
+  const accscalar_t* RESTRICT sum_dy_;
+  const accscalar_t* RESTRICT sum_dy_xmu_;
+  scalar_t* RESTRICT grad_input_;
+  const accscalar_t norm_fct_;
+  const int reduction_size_;
+  const int stride_;
+  const int* RESTRICT numel_;
+  const int64_t world_size_;
+};
+
+template <typename scalar_t, int VEC_SIZE>
+bool can_use_batch_norm_bwd_cnl_vec_kernel(
+    const scalar_t* grad_output_ptr,
+    const scalar_t* input_ptr,
+    scalar_t* grad_input_ptr,
+    int stride) {
+  return (
+      memory::can_vectorize_up_to<scalar_t>((char*)grad_output_ptr) >=
+          VEC_SIZE &&
+      memory::can_vectorize_up_to<scalar_t>((char*)input_ptr) >= VEC_SIZE &&
+      memory::can_vectorize_up_to<scalar_t>((char*)grad_input_ptr) >=
+          VEC_SIZE &&
+      stride % VEC_SIZE == 0);
+}
+
 at::Tensor batch_norm_backward_elemt_channels_last_template(
     const at::Tensor& grad_output,
     const at::Tensor& input,
@@ -2755,11 +3550,6 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
 
   // Input is guarunteed to be channels-last compatible
   at::Tensor grad_input = at::empty_like(input);
-
-  auto config = get_adaptive_launch_config(
-      reduction_size, stride, true, ELEMENTS_PER_WORK_ITEM);
-  auto global_range = std::get<0>(config);
-  auto local_range = std::get<1>(config);
   auto& queue = getCurrentSYCLQueue();
 
   AT_DISPATCH_FLOATING_TYPES_AND2(
@@ -2769,46 +3559,127 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
       "batchnorm_backward_element_xpu",
       [&] {
         using accscalar_t = at::acc_type_device<scalar_t, kXPU>;
+        constexpr int VEC_SIZE = PREFERRED_VEC_SIZE;
+        auto grad_output_ptr = grad_output.const_data_ptr<scalar_t>();
+        auto input_ptr = input.const_data_ptr<scalar_t>();
+        auto grad_input_ptr = grad_input.mutable_data_ptr<scalar_t>();
 
-        if (weight.defined() && weight.scalar_type() != input.scalar_type()) {
-          auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
-              ELEMENTS_PER_ITER,
-              scalar_t,
-              accscalar_t,
-              accscalar_t>(
-              grad_output.const_data_ptr<scalar_t>(),
-              input.const_data_ptr<scalar_t>(),
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.const_data_ptr<accscalar_t>(),
-              sum_dy.const_data_ptr<accscalar_t>(),
-              sum_dy_xmu.const_data_ptr<accscalar_t>(),
-              grad_input.mutable_data_ptr<scalar_t>(),
-              static_cast<accscalar_t>(norm_fct),
-              reduction_size,
-              stride);
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+        if (can_use_batch_norm_bwd_cnl_vec_kernel<scalar_t, VEC_SIZE>(
+                grad_output_ptr, input_ptr, grad_input_ptr, stride)) {
+          if (weight.defined() && weight.scalar_type() != input.scalar_type()) {
+            auto kfn =
+                BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor<
+                    ELEMENTS_PER_ITER / VEC_SIZE,
+                    VEC_SIZE,
+                    scalar_t,
+                    accscalar_t,
+                    accscalar_t>(
+                    grad_output_ptr,
+                    input_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight.const_data_ptr<accscalar_t>(),
+                    sum_dy.const_data_ptr<accscalar_t>(),
+                    sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                    grad_input_ptr,
+                    static_cast<accscalar_t>(norm_fct),
+                    reduction_size,
+                    stride);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                true,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          } else {
+            auto kfn =
+                BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor<
+                    ELEMENTS_PER_ITER / VEC_SIZE,
+                    VEC_SIZE,
+                    scalar_t,
+                    accscalar_t,
+                    scalar_t>(
+                    grad_output_ptr,
+                    input_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight.defined() ? weight.const_data_ptr<scalar_t>()
+                                     : nullptr,
+                    sum_dy.const_data_ptr<accscalar_t>(),
+                    sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                    grad_input_ptr,
+                    static_cast<accscalar_t>(norm_fct),
+                    reduction_size,
+                    stride);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                true,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         } else {
-          auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
-              ELEMENTS_PER_ITER,
-              scalar_t,
-              accscalar_t,
-              scalar_t>(
-              grad_output.const_data_ptr<scalar_t>(),
-              input.const_data_ptr<scalar_t>(),
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr,
-              sum_dy.const_data_ptr<accscalar_t>(),
-              sum_dy_xmu.const_data_ptr<accscalar_t>(),
-              grad_input.mutable_data_ptr<scalar_t>(),
-              static_cast<accscalar_t>(norm_fct),
-              reduction_size,
-              stride);
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+          if (weight.defined() && weight.scalar_type() != input.scalar_type()) {
+            auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
+                ELEMENTS_PER_ITER,
+                scalar_t,
+                accscalar_t,
+                accscalar_t>(
+                grad_output_ptr,
+                input_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight.const_data_ptr<accscalar_t>(),
+                sum_dy.const_data_ptr<accscalar_t>(),
+                sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                grad_input_ptr,
+                static_cast<accscalar_t>(norm_fct),
+                reduction_size,
+                stride);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                true,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          } else {
+            auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
+                ELEMENTS_PER_ITER,
+                scalar_t,
+                accscalar_t,
+                scalar_t>(
+                grad_output_ptr,
+                input_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr,
+                sum_dy.const_data_ptr<accscalar_t>(),
+                sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                grad_input_ptr,
+                static_cast<accscalar_t>(norm_fct),
+                reduction_size,
+                stride);
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                true,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         }
       });
-
   return grad_input;
 }
 
@@ -2826,12 +3697,8 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
 
   // Input is guarunteed to be channels-last compatible
   at::Tensor grad_input = at::empty_like(input);
-
-  auto config = get_adaptive_launch_config(
-      reduction_size, stride, false, ELEMENTS_PER_WORK_ITEM);
-  auto global_range = std::get<0>(config);
-  auto local_range = std::get<1>(config);
   auto& queue = getCurrentSYCLQueue();
+  constexpr int VEC_SIZE = PREFERRED_VEC_SIZE;
 
   if (weight.defined() && weight.scalar_type() != input.scalar_type()) {
     AT_DISPATCH_FLOATING_TYPES_AND2(
@@ -2841,26 +3708,72 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
         "batchnorm_backward_element_xpu",
         [&] {
           using accscalar_t = acc_type_device<scalar_t, kXPU>;
-          auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
-              ELEMENTS_PER_ITER,
-              scalar_t,
-              accscalar_t,
-              accscalar_t,
-              true>(
-              grad_output.const_data_ptr<scalar_t>(),
-              input.const_data_ptr<scalar_t>(),
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.const_data_ptr<accscalar_t>(),
-              sum_dy.const_data_ptr<accscalar_t>(),
-              sum_dy_xmu.const_data_ptr<accscalar_t>(),
-              grad_input.mutable_data_ptr<scalar_t>(),
-              0,
-              reduction_size,
-              stride,
-              count.const_data_ptr<int>(),
-              count.numel());
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+          auto grad_output_ptr = grad_output.const_data_ptr<scalar_t>();
+          auto input_ptr = input.const_data_ptr<scalar_t>();
+          auto grad_input_ptr = grad_input.mutable_data_ptr<scalar_t>();
+
+          if (!can_use_batch_norm_bwd_cnl_vec_kernel<scalar_t, VEC_SIZE>(
+                  grad_output_ptr, input_ptr, grad_input_ptr, stride)) {
+            auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
+                ELEMENTS_PER_ITER,
+                scalar_t,
+                accscalar_t,
+                accscalar_t,
+                true>(
+                grad_output_ptr,
+                input_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight.const_data_ptr<accscalar_t>(),
+                sum_dy.const_data_ptr<accscalar_t>(),
+                sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                grad_input_ptr,
+                0,
+                reduction_size,
+                stride,
+                count.const_data_ptr<int>(),
+                count.numel());
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          } else {
+            auto kfn =
+                BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor<
+                    ELEMENTS_PER_ITER / VEC_SIZE,
+                    VEC_SIZE,
+                    scalar_t,
+                    accscalar_t,
+                    accscalar_t,
+                    true>(
+                    grad_output_ptr,
+                    input_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight.const_data_ptr<accscalar_t>(),
+                    sum_dy.const_data_ptr<accscalar_t>(),
+                    sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                    grad_input_ptr,
+                    0,
+                    reduction_size,
+                    stride,
+                    count.const_data_ptr<int>(),
+                    count.numel());
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         });
   } else {
     if (weight.defined()) {
@@ -2878,33 +3791,208 @@ at::Tensor batch_norm_backward_elemt_channels_last_template(
         "batchnorm_backward_element_xpu",
         [&] {
           using accscalar_t = acc_type_device<scalar_t, kXPU>;
-          auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
-              ELEMENTS_PER_ITER,
-              scalar_t,
-              accscalar_t,
-              scalar_t,
-              true>(
-              grad_output.const_data_ptr<scalar_t>(),
-              input.const_data_ptr<scalar_t>(),
-              mean.const_data_ptr<accscalar_t>(),
-              inv_std.const_data_ptr<accscalar_t>(),
-              weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr,
-              sum_dy.const_data_ptr<accscalar_t>(),
-              sum_dy_xmu.const_data_ptr<accscalar_t>(),
-              grad_input.mutable_data_ptr<scalar_t>(),
-              0,
-              reduction_size,
-              stride,
-              count.const_data_ptr<int>(),
-              count.numel());
-          sycl_kernel_submit(global_range, local_range, queue, kfn);
+          auto grad_output_ptr = grad_output.const_data_ptr<scalar_t>();
+          auto input_ptr = input.const_data_ptr<scalar_t>();
+          auto grad_input_ptr = grad_input.mutable_data_ptr<scalar_t>();
+
+          if (!can_use_batch_norm_bwd_cnl_vec_kernel<scalar_t, VEC_SIZE>(
+                  grad_output_ptr, input_ptr, grad_input_ptr, stride)) {
+            auto kfn = BatchNormBackwardElemtChannelsLastKernelFunctor<
+                ELEMENTS_PER_ITER,
+                scalar_t,
+                accscalar_t,
+                scalar_t,
+                true>(
+                grad_output_ptr,
+                input_ptr,
+                mean.const_data_ptr<accscalar_t>(),
+                inv_std.const_data_ptr<accscalar_t>(),
+                weight.defined() ? weight.const_data_ptr<scalar_t>() : nullptr,
+                sum_dy.const_data_ptr<accscalar_t>(),
+                sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                grad_input_ptr,
+                0,
+                reduction_size,
+                stride,
+                count.const_data_ptr<int>(),
+                count.numel());
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          } else {
+            auto kfn =
+                BatchNormBackwardElemtChannelsLastVectorizedKernelFunctor<
+                    ELEMENTS_PER_ITER / VEC_SIZE,
+                    VEC_SIZE,
+                    scalar_t,
+                    accscalar_t,
+                    scalar_t,
+                    true>(
+                    grad_output_ptr,
+                    input_ptr,
+                    mean.const_data_ptr<accscalar_t>(),
+                    inv_std.const_data_ptr<accscalar_t>(),
+                    weight.defined() ? weight.const_data_ptr<scalar_t>()
+                                     : nullptr,
+                    sum_dy.const_data_ptr<accscalar_t>(),
+                    sum_dy_xmu.const_data_ptr<accscalar_t>(),
+                    grad_input_ptr,
+                    0,
+                    reduction_size,
+                    stride,
+                    count.const_data_ptr<int>(),
+                    count.numel());
+            auto config = get_adaptive_launch_config(
+                syclMaxWorkGroupSize(kfn),
+                reduction_size,
+                stride / VEC_SIZE,
+                false,
+                ELEMENTS_PER_WORK_ITEM);
+            auto global_range = std::get<0>(config);
+            auto local_range = std::get<1>(config);
+            sycl_kernel_submit(global_range, local_range, queue, kfn);
+          }
         });
   }
 
   return grad_input;
 }
 
+Tensor batch_norm_backward_elemt_kernel(
+    const Tensor& self,
+    const Tensor& input,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const c10::optional<Tensor>& weight_opt,
+    const Tensor& sum_dy,
+    const Tensor& sum_dy_xmu,
+    const Tensor& count) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> weight_maybe_owned =
+      at::borrow_from_optional_tensor(weight_opt);
+  const Tensor& weight = *weight_maybe_owned;
+
+  if (canUse32BitIndexMath(self) &&
+      batch_norm_use_channels_last_kernels(self) &&
+      batch_norm_use_channels_last_kernels(input)) {
+    return batch_norm_backward_elemt_channels_last_template(
+        self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+  }
+
+  return AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      self.scalar_type(),
+      "batch_norm_backward_elemt_xpu",
+      [&] {
+        auto mean_st = mean.dtype();
+        auto invstd_st = invstd.dtype();
+        TORCH_CHECK(
+            mean_st == invstd_st,
+            "mean and invstd need to have the same data types");
+        bool is_half_float =
+            std::is_same<scalar_t, at::Half>::value && mean_st == at::kFloat;
+        bool is_bfloat16_float = std::is_same<scalar_t, at::BFloat16>::value &&
+            mean_st == at::kFloat;
+        using accscalar_t = acc_type_device<scalar_t, kXPU>;
+        if (canUse32BitIndexMath(self)) {
+          if (is_half_float || is_bfloat16_float) {
+            return batch_norm_backward_elemt_template<
+                scalar_t,
+                accscalar_t,
+                int32_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+          } else {
+            return batch_norm_backward_elemt_template<
+                scalar_t,
+                scalar_t,
+                int32_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+          }
+        } else {
+          if (is_half_float || is_bfloat16_float) {
+            return batch_norm_backward_elemt_template<
+                scalar_t,
+                accscalar_t,
+                int64_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+          } else {
+            return batch_norm_backward_elemt_template<
+                scalar_t,
+                scalar_t,
+                int64_t>(
+                self, input, mean, invstd, weight, sum_dy, sum_dy_xmu, count);
+          }
+        }
+      });
+}
+
 // ====================== batch_norm_update_stats ======================
+
+template <typename scalar_t, typename acc_t>
+struct BatchNormUpdateStatsFunctor {
+  std::tuple<scalar_t, scalar_t> operator()(
+      acc_t mean,
+      acc_t var,
+      scalar_t running_mean,
+      scalar_t running_var) const {
+    const auto unbiased_var = var * bessel_correction_factor;
+    return std::tuple<scalar_t, scalar_t>{
+        mean * momentum + (1 - momentum) * running_mean,
+        unbiased_var * momentum + (1 - momentum) * running_var,
+    };
+  }
+
+  BatchNormUpdateStatsFunctor(
+      const acc_t bessel_correction_factor,
+      const acc_t momentum)
+      : bessel_correction_factor(bessel_correction_factor),
+        momentum(momentum) {}
+
+ private:
+  const acc_t bessel_correction_factor;
+  const acc_t momentum;
+};
+
+void batch_norm_update_stats(
+    const Tensor& save_mean,
+    const Tensor& save_var,
+    const Tensor& running_mean,
+    const Tensor& running_var,
+    double momentum_,
+    int64_t N) {
+  auto iter = TensorIteratorConfig()
+                  .add_output(running_mean)
+                  .add_output(running_var)
+                  .add_input(save_mean)
+                  .add_input(save_var)
+                  .add_input(running_mean)
+                  .add_input(running_var)
+                  .check_all_same_dtype(false)
+                  .promote_inputs_to_common_dtype(false)
+                  .build();
+
+  AT_DISPATCH_FLOATING_TYPES_AND2(
+      kHalf,
+      kBFloat16,
+      running_mean.scalar_type(),
+      "batch_norm_update_stats_xpu",
+      [&] {
+        using acc_t = acc_type_device<scalar_t, kXPU>;
+        const auto bessel_correction_factor = static_cast<acc_t>(
+            static_cast<double>(N) / static_cast<double>(N - 1));
+        const auto momentum = static_cast<acc_t>(momentum_);
+        BatchNormUpdateStatsFunctor<scalar_t, acc_t> f(
+            bessel_correction_factor, momentum);
+        gpu_kernel_multiple_outputs(iter, f);
+      });
+}
 
 void batch_norm_mean_var(
     const Tensor& self,
@@ -2940,14 +4028,50 @@ void batch_norm_mean_var(
       for (int64_t i = 2; i < ndim; ++i) {
         reduce_dims[i - 1] = i;
       }
+
       // For some reason this isn't an actual operator but it exists anyway...
-      // at::native::var_mean_out(save_var,save_mean,
-      // self,/*dims=*/reduce_dims,/*unbiased=*/false,/*keepdim=*/false);
-      at::AtenIpexTypeXPU::std_var_mean_out(
-          "var_mean", save_var, save_mean, self, reduce_dims, 0, false, false);
+      at::native::var_mean_out(
+          save_var,
+          save_mean,
+          self,
+          /*dims=*/reduce_dims,
+          /*unbiased=*/false,
+          /*keepdim=*/false);
       return;
     }
   }
+}
+
+std::tuple<Tensor, Tensor> batch_norm_update_stats_kernel(
+    const Tensor& self,
+    const c10::optional<Tensor>& running_mean_opt,
+    const c10::optional<Tensor>& running_var_opt,
+    double momentum) {
+  c10::MaybeOwned<Tensor> running_mean =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  c10::MaybeOwned<Tensor> running_var =
+      at::borrow_from_optional_tensor(running_var_opt);
+
+  const int64_t n_input = self.size(1);
+  TORCH_CHECK(
+      self.numel() != 0,
+      "input tensor must have at least one element, but got input_sizes = ",
+      self.sizes());
+
+  auto options =
+      self.options().dtype(at::toAccumulateType(self.scalar_type(), true));
+
+  auto save_mean = at::empty({n_input}, options);
+  auto save_var = at::empty({n_input}, options);
+
+  batch_norm_mean_var(self, save_mean, save_var);
+  TORCH_CHECK(running_mean->defined() == running_var->defined());
+  if (running_mean->defined()) {
+    const int64_t N = self.numel() / save_mean.numel();
+    batch_norm_update_stats(
+        save_mean, save_var, *running_mean, *running_var, momentum, N);
+  }
+  return std::tuple<Tensor, Tensor>(save_mean, save_var);
 }
 
 // ====================== native_batch_norm ======================
@@ -3202,6 +4326,7 @@ std::tuple<Tensor&, Tensor&, Tensor&> batch_norm_kernel(
     save_mean.copy_(*running_mean_opt, /*non_blocking=*/true);
     batch_norm_calc_invstd(save_invstd, running_var_opt.value(), epsilon);
   }
+
   batch_norm_elementwise(
       output, self, weight_opt, bias_opt, save_mean, save_invstd);
   return std::tuple<Tensor&, Tensor&, Tensor&>(output, save_mean, save_invstd);
@@ -3415,6 +4540,229 @@ struct BatchNormBackwardKernelFunctor : public __SYCL_KER_CONFIG_CONVENTION__ {
   sycl_local_acc_t<Float2<input_scalar_t, stat_accscalar_t>> local_sum_;
 };
 
+template <
+    int SIMD,
+    int VEC_SIZE,
+    typename input_scalar_t,
+    typename stat_scalar_t,
+    typename stat_accscalar_t,
+    typename index_t>
+struct BatchNormBackwardVectorizedKernelFunctor
+    : public __SYCL_KER_CONFIG_CONVENTION__ {
+  [[intel::reqd_sub_group_size(SIMD)]] void operator()(
+      sycl::nd_item<2> item) const {
+    index_t plane = item.get_group(1);
+    index_t N = grad_output_.size(0) * grad_output_.size(2);
+
+    stat_accscalar_t mean, invstd;
+    if (train_) {
+      mean = save_mean_[plane];
+      invstd = save_invstd_[plane];
+    } else {
+      mean = static_cast<stat_accscalar_t>(running_mean_[plane]);
+      invstd =
+          static_cast<stat_accscalar_t>(1) /
+          std::sqrt(
+              static_cast<stat_accscalar_t>(running_var_[plane]) + epsilon_);
+    }
+
+    stat_accscalar_t weight_val = weight_.size(0) > 0
+        ? static_cast<stat_accscalar_t>(weight_[plane])
+        : stat_accscalar_t(1);
+    stat_accscalar_t norm = stat_accscalar_t(1) / N;
+
+    // Compute two values across (batch, x/y/z) in one pass:
+    // 1. Sum(grad_output)
+    // 2. DotProduct(input - mean, grad_output)
+    GradOp<
+        input_scalar_t,
+        stat_accscalar_t,
+        GenericPackedTensorAccessor<
+            const input_scalar_t,
+            3,
+            DefaultPtrTraits,
+            index_t>>
+        g(mean, input_, grad_output_);
+    int num_sg = item.get_local_range(1) * item.get_local_range(0) / SIMD;
+    auto res = plane_reduce<SIMD, Float2<input_scalar_t, stat_accscalar_t>>(
+        item, g, grad_output_, plane, num_sg, local_sum_);
+
+    stat_accscalar_t grad_output_sum = res.v1;
+    stat_accscalar_t dot_p = res.v2;
+
+    stat_accscalar_t grad_mean = grad_output_sum * norm;
+    stat_accscalar_t proj_scale = dot_p * norm * invstd * invstd;
+    stat_accscalar_t grad_scale = invstd * weight_val;
+
+    auto grad_input = grad_input_;
+    if (grad_input_.data() != NULL) {
+      for (int batch = item.get_local_id(0); batch < grad_output_.size(0);
+           batch += item.get_local_range(0)) {
+        for (int x_vec_begin = item.get_local_id(1) * VEC_SIZE;
+             x_vec_begin < grad_output_.size(2);
+             x_vec_begin += VEC_SIZE * item.get_local_range(1)) {
+          using vec_t = memory::aligned_vector<input_scalar_t, VEC_SIZE>;
+          auto go_vec = *reinterpret_cast<vec_t*>(const_cast<input_scalar_t*>(
+              &grad_output_[batch][plane][x_vec_begin]));
+          vec_t grad_input_vec;
+          if (train_) {
+            auto inp_vec =
+                *reinterpret_cast<vec_t*>(const_cast<input_scalar_t*>(
+                    &input_[batch][plane][x_vec_begin]));
+#pragma unroll
+            for (int vt = 0; vt < VEC_SIZE; ++vt) {
+              stat_accscalar_t proj =
+                  ((stat_accscalar_t)inp_vec[vt] - mean) * proj_scale;
+              grad_input_vec[vt] = static_cast<input_scalar_t>(
+                  (go_vec[vt] - proj - grad_mean) * grad_scale);
+            }
+          } else {
+#pragma unroll
+            for (int vt = 0; vt < VEC_SIZE; ++vt) {
+              grad_input_vec[vt] =
+                  static_cast<input_scalar_t>(go_vec[vt] * grad_scale);
+            }
+          }
+          input_scalar_t* write_ptr = &grad_input[batch][plane][x_vec_begin];
+          *(reinterpret_cast<vec_t*>(write_ptr)) = grad_input_vec;
+        }
+      }
+    }
+
+    if (grad_weight_.size(0) > 0) {
+      if (item.get_local_id(1) == 0) {
+        auto grad_weight = grad_weight_;
+        grad_weight[plane] = static_cast<stat_scalar_t>(dot_p * invstd);
+      }
+    }
+
+    if (grad_bias_.size(0) > 0) {
+      if (item.get_local_id(1) == 0) {
+        auto grad_bias = grad_bias_;
+        grad_bias[plane] = static_cast<stat_scalar_t>(grad_output_sum);
+      }
+    }
+  }
+
+  void sycl_ker_config_convention(sycl::handler& cgh) {
+    local_sum_ = sycl_local_acc_t<Float2<input_scalar_t, stat_accscalar_t>>(
+        sycl::range<1>{(size_t)wg_size_}, cgh);
+  }
+
+  BatchNormBackwardVectorizedKernelFunctor(
+      const GenericPackedTensorAccessor<
+          const input_scalar_t,
+          3,
+          DefaultPtrTraits,
+          index_t> input,
+      const GenericPackedTensorAccessor<
+          const input_scalar_t,
+          3,
+          DefaultPtrTraits,
+          index_t> grad_output,
+      GenericPackedTensorAccessor<input_scalar_t, 3, DefaultPtrTraits, index_t>
+          grad_input,
+      GenericPackedTensorAccessor<stat_scalar_t, 1, DefaultPtrTraits, index_t>
+          grad_weight,
+      GenericPackedTensorAccessor<stat_scalar_t, 1, DefaultPtrTraits, index_t>
+          grad_bias,
+      const GenericPackedTensorAccessor<
+          const stat_scalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> weight,
+      const GenericPackedTensorAccessor<
+          const stat_scalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> running_mean,
+      const GenericPackedTensorAccessor<
+          const stat_scalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> running_var,
+      const GenericPackedTensorAccessor<
+          const stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> save_mean,
+      const GenericPackedTensorAccessor<
+          const stat_accscalar_t,
+          1,
+          DefaultPtrTraits,
+          index_t> save_invstd,
+      bool train,
+      stat_accscalar_t epsilon,
+      int wg_size)
+      : input_(input),
+        grad_output_(grad_output),
+        grad_input_(grad_input),
+        grad_weight_(grad_weight),
+        grad_bias_(grad_bias),
+        weight_(weight),
+        running_mean_(running_mean),
+        running_var_(running_var),
+        save_mean_(save_mean),
+        save_invstd_(save_invstd),
+        train_(train),
+        epsilon_(epsilon),
+        wg_size_(wg_size) {}
+
+ private:
+  const GenericPackedTensorAccessor<
+      const input_scalar_t,
+      3,
+      DefaultPtrTraits,
+      index_t>
+      input_;
+  const GenericPackedTensorAccessor<
+      const input_scalar_t,
+      3,
+      DefaultPtrTraits,
+      index_t>
+      grad_output_;
+  GenericPackedTensorAccessor<input_scalar_t, 3, DefaultPtrTraits, index_t>
+      grad_input_;
+  GenericPackedTensorAccessor<stat_scalar_t, 1, DefaultPtrTraits, index_t>
+      grad_weight_;
+  GenericPackedTensorAccessor<stat_scalar_t, 1, DefaultPtrTraits, index_t>
+      grad_bias_;
+  const GenericPackedTensorAccessor<
+      const stat_scalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      weight_;
+  const GenericPackedTensorAccessor<
+      const stat_scalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      running_mean_;
+  const GenericPackedTensorAccessor<
+      const stat_scalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      running_var_;
+  const GenericPackedTensorAccessor<
+      const stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      save_mean_;
+  const GenericPackedTensorAccessor<
+      const stat_accscalar_t,
+      1,
+      DefaultPtrTraits,
+      index_t>
+      save_invstd_;
+  bool train_;
+  stat_accscalar_t epsilon_;
+  int wg_size_;
+  sycl_local_acc_t<Float2<input_scalar_t, stat_accscalar_t>> local_sum_;
+};
+
 template <typename input_scalar_t, typename stat_scalar_t, typename index_t>
 std::tuple<Tensor, Tensor, Tensor> batch_norm_backward_template(
     const Tensor& grad_out_,
@@ -3488,67 +4836,97 @@ std::tuple<Tensor, Tensor, Tensor> batch_norm_backward_template(
 
   auto& queue = getCurrentSYCLQueue();
 
-  if (simd == SIMD32) {
-    using KernelClass = BatchNormBackwardKernelFunctor<
-        SIMD32,
-        input_scalar_t,
-        stat_scalar_t,
-        accscalar_t,
-        index_t>;
-
-    int max_group_size = get_max_group_size<KernelClass>(simd);
-    int tf = get_num_threads<KernelClass>(input.size(2), simd);
-    int wg_sz_y = std::max<int>(1, max_group_size / tf);
-    sycl::range<2> local_range(wg_sz_y, tf);
-    sycl::range<2> global_range(1 * wg_sz_y, input.size(1) * tf);
-
-    auto kfn = KernelClass(
-        input,
-        grad_output,
-        grad_input,
-        grad_weight,
-        grad_bias,
-        weight,
-        running_mean,
-        running_var,
-        save_mean,
-        save_invstd,
-        train,
-        epsilon,
-        wg_sz_y * tf);
-
-    sycl_kernel_submit(global_range, local_range, queue, kfn);
-  } else {
-    using KernelClass = BatchNormBackwardKernelFunctor<
-        SIMD16,
-        input_scalar_t,
-        stat_scalar_t,
-        accscalar_t,
-        index_t>;
-
-    int max_group_size = get_max_group_size<KernelClass>(simd);
-    int tf = get_num_threads<KernelClass>(input.size(2), simd);
-    int wg_sz_y = std::max<int>(1, max_group_size / tf);
-    sycl::range<2> local_range(wg_sz_y, tf);
-    sycl::range<2> global_range(1 * wg_sz_y, input.size(1) * tf);
-
-    auto kfn = KernelClass(
-        input,
-        grad_output,
-        grad_input,
-        grad_weight,
-        grad_bias,
-        weight,
-        running_mean,
-        running_var,
-        save_mean,
-        save_invstd,
-        train,
-        epsilon,
-        wg_sz_y * tf);
-
-    sycl_kernel_submit(global_range, local_range, queue, kfn);
+#define LAUNCH_KERNEL_WITH_SIMD(SIMD_W)                           \
+  {                                                               \
+    using KernelClass = BatchNormBackwardKernelFunctor<           \
+        SIMD_W,                                                   \
+        input_scalar_t,                                           \
+        stat_scalar_t,                                            \
+        accscalar_t,                                              \
+        index_t>;                                                 \
+    int max_group_size = get_max_group_size<KernelClass>(SIMD_W); \
+    int tf = get_num_threads<KernelClass>(input.size(2), SIMD_W); \
+    int wg_sz_y = std::max<int>(1, max_group_size / tf);          \
+    sycl::range<2> local_range(wg_sz_y, tf);                      \
+    sycl::range<2> global_range(1 * wg_sz_y, input.size(1) * tf); \
+    auto kfn = KernelClass(                                       \
+        input,                                                    \
+        grad_output,                                              \
+        grad_input,                                               \
+        grad_weight,                                              \
+        grad_bias,                                                \
+        weight,                                                   \
+        running_mean,                                             \
+        running_var,                                              \
+        save_mean,                                                \
+        save_invstd,                                              \
+        train,                                                    \
+        epsilon,                                                  \
+        wg_sz_y * tf);                                            \
+    sycl_kernel_submit(global_range, local_range, queue, kfn);    \
   }
+
+#define LAUNCH_VEC_KERNEL_WITH_SIMD(SIMD_W)                       \
+  {                                                               \
+    using KernelClass = BatchNormBackwardVectorizedKernelFunctor< \
+        SIMD_W,                                                   \
+        PREFERRED_VEC_SIZE,                                       \
+        input_scalar_t,                                           \
+        stat_scalar_t,                                            \
+        accscalar_t,                                              \
+        index_t>;                                                 \
+    int max_group_size = get_max_group_size<KernelClass>(SIMD_W); \
+    int tf = get_num_threads<KernelClass>(input.size(2), SIMD_W); \
+    int wg_sz_y = std::max<int>(1, max_group_size / tf);          \
+    sycl::range<2> local_range(wg_sz_y, tf);                      \
+    sycl::range<2> global_range(1 * wg_sz_y, input.size(1) * tf); \
+    auto kfn = KernelClass(                                       \
+        input,                                                    \
+        grad_output,                                              \
+        grad_input,                                               \
+        grad_weight,                                              \
+        grad_bias,                                                \
+        weight,                                                   \
+        running_mean,                                             \
+        running_var,                                              \
+        save_mean,                                                \
+        save_invstd,                                              \
+        train,                                                    \
+        epsilon,                                                  \
+        wg_sz_y * tf);                                            \
+    sycl_kernel_submit(global_range, local_range, queue, kfn);    \
+  }
+
+  auto input_ptr = (char*)input_reshaped.const_data_ptr();
+  auto grad_input_ptr = (char*)grad_input_reshaped.mutable_data_ptr();
+  auto grad_output_ptr = (char*)grad_output_reshaped.const_data_ptr();
+  bool can_use_vec_kernel =
+      (input_reshaped.is_contiguous() && grad_input_reshaped.is_contiguous() &&
+       grad_output_reshaped.is_contiguous() &&
+       memory::can_vectorize_up_to<input_scalar_t>(input_ptr) >=
+           PREFERRED_VEC_SIZE &&
+       memory::can_vectorize_up_to<input_scalar_t>(grad_input_ptr) >=
+           PREFERRED_VEC_SIZE &&
+       memory::can_vectorize_up_to<input_scalar_t>(grad_output_ptr) >=
+           PREFERRED_VEC_SIZE &&
+       input.size(2) % PREFERRED_VEC_SIZE == 0);
+
+  if (simd == SIMD32) {
+    if (can_use_vec_kernel) {
+      LAUNCH_VEC_KERNEL_WITH_SIMD(SIMD32);
+    } else {
+      LAUNCH_KERNEL_WITH_SIMD(SIMD32);
+    }
+  } else {
+    if (can_use_vec_kernel) {
+      LAUNCH_VEC_KERNEL_WITH_SIMD(SIMD16);
+    } else {
+      LAUNCH_KERNEL_WITH_SIMD(SIMD16);
+    }
+  }
+
+#undef LAUNCH_KERNEL_WITH_SIMD
+#undef LAUNCH_VEC_KERNEL_WITH_SIMD
   return std::make_tuple(grad_input_, grad_weight_, grad_bias_);
 }
 
@@ -4025,6 +5403,96 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_kernel_template(
   sycl_kernel_submit(global_range, local_range, getCurrentSYCLQueue(), caller);
 
   return std::make_tuple(save_mean_, save_invstd_);
+}
+
+std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts_kernel(
+    const Tensor& self,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const std::optional<Tensor>& running_mean_opt /* optional */,
+    const std::optional<Tensor>& running_var_opt /* optional */,
+    double momentum,
+    double epsilon,
+    const Tensor& counts) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+  const Tensor& running_var =
+      c10::value_or_else(running_var_opt, [] { return Tensor(); });
+
+  auto scalar_type =
+      running_mean.defined() ? running_mean.scalar_type() : self.scalar_type();
+  return AT_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      scalar_type,
+      "batch_norm_update_stats_kernel",
+      [&] {
+        using accscalar_t = acc_type_device<scalar_t, kXPU>;
+        if (canUse32BitIndexMath(self)) {
+          return batch_norm_gather_stats_kernel_template<
+              scalar_t,
+              accscalar_t,
+              int32_t>(
+              mean,
+              invstd,
+              running_mean,
+              running_var,
+              momentum,
+              epsilon,
+              counts);
+        } else {
+          return batch_norm_gather_stats_kernel_template<
+              scalar_t,
+              accscalar_t,
+              int64_t>(
+              mean,
+              invstd,
+              running_mean,
+              running_var,
+              momentum,
+              epsilon,
+              counts);
+        }
+      });
+}
+
+// accepting input(self) here to determine template data types, since
+// running_mean/running_var are optional
+std::tuple<Tensor, Tensor> batch_norm_gather_stats_kernel(
+    const Tensor& self,
+    const Tensor& mean,
+    const Tensor& invstd,
+    const std::optional<Tensor>& running_mean_opt,
+    const std::optional<Tensor>& running_var_opt,
+    double momentum,
+    double epsilon,
+    int64_t count) {
+  // See [Note: hacky wrapper removal for optional tensor]
+  c10::MaybeOwned<Tensor> running_mean_maybe_owned =
+      at::borrow_from_optional_tensor(running_mean_opt);
+  const Tensor& running_mean = *running_mean_maybe_owned;
+  const Tensor& running_var =
+      c10::value_or_else(running_var_opt, [] { return Tensor(); });
+
+  std::vector<int64_t> counts(mean.size(0), count);
+  Tensor counts_ = at::from_blob(
+      (void*)counts.data(),
+      {(int64_t)counts.size()},
+      self.options().dtype(at::kLong).device(at::kCPU));
+  counts_ =
+      counts_.to(self.device())
+          .to(running_mean.defined() ? running_mean.dtype() : self.dtype());
+  return batch_norm_gather_stats_with_counts_kernel(
+      self,
+      mean,
+      invstd,
+      running_mean,
+      running_var,
+      momentum,
+      epsilon,
+      counts_);
 }
 
 } // namespace xpu
