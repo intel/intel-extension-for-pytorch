@@ -9,6 +9,11 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "utils/ComputeEngine.h"
+#ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+#include "utils/CustomOperatorRegistration.h"
+#endif
 
 using namespace dnnl;
 using namespace at::native;
@@ -578,3 +583,107 @@ Tensor upsample_bilinear2d_backward(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+at::Tensor wrapper_XPU_upsample_bilinear2d(
+    const at::Tensor& self,
+    at::IntArrayRef output_size,
+    bool align_corners,
+    ::std::optional<double> scales_h,
+    ::std::optional<double> scales_w) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_upsample_bilinear2d", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::upsample_bilinear2d(
+      self, output_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor& wrapper_XPU_out_upsample_bilinear2d_out(
+    const at::Tensor& self,
+    IntArrayRef output_size,
+    bool align_corners,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_upsample_bilinear2d_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_upsample_bilinear2d_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::upsample_bilinear2d_out(
+      self, output_size, align_corners, scales_h, scales_w, out);
+}
+
+at::Tensor wrapper_XPU_grad_input_upsample_bilinear2d_backward(
+    const at::Tensor& grad_output,
+    at::IntArrayRef output_size,
+    at::IntArrayRef input_size,
+    bool align_corners,
+    ::std::optional<double> scales_h,
+    ::std::optional<double> scales_w) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_output,
+      "wrapper_XPU_grad_input_upsample_bilinear2d_backward_out",
+      "grad_output");
+  const OptionalDeviceGuard device_guard(device_of(grad_output));
+
+  return at::AtenIpexTypeXPU::upsample_bilinear2d_backward(
+      grad_output, output_size, input_size, align_corners, scales_h, scales_w);
+}
+
+at::Tensor& wrapper_XPU_grad_input_upsample_bilinear2d_backward_out(
+    const at::Tensor& grad_output,
+    IntArrayRef output_size,
+    IntArrayRef input_size,
+    bool align_corners,
+    c10::optional<double> scales_h,
+    c10::optional<double> scales_w,
+    at::Tensor& grad_input) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_input,
+      "wrapper_XPU_grad_input_upsample_bilinear2d_backward_out",
+      "grad_input");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_output,
+      "wrapper_XPU_grad_input_upsample_bilinear2d_backward_out",
+      "grad_output");
+  const OptionalDeviceGuard device_guard(device_of(grad_input));
+
+  return at::AtenIpexTypeXPU::upsample_bilinear2d_backward_out(
+      grad_output,
+      output_size,
+      input_size,
+      align_corners,
+      scales_h,
+      scales_w,
+      grad_input);
+}
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("upsample_bilinear2d", TORCH_FN((&wrapper_XPU_upsample_bilinear2d)));
+  m.impl(
+      "upsample_bilinear2d.out",
+      TORCH_FN((&wrapper_XPU_out_upsample_bilinear2d_out)));
+  m.impl(
+      "upsample_bilinear2d_backward",
+      TORCH_FN((&wrapper_XPU_grad_input_upsample_bilinear2d_backward)));
+  m.impl(
+      "upsample_bilinear2d_backward.grad_input",
+      TORCH_FN((&wrapper_XPU_grad_input_upsample_bilinear2d_backward_out)));
+}
+
+} // namespace
+#endif
