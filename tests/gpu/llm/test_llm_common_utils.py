@@ -129,6 +129,8 @@ class TestIpexLLMOptimizeBase(TestCase):
             **generate_kwargs,
         )
 
+        torch.xpu.synchronize()
+
         print(
             f"Run model={self.model_class}, num_beams={num_beams}, input_tokens_length={input_tokens_length},"
             f"max_new_tokens={max_new_tokens}, use_static_cache={use_static_cache}"
@@ -156,6 +158,8 @@ class TestIpexLLMOptimizeBase(TestCase):
                 min_new_tokens=int(max_new_tokens),
                 **generate_kwargs,
             )
+
+        torch.xpu.synchronize()
 
         if type(model) in need_recover_models_list.keys():
             reload_module(self.cached_module, model)
