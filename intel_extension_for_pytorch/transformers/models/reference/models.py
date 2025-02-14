@@ -27,7 +27,6 @@ try:
         MoeCausalLMOutputWithPast,
         MoeModelOutputWithPast,
     )
-    from transformers.models.llava.modeling_llava import LlavaCausalLMOutputWithPast
 except ImportError:
     pass
 
@@ -6272,7 +6271,7 @@ def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):
                 attentions=attentions,
             )
         if module.config.architectures[0] in ["Maira2ForConditionalGeneration"]:
-            return LlavaCausalLMOutputWithPast(
+            return transformers.models.llava.modeling_llava.LlavaCausalLMOutputWithPast(
                 loss=loss,
                 logits=logits,
                 past_key_values=past_key_values,
