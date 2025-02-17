@@ -1,0 +1,206 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="This website introduces Intel® Extension for PyTorch*" name="description" />
+<meta content="Intel optimization, PyTorch, Intel® Extension for PyTorch*, GPU, discrete GPU, Intel discrete GPU" name="keywords" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* &mdash; Intel&amp;#174 Extension for PyTorch* 2.6.0+cpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=01a6a0bb" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Introduction" href="tutorials/introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../">2.6.0+cpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/cheat_sheet.html">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Intel® Extension for PyTorch*</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch">
+<h1>Intel® Extension for PyTorch*<a class="headerlink" href="#intel-extension-for-pytorch" title="Link to this heading"></a></h1>
+<p>Intel® Extension for PyTorch* extends PyTorch* with the latest performance optimizations for Intel hardware.
+Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup>Matrix Extensions (XMX) AI engines on Intel discrete GPUs.
+Moreover, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device.</p>
+<p>In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain
+LLMs are introduced in the Intel® Extension for PyTorch*. For more information on LLM optimizations, refer to the <a class="reference external" href="tutorials/llm.html">Large Language Models (LLM)</a> section.</p>
+<p>The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts, users can enable it dynamically by importing <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>GPU features are not included in CPU-only packages.</p></li>
+<li><p>Optimizations for CPU-only may have a newer code base due to different development schedules.</p></li>
+</ul>
+</div>
+<p>Intel® Extension for PyTorch* has been released as an open–source project at <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch">Github</a>. You can find the source code and instructions on how to get started at:</p>
+<ul class="simple">
+<li><p><strong>CPU</strong>: <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main">CPU main branch</a> |  <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started">Quick Start</a></p></li>
+<li><p><strong>XPU</strong>: <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main">XPU main branch</a> | <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started">Quick Start</a></p></li>
+</ul>
+<p>You can find more information about the product at:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features">Features</a></p></li>
+<li><p><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance">Performance</a></p></li>
+</ul>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* is structured as shown in the following figure:</p>
+<figure class="align-center" id="id2">
+<a class="reference internal image-reference" href="_images/intel_extension_for_pytorch_structure.png"><img alt="Architecture of Intel® Extension for PyTorch*" src="_images/intel_extension_for_pytorch_structure.png" style="width: 800px;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Architecture of Intel® Extension for PyTorch*</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Eager Mode</strong>: In the eager mode, the PyTorch frontend is extended with custom Python modules (such as fusion modules), optimal optimizers, and INT8 quantization APIs. Further performance improvement is achieved by converting eager-mode models into graph mode using extended graph fusion passes.</p></li>
+<li><p><strong>Graph Mode</strong>: In the graph mode, fusions reduce operator/kernel invocation overhead, resulting in improved performance. Compared to the eager mode, the graph mode in PyTorch* normally yields better performance from the optimization techniques like operation fusion. Intel® Extension for PyTorch* amplifies them with more comprehensive graph optimizations. Both PyTorch <code class="docutils literal notranslate"><span class="pre">Torchscript</span></code> and <code class="docutils literal notranslate"><span class="pre">TorchDynamo</span></code> graph modes are supported. With <code class="docutils literal notranslate"><span class="pre">Torchscript</span></code>, we recommend using <code class="docutils literal notranslate"><span class="pre">torch.jit.trace()</span></code> as your preferred option, as it generally supports a wider range of workloads compared to <code class="docutils literal notranslate"><span class="pre">torch.jit.script()</span></code>. With <code class="docutils literal notranslate"><span class="pre">TorchDynamo</span></code>, ipex backend is available to provide good performances.</p></li>
+<li><p><strong>CPU Optimization</strong>: On CPU, Intel® Extension for PyTorch* automatically dispatches operators to underlying kernels based on detected instruction set architecture (ISA). The extension leverages vectorization and matrix acceleration units available on Intel hardware. The runtime extension offers finer-grained thread runtime control and weight sharing for increased efficiency.</p></li>
+<li><p><strong>GPU Optimization</strong>: On GPU, optimized operators and kernels are implemented and registered through PyTorch dispatching mechanism. These operators and kernels are accelerated from native vectorization feature and matrix calculation feature of Intel GPU hardware. Intel® Extension for PyTorch* for GPU utilizes the <a class="reference external" href="https://github.com/intel/llvm#oneapi-dpc-compiler">DPC++</a> compiler that supports the latest <a class="reference external" href="https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html">SYCL*</a> standard and also a number of extensions to the SYCL* standard, which can be found in the <a class="reference external" href="https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions">sycl/doc/extensions</a> directory.</p></li>
+</ul>
+</section>
+<section id="support">
+<h2>Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
+<p>The team tracks bugs and enhancement requests using <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/">GitHub issues</a>. Before submitting a suggestion or bug report, search the existing GitHub issues to see if your issue has already been reported.</p>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tutorials/introduction.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7a6c40c497e0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
