@@ -1,6 +1,29 @@
 Releases
 ========
 
+## 2.6.0
+
+We are excited to announce the release of Intel® Extension for PyTorch* 2.6.0+cpu which accompanies PyTorch 2.6. This release mainly brings you full optimization on latest Intel® Xeon® 6 P-core platform, new LLM model support including Falcon3/Jamba/DeepSeek V2.5, and latest LLM optimization including FP8 KV cache, GPTQ/AWQ support under Tensor Parallel mode, and INT8 computation for WOQ. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+
+### Highlights
+
+* Comprehensive optimization for Intel® Xeon® 6
+Intel® Xeon® 6 deliver new degrees of performance with more cores, a choice of microarchitecture, additional memory bandwidth, and exceptional input/output (I/O) across a range of workloads. Intel® Extension for PyTorch* v2.5 introduced the basic optimization for Intel® Xeon® 6, while in this new release, we added more comprehensive optimization as reflected with a set of typical AI models like DLRM/Bert-Large/ViT/Stable Diffusion/LCM/GPT-J/Llama, etc.
+
+* Large Language Model (LLM) optimization:
+Intel® Extension for PyTorch* provides more feature support of the weight only quantization including INT8 based computation by leveraging AMX-INT8 from Intel® Xeon® 6, and GPTQ/AWQ support under Tensor Parallel mode.  FP8 KV cache and FP16 general datatype support in LLM module API, etc.. These features enable better adoption of community model weight and provides better performance for low-precision scenarios. This release also extended the optimized models to include newly published models like Falcon3, DeepSeek V2.5 and Jamba. A full list of optimized models can be found at [LLM optimization](https://github.com/intel/intel-extension-for-pytorch/tree/v2.6.0+cpu/examples/cpu/llm/inference).
+
+* Bug fixing and other optimization
+    - Optimized the performance of LLM [#3420](https://github.com/intel/intel-extension-for-pytorch/commit/db3e22beeee026cc07f547be2f4fafd2e370561c) [#3441](https://github.com/intel/intel-extension-for-pytorch/commit/18eeefa762433b9b2731cf55a916cfdb4c8ca4c4) [#3406](https://github.com/intel/intel-extension-for-pytorch/commit/950e509f73a28d1b9d480e397768fbeb931b82ab) [#3376](https://github.com/intel/intel-extension-for-pytorch/commit/fbd0c0334e18760dc7d626673da1d338471dfb80)
+    - Supported loading INT4 checkpoint with Tensor Parallel [#3328](https://github.com/intel/intel-extension-for-pytorch/commit/ae09c58b33e7b052b7f8b7de19992341bdc0aa5d)
+    - Enabled TP=3 with INT4 checkpoint for Weight Only Quantization [#3400](https://github.com/intel/intel-extension-for-pytorch/commit/3e27750ee03674a054f093a707e46a16727b3931)
+    - Supported sharding checkpoint with GPTQ policy [#3423](https://github.com/intel/intel-extension-for-pytorch/commit/0e7ff79d4459a52dea57d35042f8c66c35bc295d)
+    - Enabled lowp-mode=INT8 for NF4 weight [#3395](https://github.com/intel/intel-extension-for-pytorch/commit/1be1dc86a1bba2a03549f5529e7ddce971c4115b)
+    - Fixed the correctness issue in the Weight Only Quantization kernel for Llama3-11b-vision [#3469](https://github.com/intel/intel-extension-for-pytorch/commit/4d0ff47291d35205dd2300b9cbdbdb03af3161d5)
+    - Upgraded oneDNN to v3.6.2 [#3399](https://github.com/intel/intel-extension-for-pytorch/commit/9eeaac672431cfdc5835decc72b00c073e842bd4)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.5.0+cpu...v2.6.0+cpu
+
 ## 2.5.0
 
 We are excited to announce the release of Intel® Extension for PyTorch* 2.5.0+cpu which accompanies PyTorch 2.5. This release mainly brings you the support for Llama3.2, optimization on newly launched Intel® Xeon® 6 P-core platform, GPTQ/AWQ format support, and latest optimization to push better performance for LLM models. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
