@@ -419,6 +419,22 @@ def _sample(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                elif self.model_backbone in [
+                    "DeepseekV2ForCausalLM",
+                    "DeepseekV3ForCausalLM",
+                ]:
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),  # latent_cache
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
                 else:
                     model_inputs["past_key_values"] = tuple(
                         [

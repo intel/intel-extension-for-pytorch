@@ -1,4 +1,5 @@
 #include <ATen/Tensor.h>
+#include <aten/Decode.h>
 #include <aten/FlashAttention.h>
 #include <aten/MaskedMultiHeadAttention.h>
 #include <torch/all.h>
@@ -6,7 +7,6 @@
 #include <limits>
 #include "../../utils/isa_utils.h"
 #include "vec/vec.h"
-
 namespace torch_ipex {
 namespace cpu {
 
@@ -34,6 +34,19 @@ inline void reduce_head(
     attn_w_pos[0] += static_cast<float>(q_ptr_start[hsi]) *
         static_cast<float>(k_ptr_start[hsi]);
   }
+}
+template <typename T, typename KT, typename CT>
+inline void reduce_head(
+    const T* q_ptr_start,
+    const KT* k_ptr_start,
+    CT* attn_w_pos,
+    int64_t head_size) {
+  float sum = 0;
+  for (auto hsi = 0; hsi < head_size; hsi++) {
+    sum += static_cast<float>(q_ptr_start[hsi]) *
+        static_cast<float>(k_ptr_start[hsi]);
+  }
+  attn_w_pos[0] = static_cast<CT>(sum);
 }
 #if defined(CPU_CAPABILITY_AVX512)
 template <>
@@ -130,6 +143,80 @@ inline void reduce_head(
   }
   return;
 }
+
+template <>
+inline void reduce_head(
+    const float* q_ptr_start,
+    const float* k_ptr_start,
+    float* attn_w_pos,
+    int64_t head_size) {
+  auto hsi = 0;
+  auto vec_size = 16; // 512/32
+  auto qk_sum_vec = _mm512_setzero_ps();
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto q_vec = _mm512_loadu_ps(q_ptr_start + hsi);
+    auto k_vec = _mm512_loadu_ps(k_ptr_start + hsi);
+    qk_sum_vec = _mm512_fmadd_ps(q_vec, k_vec, qk_sum_vec);
+  }
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
+  }
+  return;
+}
+
+template <>
+inline void reduce_head(
+    const at::BFloat16* q_ptr_start,
+    const at::BFloat16* k_ptr_start,
+    at::BFloat16* attn_w_pos,
+    int64_t head_size) {
+  auto hsi = 0;
+  auto vec_size = 16; // 512/32
+  auto qk_sum_vec = _mm512_setzero_ps();
+  float sum = 0;
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    // load 16 bfloat16 query from q_ptr_start and convert to 16 float32 values
+    auto q_vec_bf16 = _mm256_loadu_si256((__m256i*)(q_ptr_start + hsi));
+    auto q_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(q_vec_bf16);
+    // load 16 bfloat16 key from k_ptr_start and convert to 16 float32 values
+    auto k_vec_bf16 = _mm256_loadu_si256((__m256i*)(k_ptr_start + hsi));
+    auto k_vec_fp32 = torch_ipex::cpu::kernel::convert_bf16_to_fp32(k_vec_bf16);
+    qk_sum_vec = _mm512_fmadd_ps(q_vec_fp32, k_vec_fp32, qk_sum_vec);
+  }
+  sum += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    sum += q_ptr_start[hsi] * k_ptr_start[hsi];
+  }
+  attn_w_pos[0] = static_cast<at::BFloat16>(sum);
+  return;
+}
+
+template <>
+inline void reduce_head(
+    const at::Half* q_ptr_start,
+    const at::Half* k_ptr_start,
+    at::Half* attn_w_pos,
+    int64_t head_size) {
+  auto hsi = 0;
+  auto vec_size = 16; // 512/32
+  auto qk_sum_vec = _mm512_setzero_ps();
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    // load 16 float16 query from q_ptr_start and convert to 16 float32 values
+    auto q_vec_fp16 = _mm256_loadu_si256((__m256i*)(q_ptr_start + hsi));
+    auto q_vec_fp32 = cvt_fp16_to_fp32(q_vec_fp16);
+    // load 16 float16 key from k_ptr_start and convert to 16 float32 values
+    auto k_vec_fp16 = _mm256_loadu_si256((__m256i*)(k_ptr_start + hsi));
+    auto k_vec_fp32 = cvt_fp16_to_fp32(k_vec_fp16);
+    qk_sum_vec = _mm512_fmadd_ps(q_vec_fp32, k_vec_fp32, qk_sum_vec);
+  }
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
+  }
+  return;
+}
+
 #endif
 
 #if defined(CPU_CAPABILITY_AVX512_FP16)
@@ -970,6 +1057,60 @@ inline void copy_key_value(
       auto value_cache_ptr_start = value_cache_ptr + cache_stride;
       auto value_ptr_start = value_ptr + state_stride;
       move_and_convert(value_ptr_start, value_cache_ptr_start, hidden_size);
+    }
+  }
+}
+
+template <typename T, typename CT>
+inline void copy_key_value(
+    at::Tensor& kv_cache,
+    const at::Tensor& kv,
+    const at::Tensor& k_pe,
+    int beam_batch,
+    long offset) {
+  RECORD_FUNCTION("ipex::copy_key_value", c10::ArrayRef<c10::IValue>({}));
+  auto bs = kv.size(0);
+  auto seq_len = kv.size(1);
+  auto head_num = k_pe.size(2);
+  auto head_size = kv.size(-1);
+  auto k_pe_head_size = k_pe.size(-1);
+  auto k_pe_stride_b = k_pe.stride(0);
+  auto k_pe_stride_s = k_pe.stride(1);
+  auto kv_hidden_size = head_num * head_size;
+  auto k_pe_hidden_size = head_num * k_pe_head_size;
+  auto hidden_size = kv_hidden_size + k_pe_hidden_size;
+  auto kv_cache_ptr = kv_cache.data_ptr<CT>();
+  auto kv_ptr = kv.data_ptr<T>();
+  auto k_pe_ptr = k_pe.data_ptr<T>();
+  auto token_stride = beam_batch * hidden_size;
+  auto beam_size = beam_batch / bs;
+  if (offset == 0) {
+#pragma omp parallel for collapse(2)
+    for (auto si = 0; si < seq_len; si++) {
+      for (auto bi = 0; bi < bs; bi++) {
+        auto cache_stride = si * token_stride + bi * beam_size * hidden_size;
+        auto state_stride = (bi * seq_len + si) * kv_hidden_size;
+        auto kv_cache_start = kv_cache_ptr + cache_stride;
+        auto kv_ptr_start = kv_ptr + state_stride;
+        move_and_convert(kv_ptr_start, kv_cache_start, kv_hidden_size);
+        auto k_pe_start = k_pe_ptr + bi * k_pe_stride_b + si * k_pe_stride_s;
+        auto k_pe_cache_start = kv_cache_start + kv_hidden_size;
+        move_and_convert(k_pe_start, k_pe_cache_start, k_pe_hidden_size);
+      }
+    }
+  } else {
+#pragma omp parallel for collapse(2)
+    for (auto si = 0; si < seq_len; si++) {
+      for (auto bi = 0; bi < bs; bi++) {
+        auto cache_stride = (si + offset) * token_stride + bi * hidden_size;
+        auto state_stride = (bi * seq_len + si) * kv_hidden_size;
+        auto kv_cache_start = kv_cache_ptr + cache_stride;
+        auto kv_ptr_start = kv_ptr + state_stride;
+        move_and_convert(kv_ptr_start, kv_cache_start, kv_hidden_size);
+        auto k_pe_start = k_pe_ptr + bi * k_pe_stride_b + si * k_pe_stride_s;
+        auto k_pe_cache_start = kv_cache_start + kv_hidden_size;
+        move_and_convert(k_pe_start, k_pe_cache_start, k_pe_hidden_size);
+      }
     }
   }
 }
@@ -2346,6 +2487,79 @@ first_token_masked_mha(
       attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
 }
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+first_token_deepseekv2_mla(
+    at::Tensor query,
+    at::Tensor key,
+    at::Tensor value,
+    at::Tensor& kv_cache,
+    at::Tensor& beam_idx,
+    const int64_t beam_batch,
+    const double scale_attn,
+    at::Tensor attention_mask,
+    int64_t v_head_size,
+    bool add_casual_mask = true) {
+  auto origin_type = query.scalar_type();
+  auto bs = query.size(0);
+  auto query_length = query.size(1);
+  auto key_lenght = key.size(1);
+  auto kv_head_num = key.size(2);
+  auto head_size = key.size(3);
+  if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat &&
+      key.scalar_type() != at::kHalf) {
+    TORCH_CHECK(
+        false,
+        "key and value must be float, float16 or bfloat16 to use ipex::masked_multihead_self_attention_kernel_impl");
+  }
+
+  // support MGQ/MQA
+  // expand the head dimensiopn of key/value to be same to the query
+  if (query.size(2) != key.size(2)) {
+    auto n_req = query.size(2) / key.size(2);
+    key = key.repeat_interleave(n_req, 2);
+    value = value.repeat_interleave(n_req, 2);
+  }
+  auto attn_outputs = at::Tensor();
+  auto attn_weights = at::Tensor();
+  if (is_first_token_optimizable(key) && attention_mask.stride(-1) == 1) {
+    query = query.transpose(1, 2);
+    key = key.transpose(1, 2);
+    value = value.transpose(1, 2);
+    attn_outputs = std::get<0>(torch_ipex::cpu::flash_attention_kernel_stub(
+        kCPU,
+        query,
+        key,
+        value,
+        /* dropout */ 0.0,
+        add_casual_mask,
+        attention_mask,
+        1. / scale_attn));
+    if (v_head_size != head_size) {
+      attn_outputs = attn_outputs.slice(-1, 0, v_head_size);
+    }
+  } else {
+    if (origin_type == at::kHalf) {
+      key = key.to(at::kFloat);
+      query = query.to(at::kFloat);
+      value = value.to(at::kFloat);
+    }
+    key = key.permute({0, 2, 1, 3});
+    query = query.permute({0, 2, 1, 3});
+    value = value.permute({0, 2, 1, 3});
+    attn_weights = query.matmul(key.transpose(-1, -2));
+    attn_weights = attn_weights.div(scale_attn);
+    attn_weights = attn_weights + attention_mask;
+    attn_weights = attn_weights.softmax(-1);
+    attn_weights = attn_weights.to(value.dtype());
+    attn_outputs = attn_weights.matmul(value);
+    if (origin_type == at::kHalf) {
+      attn_weights = attn_weights.to(origin_type);
+      attn_outputs = attn_outputs.to(origin_type);
+    }
+  }
+  return std::make_tuple(attn_outputs, attn_weights, kv_cache, beam_idx);
+}
+
 inline std::optional<at::Tensor> convert_boolean_attn_mask(
     const std::optional<at::Tensor>& attn_mask,
     caffe2::TypeMeta dtype) {
@@ -2460,9 +2674,9 @@ masked_multihead_self_attention_kernel_impl(
         new_beam_idx_access[i][j] = beam_idx_access[0][j];
       }
     }
-    new_beam_idx_access[new_cache_size][0] = beam_idx_access[cache_size - 2][0];
+    new_beam_idx_access[new_cache_size][0] = beam_idx_access[cache_size][0];
     new_beam_idx_access[new_cache_size + 1][0] =
-        beam_idx_access[cache_size - 1][0];
+        beam_idx_access[cache_size + 1][0];
     key_cache = new_key_cache;
     value_cache = new_value_cache;
     beam_idx = new_beam_idx;
@@ -2518,6 +2732,407 @@ masked_multihead_self_attention_kernel_impl(
         attention_mask_v,
         add_casual_mask.value_or(true));
   }
+}
+
+template <typename T>
+std::tuple<at::Tensor, at::Tensor> get_key_value(
+    const at::Tensor& kv,
+    const at::Tensor& k_pe,
+    const int64_t q_head_num,
+    const int64_t q_head_dim,
+    const int64_t v_head_dim) {
+  RECORD_FUNCTION("get_key_value", c10::ArrayRef<c10::IValue>({}));
+  auto kv_bs = kv.size(0);
+  auto cur_len = kv.size(1);
+  auto kv_head_dim = kv.size(-1);
+  auto qk_rope_head_dim = k_pe.size(-1);
+  auto kv_head_num = k_pe.size(2);
+  auto qk_nope_head_dim = q_head_dim - qk_rope_head_dim;
+  auto head_dim = qk_nope_head_dim + qk_rope_head_dim;
+
+  auto key = at::empty({kv_bs, cur_len, q_head_num, head_dim}, kv.options());
+  auto value = at::empty({kv_bs, cur_len, q_head_num, head_dim}, kv.options());
+  auto kv_ptr = kv.data_ptr<T>();
+  auto value_ptr = value.data_ptr<T>();
+  auto key_ptr = key.data_ptr<T>();
+  auto k_pe_ptr = k_pe.data_ptr<T>();
+  auto kv_stride0 = kv.stride(0);
+  auto kv_stride1 = kv.stride(1);
+  auto kv_stride2 = kv.stride(2);
+  auto key_stride0 = key.stride(0);
+  auto key_stride1 = key.stride(1);
+  auto key_stride2 = key.stride(2);
+  auto value_stride0 = value.stride(0);
+  auto value_stride1 = value.stride(1);
+  auto value_stride2 = value.stride(2);
+  auto k_pe_stride0 = k_pe.stride(0);
+  auto k_pe_stride1 = k_pe.stride(1);
+  auto k_pe_stride2 = k_pe.stride(2);
+#pragma omp parallel for collapse(3)
+  for (auto bi = 0; bi < kv_bs; bi++) {
+    for (auto si = 0; si < cur_len; si++) {
+      for (auto hi = 0; hi < q_head_num; hi++) {
+        auto key_ptr_start =
+            key_ptr + bi * key_stride0 + si * key_stride1 + hi * key_stride2;
+        auto value_ptr_start = value_ptr + bi * value_stride0 +
+            si * value_stride1 + hi * value_stride2;
+        auto k_pe_ptr_start = k_pe_ptr + bi * k_pe_stride0 + si * k_pe_stride1;
+        auto kv_ptr_start =
+            kv_ptr + bi * kv_stride0 + si * kv_stride1 + hi * kv_stride2;
+        torch_ipex::cpu::kernel::move_ker<T, T>(
+            key_ptr_start, kv_ptr_start, qk_nope_head_dim);
+        torch_ipex::cpu::kernel::move_ker<T, T>(
+            value_ptr_start, kv_ptr_start + qk_nope_head_dim, v_head_dim);
+        torch_ipex::cpu::kernel::zero_ker<T>(
+            value_ptr_start + v_head_dim, qk_rope_head_dim);
+        torch_ipex::cpu::kernel::move_ker<T, T>(
+            key_ptr_start + qk_nope_head_dim, k_pe_ptr_start, qk_rope_head_dim);
+      }
+    }
+  }
+  return std::make_tuple(key, value);
+}
+
+template <typename T>
+at::Tensor get_query(
+    const at::Tensor& query,
+    const at::Tensor& w,
+    const int64_t qk_rope_head_dim,
+    const int64_t kv_head_num) {
+  RECORD_FUNCTION("bmm(q_nope, w_kc)", c10::ArrayRef<c10::IValue>({}));
+  auto cur_len = query.size(1);
+  auto bs = query.size(0);
+  auto kv_lora_rank = w.size(1);
+  auto q_head_num = query.size(2);
+  auto q_head_dim = query.size(-1);
+  auto kv_head_size = qk_rope_head_dim + kv_lora_rank;
+  auto qk_nope_head_dim = q_head_dim - qk_rope_head_dim;
+  auto w_ptr = w.data_ptr<T>();
+  auto w_stride0 = w.stride(0);
+  auto w_stride1 = w.stride(1);
+  auto query_ptr = query.data_ptr<T>();
+  auto query_stride0 = query.stride(0);
+  auto query_stride1 = query.stride(1);
+  auto query_stride2 = query.stride(2);
+  auto q = at::empty({bs, cur_len, q_head_num, kv_head_size}, query.options());
+  auto q_ptr = q.data_ptr<T>();
+  auto q_stride0 = q.stride(0);
+  auto q_stride1 = q.stride(1);
+  auto q_stride2 = q.stride(2);
+  auto thread_numbers = omp_get_max_threads();
+  auto max_parallel_parts = thread_numbers * 4;
+
+  auto tmp_para = bs * q_head_num;
+  auto block_count = tmp_para >= max_parallel_parts
+      ? 1
+      : std::max((max_parallel_parts / tmp_para), 1L);
+
+  auto block_size = (kv_lora_rank + block_count - 1) / block_count;
+#pragma omp parallel for collapse(4)
+  for (auto hi = 0; hi < q_head_num; hi++) {
+    for (auto block = 0; block < block_count; block++) {
+      for (auto bi = 0; bi < bs; bi++) {
+        for (auto li = 0; li < cur_len; li++) {
+          auto q_nope_ptr_start = query_ptr + bi * query_stride0 +
+              li * query_stride1 + hi * query_stride2;
+          auto q_ptr_start =
+              q_ptr + bi * q_stride0 + li * q_stride1 + hi * q_stride2;
+          auto block_start = block * block_size;
+          auto block_end = std::min(kv_lora_rank, block_start + block_size);
+          for (auto dj = block_start; dj < block_end; dj++) {
+            auto w_ptr_start = w_ptr + hi * w_stride0 + dj * w_stride1;
+            reduce_head<T, T, T>(
+                q_nope_ptr_start,
+                w_ptr_start,
+                q_ptr_start + dj,
+                qk_nope_head_dim);
+          }
+        }
+      }
+    }
+  }
+#pragma omp parallel for collapse(3)
+  for (auto bi = 0; bi < bs; bi++) {
+    for (auto li = 0; li < cur_len; li++) {
+      for (auto hi = 0; hi < q_head_num; hi++) {
+        auto q_rope_ptr_start = query_ptr + bi * query_stride0 +
+            li * query_stride1 + hi * query_stride2 + qk_nope_head_dim;
+        auto q_ptr_start = q_ptr + bi * q_stride0 + li * q_stride1 +
+            hi * q_stride2 + kv_lora_rank;
+        torch_ipex::cpu::kernel::move_ker<T, T>(
+            q_ptr_start, q_rope_ptr_start, qk_rope_head_dim);
+      }
+    }
+  }
+  return q;
+}
+
+template <typename T>
+at::Tensor handle_attn_outs(
+    const at::Tensor& attn_outs,
+    const at::Tensor& w_vc,
+    const int64_t q_head_dim,
+    const int64_t qk_rope_head_dim,
+    const int64_t kv_head_num) {
+  RECORD_FUNCTION("bmm(attn_output, w_vc)", c10::ArrayRef<c10::IValue>({}));
+  auto bs = attn_outs.size(0);
+  auto q_head_num = attn_outs.size(1);
+  auto cur_len = attn_outs.size(2);
+  auto kv_lora_rank = w_vc.size(-1);
+  auto kv_head_size = qk_rope_head_dim + kv_lora_rank;
+  auto qk_nope_head_dim = q_head_dim - qk_rope_head_dim;
+  auto o_dim = w_vc.size(1);
+  auto attn_output =
+      at::empty({bs, q_head_num, cur_len, o_dim}, attn_outs.options());
+  auto attn_output_ptr = attn_output.data_ptr<T>();
+  auto attn_outs_ptr = attn_outs.data_ptr<T>();
+  auto attn_outp_stride0 = attn_output.stride(0);
+  auto attn_outp_stride1 = attn_output.stride(1);
+  auto attn_outp_stride2 = attn_output.stride(2);
+  auto attn_outs_stride0 = attn_outs.stride(0);
+  auto attn_outs_stride1 = attn_outs.stride(1);
+  auto attn_outs_stride2 = attn_outs.stride(2);
+  auto w_ptr = w_vc.data_ptr<T>();
+  auto w_stride0 = w_vc.stride(0);
+  auto w_stride1 = w_vc.stride(1);
+#pragma omp parallel for collapse(4)
+  for (auto hi = 0; hi < q_head_num; hi++) {
+    for (auto oi = 0; oi < o_dim; oi++) {
+      for (auto bi = 0; bi < bs; bi++) {
+        for (auto li = 0; li < cur_len; li++) {
+          auto attn_output_ptr_start = attn_output_ptr +
+              bi * attn_outp_stride0 + hi * attn_outp_stride1 +
+              li * attn_outp_stride2;
+          auto attn_outs_ptr_start = attn_outs_ptr + bi * attn_outs_stride0 +
+              hi * attn_outs_stride1 + li * attn_outs_stride2;
+
+          auto w_ptr_start = w_ptr + hi * w_stride0 + oi * w_stride1;
+          reduce_head<T, T, T>(
+              attn_outs_ptr_start,
+              w_ptr_start,
+              attn_output_ptr_start + oi,
+              kv_lora_rank);
+        }
+      }
+    }
+  }
+  return attn_output;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+deepseekv2_mla_kernel_impl(
+    at::Tensor& query,
+    at::Tensor& kv,
+    at::Tensor& k_pe,
+    at::Tensor& kv_cache,
+    at::Tensor& kv_b_weight,
+    at::Tensor& w_kc,
+    at::Tensor& w_vc,
+    at::Tensor& beam_idx,
+    at::Tensor seq_info,
+    const double scale_attn,
+    int64_t max_positions,
+    int64_t v_head_dim,
+    const c10::optional<at::Tensor>& head_mask /* optional */,
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */) {
+  TORCH_CHECK(
+      attention_mask.has_value(),
+      "Attention mask is necessary for ipex::deepseekv2_mla_kernel_impl");
+  TORCH_CHECK(
+      attention_mask.value().dim() == 4,
+      "Attention mask must be 4D for ipex::deepseekv2_mla_kernel_impl");
+
+  TORCH_CHECK(
+      head_mask.has_value() != true,
+      "Head mask is not supported in ipex::deepseekv2_mla_kernel_impl");
+  TORCH_CHECK(
+      query.dtype() == kv.dtype(),
+      "query and kv must have the same data type to use ipex::deepseekv2_mla_kernel_impl");
+  TORCH_CHECK(
+      query.dtype() == k_pe.dtype(),
+      "query and k_pe must have the same data type to use ipex::deepseekv2_mla_kernel_impl");
+  auto offset = seq_info.data_ptr<long>()[0];
+  auto beam_batch = beam_idx.size(1); // need to prepare the fake beam_idx as
+                                      // (max_position, bs) for the first token
+  auto cache_size = kv_cache.size(0);
+  auto cur_len = query.size(1);
+  auto kv_bs = kv.size(0);
+  auto kv_lora_rank = kv.size(-1);
+  auto qk_rope_head_dim = k_pe.size(-1);
+  auto kv_head_num = k_pe.size(2);
+  auto q_head_num = query.size(2);
+  auto q_head_dim = query.size(-1);
+  auto kv_head_size = qk_rope_head_dim + kv_lora_rank;
+  auto qk_nope_head_dim = q_head_dim - qk_rope_head_dim;
+  std::optional<at::Tensor> attn_mask = attention_mask;
+  if (!is_first_token_optimizable(kv)) {
+    attn_mask = convert_boolean_attn_mask(attention_mask, query.dtype());
+  }
+  auto attention_mask_v = attn_mask.value().contiguous();
+  attention_mask_v = attention_mask_v.to(query.dtype());
+  if (offset == 0) {
+    max_positions =
+        max_positions > cur_len ? max_positions : max_positions + cur_len;
+    if (kv_cache.scalar_type() == at::ScalarType::Float8_e5m2) {
+      kv_cache = at::empty(
+          {max_positions, beam_batch, kv_head_num, kv_head_size},
+          kv.options().dtype(at::kFloat8_e5m2));
+    } else {
+      kv_cache = at::empty(
+          {max_positions, beam_batch, kv_head_num, kv_head_size}, kv.options());
+    }
+    beam_idx = at::zeros({max_positions + 2, beam_batch}, beam_idx.options());
+    auto beam_idx_access = beam_idx.accessor<long, 2>();
+#pragma omp parallel for collapse(2)
+    for (auto i = 0; i < max_positions; i++) {
+      for (auto j = 0; j < beam_batch; j++) {
+        if (kv_bs == beam_batch) {
+          beam_idx_access[i][j] = j;
+        } else {
+          auto beam_size = beam_batch / kv_bs;
+          beam_idx_access[i][j] = j / beam_size * beam_size;
+        }
+      }
+    }
+    beam_idx_access[max_positions][0] = cur_len; // record the prompt token len
+    beam_idx_access[max_positions + 1][0] =
+        query.size(0); // record the promt bs info
+
+  } else if (offset > 0 && offset + cur_len > cache_size) {
+    auto new_cache_size = cache_size * 2;
+    auto new_kv_cache = at::empty(
+        {new_cache_size, beam_batch, kv_head_num, kv_head_size},
+        kv_cache.options());
+    auto new_beam_idx =
+        at::zeros({new_cache_size + 2, beam_batch}, beam_idx.options());
+    new_kv_cache.slice(0, 0, cache_size).copy_(kv_cache);
+    new_beam_idx.slice(0, 0, cache_size + 2).copy_(beam_idx);
+    auto new_beam_idx_access = new_beam_idx.accessor<long, 2>();
+    auto beam_idx_access = beam_idx.accessor<long, 2>();
+    for (auto i = offset; i < new_cache_size; i++) {
+      for (auto j = 0; j < beam_batch; j++) {
+        new_beam_idx_access[i][j] = beam_idx_access[0][j];
+      }
+    }
+    new_beam_idx_access[new_cache_size][0] = beam_idx_access[cache_size][0];
+    new_beam_idx_access[new_cache_size + 1][0] =
+        beam_idx_access[cache_size + 1][0];
+    kv_cache = new_kv_cache;
+    beam_idx = new_beam_idx;
+  }
+
+  if (kv_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      kv.scalar_type() == at::ScalarType::BFloat16) {
+    copy_key_value<at::BFloat16, at::Float8_e5m2>(
+        kv_cache, kv, k_pe, beam_batch, offset);
+  } else if (kv.scalar_type() == at::kFloat) {
+    copy_key_value<float, float>(kv_cache, kv, k_pe, beam_batch, offset);
+  } else if (kv.scalar_type() == at::kBFloat16) {
+    copy_key_value<at::BFloat16, at::BFloat16>(
+        kv_cache, kv, k_pe, beam_batch, offset);
+  } else {
+    copy_key_value<at::Half, at::Half>(kv_cache, kv, k_pe, beam_batch, offset);
+  }
+
+  at::Tensor key, value;
+
+  if (offset == 0) {
+    kv = kv.matmul(kv_b_weight).view({kv_bs, kv.size(1), q_head_num, -1});
+    if (kv.scalar_type() == at::kFloat) {
+      std::tie(key, value) =
+          get_key_value<float>(kv, k_pe, q_head_num, q_head_dim, v_head_dim);
+    } else if (kv.scalar_type() == at::kBFloat16) {
+      std::tie(key, value) = get_key_value<at::BFloat16>(
+          kv, k_pe, q_head_num, q_head_dim, v_head_dim);
+    } else {
+      std::tie(key, value) =
+          get_key_value<at::Half>(kv, k_pe, q_head_num, q_head_dim, v_head_dim);
+    }
+    query = query.contiguous();
+    return first_token_deepseekv2_mla(
+        query,
+        key,
+        value,
+        kv_cache,
+        beam_idx,
+        beam_batch,
+        scale_attn,
+        attention_mask_v,
+        v_head_dim,
+        add_casual_mask.value_or(true));
+  }
+  at::Tensor q;
+  if (kv.scalar_type() == at::kFloat) {
+    q = get_query<float>(query, w_kc, qk_rope_head_dim, kv_head_num);
+  } else if (kv.scalar_type() == at::kBFloat16) {
+    q = get_query<at::BFloat16>(query, w_kc, qk_rope_head_dim, kv_head_num);
+  } else {
+    q = get_query<at::Half>(query, w_kc, qk_rope_head_dim, kv_head_num);
+  }
+
+  at::Tensor attn_output;
+  auto num_kv_splits = 8;
+  auto bs = q.size(0);
+  auto attn_outs =
+      at::empty({bs, q_head_num, cur_len, kv.size(-1)}, q.options());
+  auto attn_weights =
+      at::empty({bs, q_head_num, num_kv_splits, kv.size(-1) + 1});
+
+  auto b_ptr = beam_idx.data_ptr<long>();
+  auto max_cache_size = beam_idx.size(0);
+  auto new_beam_idx = at::empty({beam_batch, offset + q.size(1) + 1}, at::kInt);
+  auto new_b_ptr = new_beam_idx.data_ptr<int>();
+  auto new_b_stride0 = new_beam_idx.stride(0);
+  auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
+  auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
+  auto beam_size = 1;
+  if (prompt_bs != 0) {
+    beam_size = beam_batch / prompt_bs;
+  }
+// according to last decoded token to get the target beam for the past
+#pragma omp parallel for
+  for (int i = 0; i < bs; i++) {
+    new_b_ptr[i * new_b_stride0 + offset] = i + offset * beam_batch;
+    new_b_ptr[i * new_b_stride0 + offset - 1] =
+        b_ptr[(offset - 1) * bs + i] + (offset - 1) * beam_batch;
+    for (int j = offset - 2; j >= prompt_len; j--) {
+      new_b_ptr[i * new_b_stride0 + j] =
+          b_ptr
+              [j * bs + new_b_ptr[i * new_b_stride0 + j + 1] -
+               (j + 1) * beam_batch] +
+          j * beam_batch;
+    }
+  }
+#pragma omp parallel for collapse(2)
+  for (int i = 0; i < bs; i++) {
+    for (int j = prompt_len - 1; j >= 0; j--) {
+      new_b_ptr[i * new_b_stride0 + j] =
+          b_ptr[j * bs + i - i % beam_size] + j * beam_batch;
+    }
+  }
+  torch_ipex::cpu::decode_attention_kernel_stub(
+      kCPU,
+      q,
+      attn_outs,
+      kv_cache,
+      new_beam_idx,
+      attn_weights,
+      1 / scale_attn,
+      0,
+      offset);
+  if (kv.scalar_type() == at::kFloat) {
+    attn_output = handle_attn_outs<float>(
+        attn_outs, w_vc, q_head_dim, qk_rope_head_dim, kv_head_num);
+  } else if (kv.scalar_type() == at::kBFloat16) {
+    attn_output = handle_attn_outs<at::BFloat16>(
+        attn_outs, w_vc, q_head_dim, qk_rope_head_dim, kv_head_num);
+  } else {
+    attn_output = handle_attn_outs<at::Half>(
+        attn_outs, w_vc, q_head_dim, qk_rope_head_dim, kv_head_num);
+  }
+
+  return std::make_tuple(attn_output, attn_weights, kv_cache, beam_idx);
 }
 
 template <typename T>
@@ -2623,6 +3238,7 @@ at::Tensor prepare_4d_causal_attention_mask_kernel_impl(
 IPEX_REGISTER_DISPATCH(
     masked_multihead_self_attention_kernel_stub,
     &masked_multihead_self_attention_kernel_impl);
+IPEX_REGISTER_DISPATCH(deepseekv2_mla_kernel_stub, &deepseekv2_mla_kernel_impl);
 
 IPEX_REGISTER_DISPATCH(
     prepare_4d_causal_attention_mask_kernel_stub,

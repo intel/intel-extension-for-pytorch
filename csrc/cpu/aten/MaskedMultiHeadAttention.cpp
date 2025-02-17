@@ -6,6 +6,7 @@ namespace torch_ipex {
 namespace cpu {
 
 IPEX_DEFINE_DISPATCH(masked_multihead_self_attention_kernel_stub);
+IPEX_DEFINE_DISPATCH(deepseekv2_mla_kernel_stub);
 IPEX_DEFINE_DISPATCH(prepare_4d_causal_attention_mask_kernel_stub);
 
 /*
@@ -54,7 +55,41 @@ masked_multihead_self_attention_forward_cpu(
       attention_mask,
       add_casual_mask);
 }
-
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+deepseekv2_mla_forward_cpu(
+    at::Tensor& query,
+    at::Tensor& kv,
+    at::Tensor& k_pe,
+    at::Tensor& kv_cache,
+    at::Tensor& kv_b_weight,
+    at::Tensor& w_kc,
+    at::Tensor& w_vc,
+    at::Tensor& beam_idx,
+    at::Tensor seq_info,
+    const double scale_attn,
+    int64_t max_positions,
+    int64_t v_head_dim,
+    const c10::optional<at::Tensor>& head_mask /* optional */,
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */) {
+  return deepseekv2_mla_kernel_stub(
+      kCPU,
+      query,
+      kv,
+      k_pe,
+      kv_cache,
+      kv_b_weight,
+      w_kc,
+      w_vc,
+      beam_idx,
+      seq_info,
+      scale_attn,
+      max_positions,
+      v_head_dim,
+      head_mask,
+      attention_mask,
+      add_casual_mask);
+}
 at::Tensor prepare_4d_causal_attention_mask_forward_cpu(
     at::Tensor& attention_mask,
     at::Tensor& inputs_embeds,
@@ -84,6 +119,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "masked_multihead_self_attention",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::masked_multihead_self_attention_forward_cpu);
+  m.def(
+      "deepseekv2_mla(Tensor query, Tensor kv, Tensor k_pe, Tensor kv_cache, \
+       Tensor kv_b_weight, Tensor w_kc, Tensor w_vc, Tensor beam_idx, Tensor seq_info, float scale_attn, int max_positions, \
+       int v_head_dim, Tensor? head_mask, Tensor? attention_mask, bool? add_casual_mask=None)-> (Tensor, Tensor, Tensor, Tensor)");
+  m.impl(
+      "deepseekv2_mla",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::deepseekv2_mla_forward_cpu);
 }
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {

@@ -1247,6 +1247,19 @@ def get_dummy_input(_model, return_dict=False):
                 for i in range(_model.config.num_hidden_layers)
             ]
         )
+    elif _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                )
+                for i in range(model_num_layers)
+            ]
+        )
     else:
         past_key_values = tuple(
             [
