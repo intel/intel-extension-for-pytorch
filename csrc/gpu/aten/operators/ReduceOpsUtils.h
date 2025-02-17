@@ -9,7 +9,7 @@
 #include <ATen/native/TensorIterator.h>
 
 #include "Reduce.h"
-
+#include "comm/RegisterUtils.h"
 using namespace at::native;
 using namespace torch_ipex::xpu::dpcpp;
 
@@ -56,6 +56,57 @@ static inline ScalarType get_dtype_from_result(
   } else {
     return result.scalar_type();
   }
+}
+
+static ScalarType infer_dtype_from_optional(
+    const Tensor& self,
+    const optional<ScalarType>& opt_dtype,
+    const Tensor& result) {
+  // 'opt_dtype' has the priority for both cases.
+  if (result.defined()) {
+    // Otherwise, get the result type, if defined.
+    return opt_dtype.value_or(result.scalar_type());
+  } else {
+    // Last case is to get the self type.
+    // If the self type is an integer, we promote it to kLong.
+    return get_dtype_from_self(self, opt_dtype, true);
+  }
+}
+
+inline Tensor& resize_reduction(
+    Tensor& out,
+    const Tensor& self,
+    OptionalIntArrayRef opt_dims,
+    bool keepdim,
+    ScalarType out_dtype,
+    bool allow_empty_dims = false) {
+  DimVector dims_ = at::native::make_dim_vector(opt_dims, self.dim());
+  maybe_wrap_dims(dims_, self.dim());
+  auto shape =
+      at::meta::get_reduction_shape(self, dims_, keepdim, allow_empty_dims);
+  if (self.layout() == kStrided) {
+    if (out.defined()) {
+      resize_out(out, shape, {}, self.options().dtype(out_dtype));
+    } else {
+      out = create_out(shape, {}, self.options().dtype(out_dtype));
+    }
+  } else if (shape.size() == 0) {
+    if (out.defined()) {
+      resize_out(
+          out, shape, {}, self.options().dtype(out_dtype).layout(kStrided));
+    } else {
+      out = create_out(
+          shape, {}, self.options().dtype(out_dtype).layout(kStrided));
+    }
+  } else {
+    TORCH_CHECK(
+        false,
+        "resize_reduction: support for output with ",
+        self.layout(),
+        " layout is not implemented yet");
+  }
+  namedinference::propagate_names_for_reduction(out, self, dims_, keepdim);
+  return out;
 }
 
 static inline ScalarType get_result_or_bytebool_dtype(
@@ -292,7 +343,6 @@ static TensorIterator make_reduction(
   return TensorIterator::reduce_op(
       viewed_result1, viewed_result2, self.to(dtype1));
 }
-
 } // namespace meta
 
 } // namespace AtenIpexTypeXPU

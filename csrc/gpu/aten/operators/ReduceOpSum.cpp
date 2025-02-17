@@ -64,14 +64,15 @@ void sum_kernel_impl(TensorIterator& iter) {
 }
 
 void sum_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       at::ScalarType::Bool,
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
+      at::ScalarType::ComplexHalf,
       iter.dtype(),
       "sum",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         sum_kernel_impl<scalar_t, accscalar_t>(iter);
       });
 }
@@ -82,8 +83,10 @@ Tensor& sum_out(
     bool keepdim,
     c10::optional<at::ScalarType> opt_dtype,
     Tensor& result) {
-  ScalarType dtype = get_dtype(result, self, opt_dtype, true);
-  auto iter = make_reduction("sum", result, self, dim, keepdim, dtype);
+  auto out_dtype = infer_dtype_from_optional(self, opt_dtype, result);
+  result = resize_reduction(result, self, dim, keepdim, out_dtype);
+  auto iter = at::meta::make_reduction_from_out_ty(
+      self, result, dim, keepdim, result.scalar_type());
   if (iter.numel() == 0) {
     result.zero_();
   } else {
@@ -117,28 +120,27 @@ Tensor& nansum_out(
     bool keepdim,
     optional<ScalarType> opt_dtype,
     Tensor& result) {
-  TORCH_CHECK(
-      !c10::isComplexType(self.scalar_type()),
-      "nansum does not support complex inputs");
   // For integral types, use existing sum as
   // integral types don't have `Nan`.
   if (c10::isIntegralType(self.scalar_type(), true)) {
     return at::sum_out(result, self, opt_dim, keepdim, opt_dtype);
   }
 
-  ScalarType dtype = get_dtype_from_result(result, opt_dtype);
-  IntArrayRef dim = opt_dim.value_or(IntArrayRef{});
-  auto iter = meta::make_reduction("nansum", result, self, dim, keepdim, dtype);
+  auto out_dtype = infer_dtype_from_optional(self, opt_dtype, result);
+  result = resize_reduction(result, self, opt_dim, keepdim, out_dtype);
+  auto iter = at::meta::make_reduction_from_out_ty(
+      self, result, opt_dim, keepdim, result.scalar_type());
   if (iter.numel() == 0) {
     result = result.zero_();
   } else {
-    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
+    IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
+        at::ScalarType::ComplexHalf,
         iter.dtype(),
         "nansum",
         [&]() {
-          using accscalar_t = acc_type<scalar_t>;
+          using accscalar_t = at::opmath_type<scalar_t>;
           nansum_kernel_impl<scalar_t, accscalar_t>(iter);
         });
   }
