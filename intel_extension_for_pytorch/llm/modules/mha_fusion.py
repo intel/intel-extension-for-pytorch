@@ -506,22 +506,22 @@ class PagedAttention:
     .. highlight:: python
     .. code-block:: python
 
-    ipex.llm.modules.PagedAttention.flash_atten_varlen(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        cu_seqlens_q,
-        cu_seqlens_kv,
-        max_seqlen_q,
-        max_seqlen_kv,
-        scale,
-        is_cusal,
-        block_tables,
-        alibi_slopes,
-        key_cache,
-        val_cache,
-    )
+        ipex.llm.modules.PagedAttention.flash_atten_varlen(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            max_seqlen_q,
+            max_seqlen_kv,
+            scale,
+            is_cusal,
+            block_tables,
+            alibi_slopes,
+            key_cache,
+            val_cache,
+        )
 
     Args:
         out (torch.Tensor): The output tensor with shape of [num_seqs, num_heads, head_size],

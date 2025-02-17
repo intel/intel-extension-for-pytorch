@@ -194,47 +194,65 @@ def get_weight_only_quant_qconfig_mapping(
 ):
     """
     Configuration for weight-only quantization (WOQ) for LLM.
+
     Arguments:
-        weight_dtype:   Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.
-        lowp_mode:      specify the lowest precision data type for computation. Data types
-                        that has even lower precision won't be used.
-                        Not necessarily related to activation or weight dtype.
-                        - NONE(0): Use the activation data type for computation.
-                        - FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.
-                        - BF16(2): Use bfloat16 as the lowest precision for computation.
-                        - INT8(3): Use INT8 as the lowest precision for computation.
-                                   Activation is quantized to int8 at runtime in this case.
+        weight_dtype: Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.
+        lowp_mode: specify the lowest precision data type for computation. Data types
+            that has even lower precision won't be used.
+            Not necessarily related to activation or weight dtype.
+
+            - NONE(0): Use the activation data type for computation.
+
+            - FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.
+
+            - BF16(2): Use bfloat16 as the lowest precision for computation.
+
+            - INT8(3): Use INT8 as the lowest precision for computation.
+              Activation is quantized to int8 at runtime in this case.
         act_quant_mode: Quantization granularity of activation. It only works for lowp_mode=INT8.
-                        It has no effect in other cases. The tensor is divided into groups, and
-                        each group is quantized with its own quantization parameters.
-                        Suppose the activation has shape batch_size by input_channel (IC).
-                        - PER_TENSOR(0): Use the same quantization parameters for the entire tensor.
-                        - PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.
-                        - PER_BATCH(2): Tensor is divided along batch_size with group size = 1.
-                        - PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.
-                        Note that IC_BLOCK is determined by group_size automatically.
-        group_size:     Control quantization granularity along input channel (IC) dimension of weight.
-                        Must be a positive power of 2 (i.e., 2^k, k > 0) or -1.
-                        If group_size = -1:
-                            If act_quant_mode = PER_TENSOR ro PER_BATCH:
-                                No grouping along IC for both activation and weight
-                            If act_quant_mode = PER_IC_BLOCK or PER_BATCH_IC_BLOCK:
-                                No grouping along IC for weight. For activation,
-                                IC_BLOCK is determined automatically by IC.
-                        If group_size > 0:
-                            act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK(_SYM)
-                            or PER_BATCH_IC_BLOCK(_SYM), weight is grouped along IC by group_size.
-                            The IC_BLOCK for activation is determined by group_size automatically.
-                            Each group has its own quantization parameters.
+            It has no effect in other cases. The tensor is divided into groups, and
+            each group is quantized with its own quantization parameters.
+            Suppose the activation has shape batch_size by input_channel (IC).
+
+            - PER_TENSOR(0): Use the same quantization parameters for the entire tensor.
+
+            - PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.
+
+            - PER_BATCH(2): Tensor is divided along batch_size with group size = 1.
+
+            - PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.
+
+            Note that IC_BLOCK is determined by group_size automatically.
+        group_size: Control quantization granularity along input channel (IC) dimension of weight.
+            Must be a positive power of 2 (i.e., 2^k, k > 0) or -1. The rule is
+
+            ::
+
+                If group_size = -1:
+                    If act_quant_mode = PER_TENSOR ro PER_BATCH:
+                        No grouping along IC for both activation and weight
+                    If act_quant_mode = PER_IC_BLOCK or PER_BATCH_IC_BLOCK:
+                        No grouping along IC for weight. For activation,
+                        IC_BLOCK is determined automatically by IC.
+                If group_size > 0:
+                    act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK(_SYM)
+                    or PER_BATCH_IC_BLOCK(_SYM), weight is grouped along IC by group_size.
+                    The IC_BLOCK for activation is determined by group_size automatically.
+                    Each group has its own quantization parameters.
+
         weight_qscheme: Specify how to quantize weight, asymmetrically or symmetrically. Generally,
-                        asymmetric quantization has better accuracy than symmetric quantization at
-                        the cost of performance. Symmetric quantization is faster but may have worse
-                        accuracy. Default is undefined and determined by weight dtype: asymmetric in
-                        most cases and symmetric if
-                            (1) weight_dtype is NF4, or
-                            (2) weight_dtype is INT8 and lowp_mode is INT8.
-                        One must use WoqWeightQScheme.SYMMETRIC in the above two cases.
+            asymmetric quantization has better accuracy than symmetric quantization at
+            the cost of performance. Symmetric quantization is faster but may have worse
+            accuracy. Default is undefined and determined by weight dtype: asymmetric in
+            most cases and symmetric if
+
+            (1) weight_dtype is NF4, or
+
+            (2) weight_dtype is INT8 and lowp_mode is INT8.
+
+            One must use WoqWeightQScheme.SYMMETRIC in the above two cases.
     """
+
     assert group_size == -1 or (
         group_size > 0 and (group_size & (group_size - 1)) == 0
     ), "Group size must be -1 or a positive power of 2, but got {}".format(group_size)
