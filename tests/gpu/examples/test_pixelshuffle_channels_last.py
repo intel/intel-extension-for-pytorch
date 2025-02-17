@@ -32,5 +32,8 @@ class TestTorchMethod(TestCase):
         model_xpu = model.to("xpu")
         dst_xpu = model_xpu(src_xpu)
 
-        self.assertEqual(dst_xpu.is_contiguous(memory_format=torch.channels_last), True)
+        # align with Pytorch
+        self.assertEqual(
+            dst_xpu.is_contiguous(memory_format=torch.channels_last), False
+        )
         self.assertEqual(dst_cpu, dst_xpu.cpu())
