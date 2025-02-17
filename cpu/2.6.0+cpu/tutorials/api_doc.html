@@ -1413,65 +1413,61 @@ Example: <code class="docutils literal notranslate"><span class="pre">torch.ao.q
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="ipex.quantization.get_weight_only_quant_qconfig_mapping">
-<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">get_weight_only_quant_qconfig_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqWeightDtype.INT8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lowp_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqLowpMode.NONE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_quant_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_qscheme</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqWeightQScheme.UNDEFINED</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.get_weight_only_quant_qconfig_mapping" title="Link to this definition"></a></dt>
-<dd><p>Configuration for weight-only quantization (WOQ) for LLM.
-:param weight_dtype: Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.
-:param lowp_mode: specify the lowest precision data type for computation. Data types</p>
-<blockquote>
-<div><p>that has even lower precision won’t be used.
-Not necessarily related to activation or weight dtype.
-- NONE(0): Use the activation data type for computation.
-- FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.
-- BF16(2): Use bfloat16 as the lowest precision for computation.
-- INT8(3): Use INT8 as the lowest precision for computation.</p>
-<blockquote>
-<div><p>Activation is quantized to int8 at runtime in this case.</p>
-</div></blockquote>
-</div></blockquote>
+<dt class="sig sig-object py" id="intel_extension_for_pytorch.quantization.get_weight_only_quant_qconfig_mapping">
+<span class="sig-prename descclassname"><span class="pre">intel_extension_for_pytorch.quantization.</span></span><span class="sig-name descname"><span class="pre">get_weight_only_quant_qconfig_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqWeightDtype.INT8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lowp_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqLowpMode.NONE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_quant_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_qscheme</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqWeightQScheme.UNDEFINED</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#intel_extension_for_pytorch.quantization.get_weight_only_quant_qconfig_mapping" title="Link to this definition"></a></dt>
+<dd><p>Configuration for weight-only quantization (WOQ) for LLM.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>act_quant_mode</strong> – Quantization granularity of activation. It only works for lowp_mode=INT8.
+<li><p><strong>weight_dtype</strong> – Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.</p></li>
+<li><p><strong>lowp_mode</strong> – <p>specify the lowest precision data type for computation. Data types
+that has even lower precision won’t be used.
+Not necessarily related to activation or weight dtype.</p>
+<ul>
+<li><p>NONE(0): Use the activation data type for computation.</p></li>
+<li><p>FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.</p></li>
+<li><p>BF16(2): Use bfloat16 as the lowest precision for computation.</p></li>
+<li><p>INT8(3): Use INT8 as the lowest precision for computation.
+Activation is quantized to int8 at runtime in this case.</p></li>
+</ul>
+</p></li>
+<li><p><strong>act_quant_mode</strong> – <p>Quantization granularity of activation. It only works for lowp_mode=INT8.
 It has no effect in other cases. The tensor is divided into groups, and
 each group is quantized with its own quantization parameters.
-Suppose the activation has shape batch_size by input_channel (IC).
-- PER_TENSOR(0): Use the same quantization parameters for the entire tensor.
-- PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.
-- PER_BATCH(2): Tensor is divided along batch_size with group size = 1.
-- PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.
-Note that IC_BLOCK is determined by group_size automatically.</p></li>
+Suppose the activation has shape batch_size by input_channel (IC).</p>
+<ul>
+<li><p>PER_TENSOR(0): Use the same quantization parameters for the entire tensor.</p></li>
+<li><p>PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.</p></li>
+<li><p>PER_BATCH(2): Tensor is divided along batch_size with group size = 1.</p></li>
+<li><p>PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.</p></li>
+</ul>
+<p>Note that IC_BLOCK is determined by group_size automatically.</p>
+</p></li>
 <li><p><strong>group_size</strong> – <p>Control quantization granularity along input channel (IC) dimension of weight.
-Must be a positive power of 2 (i.e., 2^k, k &gt; 0) or -1.
-If group_size = -1:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>If act_quant_mode = PER_TENSOR ro PER_BATCH:</dt><dd><p>No grouping along IC for both activation and weight</p>
-</dd>
-<dt>If act_quant_mode = PER_IC_BLOCK or PER_BATCH_IC_BLOCK:</dt><dd><p>No grouping along IC for weight. For activation,
-IC_BLOCK is determined automatically by IC.</p>
-</dd>
-</dl>
-</div></blockquote>
-<dl class="simple">
-<dt>If group_size &gt; 0:</dt><dd><p>act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK(_SYM)
-or PER_BATCH_IC_BLOCK(_SYM), weight is grouped along IC by group_size.
-The IC_BLOCK for activation is determined by group_size automatically.
-Each group has its own quantization parameters.</p>
-</dd>
-</dl>
+Must be a positive power of 2 (i.e., 2^k, k &gt; 0) or -1. The rule is</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">If</span> <span class="n">group_size</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+    <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="o">=</span> <span class="n">PER_TENSOR</span> <span class="n">ro</span> <span class="n">PER_BATCH</span><span class="p">:</span>
+        <span class="n">No</span> <span class="n">grouping</span> <span class="n">along</span> <span class="n">IC</span> <span class="k">for</span> <span class="n">both</span> <span class="n">activation</span> <span class="ow">and</span> <span class="n">weight</span>
+    <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="o">=</span> <span class="n">PER_IC_BLOCK</span> <span class="ow">or</span> <span class="n">PER_BATCH_IC_BLOCK</span><span class="p">:</span>
+        <span class="n">No</span> <span class="n">grouping</span> <span class="n">along</span> <span class="n">IC</span> <span class="k">for</span> <span class="n">weight</span><span class="o">.</span> <span class="n">For</span> <span class="n">activation</span><span class="p">,</span>
+        <span class="n">IC_BLOCK</span> <span class="ow">is</span> <span class="n">determined</span> <span class="n">automatically</span> <span class="n">by</span> <span class="n">IC</span><span class="o">.</span>
+<span class="n">If</span> <span class="n">group_size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">act_quant_mode</span> <span class="n">can</span> <span class="n">be</span> <span class="nb">any</span><span class="o">.</span> <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="ow">is</span> <span class="n">PER_IC_BLOCK</span><span class="p">(</span><span class="n">_SYM</span><span class="p">)</span>
+    <span class="ow">or</span> <span class="n">PER_BATCH_IC_BLOCK</span><span class="p">(</span><span class="n">_SYM</span><span class="p">),</span> <span class="n">weight</span> <span class="ow">is</span> <span class="n">grouped</span> <span class="n">along</span> <span class="n">IC</span> <span class="n">by</span> <span class="n">group_size</span><span class="o">.</span>
+    <span class="n">The</span> <span class="n">IC_BLOCK</span> <span class="k">for</span> <span class="n">activation</span> <span class="ow">is</span> <span class="n">determined</span> <span class="n">by</span> <span class="n">group_size</span> <span class="n">automatically</span><span class="o">.</span>
+    <span class="n">Each</span> <span class="n">group</span> <span class="n">has</span> <span class="n">its</span> <span class="n">own</span> <span class="n">quantization</span> <span class="n">parameters</span><span class="o">.</span>
+</pre></div>
+</div>
 </p></li>
 <li><p><strong>weight_qscheme</strong> – <p>Specify how to quantize weight, asymmetrically or symmetrically. Generally,
 asymmetric quantization has better accuracy than symmetric quantization at
 the cost of performance. Symmetric quantization is faster but may have worse
 accuracy. Default is undefined and determined by weight dtype: asymmetric in
 most cases and symmetric if</p>
-<blockquote>
-<div><ol class="arabic simple">
+<ol class="arabic simple">
 <li><p>weight_dtype is NF4, or</p></li>
 <li><p>weight_dtype is INT8 and lowp_mode is INT8.</p></li>
 </ol>
-</div></blockquote>
 <p>One must use WoqWeightQScheme.SYMMETRIC in the above two cases.</p>
 </p></li>
 </ul>
