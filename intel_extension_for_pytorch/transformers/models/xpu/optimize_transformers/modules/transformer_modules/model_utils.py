@@ -226,8 +226,7 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
             qkv_proj, query_weight_size + key_weight_size, qkv_proj.weight.shape[0], 1
         )
 
-        if qkv_proj.weight is not None:
-            del qkv_proj.weight
+        del qkv_proj.weight
         if qkv_proj.bias is not None:
             del qkv_proj.bias
 
