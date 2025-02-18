@@ -1,0 +1,31 @@
+[[linter]]
+code = 'FLAKE8'
+include_patterns = ['*.py']
+exclude_patterns = [
+    '.git/**',
+]
+command = [
+    'python3',
+    'scripts/tools/setup/flake8.py',
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+init_command = [
+    'python',
+    '-m',
+    'lintrunner_adapters',
+    'run',
+    'pip_init',
+    '--dry-run={{DRYRUN}}',
+    'flake8==6.1.0',
+    'flake8-bugbear==23.3.23',
+    'flake8-comprehensions==3.15.0',
+    'flake8-executable==2.1.3',
+    # 'git+https://github.com/malfet/flake8-coding.git',
+    'flake8-pyi==23.3.1',
+    'mccabe==0.7.0',
+    'pycodestyle==2.11.1',
+    'pyflakes==3.1.0',
+    'black==24.3.0',
+]
