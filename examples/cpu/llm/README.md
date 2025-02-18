@@ -8,7 +8,8 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 # 2. Environment Setup
 
 **Note**: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.5.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup),
+in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
 
 **Note**: Please be aware that in order to enable the latest optimizations for MoE models (DeepSeek, Mixtral, etc.) in `DeepSpeed`,
 we are setting a different argument for `env_setup.sh` in IPEX v2.6.0+cpu comparing with previous versions,
@@ -54,7 +55,7 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/llm
-bash ./tools/env_setup.sh 8
+bash ./tools/env_setup.sh 11
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages

@@ -314,6 +314,6 @@ $ ldd example-app
 
 ## Intel® AI Reference Models
 
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/intel/ai-reference-models/tree/pytorch-r2.5-models) (former Model Zoo).
-The lists of PyTorch use cases with links to sample codes are available in the [use case tables](https://github.com/intel/ai-reference-models/tree/pytorch-r2.5-models?tab=readme-ov-file#use-cases).
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/intel/ai-reference-models/tree/pytorch-r2.6-models) (former Model Zoo).
+The lists of PyTorch use cases with links to sample codes are available in the [use case tables](https://github.com/intel/ai-reference-models/tree/pytorch-r2.6-models?tab=readme-ov-file#use-cases).
 You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.

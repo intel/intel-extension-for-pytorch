@@ -27,6 +27,7 @@ Running ResNet50 distributed training example:
 
 ```bash
 source $(python -c "import intel_extension_for_pytorch;import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/setvars.sh
+export FI_TCP_IFACE="$(ip -o -4 route show to default | awk '{print $5}')"
 # This example command would utilize all the numa sockets of the processor, taking each socket as a rank.
 ipexrun --nnodes 1 distributed_data_parallel_training.py
 ```

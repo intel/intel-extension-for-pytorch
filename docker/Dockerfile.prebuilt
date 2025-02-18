@@ -35,11 +35,11 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 100
 
 WORKDIR /root
 
-ARG IPEX_VERSION=2.5.0
-ARG TORCHCCL_VERSION=2.5.0
-ARG PYTORCH_VERSION=2.5.0
-ARG TORCHAUDIO_VERSION=2.5.0
-ARG TORCHVISION_VERSION=0.20.0
+ARG IPEX_VERSION=2.6.0
+ARG TORCHCCL_VERSION=2.6.0
+ARG PYTORCH_VERSION=2.6.0
+ARG TORCHAUDIO_VERSION=2.6.0
+ARG TORCHVISION_VERSION=0.21.0
 RUN python -m venv venv && \
     . ./venv/bin/activate && \
     python -m pip --no-cache-dir install --upgrade \

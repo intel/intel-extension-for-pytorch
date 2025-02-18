@@ -1,4 +1,3 @@
-cpuid
 accelerate
 datasets==2.21.0
 sentencepiece
