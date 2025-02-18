@@ -363,7 +363,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         # - Scales remains unchanged.
         # - Zero-point is a scalar value of 8 in symmetric (symm) scenarios, allowing oneDNN to broadcast it.
         # - Zero-point remains unchanged in asymmetric (asymm) scenarios.
-        self.qweight.data = self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+        self.qweight.data.copy_(self.qweight.transpose(0, 1).contiguous().transpose(0, 1))
         self.scales.data = self.scales.contiguous().to(torch.float16)
         if self.bias is not None:
             self.bias.data = self.bias.contiguous().to(torch.float16)
@@ -447,7 +447,12 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
         if g_idx is not None and quant_method == QuantMethod.GPTQ_GEMM:
             shuffler = GPTQShuffle(bits=4, blocksize=group_size)
-            qweight, g_idx = shuffler(qweight, g_idx)
+            qweight_new, g_idx_new = shuffler(qweight, g_idx)
+            qweight.data.copy_(qweight_new)
+            g_idx.data.copy_(g_idx_new)
+            qweight_new = None
+            g_idx_new = None
+            del qweight_new, g_idx_new
         cls_inst.set_weights_bias(qweight, bias)
         cls_inst.set_scales_zps_gidx(scales, zero_points, g_idx, quant_method)
         if quant_method == QuantMethod.AWQ_GEMM:
