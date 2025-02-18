@@ -14,7 +14,8 @@ namespace {
 using namespace at::vec;
 template <
     typename scalar_t,
-    typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, int> = 0>
+    typename std::enable_if_t<c10::is_reduced_floating_point_v<scalar_t>, int> =
+        0>
 inline Vectorized<scalar_t> convert_from_float_ext(
     const Vectorized<float>& a,
     const Vectorized<float>& b) {
