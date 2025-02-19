@@ -550,6 +550,10 @@ void fractional_max_pool3d_out_template(
     indices_ = indices_.reshape({1, numPlanes, outputT, outputH, outputW});
     input_ = input_.reshape({1, numPlanes, inputT, inputH, inputW});
   }
+
+  if (output_.numel() == 0) {
+    return;
+  }
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
