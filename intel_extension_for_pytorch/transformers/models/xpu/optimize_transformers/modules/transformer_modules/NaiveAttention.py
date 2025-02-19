@@ -565,6 +565,15 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         causal_mask = None
         if self.use_causal_mask:
             query_length, key_length = query.size(-2), key.size(-2)
+            if IPEXTransformerAttnNaive.attention_mask is None:
+                mask = torch.ones(
+                    (self.max_position, self.max_position), dtype=query.dtype
+                )
+                mask = (
+                    1
+                    - torch.tril(mask).view(1, 1, self.max_position, self.max_position)
+                ) * torch.finfo(query.dtype).min
+                IPEXTransformerAttnNaive.attention_mask = mask.to(self.config.device)
             causal_mask = IPEXTransformerAttnNaive.attention_mask[
                 :, :, key_length - query_length : key_length, :key_length
             ].contiguous()
