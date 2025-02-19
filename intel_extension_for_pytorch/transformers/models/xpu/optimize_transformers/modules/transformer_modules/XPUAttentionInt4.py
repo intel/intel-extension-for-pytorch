@@ -418,18 +418,32 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 intermediate_shape = (bs, seqlen, -1, num_group + 2, self.head_dim)
                 qkv_out = qkv_out.view(*intermediate_shape)
                 if IPEXAttention.cache_type == "static":
-                    query = (
-                        qkv_out[:, :, :, :-2]
-                        .reshape(bs, seqlen, -1)
-                        .transpose(0, 1)
-                        .contiguous()
-                    )
-                    key.copy_(
-                        qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1).transpose(0, 1)
-                    )
-                    value.copy_(
-                        qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1).transpose(0, 1)
-                    )
+                    if (
+                        IPEXAttention.cache_format == CacheFormat.FBNH
+                        and not self.beam_search_first_iter(hidden_states.shape[1])
+                    ):
+                        query = (
+                            qkv_out[:, :, :, :-2]
+                            .reshape(bs, seqlen, -1)
+                            .transpose(0, 1)
+                            .contiguous()
+                        )
+                        key.copy_(
+                            qkv_out[:, :, :, [-2]]
+                            .reshape(bs, seqlen, -1)
+                            .transpose(0, 1)
+                        )
+                        value.copy_(
+                            qkv_out[:, :, :, [-1]]
+                            .reshape(bs, seqlen, -1)
+                            .transpose(0, 1)
+                        )
+                    else:
+                        query = (
+                            qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
+                        )
+                        key.copy_(qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1))
+                        value.copy_(qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1))
                 elif IPEXAttention.cache_type == "dynamic":
                     query = qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
                     key = qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1).contiguous()
