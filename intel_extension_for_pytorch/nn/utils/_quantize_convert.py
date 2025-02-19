@@ -363,9 +363,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
         # - Scales remains unchanged.
         # - Zero-point is a scalar value of 8 in symmetric (symm) scenarios, allowing oneDNN to broadcast it.
         # - Zero-point remains unchanged in asymmetric (asymm) scenarios.
-        self.qweight.data.copy_(
-            self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
-        )
+        reshaped_tensor = self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+        self.qweight.as_strided_(reshaped_tensor.shape, reshaped_tensor.stride())
+        self.qweight.copy_(reshaped_tensor)
         self.scales.data = self.scales.contiguous().to(torch.float16)
         if self.bias is not None:
             self.bias.data = self.bias.contiguous().to(torch.float16)
