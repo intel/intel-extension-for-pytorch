@@ -227,6 +227,7 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_llava,
         prepare_inputs_for_generation_opt_mpt,
         prepare_inputs_for_generation_t5,
+        prepare_inputs_for_generation_phi3,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -1002,6 +1003,11 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_phi3,
         )
     elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
         convert_function(_model, "detect_language", detect_language)

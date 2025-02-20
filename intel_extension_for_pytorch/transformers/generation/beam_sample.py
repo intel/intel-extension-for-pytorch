@@ -462,6 +462,9 @@ def _beam_sample(
                 model_inputs["num_logits_to_keep"] = torch.tensor(
                     model_inputs["num_logits_to_keep"]
                 )
+            if self.model_backbone == "Phi3ForCausalLM":
+                model_inputs.pop("inputs_embeds", None)
+                model_inputs.pop("num_logits_to_keep", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

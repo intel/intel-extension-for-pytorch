@@ -452,6 +452,9 @@ def _sample(
                 )
                 model_inputs.pop("decoder_position_ids", None)
                 model_inputs.pop("decoder_attention_mask", None)
+            if self.model_backbone == "Phi3ForCausalLM":
+                model_inputs.pop("inputs_embeds", None)
+                model_inputs.pop("num_logits_to_keep", None)
             model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
