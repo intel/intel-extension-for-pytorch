@@ -13,7 +13,6 @@ import errno
 from ..utils._logger import logger, WarningType
 
 import torch
-from torch.utils.cpp_extension import _TORCH_PATH
 from torch.utils.file_baton import FileBaton
 from torch.utils._cpp_extension_versioner import ExtensionVersioner
 from torch.utils.hipify.hipify_python import GeneratedFileCleaner
@@ -51,7 +50,7 @@ COMMON_MSVC_FLAGS = [
 
 COMMON_DPCPP_FLAGS = ["-fPIC"]
 
-TORCH_LIB_PATH = os.path.join(_TORCH_PATH, "lib")
+TORCH_LIB_PATH = os.path.join(os.path.dirname(torch.__file__), "lib")
 
 JIT_EXTENSION_VERSIONER = ExtensionVersioner()
 
@@ -1645,7 +1644,7 @@ class _one_api_help:
 
 
 def get_pytorch_include_dir():
-    lib_include = os.path.join(_TORCH_PATH, "include")
+    lib_include = os.path.join(os.path.dirname(torch.__file__), "include")
     paths = [
         lib_include,
         # Remove this once torch/torch.h is officially no longer supported for C++ extensions.
@@ -1658,7 +1657,7 @@ def get_pytorch_include_dir():
 
 
 def get_pytorch_lib_dir():
-    return [os.path.join(_TORCH_PATH, "lib")]
+    return [os.path.join(os.path.dirname(torch.__file__), "lib")]
 
 
 def DPCPPExtension(name, sources, *args, **kwargs):
