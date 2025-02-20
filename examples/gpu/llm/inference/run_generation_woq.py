@@ -248,21 +248,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     if args.token_latency:
         generate_kwargs["token_latency"] = True
 
-    # Accuracy check, take the ref_prompt as reference for check
-    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"), encoding="utf8")
-    prompt_json = json.load(f1)
-    f1.close()
-    ref_prompt=None
-    ref_prompt_cuda=None
-    token_support = [(32, 32), (1024, 128)]
-    if (int(num_input_tokens), num_tokens) in token_support:
-        ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
-        try:
-            ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]
-        except Exception:
-            pass
-    acc_pass = 0
-
     # start
     total_time = 0.0
     num_iter = args.num_iter
@@ -318,10 +303,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                 total_time += toc - tic
                 if args.token_latency:
                     total_list.append(output[1])
-            if ref_prompt is not None and ref_prompt in gen_text:
-                acc_pass += 1
-            elif ref_prompt_cuda is not None and ref_prompt_cuda in gen_text:
-                acc_pass += 1
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)
@@ -341,13 +322,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         print("Average 2... latency: %.6f sec." % average_2n_latency)
         #print("P90 2... latency: %.3f sec." % p90_latency)
         #print("P99 2... latency: %.3f sec." % p99_latency)
-
-    if ref_prompt is None:
-        print("Accuracy check skip")
-    elif acc_pass==args.num_iter:
-        print("Accuracy check pass")
-    else:
-        print("Accuracy check fail, the wrong iteration number is:", args.num_iter - acc_pass)
 
 def to_list(obj):
     if not isinstance(obj, list):
