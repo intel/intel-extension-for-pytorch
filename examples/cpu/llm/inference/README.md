@@ -405,40 +405,13 @@ you can quantize the model using [Intel® Neural Compressor (INC)](https://githu
 INC supports WoQ INT4 quantization with GPTQ, AWQ and [intel/auto-round](https://github.com/intel/auto-round) algorithms.
 
 Please refer to [INC's tutorial](https://github.com/intel/neural-compressor/tree/9c3d4a1243d7ea7f0843454c37851b1f03fe695b/examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation#quantization-for-cpu-device)
-to generate the INT4 weight checkpoint files. Be aware that you need a different environment for the process with INC because INC's dependencies have conflicts with latest IPEX.
-
-Here is an example of a typical INT4 checkpoint generation process using INC for your reference:
-
-- Step 1: Set up the environment
-
-```bash
-conda create --name inc python=3.10 -y
-conda activate inc
-git clone https://github.com/intel/neural-compressor.git
-cd neural-compressor
-git checkout 9c3d4a1243d7ea7f0843454c37851b1f03fe695b
-pip install -r requirements.txt
-python setup.py install
-pip install -r requirements_pt.txt
-cd examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation/
-pip install -r requirements_cpu_woq.txt
-```
-
-- Step 2: Run the script to quantize the model and generate the int4 checkpoint files
-
-```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_generation_cpu_woq.py  \
-    --model meta-llama/Meta-Llama-3.1-8B-Instruct \
-    --woq \
-    --woq_algo GPTQ \  # or Awq, AutoRound
-    --output_dir ./llama_3_1_8B_INT4_GPTQ \  # Default is "./saved_results"
-```
-
-It may take several hours to complete the quantization process. When it finishes, use the same command to run the model:
+to generate the INT4 weight checkpoint files in a separate python environment.
+When the quantization process finishes, use the same command to run the model:
 
 ```bash
 # Switch back to IPEX environment first.
 conda activate llm
+# "./llama_3_1_8B_INT4_GPTQ" is the example path of the output INT4 checkpoint.
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m ./llama_3_1_8B_INT4_GPTQ --ipex-weight-only-quantization --quant-with-amp --lowp-mode BF16
 ```
 
