@@ -37,13 +37,14 @@ RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/re
 FROM base AS dev
 # --build-arg COMPILE=ON to compile from source
 ARG COMPILE
+ARG AOT=pytorch
 RUN bash /basekit_driver_install_helper.sh dev
 COPY . ./intel-extension-for-pytorch/
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     cd intel-extension-for-pytorch/examples/gpu/llm && \
     MODE=0; if [ -z ${COMPILE} ]; then (( MODE |= 0x06 )); else (( MODE |= 0x02 )); fi && \
-    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest /opt/intel/oneapi/pti/latest pvc,ats-m150,xe-lpg
+    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi ${AOT}
 
 FROM base AS deploy
 COPY --from=dev /root/intel-extension-for-pytorch/examples/gpu/llm ./llm

@@ -65,7 +65,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     echo "set -e" >> ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/xpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
     else
         DPCPP_ROOT=
         ONEMKL_ROOT=
@@ -113,7 +114,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
            [ -z ${AOT} ]; then
             echo "Source code compilation is needed. Please set arguments DPCPP_ROOT, ONEMKL_ROOT, ONECCL_ROOT, MPI_ROOT, PTIROOT and AOT."
             echo "DPCPPROOT, MKLROOT, CCLROOT, MPIROOT and PTIROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL, oneCCL, Intel(R) MPI and Profiling Tools Interfaces for GPU (PTI for GPU) respectively."
-            echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
+            echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT. Setting it to \"pytorch\" to follow the AOT configuration in the PyTorch prebuilt binary."
             exit 3
         fi
         if [ ! -f ${DPCPP_ROOT}/env/vars.sh ]; then
@@ -146,11 +147,14 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         cd ..
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT} ${MPI_ROOT} ${PTI_ROOT} ${AOT} 1
-        cp pytorch/dist/*.whl ${WHEELFOLDER}
-        cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-        cp torch-ccl/dist/*.whl ${WHEELFOLDER}
-        rm -rf compile_bundle.sh llvm-project llvm-release pytorch torch-ccl patchelf
+        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT} ${MPI_ROOT} ${PTI_ROOT} ${AOT} 9
+        find . -name "dist" -exec bash -c "cp {}/*.whl ${WHEELFOLDER}" \;
+        rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl patchelf
+        if [ -d pytorch ]; then
+            rm -rf pytorch
+        else
+            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/xpu" >> ${AUX_INSTALL_SCRIPT}
+        fi
         echo "python -m pip install ./wheels/*.whl" >> ${AUX_INSTALL_SCRIPT}
         echo "rm -rf wheels" >> ${AUX_INSTALL_SCRIPT}
     fi
