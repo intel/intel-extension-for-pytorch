@@ -235,6 +235,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> transducer_loss_forward(
     int64_t blankIdx,
     int64_t opt,
     bool packedInput) {
+  const OptionalDeviceGuard device_guard(device_of(x));
+
   auto scalarType = x.scalar_type();
   auto tensorOpt = x.options();
   const int batchSize = label.size(0);
@@ -450,6 +452,8 @@ Tensor transducer_loss_backward(
     int64_t opt,
     bool fuseSoftmaxBackward,
     bool packedInput) {
+  const OptionalDeviceGuard device_guard(device_of(x));
+
   auto scalarType = x.scalar_type();
   Tensor xGrad;
   const int batchSize = label.size(0);

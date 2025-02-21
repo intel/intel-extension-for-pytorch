@@ -27,6 +27,8 @@ namespace AtenIpexTypeQuantizedXPU {
 c10::intrusive_ptr<LinearPackedParamsBase> dpcppLinearPrepack(
     Tensor weight,
     c10::optional<Tensor> bias) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
+
   // This is just align with Pytorch Python API!
   auto ret_ptr = PackedLinearWeightQDPCPP::prepack(weight, bias);
   return ret_ptr;

@@ -423,6 +423,8 @@ Tensor linear_pointwise(
     c10::string_view attr,
     torch::List<c10::optional<at::Scalar>> scalars,
     c10::optional<c10::string_view> algorithm) {
+  const OptionalDeviceGuard device_guard(device_of(input_t));
+
   Attr att;
   att = construct_unary_attr(attr, scalars, algorithm, att);
   auto linear_wrapper = LinearConverter();
@@ -437,6 +439,8 @@ Tensor linear_pointwise_binary(
     const Tensor& weight_t,
     const c10::optional<Tensor>& bias_opt,
     c10::string_view binary_attr) {
+  const OptionalDeviceGuard device_guard(device_of(input_t));
+
   Tensor output;
 
   Attr attr;

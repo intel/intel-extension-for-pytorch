@@ -46,6 +46,8 @@ c10::intrusive_ptr<ConvPackedParamsBase<2>> dpcppConvPrepack2d(
     torch::List<int64_t> padding,
     torch::List<int64_t> dilation,
     int64_t groups) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
+
   // This is just align with Pytorch Python API!
   torch::List<int64_t> output_padding;
   int dim = 2;
@@ -72,6 +74,8 @@ c10::intrusive_ptr<ConvPackedParamsBase<3>> dpcppConvPrepack3d(
     torch::List<int64_t> padding,
     torch::List<int64_t> dilation,
     int64_t groups) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
+
   torch::List<int64_t> output_padding;
   int dim = 3;
   output_padding.reserve(dim);
@@ -98,6 +102,8 @@ c10::intrusive_ptr<ConvPackedParamsBase<3>> dpcppDeconvPrepack3d(
     torch::List<int64_t> output_padding,
     torch::List<int64_t> dilation,
     int64_t groups) {
+  const OptionalDeviceGuard device_guard(device_of(weight));
+
   auto ret_ptr = PackedConvWeightQDPCPP<3>::prepack(
       weight,
       bias,

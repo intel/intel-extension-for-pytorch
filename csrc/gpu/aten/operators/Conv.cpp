@@ -2842,6 +2842,8 @@ Tensor convolution_pointwise(
     c10::string_view attr,
     torch::List<c10::optional<at::Scalar>> scalars,
     c10::optional<c10::string_view> algorithm) {
+  const OptionalDeviceGuard device_guard(device_of(input_t));
+
   return onednn_convolution(
       input_t,
       weight_t,
@@ -2869,6 +2871,8 @@ Tensor convolution_pointwise_binary(
     c10::optional<c10::string_view> unary_attr,
     torch::List<c10::optional<at::Scalar>> unary_scalars,
     c10::optional<c10::string_view> unary_algorithm) {
+  const OptionalDeviceGuard device_guard(device_of(input_t));
+
   Tensor output;
   Tensor bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
   // Step1: Construct binary attr
@@ -2926,6 +2930,8 @@ Tensor convolution_pointwise_binary_(
     c10::optional<c10::string_view> unary_attr,
     torch::List<c10::optional<at::Scalar>> unary_scalars,
     c10::optional<c10::string_view> unary_algorithm) {
+  const OptionalDeviceGuard device_guard(device_of(input_t));
+
   Tensor output;
   Tensor bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
   // Step1: Construct binary attr
