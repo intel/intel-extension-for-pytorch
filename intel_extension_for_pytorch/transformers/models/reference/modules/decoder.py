@@ -1918,6 +1918,10 @@ def DeepseekV2DecoderLayer_forward(
         else:
             tok_idx, topk_weight = moegate_outputs
             aux_loss = None
+        cnts = topk_idx.new_zeros((topk_idx.shape[0], len(self.mlp.experts)))
+        cnts.scatter_(1, topk_idx, 1)
+        tokens_per_expert = cnts.sum(dim=0)
+        print(f"{torch.sum(tokens_per_expert>0)} experts activated")
         hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
             *orig_shape
         )
