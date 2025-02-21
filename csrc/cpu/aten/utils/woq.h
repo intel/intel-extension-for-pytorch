@@ -3454,11 +3454,21 @@ static at::Tensor woq_gemm_ref_impl(
     at::silu_(y);
   } else if (fusion_type == WOQ_FUSE_ADD || fusion_type == WOQ_FUSE_ADD_ADD) {
     for (auto& tin : others_list) {
-      y = at::add(y, tin.view(y.sizes()));
+      auto tin_view = tin.view({-1, y.size(-1)});
+      if (tin_view.size(0) < y.size(0)) {
+        tin_view = at::pad(
+            tin_view, {0, 0, 0, y.size(0) - tin_view.size(0)}, "constant", 0);
+      }
+      y = at::add(y, tin_view);
     }
   } else if (fusion_type == WOQ_FUSE_MUL) {
     for (auto& tin : others_list) {
-      y = at::mul(y, tin.view(y.sizes()));
+      auto tin_view = tin.view({-1, y.size(-1)});
+      if (tin_view.size(0) < y.size(0)) {
+        tin_view = at::pad(
+            tin_view, {0, 0, 0, y.size(0) - tin_view.size(0)}, "constant", 0);
+      }
+      y = at::mul(y, tin_view);
     }
   } else {
     TORCH_CHECK(

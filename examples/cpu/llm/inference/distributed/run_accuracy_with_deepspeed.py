@@ -402,7 +402,11 @@ class HuggingFaceModel(BaseLM):
         def get_checkpoint_files(model_name_or_path):
             cached_repo_dir = get_repo_root(model_name_or_path)
             glob_pattern = "*.[bp][it][n]"
-            if re.search("deepseek-v2", model_name_or_path, re.IGNORECASE):
+            if (
+                re.search("deepseek-v2", model_name_or_path, re.IGNORECASE)
+                or re.search("deepseek-v3", model_name_or_path, re.IGNORECASE)
+                or re.search("deepseek-r1", model_name_or_path, re.IGNORECASE)
+            ):
                 glob_pattern = "*.[sbp][ait][fn][e][t][e][n][s][o][r][s]"
             # extensions: .bin | .pt
             # creates a list of paths from all downloaded files in cache dir
@@ -730,6 +734,8 @@ class HuggingFaceModel(BaseLM):
             example_dict["output_router_logits"] = torch.tensor(
                 model_inputs["output_router_logits"]
             )
+        if self.config.architectures[0] == "JambaForCausalLM":
+            example_dict["num_logits_to_keep"] = torch.tensor(0)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,

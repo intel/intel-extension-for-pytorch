@@ -1207,7 +1207,7 @@ class WeightOnlyQuantizationTester(TestCase):
         ]
         bias_list = [False, True]
         bf16_list = [False, True]
-        batch_size_list = [4, 1024]
+        batch_size_list = [4, 1024, 63]
         cases = itertools.product(
             weight_dtype_list, bias_list, bf16_list, batch_size_list
         )

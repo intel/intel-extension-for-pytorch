@@ -298,7 +298,8 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate(
     const int64_t n_group,
     const int64_t topk_group,
     const int64_t n_routed_experts,
-    const int64_t top_k) {
+    const int64_t top_k,
+    c10::optional<at::Tensor> e_score_cbias) {
   RECORD_FUNCTION("ipex::deepseek_moegate", c10::ArrayRef<c10::IValue>({}));
 
   return deepseek_moegate_kernel_stub(
@@ -309,7 +310,8 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate(
       n_group,
       topk_group,
       n_routed_experts,
-      top_k);
+      top_k,
+      e_score_cbias);
 }
 } // namespace cpu
 } // namespace torch_ipex
@@ -374,7 +376,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::CPU,
       torch_ipex::cpu::deepseek_moe_woq);
   m.def(
-      "deepseek_moegate(Tensor hidden_states, Tensor scores, Tensor routed_scaling_factor, int n_group, int topk_group, int n_routed_experts, int top_k) -> (Tensor, Tensor)");
+      "deepseek_moegate(Tensor hidden_states, Tensor scores, Tensor routed_scaling_factor, int n_group, int topk_group, int n_routed_experts, int top_k, Tensor? e_score_cbias=None) -> (Tensor, Tensor)");
   m.impl(
       "deepseek_moegate",
       c10::DispatchKey::CPU,
