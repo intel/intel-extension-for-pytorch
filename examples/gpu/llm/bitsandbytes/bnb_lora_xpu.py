@@ -19,13 +19,13 @@ parser.add_argument("--max_seq_length", default=512, type=int, help="Maximum seq
 parser.add_argument("--per_device_train_batch_size", default=2, type=int)
 parser.add_argument("--gradient_accumulation_steps", default=4, type=int)
 parser.add_argument("--max_steps", default=300, type=int)
+parser.add_argument("--do_eval", action="store_true")
 
 args = parser.parse_args()
 
 seed = 123
 torch.manual_seed(seed)
 torch.xpu.manual_seed_all(seed)
-
 
 # Quantization configuration
 if args.quant_type == "int8":
@@ -50,8 +50,8 @@ tokenizer = AutoTokenizer.from_pretrained(
 tokenizer.pad_token = tokenizer.eos_token
 
 train_dataset = load_dataset('gem/viggo', split='train',trust_remote_code=True)
-eval_dataset = load_dataset('gem/viggo', split='validation',trust_remote_code=True)
-test_dataset = load_dataset('gem/viggo', split='test',trust_remote_code=True)
+if args.do_eval:
+    eval_dataset = load_dataset('gem/viggo', split='validation',trust_remote_code=True)
 
 def tokenize(prompt):
     result = tokenizer(
@@ -61,7 +61,7 @@ def tokenize(prompt):
         padding="max_length",
     )
     result["labels"] = result["input_ids"].copy()
-    return result.to(args.device)
+    return result
 
 def generate_and_tokenize_prompt(data_point):
     full_prompt =f"""Given a target sentence construct the underlying meaning representation of the input sentence as a single function with attributes and attribute values.
@@ -79,7 +79,8 @@ The attributes must be one of the following: ['name', 'exp_release_date', 'relea
     return tokenize(full_prompt)
 
 tokenized_train_dataset = train_dataset.map(generate_and_tokenize_prompt)
-tokenized_val_dataset = eval_dataset.map(generate_and_tokenize_prompt)
+if args.do_eval:
+    tokenized_val_dataset = eval_dataset.map(generate_and_tokenize_prompt)
 
 model.gradient_checkpointing_enable()
 model = prepare_model_for_kbit_training(model) 
@@ -114,6 +115,7 @@ elif args.model_name in ["meta-llama/Llama-3.1-8B"]:
         "down_proj",
         "lm_head",
     ]
+assert lora_targets != [], "lora_targets should not be empty. If you use absolute path to load the model, pls manually set the target as above."
 
 config = LoraConfig(
     r=args.lora_r,
@@ -138,23 +140,22 @@ ipex_update_causal_mask(model)
 trainer = transformers.Trainer(
     model=model,
     train_dataset=tokenized_train_dataset,
-    eval_dataset=tokenized_val_dataset,
+    eval_dataset=tokenized_val_dataset if args.do_eval else None,
     args=transformers.TrainingArguments(
         output_dir=output_dir,
         warmup_steps=5,
         per_device_train_batch_size=args.per_device_train_batch_size,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         max_steps=args.max_steps,         # Add a more higher value for better performance
         learning_rate=2.5e-5, # Want about 10x smaller than the pre-trained learning rate
         logging_steps=1,
         bf16=True,
         # optim="paged_adamw_8bit",
         logging_dir="./logs",        # Directory for storing logs
-        save_strategy="steps",       # Save the model checkpoint every logging step
-        save_steps=50,                # Save checkpoints every 50 steps
-        eval_strategy="steps", # Evaluate the model every logging step
+        save_strategy="no",  # Disable saving the model
+        eval_strategy="steps" if args.do_eval else "no" , # Evaluate the model every logging step
         eval_steps=50,               # Evaluate and save checkpoints every 50 steps
-        do_eval=True,                # Perform evaluation at the end of training
+        do_eval=args.do_eval,                # Perform evaluation at the end of training
         report_to='tensorboard',           # set to 'wandb' for weights & baises logging
         run_name=f"{run_name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",          # Name of the W&B run (optional)
     ),
