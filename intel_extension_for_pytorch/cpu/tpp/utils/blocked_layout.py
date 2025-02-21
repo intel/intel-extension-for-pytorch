@@ -122,6 +122,9 @@ def _get_permute_list(blocking_signeture):
     return [item for sublist in blocking_signeture for item in sublist]
 
 
+tf_file_utils_is_tensor_replace = False
+
+
 class BlockedTensor(object):
     def __init__(self, data, blocking_signeture=None, plain_dtype=None, **kwargs):
         self._t = torch.as_tensor(data, **kwargs)
@@ -129,6 +132,27 @@ class BlockedTensor(object):
         self.permute_list = None
         self.plain_shape = None
         self.plain_dtype = plain_dtype if plain_dtype else self._t.dtype
+        if not tf_file_utils_is_tensor_replace:
+            self.replace_tf_file_tiles_is_tensor()
+
+    def replace_tf_file_tiles_is_tensor(self):
+        try:
+            import transformers
+
+            transformers_orig_is_tensor = transformers.file_utils.is_tensor
+
+            def is_tensor(x):
+                """Tests if ``x`` is a :obj:`torch.Tensor`, :obj:`tf.Tensor` or :obj:`np.ndarray`."""
+                if transformers_orig_is_tensor(x):
+                    return True
+                if isinstance(x, BlockedTensor):
+                    return True
+                return False
+
+            transformers.file_utils.is_tensor = is_tensor
+            file_utils_is_tensor_replace = True
+        except ImportError:
+            pass
 
     def __repr__(self):
         return "Blocking_signature:\n{}\n\ndata:\n{}".format(

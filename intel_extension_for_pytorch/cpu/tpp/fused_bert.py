@@ -12,22 +12,6 @@ import intel_extension_for_pytorch._C as torch_ipex_cpp
 import copy
 from ...utils._logger import logger, WarningType
 
-try:
-    import transformers
-
-    transformers_orig_is_tensor = transformers.file_utils.is_tensor
-
-    def is_tensor(x):
-        """Tests if ``x`` is a :obj:`torch.Tensor`, :obj:`tf.Tensor` or :obj:`np.ndarray`."""
-        if transformers_orig_is_tensor(x):
-            return True
-        if isinstance(x, BlockedTensor):
-            return True
-        return False
-
-    transformers.file_utils.is_tensor = is_tensor
-except ImportError:
-    pass
 USE_BF16_PARAMS = True
 layer_use_bf16 = False
 unpad = True
