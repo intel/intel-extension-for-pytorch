@@ -30,6 +30,7 @@ MODEL_CLASSES = {
     "git": (AutoModelForCausalLM, AutoProcessor),
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
+    "phio": (AutoModelForCausalLM, AutoProcessor),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
     "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "maira2": (AutoModelForCausalLM, AutoProcessor),
