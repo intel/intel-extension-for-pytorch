@@ -463,6 +463,8 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             key, value = past_key_value.get_kv_slice_for_qkv(
                 self.layer_idx, cache_position=cache_position
             )
+            # StaticCache format is FBNH, hidden_states(input) need align this format
+            hidden_states = hidden_states.permute(1, 0, 2)
 
         else:
             query = torch.empty(

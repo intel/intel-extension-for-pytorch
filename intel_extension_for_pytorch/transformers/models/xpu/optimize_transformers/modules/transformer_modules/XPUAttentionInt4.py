@@ -9,7 +9,6 @@ from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     dequant_gemm_block,
 )
 from .model_utils import xpu_gemm_use_xetla
-from .CacheUtils import CacheFormat
 
 
 class IPEXAttentionInt4(IPEXAttention):
@@ -194,21 +193,9 @@ class IPEXAttentionInt4(IPEXAttention):
                 mq = query.shape[-1]
                 mk = key.shape[-1]
                 if IPEXAttention.cache_type == "static":
-                    if (
-                        IPEXAttention.cache_format == CacheFormat.FBNH
-                        and not self.beam_search_first_iter(hidden_states.shape[1])
-                    ):
-                        query = qkv_out[:, :, :mq].transpose(0, 1)
-                        key.copy_(
-                            qkv_out[:, :, mq : mq + mk].transpose(0, 1)
-                        ).contiguous()
-                        value.copy_(
-                            qkv_out[:, :, mq + mk :].transpose(0, 1)
-                        ).contiguous()
-                    else:
-                        query = qkv_out[:, :, :mq]
-                        key.copy_(qkv_out[:, :, mq : mq + mk]).contiguous()
-                        value.copy_(qkv_out[:, :, mq + mk :]).contiguous()
+                    query = qkv_out[:, :, :mq]
+                    key.copy_(qkv_out[:, :, mq : mq + mk]).contiguous()
+                    value.copy_(qkv_out[:, :, mq + mk :]).contiguous()
                 else:
                     query = qkv_out[:, :, :mq]
                     key = qkv_out[:, :, mq : mq + mk]
@@ -310,6 +297,9 @@ class IPEXAttentionInt4(IPEXAttention):
             if residual is not None:
                 attn_output += residual
             return attn_output
+        # ensure onednn kernel input is contiguous
+        if not attn_output.is_contiguous():
+            attn_output = attn_output.contiguous()
         if residual is None:
             if self.out_proj.bias is not None:
                 attn_output = torch.ops.torch_ipex.mm_bias_int4(
@@ -399,6 +389,9 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
         pass
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        # ensure onednn kernel input is contiguous
+        if not hidden_states.is_contiguous():
+            hidden_states = hidden_states.contiguous()
         if (
             self.q_proj_quant.qweight is None
             and self.qkv_proj_quant.qweight is not None
@@ -418,32 +411,9 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 intermediate_shape = (bs, seqlen, -1, num_group + 2, self.head_dim)
                 qkv_out = qkv_out.view(*intermediate_shape)
                 if IPEXAttention.cache_type == "static":
-                    if (
-                        IPEXAttention.cache_format == CacheFormat.FBNH
-                        and not self.beam_search_first_iter(hidden_states.shape[1])
-                    ):
-                        query = (
-                            qkv_out[:, :, :, :-2]
-                            .reshape(bs, seqlen, -1)
-                            .transpose(0, 1)
-                            .contiguous()
-                        )
-                        key.copy_(
-                            qkv_out[:, :, :, [-2]]
-                            .reshape(bs, seqlen, -1)
-                            .transpose(0, 1)
-                        )
-                        value.copy_(
-                            qkv_out[:, :, :, [-1]]
-                            .reshape(bs, seqlen, -1)
-                            .transpose(0, 1)
-                        )
-                    else:
-                        query = (
-                            qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
-                        )
-                        key.copy_(qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1))
-                        value.copy_(qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1))
+                    query = qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
+                    key.copy_(qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1))
+                    value.copy_(qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1))
                 elif IPEXAttention.cache_type == "dynamic":
                     query = qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
                     key = qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1).contiguous()
@@ -455,17 +425,9 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 # Statice Cache needs to store the key and value in the applied space.
                 # Dynamic Cache will cat the new key and value, so that does not need inplace operation.
                 if IPEXAttention.cache_type == "static":
-                    if (
-                        IPEXAttention.cache_format == CacheFormat.FBNH
-                        and not self.beam_search_first_iter(hidden_states.shape[1])
-                    ):
-                        query = qkv_out[:, :, :mq].transpose(0, 1).contiguous()
-                        key.copy_(qkv_out[:, :, mq : mq + mk].transpose(0, 1))
-                        value.copy_(qkv_out[:, :, mq + mk :].transpose(0, 1))
-                    else:
-                        query = qkv_out[:, :, :mq].contiguous()
-                        key.copy_(qkv_out[:, :, mq : mq + mk])
-                        value.copy_(qkv_out[:, :, mq + mk :])
+                    query = qkv_out[:, :, :mq].contiguous()
+                    key.copy_(qkv_out[:, :, mq : mq + mk])
+                    value.copy_(qkv_out[:, :, mq + mk :])
                 elif IPEXAttention.cache_type == "dynamic":
                     query = qkv_out[:, :, :mq].contiguous()
                     key = qkv_out[:, :, mq : mq + mk].contiguous()
@@ -500,12 +462,6 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 self.v_proj_quant.g_idx,
             )
             if IPEXAttention.cache_type == "static":
-                if self.beam_idx is None or self.beam_search_next_token(
-                    hidden_states.size(1)
-                ):
-                    key.copy_(key_out.transpose(0, 1))
-                    value.copy_(value_out.transpose(0, 1))
-                    return query.transpose(0, 1).contiguous(), key, value
                 key.copy_(key_out)
                 value.copy_(value_out)
                 return query, key, value
