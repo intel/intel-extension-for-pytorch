@@ -126,7 +126,7 @@ class RotaryEmbedding(torch.nn.Module):
             ]
             scale = max_position_embeddings / self.original_max_position_embeddings
             if scale > 1.0:
-                if "type" in kwargs and kwargs["type"] == "su":
+                if "type" in kwargs and kwargs["type"] in ["su", "longrope"]:
                     self.scaling_factor = math.sqrt(
                         1
                         + math.log(scale)
