@@ -471,18 +471,23 @@ class _IPEXPagedAttentionXPU:
         is_causal,
         block_table,
         alibi_slopes=None,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         head_dim = query.size(-1)
         pad_query = query
         pad_k_cache = k_cache
         pad_v_cache = v_cache
+        block_table_s = block_table
         pad_output = output
         if head_dim % 64 != 0:
             pad_size = 64 - head_dim % 64
             pad_query = torch.nn.functional.pad(query, (0, pad_size))
-            pad_k_cache = torch.nn.functional.pad(k_cache, (0, pad_size))
-            pad_v_cache = torch.nn.functional.pad(v_cache, (0, pad_size))
+            block_valid, block_table_s = block_table.unique(return_inverse=True)
+            pad_k_cache = torch.nn.functional.pad(k_cache[block_valid], (0, pad_size))
+            pad_v_cache = torch.nn.functional.pad(v_cache[block_valid], (0, pad_size))
             pad_output = torch.nn.functional.pad(output, (0, pad_size))
+            block_table_s = block_table_s.to(torch.int32)
         torch.ops.torch_ipex.chunked_prefill(
             pad_query,
             pad_k_cache,
@@ -491,7 +496,7 @@ class _IPEXPagedAttentionXPU:
             cu_seqlens_q,
             cu_seqlens_kv,
             None,
-            block_table,
+            block_table_s,
             alibi_slopes,
             max_seqlen_q,
             max_seqlen_kv,
