@@ -2245,7 +2245,10 @@ class CPUOPsTester(TestCase):
             topk_weight = topk_weight * routed_scaling_factor
             return topk_idx, topk_weight
 
-        for dtype in [torch.float32, torch.bfloat16]:
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
             hidden_states = torch.rand(10, 2560, dtype=dtype)
             weight = torch.rand(16, 2560, dtype=dtype)
             logits = torch.nn.functional.linear(
@@ -2263,6 +2266,66 @@ class CPUOPsTester(TestCase):
                     topk_group,
                     n_routed_experts,
                     top_k,
+                )
+                self.assertEqual(topk_idx_ref, topk_idx_ipex)
+                self.assertEqual(topk_weight_ref, topk_weight_ipex)
+
+    def test_deepseekv3_moegate(self):
+        n_group = 8
+        topk_group = 3
+        n_routed_experts = 16
+        top_k = 6
+        routed_scaling_factor = 16.0
+        e_score_correction_bias = torch.rand(n_routed_experts)
+
+        def moe_gate(scores):
+            n, h = scores.shape
+            scores_for_choice = scores.view(n, -1) + e_score_correction_bias.unsqueeze(
+                0
+            )
+            group_scores = (
+                scores_for_choice.view(n, n_group, -1).topk(2, dim=-1)[0].sum(dim=-1)
+            )  # [n, n_group]
+            group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+                1
+            ]  # [n, top_k_group]
+            group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(n, n_group, n_routed_experts // n_group)
+                .reshape(n, -1)
+            )  # [n, e]
+            tmp_scores = scores_for_choice.masked_fill(
+                ~score_mask.bool(), 0.0
+            )  # [n, e]
+            _, topk_idx = torch.topk(tmp_scores, k=top_k, dim=-1, sorted=False)
+            topk_weight = scores.gather(1, topk_idx)
+
+            return topk_idx, topk_weight
+
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
+            hidden_states = torch.rand(10, 2560, dtype=dtype)
+            weight = torch.rand(16, 2560, dtype=dtype)
+            logits = torch.nn.functional.linear(
+                hidden_states.type(torch.float32), weight.type(torch.float32), None
+            )
+            scores = logits.sigmoid()
+            enable_autocast = dtype == torch.bfloat16
+            with torch.no_grad(), torch.cpu.amp.autocast(enabled=enable_autocast):
+                topk_idx_ref, topk_weight_ref = moe_gate(scores)
+                topk_idx_ipex, topk_weight_ipex = torch.ops.torch_ipex.deepseek_moegate(
+                    hidden_states,
+                    scores.to(dtype),
+                    torch.tensor(routed_scaling_factor),
+                    n_group,
+                    topk_group,
+                    n_routed_experts,
+                    top_k,
+                    torch.tensor(e_score_correction_bias),
                 )
                 self.assertEqual(topk_idx_ref, topk_idx_ipex)
                 self.assertEqual(topk_weight_ref, topk_weight_ipex)

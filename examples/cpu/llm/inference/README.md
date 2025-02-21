@@ -4,88 +4,90 @@
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |   | 🟩 |   |
-|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |   | 🟩 | 🟩 |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 | 🟩 |
-|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
-|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟩 |   |
-|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|Maira| microsoft/maira-2 | 🟩 | 🟩 |   | 🟩 |   |
-|Jamba| ai21labs/Jamba-v0.1 | 🟩 | 🟩 |   | 🟩 |   |
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ |   | ✅ | ✅ |
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-7b  | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-11b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-30b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Bloom| bigscience/bloom-1b7 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm2-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ✅ | ✅ | ✅ |
+|T5| google/flan-t5-xl | ✅ | ✅ | ✅ | ✅ | ✅ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
+|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ | ✅ |
+|LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ |   | ✅ | ✅ |
+|GIT| microsoft/git-base | ✅ | ✅ |   | ✅ | ✅ |
+|Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ |   | ✅ |   |
+|Phi| microsoft/phi-2 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Maira| microsoft/maira-2 | ✅ | ✅ |   | ✅ | ✅ |
+|Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
+|DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |   | ✅ | ✅ |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | BF16 | Weight only quantization INT8 |
 |:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 |
-|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |
-|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 |
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟩 | 🟩 |
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 |
-|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 |
-|CodeGen| Salesforce/codegen-2B-multi |  🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
-|Mistral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |
-|MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
-|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 |
-|GIT| microsoft/git-base | 🟩 | 🟩 |
-|Phi| microsoft/phi-2 | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
-|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ |
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ |
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ |
+|FALCON| tiiuae/falcon-11b | ✅ | ✅ |
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ |
+|OPT| facebook/opt-30b | ✅ | ✅ |
+|OPT| facebook/opt-1.3b | ✅ | ✅ |
+|Bloom| bigscience/bloom-1b7 | ✅ | ✅ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ |
+|T5| google/flan-t5-xl | ✅ | ✅ |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ |
+|Mistral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ |
+|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ |
+|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ |
+|Qwen| Qwen/Qwen2-7B | ✅ | ✅ |
+|GIT| microsoft/git-base | ✅ | ✅ |
+|Phi| microsoft/phi-2 | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ |
+|Whisper| openai/whisper-large-v2 | ✅ | ✅ |
+|DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family)
 are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels.
@@ -113,6 +115,7 @@ python run.py --help # for more detailed usages
 | token latency |  enable "--token-latency" to print out the first or next token latency |
 | generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
 | streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
+| KV Cache dtype |   default: auto, use "--kv-cache-dtype=fp8_e5m2" to enable e5m2 KV Cache. More information refer to [vLLM FP8 E5M2 KV Cache](https://docs.vllm.ai/en/v0.6.6/quantization/fp8_e5m2_kvcache.html) |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
@@ -120,7 +123,7 @@ python run.py --help # for more detailed usages
 
 Additional setup instructions for running the notebook can be found [here](../README.md#23-optional-setup-for-running-jupyter-notebooks).
 
-## 2.1 Quick example for running Llama2-7b
+## 2.1 Quick examples for running Llama3.1-8B
 
 ### 2.1.1 To run generation task and benchmark performance
 
@@ -129,50 +132,51 @@ Additional setup instructions for running the notebook can be found [here](../RE
 #### 2.1.1.1 Run in FP32 with stock PyTorch
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32
 ```
 
 #### 2.1.1.2 Run in FP32 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex 
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32 --ipex
 ```
 
 #### 2.1.1.3 Run in BF16 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex 
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
 #### 2.1.1.4 Run in static quantization INT8 with ipex.llm
 
 ```bash
-wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-7b_qconfig.json
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file llama2-7b_qconfig.json --output-dir "saved_results"
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-smooth-quant --qconfig-summary-file llama3-1-8b_qconfig.json --output-dir "saved_results"
 ```
 
 #### 2.1.1.5 Run in weight-only quantization INT8 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"
 ```
 
 #### 2.1.1.6 Run in weight-only quantization INT4 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT4  --gptq --quant-with-amp --output-dir "saved_results" 
+huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir "./llama_int4_checkpoint"
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --low-precision-checkpoint "./llama_int4_checkpoint"
 ```
 
 #### 2.1.1.7 Run in BF16 with ipex.llm in distributed way
 
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex  --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex  --autotp --shard-model
 ```
 
 #### 2.1.1.8 Run in weight-only quantization INT8 with ipex.llm in distributed way
 
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --autotp --shard-model --output-dir "saved_results"
 ```
 
 ### 2.1.2 To run generation task and test accuracy
@@ -192,30 +196,31 @@ Check [Advanced Usage](#32-accuracy-test) for details.
 cd single_instance
 
 # Running FP32 model
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32 --ipex --tasks lambada_openai
 
 # Running BF16 model
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex --tasks lambada_openai
 
-# Quantization
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "../saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
+# Quantization. Assuming the quantized model is generated at "../saved_results/best_model.pt".
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --quantized-model-path "../saved_results/best_model.pt" --dtype int8 --ipex --quant-with-amp --tasks lambada_openai
 ```
 
 #### 2.1.2.2 Distributed inference
 
 ```bash
+# Assuming the pre-sharded Llama model is generated at "saved_results/llama_local_shard/" folder.
 # run_accuracy_with_deepspeed.py script is inside distributed directory.
 cd distributed
 unset KMP_AFFINITY
 
 # Distributed inference in FP32
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype float32 --ipex --tasks lambada_openai
 
 # Distributed inference in BF16
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype bfloat16 --ipex --tasks lambada_openai
 
 # Distributed inference with Weight-Only Quantization
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai  
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai
 ```
 
 #### 2.1.2.3 Distributed inference among multiple nodes with TCP 
@@ -255,9 +260,9 @@ docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:2.6.0 
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <MODEL_ID> --dtype float32 --ipex
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32 --ipex
 ```
 
 #### 2.2.1.2 BF16:
@@ -267,9 +272,9 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
 #### 2.2.1.3 Static quantization (INT8):
@@ -278,12 +283,13 @@ We use the SmoothQuant algorithm to get good accuracy of static quantization, wh
 
 - Command:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to the qconfig of the model_id> --output-dir "saved_results" 
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to the qconfig of the model_id> --output-dir "saved_results"
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results"
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-smooth-quant --qconfig-summary-file llama3-1-8b_qconfig.json --output-dir "saved_results"
 ```
 
 We provide the following qconfig summary files with good quality (calibration on "NeelNanda/pile-10k" dataset and evaluate accuracy on "lambada_openai" dataset):
@@ -292,6 +298,7 @@ We provide the following qconfig summary files with good quality (calibration on
 |---|:---:|
 | meta-llama/Llama-2-13b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-13b_qconfig.json) |
 | meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
+| meta-llama/Meta-Llama-3.1-8B-Instruct | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json) |
 | EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
 | tiiuae/falcon-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-7b_qconfig.json) |
 | tiiuae/falcon-11b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-11b_qconfig.json) |
@@ -309,13 +316,13 @@ We provide the following qconfig summary files with good quality (calibration on
 
 If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), please follow the [tuning examples](https://github.com/intel/neural-compressor/tree/master/examples/pytorch/nlp/huggingface_models/language-modeling/quantization/llm) provided by Intel® Neural Compressor.
 
-#### 2.2.1.4 Weight-only quantization:
+#### 2.2.1.4 Weight-only quantization INT8:
 
-By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
+By default, for Weight-only Quantization (WoQ), we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
 
-- Command (INT8):
+- Command for WoQ INT8:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"
 ```
 
 The command above works for most models we listed. However, to get better accuracy for the following models, some changes to the command are needed.
@@ -332,28 +339,89 @@ The command above works for most models we listed. However, to get better accura
 | stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
 | meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
-- Command (INT4):
+- An WoQ INT8 example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --gptq --quant-with-amp --output-dir "saved_results" 
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"
 ```
 
-- An INT8 example of llama2 7b model:
+#### 2.2.1.5 Weight-only quantization INT4:
+
+If the INT4 quantized weight checkpoint files can be found in [HuggingFace Models](https://huggingface.co/models),
+you can download and benchmark them with the following commands.
+
+- Command for downloading and running WoQ INT4 models from huggingface:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization  --weight-dtype INT8 --quant-with-amp --output-dir "saved_results" 
+huggingface-cli download <INT4_MODEL_ID> --local-dir <INT4_CKPT_SAVE_PATH>
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <ORIGINAL_MODEL_ID> --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <INT4_CKPT_SAVE_PATH>
 ```
 
-- An INT4 example of llama2 7b model:
+- Example with GPTQ INT4 Llama-3.1-8B model provided by huggingface:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT4 --gptq --quant-with-amp --output-dir "saved_results" 
+huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir "./llama_int4_checkpoint"
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint "./llama_int4_checkpoint"
 ```
 
-#### 2.2.1.5 Notes:
+If the quantized INT4 checkpoint of the desired model is not available in HuggingFace Models,
+you can quantize the model yourself with [Intel® Neural Compressor (INC)](https://github.com/intel/neural-compressor).
+INC supports WoQ INT4 quantization with GPTQ, AWQ and [intel/auto-round](https://github.com/intel/auto-round) algorithms.
+
+Please refer to [the WoQ weight generation guide](https://github.com/intel/neural-compressor/tree/9c3d4a1243d7ea7f0843454c37851b1f03fe695b/examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation#quantization-for-cpu-device)
+to generate the INT4 weight checkpoint files. Be aware that some dependent packages are incompatible for INT4 weight generation stage in INC and LLM benchmarking stage in IPEX,
+therefore you need to **create a new environment** for the process within INC.
+
+Here is an example of a typical INT4 checkpoint generation process using INC for your reference:
+
+- Step 1: Create an environment and install INC with its dependencies
+```bash
+conda create -n inc python=3.10 -y
+conda activate inc
+git clone https://github.com/intel/neural-compressor.git
+cd neural-compressor
+git checkout 9c3d4a1243d7ea7f0843454c37851b1f03fe695b
+pip install -r requirements.txt
+python setup.py install
+pip install -r requirements_pt.txt
+cd examples/3.x_api/pytorch/nlp/huggingface_models/language-modeling/quantization/transformers/weight_only/text-generation/
+pip install -r requirements_cpu_woq.txt
+```
+
+- Step 2: Run the script to quantize the model and get weight checkpoint files
+```bash
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_generation_cpu_woq.py  \
+    --model meta-llama/Meta-Llama-3.1-8B-Instruct \
+    --woq \
+    --woq_algo GPTQ \  # or Awq, AutoRound
+    --output_dir ./llama_3_1_8B_INT4_GPTQ \  # Default is "./saved_results"
+```
+
+It may take several hours to complete the quantization process.
+When it finishes, use the same command to run the model:
+
+```bash
+# Switch back to IPEX environment first.
+conda activate llm
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint "./llama_3_1_8B_INT4_GPTQ"
+```
+
+Alternatively, you can use the `run.py` script in IPEX to get the WoQ INT4 model with RTN quantization.
+
+- Command for WoQ INT4 quantization with RTN algorithm for huggingface models:
+```bash
+python run.py -m <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"
+```
+
+- Example with INT4 quantization with RTN algorithm for Llama-3.1-8B model:
+```bash
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization  --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"
+```
+
+#### 2.2.1.6 Notes:
 
 (1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node (e.g., 0-56 from the first numa node). You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
 
 (2) The _\<MODEL_ID\>_ (e.g., "meta-llama/Llama-2-13b-hf") specifies the model you will run. we provide some verified _\<MODEL ID\>_ in the [Optimized Model List](#1-ipexllm-optimized-model-list-for-inference). You can also try other models from [HuggingFace Models](https://huggingface.co/models).
 
-(3) <a name="generation_sq">for all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
+(3) <a name="generation_sq">For all quantization benchmarks</a>, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
 
 ### 2.2.2 Run generation in distributed way
 
@@ -368,40 +436,40 @@ In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
 If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <MODEL_ID>" with "-m \<shard model path\>" to skip the repeated shard steps.
 
-Besides, the standalone shard model function/scripts are also provided in the [Advanced Usage](#33-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp) section, in case you would like to generate the shard model weights files in advance before running distributed inference.
+Besides, the standalone shard model function/scripts are also provided in the [Advanced Usage](#31-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp) section, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
 #### 2.2.2.2 FP32:
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype float32 --ipex --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py --benchmark -m <MODEL_ID> --dtype float32 --ipex --autotp --shard-model
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32 --ipex --autotp --shard-model
 ```
 
 #### 2.2.2.3 BF16:
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex  --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex --autotp --shard-model
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex  --autotp --shard-model
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex --autotp --shard-model
 ```
 
-#### 2.2.2.4 Weight-only quantization:
+#### 2.2.2.4 Weight-only quantization INT8:
 
 By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
 For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won't be saved.
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
+deepspeed --bind_cores_to_rank run.py --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp  --autotp --shard-model --output-dir "saved_results"
 ```
 
 Similar to single instance usage, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
@@ -419,9 +487,28 @@ Similar to single instance usage, we need to update some arguments of the runnin
 | stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
 | meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m meta-llama/Llama-2-7b-hf --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --autotp --shard-model --output-dir "saved_results"
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --autotp --shard-model --output-dir "saved_results"
+```
+
+#### 2.2.2.5 Weight-only quantization INT4:
+
+We can either download a quantized weight checkpoint from Huggingface Models,
+or quantize the model using INC with GPTQ/AWQ/AutoRound algorithms,
+or quantize the model with RTN algorithm within IPEX. Please refer
+[the instructions](#2215-weight-only-quantization-int4) for details.
+For WoQ GPTQ INT4 benchmarking with DeepSpeed, we need to set `--weight-dtype INT4` and `--lowp-mode BF16`
+as well as the path of the INT4 checkpoint files for `--low-precision-checkpoint` explicitly.
+
+- Command:
+```bash
+deepspeed --bind_cores_to_rank run.py --benchmark -m <MODEL_ID> --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp  --autotp --shard-model --low-precision-checkpoint <INT4_CKPT_PATH> --output-dir "saved_results"
+```
+
+- Example with GPTQ INT4 Llama-3.1-8B model:
+```bash
+deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --low-precision-checkpoint <INT4_CKPT_PATH> --autotp --shard-model --output-dir "saved_results"
 ```
 
 ### 2.2.3 Additional configuration for specific models
@@ -446,16 +533,16 @@ In cache mode, only DDR address space is visible to software and HBM functions a
 
 #### 2.3.1.2 Flat Mode HBM
 
-In flat mode, HBM and DDR are exposed to software as separate address spaces in this mode. Therefore we need to check the `HBM_NODE_INDEX` of interest with commands like `lscpu`, then the LLM inference invoking command would be like:
+In flat mode, HBM and DDR are exposed to software as separate address spaces. Therefore we need to check the `HBM_NODE_INDEX` of interest with commands like `lscpu`, then the LLM inference invoking command would be like:
 
 - Command:
 ```bash
 OMP_NUM_THREADS=<HBM node cores num> numactl -m <HBM_NODE_INDEX> -C <HBM cores list> python run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex
 ```
 
-- An example of llama2 7b model with HBM numa node index being 2:
+- An example of Llama-3.1-8B model with HBM numa node index being 2:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 2 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex
+OMP_NUM_THREADS=56 numactl -m 2 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
 *Note:* For some very large models we may get an "OOM Error" due to HBM capacity limitations. In this case we can change `-m` argument for `numactl` to `-p` in the above command to enable the model inference with the larger DDR memory.
@@ -464,14 +551,15 @@ OMP_NUM_THREADS=56 numactl -m 2 -C 0-55 python run.py --benchmark -m meta-llama/
 ```bash
 OMP_NUM_THREADS=<HBM node cores num> numactl -p <HBM_NODE_INDEX> -C <HBM cores list> python run.py --benchmark -m <MODEL_ID> --dtype bfloat16 --ipex
 ```
-- An example of llama2 7b model with HBM numa node index being 2:
+
+- An example of Llama-3.1-8B model with HBM numa node index being 2:
 ```bash
-OMP_NUM_THREADS=56 numactl -p 2 -C 0-55 python run.py --benchmark -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex
+OMP_NUM_THREADS=56 numactl -p 2 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
 ### 2.3.2 Distributed Inference with Xeon® CPU Max Series
 
-As HBM has memory capacity limitations, we need to shard the model in advance with DDR memory. Please follow [the example](#33-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp).
+As HBM has memory capacity limitations, we need to shard the model in advance with DDR memory. Please follow [the example](#31-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp).
 
 Then we can invoke distributed inference with `deepspeed` command:
 
@@ -482,50 +570,29 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m <SHARDED_MODEL_PATH> --dtyp
 
 As the model has been sharded, we specify `SHARDED_MODEL_PATH` for `-m` argument instead of original model name or path, and `--shard-model` argument is not needed.
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-python utils/create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b
-deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama2_7b --dtype bfloat16 --ipex --autotp
+python utils/create_shard_model.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --save-path ./local_llama3_1_8b
+deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama3_1_8b --dtype bfloat16 --ipex --autotp
 ```
 
 <br>
 
-
 # 3. Advanced Usage
 
-## 3.1 Weight-only quantization with low precision checkpoint (Prototype)
+## 3.1 How to Shard model for Distributed tests with DeepSpeed (autoTP)
 
-Quantizing weight to INT4 can further improve performance by reducing memory bandwidth.
-However, the naive round-to-nearest quantization method probably results in poor accuracy.
-Some algorithms can quantize weights to INT4 while minimize accuracy drop.
-GPTQ is one of such algorithms.
-You may use [Intel(R) Neural Compressor](https://github.com/intel/neural-compressor) to run GPTQ and generate low-precision checkpoints for inference.
+To save memory usage, we could shard the model weights under the local path before we launch distributed tests with DeepSpeed.
 
-To convert model and run inference with INT4 checkpoints, you can run the following command:
-
-```bash
-# Provide checkpoint file name by --low-precision-checkpoint <path-to-files>
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run.py -m <MODEL_ID> --benchmark --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <PATH_TO_CHECKPOINT>
 ```
+cd ./utils
+# general command:
+python create_shard_model.py -m <MODEL ID> --save-path <SHARD MODEL PATH>
+# After sharding the model, using -m <SHARD MODEL PATH> in later tests
 
-To run accuracy tests, please follow the instructions in the [Accuracy Test](#32-accuracy-test) part.
-
-**Example**
-
-Intel® Extension for PyTorch\* with INT4 weight only quantization has been used in MLPerf submission (August 2023) to fully maximize the power of Intel® Xeon®, and also shows good accuracy as comparing with FP32. This example is a simplified version of the MLPerf task. It will download a finetuned FP32 GPT-J model used for MLPerf submission, quantize the model to INT4 and run a text summarization task on the `cnn_dailymail` dataset. The example runs for 1000 samples, which is a good approximation of the results for the entire dataset and saves time.
-
-```bash
-pip install evaluate nltk absl-py rouge_score
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> bash single_instance/run_int4_gpt-j_on_cnndailymail.sh
+# An example of Llama-3.1-8B:
+python create_shard_model.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --save-path ./local_llama3_1_8b
 ```
-
-Please note that 100 GB disk space, 100 GB memory and Internet access are needed to run this example. The example will run for a few hours depending on your hardware and network condition. The example is verified on the 4th Generation Intel® Xeon® Scalable (Sapphire Rapids) platform. You may get different results on older platforms as some new hardware features are unavailable.
-
-**Checkpoint Requirements**
-
-IPEX now only supports the GPTQ format and AWQ format on HuggingFace.
-Checkpoints generated by Intel(R) Neural Compressor have the same format.
-Only INT4 is supported.
 
 ## 3.2 Accuracy test
 
@@ -546,44 +613,55 @@ cd ./single_instance
 
 - Command:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py  -m <MODEL_ID> --dtype float32 --ipex --tasks {TASK_NAME}
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py  -m <MODEL_ID> --dtype float32 --ipex --tasks <TASK_NAME>
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype float32 --ipex --tasks lambada_openai
 ```
 
 #### 3.2.1.2 BF16:
 
 - Command:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py  -m <MODEL_ID> --dtype bfloat16 --ipex --tasks {TASK_NAME}
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run_accuracy.py  -m <MODEL_ID> --dtype bfloat16 --ipex --tasks <TASK_NAME>
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex --tasks lambada_openai
 ```
 
-#### 3.2.1.3 Quantizations:
+#### 3.2.1.3 Weight-only Quantization:
 
-For the quantized models to be used in accuracy tests, we can reuse the model files that are named "best_model.pt" in the "--output-dir" path ([generated during inference performance tests](#generation_sq)).
+For the quantized models to be used in accuracy tests, we can reuse the model files that are named "best_model.pt" in the "--output-dir" path [generated during inference performance tests](#generation_sq).
 
 - Command:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "../saved_results/best_model.pt" --dtype <int8 or int4> --tasks {TASK_NAME}
-# Please add  "--quant-with-amp" if your model is quantized with this flag
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "../saved_results/best_model.pt" --dtype <int8 or int4> --tasks <TASK_NAME>
+# Please add "--quant-with-amp" if your model is quantized with this flag
 ```
 
-- An example of llama2 7b model:
+- An example of Llama-3.1-8B model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "../saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Meta-Llama-3.1-8B-Instruct --quantized-model-path "../saved_results/best_model.pt" --dtype int8 --ipex --quant-with-amp --tasks lambada_openai
 ```
 
 ### 3.2.2 Run in distributed way
 
 #### 3.2.2.1 Prepare:
+
+We provided `run_accuracy_with_deepspeed.py` script for testing accuracy
+for the models benchmarked in distributed way via `deepspeed`.
+
+Prior to the accuracy testing, we need to have the sharded model. The sharded model should have been generated
+following [the instruction for performance benchmarking with deepspeed](#2221-prepare) where `--shard-model`
+flag is set. The generated model shards will be placed in the folder specified by `--output-dir` argument.
+Alternatively, the model sharding process can also be accomplished [in a standalone way](#31-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp).
+
+Then we can test the accuracy with the following commands, in which `-m` or `--model` is specified with
+the path of the folder of the sharded model instead of original model ID.
 
 ```bash
 # Run distributed accuracy with 2 ranks of one node
@@ -595,28 +673,30 @@ unset KMP_AFFINITY
 
 - Command:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype float32 --ipex --tasks <TASK_NAME> 
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype float32 --ipex --tasks <TASK_NAME>
 ```
-- An example of llama2 7b model:
+
+- An example of a pre-sharded llama model:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard" --dtype float32 --ipex --tasks lambada_openai
 ```
 
 #### 3.2.2.3 BF16:
 - Command:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype  bfloat16 -ipex --tasks <TASK_NAME> 
-```
-- An example of llama2 7b model:
-```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype bfloat16 --ipex --tasks <TASK_NAME>
 ```
 
-#### 3.2.2.4 Weight-only quantization (INT8):
+- An example of a pre-sharded llama model:
+```bash
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard" --dtype bfloat16 --ipex --tasks lambada_openai
+```
+
+#### 3.2.2.4 Weight-only quantization INT8:
 
 - Command:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
 Similar to script usage for performance benchmarking, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
@@ -632,23 +712,25 @@ Similar to script usage for performance benchmarking, we need to update some arg
 | facebook/opt-30b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
 | databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32`" |
 
-- An example of llama2 7b model:
+- An example of a pre-sharded INT8 llama model:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
-## 3.3 How to Shard model for Distributed tests with DeepSpeed (autoTP)
+#### 3.2.2.5 Weight-only quantization INT4:
 
-To save memory usage, we could shard the model weights under the local path before we launch distributed tests with DeepSpeed.
+Please check [the instructions for WoQ INT4 performance benchmarking](#2215-weight-only-quantization-int4)
+for the details on how to download or generate the INT4 quantized checkpoint files.
+Then we can use similar commands for WoQ INT4 model accuracy test.
 
+- Command:
+```bash
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --low-precision-checkpoint <INT4_CKPT_PATH> --tasks <TASK_NAME>
 ```
-cd ./utils
-# general command:
-python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL PATH>
-# After sharding the model, using -m <SHARD MODEL PATH> in later tests
 
-# An example of llama2 7b:
-python create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b
+- An example with a pre-sharded INT4 llama model:
+```bash
+deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard" --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --low-precision-checkpoint <INT4_CKPT_PATH> --tasks lambada_openai
 ```
 
 <br>
@@ -661,6 +743,4 @@ The performance results on AWS instances can be found [here](../../../../docs/tu
 
 # 5. Miscellaneous Tips
 
-- We can build up LLM services optimized by Intel® Extension for PyTorch\* with Triton Server. Please refer [here](../../serving/triton/README.md) for best practice.
-
-- The LLM inference methods introduced in this page can be well applied for AWS. We can just follow the above instructions and enjoy the boosted performance of LLM with Intel® Extension for PyTorch\* optimizations on the AWS instances.
+The LLM inference methods introduced in this page can be well applied for AWS. We can just follow the above instructions and enjoy the boosted performance of LLM with Intel® Extension for PyTorch\* optimizations on the AWS instances.

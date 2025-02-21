@@ -21,12 +21,8 @@ def inference(model, data):
         latency = duration / measure_iter
         throughput = measure_iter / duration
 
-        print(
-            "@hypertune {'name': 'latency (ms)'}"
-        )  # Add print statement of the form @hypertune {'name': str, 'higher_is_better': bool, 'target_val': int or float}`
-        print(
-            latency
-        )  # Print the objective(s) you want to optimize. Make sure this is just an int or float to be minimzied or maximized.
+        print("@hypertune {'name': 'latency (ms)'}")
+        print(latency)
 
 
 def main(args):

@@ -1,4 +1,3 @@
-import os
 import argparse
 import time
 import json
@@ -12,6 +11,9 @@ import transformers
 from transformers import AutoConfig
 from transformers import TextStreamer
 import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.llm.utils import (
+    load_low_precision_checkpoint,
+)
 from ast import literal_eval
 import sys
 
@@ -439,6 +441,8 @@ elif re.search("deepseekv2", config.architectures[0], re.IGNORECASE):
     model = DeepseekV2Config(args.model_id)
 elif re.search("deepseekv3", config.architectures[0], re.IGNORECASE):
     model = DeepseekV3Config(args.model_id)
+    if "deepseek-r1" in args.model_id.lower() or "deepseekr1" in args.model_id.lower():
+        model.name = "deepseekr1"
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -1183,75 +1187,8 @@ elif args.ipex_weight_only_quantization:
     )
     if args.low_precision_checkpoint != "":
         pathname = args.low_precision_checkpoint
-        assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
-        if os.path.isfile(pathname):
-            low_precision_checkpoint = None
-            if pathname.endswith((".pt", ".pth", ".bin")):
-                low_precision_checkpoint = torch.load(pathname, weights_only=True)
-            elif pathname.endswith(".safetensors"):
-                try:
-                    import safetensors
-                except ImportError:
-                    print(
-                        "Please install safetensors package to load safetensors checkpoint."
-                    )
-                    exit(1)
-                low_precision_checkpoint = safetensors.torch.load_file(pathname)
-            assert (
-                low_precision_checkpoint is not None
-            ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth, .bin or .safetensors file."
-
-            quant_method = {"quant_method": "gptq"}
-
-        elif os.path.isdir(pathname):
-            low_precision_checkpoint = {}
-            for pattern in ["*.pt", "*.pth", "*.bin"]:
-                files = list(pathlib.Path(pathname).glob(pattern))
-                if files:
-                    for f in files:
-                        data_f = torch.load(f, weights_only=True)
-                        low_precision_checkpoint.update(data_f)
-                    break
-            if not low_precision_checkpoint:
-                files = list(pathlib.Path(pathname).glob("*.safetensors"))
-                if files:
-                    try:
-                        import safetensors
-                    except ImportError:
-                        print(
-                            "Please install safetensors package to load safetensors checkpoint."
-                        )
-                        exit(1)
-                    for f in files:
-                        data_f = safetensors.torch.load_file(f)
-                        low_precision_checkpoint.update(data_f)
-            assert (
-                len(low_precision_checkpoint) > 0
-            ), f"Cannot find checkpoint (.pt/.pth/.bin/.safetensors) files in path {pathname}."
-
-            try:
-                with open(pathname + "/config.json") as f:
-                    quant_model_config = json.load(f)
-                quant_method = {
-                    "quant_method": quant_model_config["quantization_config"][
-                        "quant_method"
-                    ]
-                }
-            except Exception as e:
-                print(
-                    "warning: loading HF config.json to get `quant_method` failed, due to ",
-                    e,
-                )
-                print("warning: specifying `quant_method` = `gptq` by default.")
-                quant_method = {"quant_method": "gptq"}
-
-        else:
-            raise AssertionError(
-                f"Invalid low-precision-checkpoint: {pathname}."
-                " Should be a .pt/.pth/.safetensors file or a directory containing them."
-            )
-
-        low_precision_checkpoint = (low_precision_checkpoint, quant_method)
+        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+        low_precision_checkpoint = (low_precision_checkpoint, quant_config)
 
         if args.gptq_legacy_format:
             raise AssertionError(

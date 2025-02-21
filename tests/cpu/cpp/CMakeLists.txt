@@ -32,9 +32,7 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
-include_directories(${PYTORCH_INSTALL_DIR}/include)
-include_directories(${PYTORCH_INSTALL_DIR}/include/torch/csrc/api/include/)
-include_directories(${THIRD_PARTY_ROOT}/googletest/googletest/include)
+include_directories(${TORCH_INCLUDE_DIRS})
 include_directories(${IPEX_PROJECT_TOP_DIR})
 include_directories(${IPEX_PROJECT_TOP_DIR}/csrc/include)
 
@@ -42,13 +40,24 @@ link_directories(${PYTORCH_INSTALL_DIR}/lib)
 # search the lib directory for gtest
 link_directories(${CPP_TEST_BUILD_DIR}/lib)
 
-# add gtest cmake path
-add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_party/googletest EXCLUDE_FROM_ALL)
-
 # Add the Test Files
 set(IPEX_CPP_TEST_SOURCES test_runtime_api.cpp test_dyndisp_and_isa_api.cpp)
 
 add_executable(${CPU_CPP_TEST_NAME} ${IPEX_CPP_TEST_SOURCES})
+
+if(USE_SYSTEM_GTEST)
+  find_package(GTest REQUIRED)
+  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC GTest::gtest GTest::gtest_main)
+else()
+  # add gtest cmake path
+  add_subdirectory(${THIRD_PARTY_ROOT}/googletest ${CPP_TEST_BUILD_DIR}/third_party/googletest EXCLUDE_FROM_ALL)
+
+  # Link GTest
+  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
+  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
+
+  target_include_directories(${CPU_CPP_TEST_NAME} PRIVATE ${THIRD_PARTY_ROOT}/googletest/googletest/include)
+endif()
 
 set(BUILD_STATIC_ONEMKL ON)
 find_package(oneMKL QUIET)
@@ -58,14 +67,8 @@ endif()
 
 target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/)
 
-# Link GTest
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest_main)
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC gtest)
-
 # Link Pytorch
-target_link_directories(${CPU_CPP_TEST_NAME} PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC torch_cpu)
-target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC c10)
+target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${TORCH_LIBRARIES})
 
 # Link IPEX
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC intel-ext-pt-cpu)

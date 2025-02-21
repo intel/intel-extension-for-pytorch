@@ -373,7 +373,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size: int = -1,
         g_idx: Optional[torch.Tensor] = None,
         quant_method: QuantMethod = QuantMethod.GPTQ_GEMM,
-        dtype: int = 0,
+        dtype: QuantDtype = QuantDtype.INT4,
         **kwargs,
     ):
         r"""Create a weight-only quantized module from weight
