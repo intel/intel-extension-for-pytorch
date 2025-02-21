@@ -755,7 +755,10 @@ elif model_type == "mllama":
     # elif int(args.input_tokens) > 8192:
     #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
     elif args.input_tokens in prompt_pool[model_type]:
-        prompt = prompt_pool[model_type][args.input_tokens]
+        current_prompt = [prompt_pool[model_type][args.input_tokens][0]]
+        for i in range(1, args.batch_size):
+            current_prompt = current_prompt + [prompt_pool[model_type][args.input_tokens][i]]
+        prompt = current_prompt
     else:
         raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
 
@@ -764,7 +767,7 @@ elif model_type == "mllama":
     inputs = tokenizer(raw_image, prompt, return_tensors="pt")
     input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
-    inputs = [prompt] * args.batch_size
+    inputs = prompt
 elif model_type == "maira2":
     from PIL import Image
     import requests
