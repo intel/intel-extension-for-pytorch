@@ -251,7 +251,7 @@ def _build_installation_dependency():
         for key, value in _get_basekit_rt().items():
             if key in ["oneccl-devel", "impi-devel", "intel-pti"] and not IS_LINUX:
                 continue
-            if len(value['version'].split(".")) != 3:
+            if len(value["version"].split(".")) != 3:
                 continue
             install_requires.append(f"{key}=={value['version']}")
     return install_requires

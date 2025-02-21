@@ -11,7 +11,7 @@ ENABLE_ONEAPI_INTEGRATION=1
 if [[ $# -lt 2 ]]; then
     echo "Usage: bash $0 <ONEAPI_ROOT_DIR> <AOT>"
     echo "ONEAPI_ROOT_DIR should be set to the text string of the root path where oneAPI was installed in. For instance, \"/opt/intel/oneapi\"."
-    echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
+    echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT. Setting it to \"pytorch\" to follow the AOT configuration in the PyTorch prebuilt binary."
     exit 1
 fi
 
@@ -20,12 +20,12 @@ fi
 #           | | | | | | | └- torch-ccl
 #           | | | | | | └--- TorchAudio
 #           | | | | | └----- TorchVision
-#           | | | | └------- Undefined
+#           | | | | └------- Torch
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
 #           | └------------- Undefined
 #           └--------------- Undefined
-MODE=0x07
+MODE=0x0F
 
 DPCPP_ROOT=
 ONEMKL_ROOT=
@@ -57,8 +57,10 @@ fi
 git submodule sync
 git submodule update --init --recursive
 
-COMMIT_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:commit)
 VERSION_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
+VERSION_TORCHVISION=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchvision:version)
+VERSION_TORCHAUDIO=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchaudio:version)
+COMMIT_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:commit)
 COMMIT_TORCHVISION=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchvision:commit)
 COMMIT_TORCHAUDIO=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchaudio:commit)
 COMMIT_TORCHCCL=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torch-ccl:commit)
@@ -94,9 +96,6 @@ else
     ARGS=(${ARGS[@]:1})
     AOT=${ARGS[0]}
     ARGS=(${ARGS[@]:1})
-fi
-if [[ ${AOT} == "none" ]]; then
-    AOT=""
 fi
 if [[ ${#ARGS[@]} -gt 0 ]]; then
     if [[ ${ARGS[0]} =~ ^[0-9]+$ ]] || [[ ${ARGS[0]} =~ ^0x[0-9a-fA-F]+$ ]]; then
@@ -155,94 +154,95 @@ BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pw
 cd ${BASEFOLDER}
 
 # Checkout individual components
-if [ "${COMMIT_TORCHVISION}" = "N/A" ]; then
-    (( MODE &= 0xFB ))
-fi
-if [ "${COMMIT_TORCHAUDIO}" = "N/A" ]; then
-    (( MODE &= 0xFD ))
-fi
-if [ "${COMMIT_TORCHCCL}" = "N/A" ]; then
-    (( MODE &= 0xFE ))
-fi
-
-if [ ! -d pytorch ]; then
-    git clone https://github.com/pytorch/pytorch.git
-fi
-#if [ ! -d llvm-project ]; then
-#    git clone https://github.com/llvm/llvm-project.git
-#fi
-if [ $((${MODE} & 0x04)) -ne 0 ]; then
-    if [ ! -d vision ]; then
-        git clone https://github.com/pytorch/vision.git
+if [ "${AOT}" != "pytorch" ]; then
+    if [ "${COMMIT_TORCHVISION}" = "N/A" ]; then
+        (( MODE &= 0xFB ))
     fi
-fi
-if [ $((${MODE} & 0x02)) -ne 0 ]; then
-    if [ ! -d audio ]; then
-        git clone https://github.com/pytorch/audio.git
+    if [ "${COMMIT_TORCHAUDIO}" = "N/A" ]; then
+        (( MODE &= 0xFD ))
+    fi
+    if [ "${COMMIT_TORCHCCL}" = "N/A" ]; then
+        (( MODE &= 0xFE ))
+    fi
+    if [ $((${MODE} & 0x06)) -ne 0 ]; then
+        (( MODE |= 0x08 ))
+    fi
+
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+        if [ ! -d pytorch ]; then
+            git clone https://github.com/pytorch/pytorch.git
+        fi
+    fi
+    if [ $((${MODE} & 0x04)) -ne 0 ]; then
+        if [ ! -d vision ]; then
+            git clone https://github.com/pytorch/vision.git
+        fi
+    fi
+    if [ $((${MODE} & 0x02)) -ne 0 ]; then
+        if [ ! -d audio ]; then
+            git clone https://github.com/pytorch/audio.git
+        fi
+    fi
+    
+    # Checkout required branch/commit and update submodules
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+        cd pytorch
+        rm -rf * > /dev/null
+        if [ -f .ci/docker/ci_commit_pins/triton-xpu.txt ]; then
+            rm .ci/docker/ci_commit_pins/triton-xpu.txt
+        fi
+        git checkout . > /dev/null
+        if [ ! -z ${COMMIT_TORCH} ]; then
+            git checkout main > /dev/null
+            git pull > /dev/null
+            git checkout ${COMMIT_TORCH}
+        fi
+        git submodule sync
+        git submodule update --init --recursive
+        #git apply ../intel-extension-for-pytorch/torch_patches/*.patch
+        cd ..
+    fi
+    if [ $((${MODE} & 0x04)) -ne 0 ]; then
+        cd vision
+        if [ ! -z ${COMMIT_TORCHVISION} ]; then
+            rm -rf * > /dev/null
+            git checkout . > /dev/null
+            git checkout main > /dev/null
+            git pull > /dev/null
+            git checkout ${COMMIT_TORCHVISION}
+        fi
+        git submodule sync
+        git submodule update --init --recursive
+        cd ..
+    fi
+    if [ $((${MODE} & 0x02)) -ne 0 ]; then
+        cd audio
+        if [ ! -z ${COMMIT_TORCHAUDIO} ]; then
+            rm -rf * > /dev/null
+            git checkout . > /dev/null
+            git checkout main > /dev/null
+            git pull > /dev/null
+            git checkout ${COMMIT_TORCHAUDIO}
+        fi
+        git submodule sync
+        git submodule update --init --recursive
+        cd ..
+    fi
+else
+    if [ "${VERSION_TORCHVISION}" = "N/A" ]; then
+        (( MODE &= 0xFB ))
+    fi
+    if [ "${VERSION_TORCHAUDIO}" = "N/A" ]; then
+        (( MODE &= 0xFD ))
+    fi
+    if [ $((${MODE} & 0x06)) -ne 0 ]; then
+        (( MODE |= 0x08 ))
     fi
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ ! -d torch-ccl ]; then
         git clone https://github.com/intel/torch-ccl.git
     fi
-fi
-
-# Checkout required branch/commit and update submodules
-cd pytorch
-rm -rf * > /dev/null
-if [ -f .ci/docker/ci_commit_pins/triton-xpu.txt ]; then
-    rm .ci/docker/ci_commit_pins/triton-xpu.txt
-fi
-git checkout . > /dev/null
-if [ ! -z ${COMMIT_TORCH} ]; then
-    git checkout main > /dev/null
-    git pull > /dev/null
-    git checkout ${COMMIT_TORCH}
-fi
-git submodule sync
-git submodule update --init --recursive
-git apply ../intel-extension-for-pytorch/torch_patches/*.patch
-cd ..
-
-#cd llvm-project
-#if [ ! -z "${COMMIT_LLVM}" ]; then
-#    rm -rf * > /dev/null
-#    git checkout . > /dev/null
-#    git checkout main > /dev/null
-#    git pull > /dev/null
-#    git checkout ${COMMIT_LLVM}
-#fi
-#git submodule sync
-#git submodule update --init --recursive
-#cd ..
-
-if [ $((${MODE} & 0x04)) -ne 0 ]; then
-    cd vision
-    if [ ! -z ${COMMIT_TORCHVISION} ]; then
-        rm -rf * > /dev/null
-        git checkout . > /dev/null
-        git checkout main > /dev/null
-        git pull > /dev/null
-        git checkout ${COMMIT_TORCHVISION}
-    fi
-    git submodule sync
-    git submodule update --init --recursive
-    cd ..
-fi
-if [ $((${MODE} & 0x02)) -ne 0 ]; then
-    cd audio
-    if [ ! -z ${COMMIT_TORCHAUDIO} ]; then
-        rm -rf * > /dev/null
-        git checkout . > /dev/null
-        git checkout main > /dev/null
-        git pull > /dev/null
-        git checkout ${COMMIT_TORCHAUDIO}
-    fi
-    git submodule sync
-    git submodule update --init --recursive
-    cd ..
-fi
-if [ $((${MODE} & 0x01)) -ne 0 ]; then
     cd torch-ccl
     if [ ! -z "${COMMIT_TORCHCCL}" ]; then
         rm -rf * > /dev/null
@@ -255,17 +255,35 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     git submodule update --init --recursive
     cd ..
 fi
+    
+#if [ ! -d llvm-project ]; then
+#    git clone https://github.com/llvm/llvm-project.git
+#fi
+#
+#cd llvm-project
+#if [ ! -z "${COMMIT_LLVM}" ]; then
+#    rm -rf * > /dev/null
+#    git checkout . > /dev/null
+#    git checkout main > /dev/null
+#    git pull > /dev/null
+#    git checkout ${COMMIT_LLVM}
+#fi
+#git submodule sync
+#git submodule update --init --recursive
+#cd ..
 
 # Install python dependency
-python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch intel-extension-for-pytorch-deepspeed oneccl_bind_pt
-python -m pip install cmake make ninja
-if [ $((${MODE} & 0x04)) -ne 0 ]; then
-    python -m pip install Pillow
-    conda install -y conda-forge::libpng conda-forge::libjpeg-turbo
+if [ $((${MODE} & 0x08)) -ne 0 ]; then
+    python -m pip uninstall -y torch torchvision torchaudio
 fi
+python -m pip uninstall -y intel-extension-for-pytorch intel-extension-for-pytorch-deepspeed oneccl_bind_pt
+python -m pip install cmake make ninja
 wget https://github.com/NixOS/patchelf/releases/download/0.18.0/patchelf-0.18.0-x86_64.tar.gz -O patchelf.tar.gz
+if [ -d patchelf ]; then
+    rm -rf patchelf
+fi
 mkdir patchelf
-tar xvf patchelf.tar.gz -C patchelf
+tar xvf patchelf.tar.gz -C patchelf > /dev/null
 rm patchelf.tar.gz
 export PATH=`pwd`/patchelf/bin:${PATH}
 
@@ -284,8 +302,6 @@ patchelf_so_files() {
     rm -rf tmp
     cd ..
 }
-
-ABI=1
 
 ## Check gcc version
 #function ver_compare() {
@@ -385,85 +401,122 @@ source ${CCL_ENV}
 source ${MPI_ENV}
 source ${PTI_ENV}
 
-#  PyTorch
-cd pytorch
-python -m pip install -r requirements.txt
-python -m pip install --force-reinstall mkl-static mkl-include
-#export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
-#export PYTORCH_BUILD_NUMBER=0
-# Ensure cmake can find python packages when using conda or virtualenv
-CMAKE_PREFIX_PATH_BK=${CMAKE_PREFIX_PATH}
-if [ -n "${CONDA_PREFIX-}" ]; then
-    export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v conda))/../'}:${CMAKE_PREFIX_PATH}"
-elif [ -n "${VIRTUAL_ENV-}" ]; then
-    export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v python))/../'}:${CMAKE_PREFIX_PATH}"
-fi
-export USE_STATIC_MKL=1
-export _GLIBCXX_USE_CXX11_ABI=${ABI}
-export USE_NUMA=0
-export USE_CUDA=0
-export USE_MPI=0
-export TORCH_XPU_ARCH_LIST=${AOT}
-python setup.py clean
-if [ -d dist ]; then
-    rm -rf dist
-fi
-#CFLAGS_BK=${CFLAGS}
-#CXXFLAGS_BK=${CXXFLAGS}
-#export CFLAGS="${CFLAGS} -Wno-nonnull"
-#export CXXFLAGS="${CXXFLAGS} -Wno-nonnull"
-python setup.py bdist_wheel 2>&1 | tee build.log
-#if [ ! -z ${CFLAGS_BK} ]; then
-#    export CFLAGS=${CFLAGS_BK}
-#else
-#    unset CFLAGS
-#fi
-#if [ ! -z ${CXXFLAGS_BK} ]; then
-#    export CXXFLAGS=${CXXFLAGS_BK}
-#else
-#    unset CXXFLAGS
-#fi
-unset TORCH_XPU_ARCH_LIST
-unset USE_MPI
-unset USE_CUDA
-unset USE_NUMA
-unset _GLIBCXX_USE_CXX11_ABI
-unset USE_STATIC_MKL
-if [ ! -z ${CMAKE_PREFIX_PATH_BK} ]; then
-    export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH_BK}
+if [ "${AOT}" != "pytorch" ]; then
+    ABI=1
+    if [[ ${AOT} == "none" ]]; then
+        AOT=""
+    fi
+    
+    #  PyTorch
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+        cd pytorch
+        python -m pip install -r requirements.txt
+        python -m pip install --force-reinstall mkl-static mkl-include
+        #export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
+        #export PYTORCH_BUILD_NUMBER=0
+        # Ensure cmake can find python packages when using conda or virtualenv
+        CMAKE_PREFIX_PATH_BK=${CMAKE_PREFIX_PATH}
+        if [ -n "${CONDA_PREFIX-}" ]; then
+            export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v conda))/../'}:${CMAKE_PREFIX_PATH}"
+        elif [ -n "${VIRTUAL_ENV-}" ]; then
+            export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v python))/../'}:${CMAKE_PREFIX_PATH}"
+        fi
+        export USE_STATIC_MKL=1
+        export _GLIBCXX_USE_CXX11_ABI=${ABI}
+        export USE_NUMA=0
+        export USE_CUDA=0
+        export USE_MPI=0
+        export TORCH_XPU_ARCH_LIST=${AOT}
+        export PYTORCH_EXTRA_INSTALL_REQUIREMENTS="intel-cmplr-lib-rt==2025.0.2|intel-cmplr-lib-ur==2025.0.2|intel-cmplr-lic-rt==2025.0.2|intel-sycl-rt==2025.0.2|tcmlib==1.2.0|umf==0.9.1|intel-pti==0.10.0"
+        python setup.py clean
+        if [ -d dist ]; then
+            rm -rf dist
+        fi
+        #CFLAGS_BK=${CFLAGS}
+        #CXXFLAGS_BK=${CXXFLAGS}
+        #export CFLAGS="${CFLAGS} -Wno-nonnull"
+        #export CXXFLAGS="${CXXFLAGS} -Wno-nonnull"
+        python setup.py bdist_wheel 2>&1 | tee build.log
+        #if [ ! -z ${CFLAGS_BK} ]; then
+        #    export CFLAGS=${CFLAGS_BK}
+        #else
+        #    unset CFLAGS
+        #fi
+        #if [ ! -z ${CXXFLAGS_BK} ]; then
+        #    export CXXFLAGS=${CXXFLAGS_BK}
+        #else
+        #    unset CXXFLAGS
+        #fi
+        unset PYTORCH_EXTRA_INSTALL_REQUIREMENTS
+        unset TORCH_XPU_ARCH_LIST
+        unset USE_MPI
+        unset USE_CUDA
+        unset USE_NUMA
+        unset _GLIBCXX_USE_CXX11_ABI
+        unset USE_STATIC_MKL
+        if [ ! -z ${CMAKE_PREFIX_PATH_BK} ]; then
+            export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH_BK}
+        else
+            unset CMAKE_PREFIX_PATH
+        fi
+        unset PYTORCH_BUILD_NUMBER
+        unset PYTORCH_BUILD_VERSION
+        python -m pip uninstall -y mkl-static mkl-include
+        if [ ${ENABLE_ONEAPI_INTEGRATION} -eq 1 ]; then
+            patchelf_so_files torch
+        fi
+        python -m pip install dist/*.whl
+        cd ..
+    fi
+    #  TorchVision
+    if [ $((${MODE} & 0x04)) -ne 0 ]; then
+        python -m pip install Pillow
+        conda install -y conda-forge::libpng conda-forge::libjpeg-turbo
+        cd vision
+        python setup.py clean
+        if [ -d dist ]; then
+            rm -rf dist
+        fi
+        python setup.py bdist_wheel 2>&1 | tee build.log
+        python -m pip install dist/*.whl
+        cd ..
+    fi
+    #  TorchAudio
+    if [ $((${MODE} & 0x02)) -ne 0 ]; then
+        cd audio
+        python -m pip install -r requirements.txt
+        python setup.py clean
+        if [ -d dist ]; then
+            rm -rf dist
+        fi
+        python setup.py bdist_wheel 2>&1 | tee build.log
+        python -m pip install dist/*.whl
+        cd ..
+    fi
 else
-    unset CMAKE_PREFIX_PATH
-fi
-unset PYTORCH_BUILD_NUMBER
-unset PYTORCH_BUILD_VERSION
-python -m pip uninstall -y mkl-static mkl-include
-if [ ${ENABLE_ONEAPI_INTEGRATION} -eq 1 ]; then
-    patchelf_so_files torch
-fi
-python -m pip install dist/*.whl
-cd ..
-#  TorchVision
-if [ $((${MODE} & 0x04)) -ne 0 ]; then
-    cd vision
-    python setup.py clean
-    if [ -d dist ]; then
-        rm -rf dist
+    CMD_INS=""
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+        CMD_INS="python -m pip install torch==${VERSION_TORCH}"
     fi
-    python setup.py bdist_wheel 2>&1 | tee build.log
-    python -m pip install dist/*.whl
-    cd ..
-fi
-#  TorchAudio
-if [ $((${MODE} & 0x02)) -ne 0 ]; then
-    cd audio
-    python -m pip install -r requirements.txt
-    python setup.py clean
-    if [ -d dist ]; then
-        rm -rf dist
+    if [ $((${MODE} & 0x04)) -ne 0 ]; then
+        CMD_INS="${CMD_INS} torchvision==${VERSION_TORCHVISION}"
     fi
-    python setup.py bdist_wheel 2>&1 | tee build.log
-    python -m pip install dist/*.whl
-    cd ..
+    if [ $((${MODE} & 0x02)) -ne 0 ]; then
+        CMD_INS="${CMD_INS} torchaudio==${VERSION_TORCHAUDIO}"
+    fi
+    if [[ ! -z ${CMD_INS} ]]; then
+        CMD_INS="${CMD_INS} --index-url https://download.pytorch.org/whl/xpu"
+        eval ${CMD_INS}
+    fi
+    set +e
+    python -m pip list | grep torch > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "Error: PyTorch is not found in the environment."
+        exit 1
+    fi
+    set -e
+    ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
+    AOT=$(python -c "import torch; arch_list = torch._C._xpu_getArchFlags().split(); print(\",\".join(arch_list));")
 fi
 ##  LLVM
 #LLVM_ROOT="$(pwd)/llvm-release"
