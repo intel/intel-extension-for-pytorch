@@ -569,12 +569,24 @@ void index_gemm_kernel_nt(
       int nb_size = std::min(BLOCK_N, N - nb_start);
       switch (mb_size << 4 | nb_size) {
         // mb_size = 1
-        // case 0x11: LAUNCH_TINYGEMM_KERNEL_NT(1, 1); break;
-        // case 0x12: LAUNCH_TINYGEMM_KERNEL_NT(1, 2); break;
-        // case 0x13: LAUNCH_TINYGEMM_KERNEL_NT(1, 3); break;
-        // case 0x14: LAUNCH_TINYGEMM_KERNEL_NT(1, 4); break;
-        // case 0x15: LAUNCH_TINYGEMM_KERNEL_NT(1, 5); break;
-        // case 0x16: LAUNCH_TINYGEMM_KERNEL_NT(1, 6); break;
+        case 0x11:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 1);
+          break;
+        case 0x12:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 2);
+          break;
+        case 0x13:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 3);
+          break;
+        case 0x14:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 4);
+          break;
+        case 0x15:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 5);
+          break;
+        case 0x16:
+          LAUNCH_TINYGEMM_KERNEL_NT(1, 6);
+          break;
         // mb_size = 2
         case 0x21:
           LAUNCH_TINYGEMM_KERNEL_NT(2, 1);
@@ -710,12 +722,24 @@ void index_gemm_kernel_nn(
       int nb_size = std::min(BLOCK_N, N - nb_start);
       switch (mb_size << 4 | nb_size >> 4) {
         // mb_size = 1
-        // case 0x11: LAUNCH_TINYGEMM_KERNEL_NN(1, 16); break;
-        // case 0x12: LAUNCH_TINYGEMM_KERNEL_NN(1, 32); break;
-        // case 0x13: LAUNCH_TINYGEMM_KERNEL_NN(1, 48); break;
-        // case 0x14: LAUNCH_TINYGEMM_KERNEL_NN(1, 64); break;
-        // case 0x15: LAUNCH_TINYGEMM_KERNEL_NN(1, 80); break;
-        // case 0x16: LAUNCH_TINYGEMM_KERNEL_NN(1, 96); break;
+        case 0x11:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 16);
+          break;
+        case 0x12:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 32);
+          break;
+        case 0x13:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 48);
+          break;
+        case 0x14:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 64);
+          break;
+        case 0x15:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 80);
+          break;
+        case 0x16:
+          LAUNCH_TINYGEMM_KERNEL_NN(1, 96);
+          break;
         // mb_size = 2
         case 0x21:
           LAUNCH_TINYGEMM_KERNEL_NN(2, 16);
