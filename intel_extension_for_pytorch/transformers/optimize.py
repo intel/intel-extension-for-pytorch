@@ -205,6 +205,8 @@ def model_convert_reference(_model):
         PhiForCausalLM_forward,
         PhiModel_forward,
         Phi3Model_forward,
+        PhiOModel_forward,
+        PhiOForCausalLM_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
@@ -228,6 +230,7 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_opt_mpt,
         prepare_inputs_for_generation_t5,
         prepare_inputs_for_generation_phi3,
+        prepare_inputs_for_generation_phio,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -1009,6 +1012,28 @@ def model_convert_reference(_model):
             "prepare_inputs_for_generation",
             prepare_inputs_for_generation_phi3,
         )
+    elif _model.config.architectures[0] == "PhiOForCausalLM":
+        convert_function(_model, "forward", PhiOForCausalLM_forward)
+        convert_function(_model.model, "forward", PhiOModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_phio,
+        )
     elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
         convert_function(_model, "detect_language", detect_language)
         if version.parse(transformers.__version__) >= version.parse("4.43.0"):
@@ -1483,6 +1508,11 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs["cross_attention_mask"] = cross_attention_mask
         else:
             sample_inputs = sample_inputs + (cross_attention_mask,)
+    if _model.config.architectures[0] == "PhiOForCausalLM":
+        if return_dict:
+            sample_inputs["input_mode"] = torch.tensor([0])
+        else:
+            sample_inputs = sample_inputs + (torch.tensor([0]),)
     return sample_inputs
 
 
@@ -1639,6 +1669,7 @@ def model_convert_lowering(
                 "BaichuanForCausalLM",
                 "YuanForCausalLM",
                 "Phi3ForCausalLM",
+                "PhiOForCausalLM",
             ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -1984,6 +2015,7 @@ def optimize(
                 "YuanForCausalLM",
                 "PhiForCausalLM",
                 "Phi3ForCausalLM",
+                "PhiOForCausalLM",
                 "WhisperForConditionalGeneration",
                 "Maira2ForConditionalGeneration",
                 "JambaForCausalLM",

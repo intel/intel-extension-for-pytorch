@@ -1256,6 +1256,53 @@ def _MptAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _PhiOAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value=None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    qkv = self.qkv_proj(hidden_states)
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    query_states, key_states, value_states = self._IPEXROPE(
+        qkv,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.pos_embd_dim // 2,
+        self.pos_embd_dim,
+        kv_seq_len,
+        3,
+    )
+    value_states = value_states.view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
+    )
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+        add_casual_mask=False,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+    if not output_attentions:
+        attn_weights = None
+    return attn_output, attn_weights, past_key_value
+
+
 def _relative_position_bucket(
     self, relative_position, bidirectional=True, num_buckets=32, max_distance=128
 ):
@@ -3121,6 +3168,16 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "Phi3ForCausalLM":
             return _Phi3Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "PhiOForCausalLM":
+            return _PhiOAttention_forward(
                 self,
                 hidden_states,
                 attention_mask,
