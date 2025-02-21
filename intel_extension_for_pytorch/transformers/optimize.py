@@ -1247,7 +1247,10 @@ def get_dummy_input(_model, return_dict=False):
                 for i in range(_model.config.num_hidden_layers)
             ]
         )
-    elif _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+    elif _model.config.architectures[0] in [
+        "DeepseekV2ForCausalLM",
+        "DeepseekV3ForCausalLM",
+    ]:
         past_key_values = tuple(
             [
                 (
