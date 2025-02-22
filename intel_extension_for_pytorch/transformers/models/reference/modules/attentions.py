@@ -2578,6 +2578,61 @@ def _SiglipAttention_forward(
     return attn_output, attn_weights
 
 
+def _ConformerAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    pos_k: torch.Tensor,
+    pos_v: torch.Tensor,
+    mask: Optional[torch.Tensor],
+    relative_attention_bias: Optional[torch.Tensor] = None,
+):
+    n_batch = hidden_states.size(0)
+
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        q, k, v = concat_qkv.split(
+            [self.h * self.d_k, self.h_k * self.d_k, self.h_k * self.d_k], dim=-1
+        )
+    else:
+        q = self.linear_q(hidden_states)
+        k = self.linear_k(hidden_states)
+        v = self.linear_v(hidden_states)
+
+    q = q.view(n_batch, -1, self.h, self.d_k).transpose(1, 2)
+    k = k.view(n_batch, -1, self.h_k, self.d_k).transpose(
+        1, 2
+    )  # (batch, head_k, time2, d_k)
+    v = v.view(n_batch, -1, self.h_k, self.d_k).transpose(
+        1, 2
+    )  # (batch, head_k, time2, d_k)
+
+    attn_mask = None
+    if mask is not None:
+        mask = mask.unsqueeze(1)
+        if relative_attention_bias is not None:
+            attn_mask = mask + relative_attention_bias
+        else:
+            attn_mask = mask
+        if mask.dtype != q.dtype:
+            attn_mask = attn_mask.to(q.dtype)
+
+    x = torch.nn.functional.scaled_dot_product_attention(
+        q,
+        k,
+        v,
+        attn_mask=attn_mask,
+        dropout_p=self.dropout_rate,
+        is_causal=False,
+    )
+    x = (
+        x.transpose(1, 2).contiguous().view(n_batch, -1, self.h_k * self.d_k)
+    )  # (batch, time1, d_model)
+
+    # return self.linear_out(x)  # (batch, time1, d_model)
+    return x
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -2639,6 +2694,13 @@ class _IPEXAttentionRef(nn.Module):
                     or config.num_key_value_heads == config.num_attention_heads
                 ):
                     self.num_key_value_heads = self.num_attention_heads
+                elif (
+                    self.model_backbone == "PhiOForCausalLM"
+                    and module._get_name() == "MultiHeadedAttention"
+                ):
+                    self.num_key_value_heads = self.h_k
+                    self.num_attention_heads = self.h
+                    self.hidden_size = self.d_k
                 else:
                     raise ValueError(
                         "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
@@ -2686,6 +2748,7 @@ class _IPEXAttentionRef(nn.Module):
                 self.model_backbone == "PhiOForCausalLM"
                 and module._get_name() != "SiglipAttention"
                 and module._get_name() != "SiglipFlashAttention2"
+                and module._get_name() != "MultiHeadedAttention"
             )
         ):
             if hasattr(module, "rotary_dim"):
@@ -2806,6 +2869,16 @@ class _IPEXAttentionRef(nn.Module):
                         [module.q_a_proj, module.kv_a_proj_with_mqa]
                     )
                     del module.q_a_proj, module.kv_a_proj_with_mqa
+            if self.model_backbone in ["PhiOForCausalLM"]:
+                if (
+                    hasattr(module, "linear_q")
+                    and hasattr(module, "linear_k")
+                    and hasattr(module, "linear_v")
+                ):
+                    self.concat_qkv = _IPEXConcatLinearRef(
+                        [module.linear_q, module.linear_k, module.linear_v]
+                    )
+                    del module.linear_q, module.linear_k, module.linear_v
         if not (
             self.model_backbone == "MllamaForConditionalGeneration"
             and (
@@ -2822,6 +2895,10 @@ class _IPEXAttentionRef(nn.Module):
                 self.is_vision_attention = True
             else:
                 self.is_vision_attention = False
+            if module._get_name() == "MultiHeadedAttention":
+                self.is_speech_attention = True
+            else:
+                self.is_speech_attention = False
         if (
             self.model_backbone == "FalconForCausalLM"
             or self.model_backbone == "RWForCausalLM"
@@ -2992,6 +3069,7 @@ class _IPEXAttentionRef(nn.Module):
         vision: Optional[bool] = False,
         cross_attention_states: Optional[torch.Tensor] = None,
         cache_position=None,
+        **kwargs,
     ):
         if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(
@@ -3254,6 +3332,13 @@ class _IPEXAttentionRef(nn.Module):
                     hidden_states,
                     attention_mask,
                     output_attentions,
+                )
+            if self.is_speech_attention:
+                return _ConformerAttention_forward(
+                    self,
+                    hidden_states,
+                    mask=mask,
+                    **kwargs,
                 )
             return _PhiOAttention_forward(
                 self,

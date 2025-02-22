@@ -154,6 +154,37 @@ def SiglipEncoderLayer_forward(
     return outputs
 
 
+def ConformerEncoderLayer_forward(
+    self,
+    x,
+    pos_k,
+    pos_v,
+    mask,
+    relative_attention_bias=None,
+):
+    x = x + 0.5 * self.feed_forward_in(x)
+    norm_x = self.layer_norm_att(x)
+
+    attn_out = self.self_attn(
+        norm_x,
+        pos_k=pos_k,
+        pos_v=pos_v,
+        mask=mask,
+        relative_attention_bias=relative_attention_bias,
+    )
+    if hasattr(self, "mha_linear_add"):
+        x = self.mha_linear_add(attn_out, x)
+    else:
+        x = x + self.self_attn.linear_out(attn_out)
+    x = x + self.conv(x)
+
+    x = x + 0.5 * self.feed_forward_out(x)
+
+    out = self.layer_norm(x)
+
+    return out, pos_k, pos_v, mask
+
+
 def OPTDecoderLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -2714,11 +2745,22 @@ class _IPEXEncoderLayerRef(nn.Module):
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
             del self.__dict__["_modules"]["mlp"].fc1
         elif self.model_backbone == "PhiOForCausalLM":
-            if not self.distributed:
-                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
-                del self.__dict__["_modules"]["mlp"].fc2
-                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
-                del self.__dict__["_modules"]["self_attn"].out_proj
+            self.is_vision_encoder = False
+            if module._get_name() == "SiglipEncoderLayer":
+                self.is_vision_encoder = True
+                if not self.distributed:
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                    del self.__dict__["_modules"]["mlp"].fc2
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
+                    del self.__dict__["_modules"]["self_attn"].out_proj
+            elif module._get_name() == "ConformerEncoderLayer":
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.linear_out)
+                    del self.__dict__["_modules"]["self_attn"].linear_out
+            else:
+                AssertionError(
+                    False, f"Do not support the optimization of {module._get_name()}"
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2727,6 +2769,7 @@ class _IPEXEncoderLayerRef(nn.Module):
         hidden_state: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = None,
+        **kwargs,
     ):
         if self.model_backbone == "MllamaForConditionalGeneration":
             return MllamaVisionEncoderLayer_forward(
@@ -2736,11 +2779,17 @@ class _IPEXEncoderLayerRef(nn.Module):
                 output_attentions,
             )
         elif self.model_backbone == "PhiOForCausalLM":
-            return SiglipEncoderLayer_forward(
+            if self.is_vision_encoder:
+                return SiglipEncoderLayer_forward(
+                    self,
+                    hidden_state,
+                    attention_mask,
+                    output_attentions,
+                )
+            return ConformerEncoderLayer_forward(
                 self,
                 hidden_state,
-                attention_mask,
-                output_attentions,
+                **kwargs,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

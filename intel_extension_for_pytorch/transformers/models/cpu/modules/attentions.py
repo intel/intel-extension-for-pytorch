@@ -36,6 +36,7 @@ class _IPEXAttentionCPU(nn.Module):
             or (
                 self.model_backbone == "PhiOForCausalLM"
                 and not self.is_vision_attention
+                and not self.is_speech_attention
             )
             and not self.is_mllama_cross_attention
         ):

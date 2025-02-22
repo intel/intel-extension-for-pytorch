@@ -207,6 +207,7 @@ def model_convert_reference(_model):
         Phi3Model_forward,
         PhiOModel_forward,
         PhiOForCausalLM_forward,
+        ConformerEncoder_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
@@ -1015,6 +1016,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "PhiOForCausalLM":
         convert_function(_model, "forward", PhiOForCausalLM_forward)
         convert_function(_model.model, "forward", PhiOModel_forward)
+        convert_function(
+            _model.model.embed_tokens_extend.audio_embed.encoder,
+            "forward",
+            ConformerEncoder_forward,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),
@@ -1046,6 +1052,28 @@ def model_convert_reference(_model):
                 _model.model.embed_tokens_extend.image_embed.img_processor.encoder.layers[
                     0
                 ].self_attn
+            ),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.audio_embed.encoder.encoders[
+                    0
+                ]._checkpoint_wrapped_module
+            ),
+            _IPEXEncoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.audio_embed.encoder.encoders[
+                    0
+                ]._checkpoint_wrapped_module.self_attn
             ),
             _IPEXAttentionRef,
             _model.config,
@@ -1538,6 +1566,9 @@ def get_dummy_input(_model, return_dict=False):
                 sample_inputs["image_sizes"] = torch.tensor([[896, 1344]])
                 sample_inputs["image_attention_mask"] = torch.ones(1, 7, 32, 32)
                 sample_inputs["input_image_embeds"] = torch.rand(1, 7, 3, 448, 448)
+            if input_mode in [2, 3]:
+                sample_inputs["input_audio_embeds"] = torch.rand(1, 498, 80)
+                sample_inputs["audio_embed_sizes"] = torch.tensor([63])
         else:
             sample_inputs = sample_inputs + (torch.tensor([input_mode]),)
             if input_mode in [1, 3]:
@@ -1545,6 +1576,11 @@ def get_dummy_input(_model, return_dict=False):
                     torch.tensor([[896, 1344]]),
                     torch.ones(1, 7, 32, 32),
                     torch.rand(1, 7, 3, 448, 448),
+                )
+            if input_mode in [2, 3]:
+                sample_inputs = sample_inputs + (
+                    torch.rand(1, 498, 80),
+                    torch.tensor([63]),
                 )
     return sample_inputs
 
