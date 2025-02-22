@@ -44,6 +44,7 @@ from llm.inference.utils.model_class.git import GitConfig
 from llm.inference.utils.model_class.llava import LlavaConfig
 from llm.inference.utils.model_class.phi import PhiConfig
 from llm.inference.utils.model_class.phi import Phi3Config
+from llm.inference.utils.model_class.phi import PhiOConfig
 from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
 from llm.inference.utils.model_class.maira2 import MAIRA2Config
@@ -279,6 +280,13 @@ parser.add_argument(
     help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
     " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
 )
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+)
 args = parser.parse_args()
 
 
@@ -419,6 +427,55 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         roles = conv.roles
 elif re.search("phi3", config.architectures[0], re.IGNORECASE):
     model = Phi3Config(args.model_id)
+elif re.search("phio", config.architectures[0], re.IGNORECASE):
+    model = PhiOConfig(args.model_id)
+    from PIL import Image
+    import soundfile
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    if args.prompt:
+        prompt = args.prompt
+        _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+        _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+        image_in_prompt = len(
+            re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt)
+        )
+        audio_in_prompt = len(
+            re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt)
+        )
+        is_vision = image_in_prompt > 0
+        is_speech = audio_in_prompt > 0
+        if is_vision:
+            assert (
+                image_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
+                <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+        if is_speech:
+            assert (
+                audio_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
+                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+        if not is_vision and not is_speech:
+            config.input_mode = 0
+        elif is_vision and not is_speech:
+            config.input_mode = 1
+        elif not is_vision and is_speech:
+            config.input_mode = 2
+        else:
+            config.input_mode = 3
+        assert config.input_mode == int(
+            args.input_mode
+        ), "Input mode in prompt is not consistent with the input mode in the command line."
+    else:
+        config.input_mode = int(args.input_mode)
 elif re.search("phi", config.architectures[0], re.IGNORECASE):
     model = PhiConfig(args.model_id)
 elif re.search("yuan", config.architectures[0], re.IGNORECASE):
@@ -679,7 +736,20 @@ def get_example_inputs(model):
         if model.name == "mllama":
             cross_attention_mask = torch.ones(1, 32, 1, 4)
             example_inputs = example_inputs + (cross_attention_mask,)
-
+        if model.name == "phio":
+            input_mode = config.input_mode
+            example_inputs = example_inputs + (torch.tensor([input_mode]),)
+            if input_mode in [1, 3]:
+                example_inputs = example_inputs + (
+                    torch.tensor([[896, 1344]]),
+                    torch.ones(1, 7, 32, 32),
+                    torch.rand(1, 7, 3, 448, 448),
+                )
+            if input_mode in [2, 3]:
+                example_inputs = example_inputs + (
+                    torch.rand(1, 498, 80),
+                    torch.tensor([63]),
+                )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
             input_ids.unsqueeze(0),
@@ -1374,6 +1444,9 @@ if args.benchmark:
             if hasattr(tokenizer, "process_reporting_input")
             else tokenizer.format_and_preprocess_reporting_input
         )
+    elif model.name == "phio":
+        prompt = args.prompt
+        sample = soundfile.read(args.audio)
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -1457,6 +1530,18 @@ if args.benchmark:
                 )
                 input_ids = processed_inputs["input_ids"]
                 output = user_model.generate(**processed_inputs, **generate_kwargs)
+            elif model.name == "phio":
+                raw_image = load_image(args.image_url)
+                raw_image = [raw_image] * args.batch_size
+                samples = [sample] * args.batch_size
+                inputs = tokenizer(
+                    text=prompt[0],
+                    images=raw_image if is_vision else None,
+                    audios=samples if is_speech else None,
+                    return_tensors="pt",
+                )
+                input_ids = inputs["input_ids"]
+                output = user_model.generate(**inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
@@ -1545,6 +1630,18 @@ if args.benchmark:
                     )
                     input_ids = processed_inputs["input_ids"]
                     output = user_model.generate(**processed_inputs, **generate_kwargs)
+                elif model.name == "phio":
+                    raw_image = load_image(args.image_url)
+                    raw_image = [raw_image] * args.batch_size
+                    samples = [sample] * args.batch_size
+                    inputs = tokenizer(
+                        text=prompt[0],
+                        images=raw_image if is_vision else None,
+                        audios=samples if is_speech else None,
+                        return_tensors="pt",
+                    )
+                    input_ids = inputs["input_ids"]
+                    output = user_model.generate(**inputs, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)

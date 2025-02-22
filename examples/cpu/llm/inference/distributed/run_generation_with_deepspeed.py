@@ -221,7 +221,13 @@ parser.add_argument(
     " INT4 weights, scales, zero points, etc. For better accuracy of weight only"
     " quantization with INT4 weight.",
 )
-
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+)
 
 args = parser.parse_args()
 

@@ -207,6 +207,8 @@ def model_convert_reference(_model):
         Phi3Model_forward,
         PhiOModel_forward,
         PhiOForCausalLM_forward,
+        PhiOImageEmbedding_forward,
+        PhiOAudioEmbedding_forward,
         ConformerEncoder_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
@@ -1020,6 +1022,16 @@ def model_convert_reference(_model):
             _model.model.embed_tokens_extend.audio_embed.encoder,
             "forward",
             ConformerEncoder_forward,
+        )
+        convert_function(
+            _model.model.embed_tokens_extend.image_embed,
+            "forward",
+            PhiOImageEmbedding_forward,
+        )
+        convert_function(
+            _model.model.embed_tokens_extend.audio_embed,
+            "forward",
+            PhiOAudioEmbedding_forward,
         )
         convert_class(
             _model,

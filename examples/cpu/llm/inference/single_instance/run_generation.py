@@ -116,7 +116,13 @@ parser.add_argument(
     help='Data type for kv cache storage. If "auto", will use model '
     "data type. fp8 type now supports e5m2.",
 )
-
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+)
 args = parser.parse_args()
 print(args)
 
@@ -212,6 +218,9 @@ if model_type == "phio":
     else:
         config.input_mode = 3
 
+    assert config.input_mode == int(
+        args.input_mode
+    ), "Input mode in prompt is not consistent with the input mode in the command line."
 if model_type != "llava":
     model = model_class[0].from_pretrained(
         args.model_id,

@@ -6123,8 +6123,8 @@ def PhiOForCausalLM_forward(
     self,
     input_ids: torch.LongTensor = None,
     attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[List[torch.FloatTensor]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
     input_mode=None,
     input_image_embeds: Optional[torch.FloatTensor] = None,
     image_sizes: Optional[torch.LongTensor] = None,
@@ -6292,6 +6292,475 @@ def ConformerEncoder_forward(self, xs_pad, masks):
         if chunk_pad_size > 0:
             input_tensor = input_tensor[:, :-chunk_pad_size, :]
     return input_tensor, masks  # , layer_emb
+
+
+_IMAGE_SPECIAL_TOKEN_ID = (
+    200010  # '<|endoftext10|>', or we can better name it (in `tokenizer_config.json`)
+)
+_AUDIO_SPECIAL_TOKEN_ID = 200011  # '<|endoftext11|>'
+
+
+def PhiOImageEmbedding_forward(
+    self,
+    input_ids: torch.LongTensor,
+    input_embeds: torch.FloatTensor,
+    image_sizes=None,
+    **kwargs,
+) -> torch.FloatTensor:
+    if isinstance(input_ids, tuple):
+        # # pipeline parallel
+        input_ids, input_embeds = input_ids
+
+    img_embeds = input_embeds
+    if image_sizes is None and "image_sizes" in kwargs:
+        image_sizes = kwargs["image_sizes"]
+    img_sizes = image_sizes
+
+    if self.img_features is not None:
+        img_embeds = self.img_features.clone()
+        self.img_features = None
+
+    if self.img_sizes is not None:
+        img_sizes = self.img_sizes
+
+    if img_embeds is not None:
+        # convert to bf16
+        img_embeds = img_embeds.to(torch.bfloat16)
+
+    if self.image_attention_mask is not None:
+        image_attention_mask = self.image_attention_mask.clone()
+        self.image_attention_mask = None
+    elif "image_attention_mask" in kwargs:
+        image_attention_mask = kwargs["image_attention_mask"]
+    else:
+        image_attention_mask = None
+    input_shape = input_ids.size()
+    input_ids = input_ids.view(-1, input_shape[-1])
+
+    with torch.no_grad():
+        positions = torch.nonzero(input_ids == _IMAGE_SPECIAL_TOKEN_ID, as_tuple=False)
+        positions_tuple = torch.nonzero(
+            input_ids == _IMAGE_SPECIAL_TOKEN_ID, as_tuple=True
+        )
+
+    # logger.info(f'position size: {positions.size()} ...')
+    fake_image_forward = False
+    select = False
+    hd_transform = False
+    if isinstance(self.img_projection, torch.nn.Sequential):
+        if self.img_projection[0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = self.img_projection[0]._op_context.get_bias().dtype
+        else:
+            target_dtype = self.img_projection[0].bias.dtype
+    else:  # It's a single nn.Linear layer
+        if self.img_projection.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
+            target_dtype = self.img_projection._op_context.get_bias().dtype
+        else:
+            target_dtype = self.img_projection.bias.dtype
+
+    num_img_tokens = self.num_img_tokens
+    if len(positions.tolist()) > 0:
+        if self.use_hd_transform and img_sizes is not None and len(img_sizes):
+            hd_transform = True
+            assert (
+                img_embeds.ndim == 5
+            ), f"(branch 1) img_embeds size: {img_embeds.size()}, expect 5D tensor for hd transform"
+            # img_embeds: (num_images, max_num_crops, 3, H, W)
+            # img_sizes: (num_images, 2).view(1, -1)
+
+            bs = img_embeds.shape[0]
+            # Nx(HW)xC
+            if image_attention_mask is not None and len(image_attention_mask) > 0:
+                img_features = self.get_img_features(
+                    img_embeds.flatten(0, 1),
+                    attention_mask=image_attention_mask.type(torch.BoolTensor).flatten(
+                        0, 1
+                    ),
+                )
+            else:
+                img_features = self.get_img_features(img_embeds.flatten(0, 1))
+
+            base_feat_height_target = self.base_feat_height_target
+            base_resolution = self.crop_size
+            base_feat_height_reduction = self.base_feat_height_reduction
+
+            base_feat_height = base_feat_width = int(np.sqrt(img_features.shape[1]))
+
+            assert (
+                base_feat_height == base_feat_height_target
+                and base_feat_width == base_feat_height_target
+            ), f"base_feat_height: {base_feat_height}, base_feat_width: {base_feat_width}, expect {base_feat_height_target} features for hd transform"
+
+            # bs x max_num_crops x (24x24) x C
+            img_features = img_features.view(
+                bs, -1, base_feat_height * base_feat_width, self.image_dim_out
+            )
+            C = self.image_dim_out
+            H = base_feat_height
+
+            output_imgs = []
+            output_len = []
+            # training is tensor, inference is list
+            if isinstance(img_sizes, torch.Tensor):
+                img_sizes = img_sizes.view(-1, 2)
+            for _bs in range(bs):
+                h, w = img_sizes[_bs]
+                h = h // base_resolution
+                w = w // base_resolution
+                B_ = h * w
+
+                # 1 x (24x24) x 1024
+                global_img_feature = img_features[_bs, :1]
+
+                # 1 x 12 x 12 x 4096
+                glb_img = (
+                    global_img_feature.reshape(1, H, H, C)
+                    .reshape(
+                        1,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        C,
+                    )
+                    .contiguous()
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        1,
+                        H // base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                    .contiguous()
+                )
+                temp_glb_GN = self.sub_GN.repeat(
+                    1, H // base_feat_height_reduction, 1, 1
+                )
+
+                # 1 x 156 x 4096
+                glb_img = torch.cat([glb_img, temp_glb_GN], dim=2).reshape(
+                    1, -1, base_feat_height_reduction * base_feat_height_reduction * C
+                )
+
+                # (max_num_crops-1) x (12x12) x C
+                sub_img = img_features[_bs, 1:]
+                # 16x574x1024
+                # get rid of padding sub_img
+                sub_img = sub_img[:B_]
+
+                # (num_crops, 12, 2, 12, 2, 1024) -> (num_crops, 12, 12, 2, 2, 1024) -> (num_crops, 12*12, 4*1024)
+                sub_img = (
+                    sub_img.reshape(B_, H, H, C)
+                    .reshape(
+                        B_,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        C,
+                    )
+                    .contiguous()
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        B_,
+                        -1,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                    .contiguous()
+                )
+                sub_img = (
+                    sub_img.reshape(
+                        1,
+                        h,
+                        w,
+                        base_feat_height // base_feat_height_reduction,
+                        base_feat_width // base_feat_height_reduction,
+                        -1,
+                    )
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        1,
+                        h * base_feat_height // base_feat_height_reduction,
+                        w * base_feat_width // base_feat_height_reduction,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                )
+
+                if image_attention_mask is not None and len(image_attention_mask) > 0:
+                    reshaped_image_attention_mask = (
+                        image_attention_mask[_bs, 1 : B_ + 1, 0::2, 0::2]
+                        .reshape(
+                            1,
+                            h,
+                            w,
+                            base_feat_height // base_feat_height_reduction,
+                            base_feat_width // base_feat_height_reduction,
+                        )
+                        .permute(0, 1, 3, 2, 4)
+                        .reshape(
+                            1,
+                            h * base_feat_height // base_feat_height_reduction,
+                            w * base_feat_width // base_feat_height_reduction,
+                        )
+                    )
+                    useful_height = int(
+                        reshaped_image_attention_mask[0, :, 0].sum().item()
+                    )
+                    useful_width = int(
+                        reshaped_image_attention_mask[0, 0, :].sum().item()
+                    )
+                    sub_img = sub_img[:, :useful_height, :useful_width]
+                    temp_sub_GN = self.sub_GN.repeat(1, useful_height, 1, 1)
+                    temp_len = (
+                        int(
+                            image_attention_mask[_bs, : B_ + 1, 0::2, 0::2].sum().item()
+                        )
+                        + (useful_height + 1)
+                        + base_feat_height // base_feat_height_reduction
+                    )
+                else:
+                    temp_sub_GN = self.sub_GN.repeat(
+                        1, h * base_feat_height // base_feat_height_reduction, 1, 1
+                    )
+                    temp_len = int(
+                        (h * w + 1) * self.num_img_tokens
+                        + 1
+                        + (h + 1) * base_feat_height // base_feat_height_reduction
+                    )
+
+                sub_img = torch.cat([sub_img, temp_sub_GN], dim=2).reshape(
+                    1, -1, base_feat_height_reduction * base_feat_height_reduction * C
+                )
+                # (1, num_img_tokens, 1024*4)
+
+                # glb + sub
+                if self.hd_transform_order == "glb_sub":
+                    output_imgs.append(
+                        torch.cat([glb_img, self.glb_GN, sub_img], dim=1)
+                    )
+                elif self.hd_transform_order == "sub_glb":
+                    output_imgs.append(
+                        torch.cat([sub_img, self.glb_GN, glb_img], dim=1)
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"hd_transform_order = {self.hd_transform_order}, not implemented"
+                    )
+
+                # temp_len = int((h*w+1)*144 + 1 + (h+1)*12)
+                assert (
+                    temp_len == output_imgs[-1].shape[1]
+                ), f"temp_len: {temp_len}, output_imgs[-1].shape[1]: {output_imgs[-1].shape[1]}"
+                output_len.append(temp_len)
+
+            num_img_tokens = output_len
+            img_set_tensor = []
+            for _output_img in output_imgs:
+                img_feature_proj = self.img_projection(_output_img.to(target_dtype))
+                img_set_tensor.append(img_feature_proj)
+            # logger.info(f'img_embeds size: {img_embeds.size()}, image sizes: {img_sizes} loading time {datetime.now() - start_time}')
+            # assert sum(num_img_tokens) == len(g_values), f'(branch 1) sum(num_img_tokens): {sum(num_img_tokens)}, g_values size: {len(g_values)}, g_values {g_values}'
+
+        else:
+            raise NotImplementedError
+        select = True
+    else:
+        # # create a fake image tensor
+        # # TODO: need define image size for different vision model
+        if self.training:
+            img_embeds = torch.zeros(
+                1,
+                3,
+                self.crop_size,
+                self.crop_size,
+                dtype=torch.bfloat16,
+                device=input_ids.device,
+            )
+
+            tt = self.get_img_features(img_embeds).to(target_dtype).reshape(-1, 1024)
+            if self.use_hd_transform:
+                img_set_tensor = self.img_projection(
+                    tt.reshape(
+                        -1, self.image_dim_out * self.base_feat_height_reduction**2
+                    )
+                    * self.glb_GN[0]
+                    * self.sub_GN[0, 0]
+                )
+            else:
+                img_set_tensor = self.img_projection(tt)  # adapted visual features.
+            fake_image_forward = True
+
+    # we use the token embedding layer from the huggingface model, this is REQUIRED to make sure we are using the loaded weights.
+    hidden_states = kwargs["wte"](input_ids)
+
+    if select:
+        if hd_transform:
+            # new implementation without in-place operation
+            # Ref: https://huggingface.co/microsoft/Phi-3.5-vision-instruct/blob/4a0d683eba9f1d0cbfb6151705d1ee73c25a80ca/modeling_phi3_v.py#L233
+            # Ref: https://pytorch.org/docs/stable/generated/torch.Tensor.index_put.html
+            # Ref: https://pytorch.org/docs/stable/generated/torch.Tensor.index_put_.html#torch.Tensor.index_put_
+            # img_set_tensor: a list of tensors, each tensor has shape (1, N_tokens, C)
+            assert all(
+                [_img_set_tensor.shape[0] == 1 for _img_set_tensor in img_set_tensor]
+            ), "img_set_tensor should have shape (1, N_tokens, C)"
+            # Shape: (merged_N_tokens, C)
+            merged_img_set_tensor = torch.cat(img_set_tensor, dim=1).squeeze(0)
+            merged_img_set_tensor = merged_img_set_tensor.to(hidden_states.dtype).to(
+                hidden_states.device
+            )
+            # Temporarily disable autocast to avoid issue on bf16 tensors
+            # Ref: https://github.com/pytorch/pytorch/issues/132715
+            with torch.autocast(device_type=hidden_states.device.type, enabled=False):
+                new_hidden_states = hidden_states.index_put(
+                    indices=positions_tuple,
+                    values=merged_img_set_tensor,
+                    accumulate=False,
+                )
+            hidden_states = new_hidden_states
+        else:
+            raise NotImplementedError
+
+    if fake_image_forward and self.training:
+        hidden_states = (
+            hidden_states
+            + (
+                0 * img_set_tensor[0].to(hidden_states.dtype).to(hidden_states.device)
+            ).sum()
+        )
+
+    if self.drop is not None:
+        hidden_states = self.drop(hidden_states)
+
+    return hidden_states
+
+
+def PhiOAudioEmbedding_forward(
+    self,
+    input_ids: torch.LongTensor,
+    input_embeds: torch.FloatTensor,
+    audio_embed_sizes=None,
+    audio_attention_mask=None,
+    audio_projection_mode="speech",
+    **kwargs,
+) -> torch.FloatTensor:
+    """
+    arguments:
+        input_ids: input text ids (B, U)
+        input_embeds: audio features (B, T, D)  B: num audios in a sequence
+    """
+    if self.input_embeds is not None:
+        input_embeds = self.input_embeds.clone()
+    if self.audio_embed_sizes is not None:
+        audio_embed_sizes = self.audio_embed_sizes.clone()
+
+    input_shape = input_ids.size()
+    input_ids = input_ids.view(-1, input_shape[-1])
+    MAX_INPUT_ID = int(1e9)
+
+    with torch.no_grad():
+        positions = torch.nonzero(input_ids == _AUDIO_SPECIAL_TOKEN_ID, as_tuple=False)
+        positions_tuple = torch.nonzero(
+            input_ids == _AUDIO_SPECIAL_TOKEN_ID, as_tuple=True
+        )
+
+    if isinstance(self.audio_projection, torch.nn.Sequential):
+        if self.audio_projection[0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = self.audio_projection[0]._op_context.get_bias().dtype
+        else:
+            target_dtype = self.audio_projection[0].bias.dtype
+    elif isinstance(self.audio_projection, torch.nn.ModuleDict):
+        if self.audio_projection[audio_projection_mode][0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = (
+                self.audio_projection[audio_projection_mode][0]
+                ._op_context.get_bias()
+                .dtype
+            )
+        else:
+            target_dtype = self.audio_projection[audio_projection_mode][0].bias.dtype
+    else:  # It's a single nn.Linear layer
+        if self.audio_projection.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
+            target_dtype = self.audio_projection._op_context.get_bias().dtype
+        else:
+            target_dtype = self.audio_projection.bias.dtype
+
+    if input_embeds is not None:
+        input_embeds = input_embeds.to(target_dtype)
+
+    if len(positions.tolist()) > 0:
+        audio_set_tensor = self.get_audio_features(
+            input_embeds, audio_attention_mask, audio_projection_mode
+        )
+    else:
+        # # create an audio tensor
+        # To do: not sure if this is required for text only input
+        if self.training:
+            audio_embeds = torch.zeros(1, 500, self.audio_dim_in).to(target_dtype)
+            audio_attention_mask = audio_embeds.new_ones(audio_embeds.size()[:2]).long()
+            audio_set_tensor = self.get_audio_features(
+                audio_embeds, audio_attention_mask, audio_projection_mode
+            )
+
+    hidden_states = kwargs["wte"](input_ids)
+
+    if len(positions.tolist()) > 0:
+
+        assert audio_embed_sizes.sum().item() == len(
+            positions
+        ), f"please ensure the encoder outputs have the same length as defined in input_ids! \n audio_embed_sizes.sum().item(): {audio_embed_sizes.sum().item()} \n len(positions): {len(positions)} \n audio_embed_sizes: {audio_embed_sizes} \n positions: {positions} \n input_ids.shape \n {input_ids.shape}"
+
+        # new implementation without in-place operation
+        # Ref: https://huggingface.co/microsoft/Phi-3.5-vision-instruct/blob/4a0d683eba9f1d0cbfb6151705d1ee73c25a80ca/modeling_phi3_v.py#L233
+        # Ref: https://pytorch.org/docs/stable/generated/torch.Tensor.index_put.html
+        # Ref: https://pytorch.org/docs/stable/generated/torch.Tensor.index_put_.html#torch.Tensor.index_put_
+        # audio_set_tensor: shape (N_audios, N_padded_tokens, C)
+        # Shape: (merged_N_tokens, C)
+        merged_audio_set_tensor = torch.cat(
+            [
+                audio_set_tensor[i, : audio_embed_sizes[i], :]
+                for i in range(len(audio_embed_sizes))
+            ],
+            dim=0,
+        )
+        merged_audio_set_tensor = merged_audio_set_tensor.to(hidden_states.dtype).to(
+            hidden_states.device
+        )
+        # Temporarily disable autocast to avoid issue on bf16 tensors
+        # Ref: https://github.com/pytorch/pytorch/issues/132715
+        with torch.autocast(device_type=hidden_states.device.type, enabled=False):
+            new_hidden_states = hidden_states.index_put(
+                indices=positions_tuple,
+                values=merged_audio_set_tensor,
+                accumulate=False,
+            )
+        hidden_states = new_hidden_states
+    else:
+        if self.training:
+            hidden_states = (
+                hidden_states
+                + (
+                    0
+                    * audio_set_tensor[:, 0]
+                    .to(hidden_states.dtype)
+                    .to(hidden_states.device)
+                ).sum()
+            )
+
+    if self.drop is not None:
+        hidden_states = self.drop(hidden_states)
+
+    return hidden_states
 
 
 def PhiOModel_forward(
