@@ -209,6 +209,7 @@ def model_convert_reference(_model):
         PhiOForCausalLM_forward,
         PhiOImageEmbedding_forward,
         PhiOAudioEmbedding_forward,
+        LoraLinear_forward,
         ConformerEncoder_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
@@ -1016,6 +1017,11 @@ def model_convert_reference(_model):
             prepare_inputs_for_generation_phi3,
         )
     elif _model.config.architectures[0] == "PhiOForCausalLM":
+        import peft
+
+        convert_functions(
+            _model, peft.tuners.lora.layer.Linear, "forward", LoraLinear_forward
+        )
         convert_function(_model, "forward", PhiOForCausalLM_forward)
         convert_function(_model.model, "forward", PhiOModel_forward)
         convert_function(
@@ -1574,26 +1580,42 @@ def get_dummy_input(_model, return_dict=False):
         input_mode = _model.config.input_mode
         if return_dict:
             sample_inputs["input_mode"] = torch.tensor([input_mode])
-            if input_mode in [1, 3]:
-                sample_inputs["image_sizes"] = torch.tensor([[896, 1344]])
-                sample_inputs["image_attention_mask"] = torch.ones(1, 7, 32, 32)
-                sample_inputs["input_image_embeds"] = torch.rand(1, 7, 3, 448, 448)
-            if input_mode in [2, 3]:
-                sample_inputs["input_audio_embeds"] = torch.rand(1, 498, 80)
-                sample_inputs["audio_embed_sizes"] = torch.tensor([63])
+            sample_inputs["image_sizes"] = (
+                torch.tensor([[896, 1344]])
+                if input_mode in [1, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["image_attention_mask"] = (
+                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([])
+            )
+            sample_inputs["input_image_embeds"] = (
+                torch.rand(1, 7, 3, 448, 448)
+                if input_mode in [1, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["input_audio_embeds"] = (
+                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([])
+            )
+            sample_inputs["audio_embed_sizes"] = (
+                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([])
+            )
         else:
-            sample_inputs = sample_inputs + (torch.tensor([input_mode]),)
-            if input_mode in [1, 3]:
-                sample_inputs = sample_inputs + (
-                    torch.tensor([[896, 1344]]),
-                    torch.ones(1, 7, 32, 32),
-                    torch.rand(1, 7, 3, 448, 448),
-                )
-            if input_mode in [2, 3]:
-                sample_inputs = sample_inputs + (
-                    torch.rand(1, 498, 80),
-                    torch.tensor([63]),
-                )
+            sample_inputs = sample_inputs + (
+                torch.tensor([input_mode]),
+                (
+                    torch.tensor([[896, 1344]])
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
+                (
+                    torch.rand(1, 7, 3, 448, 448)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
+                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
+            )
     return sample_inputs
 
 

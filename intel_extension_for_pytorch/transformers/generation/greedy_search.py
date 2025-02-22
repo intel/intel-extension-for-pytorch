@@ -454,13 +454,6 @@ def _greedy_search(
                     model_inputs.pop("num_logits_to_keep", None)
                 if self.model_backbone == "PhiOForCausalLM":
                     model_inputs.pop("audio_attention_mask", None)
-                    if model_inputs["input_mode"] in [0, 1]:
-                        model_inputs.pop("input_audio_embeds", None)
-                        model_inputs.pop("audio_embed_sizes", None)
-                    if model_inputs["input_mode"] in [0, 2]:
-                        model_inputs.pop("input_image_embeds", None)
-                        model_inputs.pop("image_sizes", None)
-                        model_inputs.pop("image_attention_mask", None)
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 elif (

@@ -738,18 +738,22 @@ def get_example_inputs(model):
             example_inputs = example_inputs + (cross_attention_mask,)
         if model.name == "phio":
             input_mode = config.input_mode
-            example_inputs = example_inputs + (torch.tensor([input_mode]),)
-            if input_mode in [1, 3]:
-                example_inputs = example_inputs + (
-                    torch.tensor([[896, 1344]]),
-                    torch.ones(1, 7, 32, 32),
-                    torch.rand(1, 7, 3, 448, 448),
-                )
-            if input_mode in [2, 3]:
-                example_inputs = example_inputs + (
-                    torch.rand(1, 498, 80),
-                    torch.tensor([63]),
-                )
+            example_inputs = example_inputs + (
+                torch.tensor([input_mode]),
+                (
+                    torch.tensor([[896, 1344]])
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
+                (
+                    torch.rand(1, 7, 3, 448, 448)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
+                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
+            )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
             input_ids.unsqueeze(0),
