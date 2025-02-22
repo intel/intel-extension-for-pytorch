@@ -27,10 +27,15 @@ class _IPEXAttentionCPU(nn.Module):
                 "MptForCausalLM",
                 "GitForCausalLM",
                 "WhisperForConditionalGeneration",
+                "PhiOForCausalLM",
             ]
             or (
                 self.model_backbone == "BaichuanForCausalLM"
                 and hasattr(module, "rotary_emb")
+            )
+            or (
+                self.model_backbone == "PhiOForCausalLM"
+                and not self.is_vision_attention
             )
             and not self.is_mllama_cross_attention
         ):
@@ -89,6 +94,7 @@ class _IPEXAttentionCPU(nn.Module):
             "Qwen2ForCausalLM",
             "JambaForCausalLM",
             "DeepseekV2ForCausalLM",
+            "PhiOForCausalLM",
         ]:
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(

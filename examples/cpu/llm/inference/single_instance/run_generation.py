@@ -185,6 +185,32 @@ if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
 if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
+if model_type == "phio":
+    prompt = args.prompt
+    _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+    _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+    image_in_prompt = len(re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt))
+    audio_in_prompt = len(re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt))
+    is_vision = image_in_prompt > 0
+    is_speech = audio_in_prompt > 0
+    if is_vision:
+        assert (
+            image_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
+            <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+    if is_speech:
+        assert (
+            audio_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
+            <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+    if not is_vision and not is_speech:
+        config.input_mode = 0
+    elif is_vision and not is_speech:
+        config.input_mode = 1
+    elif not is_vision and is_speech:
+        config.input_mode = 2
+    else:
+        config.input_mode = 3
 
 if model_type != "llava":
     model = model_class[0].from_pretrained(
@@ -356,26 +382,6 @@ if args.benchmark:
         )
     elif model_type == "phio":
         prompt = args.prompt
-        _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
-        _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
-        image_in_prompt = len(
-            re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt)
-        )
-        audio_in_prompt = len(
-            re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt)
-        )
-        is_vision = image_in_prompt > 0
-        is_speech = audio_in_prompt > 0
-        if is_vision:
-            assert (
-                image_in_prompt == args.batch_size
-            ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
-                <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
-        if is_speech:
-            assert (
-                audio_in_prompt == args.batch_size
-            ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
-                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()

@@ -213,6 +213,7 @@ class _IPEXEncoderLayerCPU(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
         if self.model_backbone in [
             "MllamaForConditionalGeneration",
+            "PhiOForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "mlp_linear_add"):
@@ -222,6 +223,10 @@ class _IPEXEncoderLayerCPU(nn.Module):
                 if hasattr(module, "mlp_linear_mul"):
                     self.mlp_linear_mul = _IPEXlinearMulCPU(
                         module.mlp_linear_mul.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "mha_linear_add"):
+                    self.mha_linear_add = _IPEXlinearAddCPU(
+                        module.mha_linear_add.linear, tpp=tpp, woq=woq
                     )
             if hasattr(module, "linear_gelu"):
                 self.linear_silu = _IPEXlinearGeluCPU(

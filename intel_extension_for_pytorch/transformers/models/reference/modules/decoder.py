@@ -116,6 +116,44 @@ def MllamaVisionEncoderLayer_forward(
     return outputs
 
 
+def SiglipEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor]:
+    residual = hidden_states
+
+    hidden_states = self.layer_norm1(hidden_states)
+    hidden_states, attn_weights = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        output_attentions=output_attentions,
+    )
+    if hasattr(self, "mha_linear_add"):
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.layer_norm2(hidden_states)
+    hidden_states = self.mlp.fc1(hidden_states)
+    hidden_states = self.mlp.activation_fn(hidden_states)
+    if hasattr(self, "mlp_linear_add"):
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
 def OPTDecoderLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -2675,6 +2713,12 @@ class _IPEXEncoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc2
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
             del self.__dict__["_modules"]["mlp"].fc1
+        elif self.model_backbone == "PhiOForCausalLM":
+            if not self.distributed:
+                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                del self.__dict__["_modules"]["mlp"].fc2
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
+                del self.__dict__["_modules"]["self_attn"].out_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2686,6 +2730,13 @@ class _IPEXEncoderLayerRef(nn.Module):
     ):
         if self.model_backbone == "MllamaForConditionalGeneration":
             return MllamaVisionEncoderLayer_forward(
+                self,
+                hidden_state,
+                attention_mask,
+                output_attentions,
+            )
+        elif self.model_backbone == "PhiOForCausalLM":
+            return SiglipEncoderLayer_forward(
                 self,
                 hidden_state,
                 attention_mask,

@@ -1029,6 +1029,28 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.image_embed.img_processor.encoder.layers[
+                    0
+                ]
+            ),
+            _IPEXEncoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.image_embed.img_processor.encoder.layers[
+                    0
+                ].self_attn
+            ),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
         convert_function(
             _model,
             "prepare_inputs_for_generation",
@@ -1509,10 +1531,21 @@ def get_dummy_input(_model, return_dict=False):
         else:
             sample_inputs = sample_inputs + (cross_attention_mask,)
     if _model.config.architectures[0] == "PhiOForCausalLM":
+        input_mode = _model.config.input_mode
         if return_dict:
-            sample_inputs["input_mode"] = torch.tensor([0])
+            sample_inputs["input_mode"] = torch.tensor([input_mode])
+            if input_mode in [1, 3]:
+                sample_inputs["image_sizes"] = torch.tensor([[896, 1344]])
+                sample_inputs["image_attention_mask"] = torch.ones(1, 7, 32, 32)
+                sample_inputs["input_image_embeds"] = torch.rand(1, 7, 3, 448, 448)
         else:
-            sample_inputs = sample_inputs + (torch.tensor([0]),)
+            sample_inputs = sample_inputs + (torch.tensor([input_mode]),)
+            if input_mode in [1, 3]:
+                sample_inputs = sample_inputs + (
+                    torch.tensor([[896, 1344]]),
+                    torch.ones(1, 7, 32, 32),
+                    torch.rand(1, 7, 3, 448, 448),
+                )
     return sample_inputs
 
 

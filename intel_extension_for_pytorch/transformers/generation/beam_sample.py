@@ -474,9 +474,24 @@ def _beam_sample(
                     model_inputs.pop("input_audio_embeds", None)
                     model_inputs.pop("audio_embed_sizes", None)
                     model_inputs.pop("audio_attention_mask", None)
+                if model_inputs["input_mode"] == 1:
+                    model_inputs.pop("input_audio_embeds", None)
+                    model_inputs.pop("audio_embed_sizes", None)
+                    model_inputs.pop("audio_attention_mask", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
+                elif (
+                    first_token
+                    and self.model_backbone in ["PhiOForCausalLM"]
+                    and model_inputs["input_mode"] == 1
+                ):
+                    outputs = self(
+                        **model_inputs,
+                        return_dict=True,
+                        output_attentions=output_attentions,
+                        output_hidden_states=output_hidden_states,
+                    )
                 else:
                     outputs = self.trace_graph(**model_inputs)
             else:
