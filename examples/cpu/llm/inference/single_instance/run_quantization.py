@@ -1553,7 +1553,7 @@ if args.benchmark:
             gen_text = tokenizer.batch_decode(
                 (
                     gen_ids[:, input_ids.shape[1] :]
-                    if model.name in ["llava", "maira2"]
+                    if model.name in ["llava", "maira2", "phio"]
                     else gen_ids
                 ),
                 skip_special_tokens=True,
@@ -1653,7 +1653,7 @@ if args.benchmark:
                 gen_text = tokenizer.batch_decode(
                     (
                         gen_ids[:, input_ids.shape[1] :]
-                        if model.name == "llava"
+                        if model.name in ["llava", "phio"]
                         else gen_ids
                     ),
                     skip_special_tokens=True,

@@ -43,7 +43,8 @@ class PhiOConfig(LLMConfig):
         self.use_ipex_autotune = True
 
     def get_user_model(self, config, load_to_meta_device):
-        if load_to_meta_device:
+        # input_mode > 0 has accuracy issue when loading to meta device
+        if load_to_meta_device and config.input_mode == 0:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = AutoModelForCausalLM.from_config(
