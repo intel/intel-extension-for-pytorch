@@ -40,6 +40,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
         elif self.model_backbone in [
             "WhisperForConditionalGeneration",
             "Phi3ForCausalLM",
+            "PhiOForCausalLM",
             "LlavaLlamaForCausalLM",
             "GitForCausalLM",
             "MixtralForCausalLM",

@@ -1485,13 +1485,26 @@ def PhiODecoderLayer_forward(
         use_cache=use_cache,
         cache_position=cache_position,
     )
-
-    hidden_states = residual + self.resid_attn_dropout(attn_outputs)
+    if self.config.input_mode == 0 and hasattr(self, "mha_linear_add"):
+        hidden_states = self.mha_linear_add(attn_outputs, residual)
+    else:
+        attn_outputs = self.self_attn.o_proj(attn_outputs)
+        hidden_states = residual + self.resid_attn_dropout(attn_outputs)
 
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
-    hidden_states = self.mlp(hidden_states)
-    hidden_states = residual + self.resid_mlp_dropout(hidden_states)
+    # hidden_states = self.mlp(hidden_states)
+    if self.config.input_mode == 0 and hasattr(self, "linear_silu_mul"):
+        hidden_states = self.linear_silu_mul(hidden_states)
+    else:
+        up_states = self.mlp.gate_up_proj(hidden_states)
+        gate, up_states = up_states.chunk(2, dim=-1)
+        hidden_states = up_states * self.mlp.activation_fn(gate)
+    if self.config.input_mode == 0 and hasattr(self, "mlp_linear_add"):
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.down_proj(hidden_states)
+        hidden_states = residual + self.resid_mlp_dropout(hidden_states)
 
     outputs = (hidden_states,)
 
@@ -2370,6 +2383,40 @@ class _IPEXDecoderLayerRef(nn.Module):
                 )
                 del self.__dict__["_modules"]["mlp"].gate_proj
                 del self.__dict__["_modules"]["mlp"].up_proj
+        elif self.model_backbone == "PhiOForCausalLM":
+            if config.input_mode == 0:
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(
+                        module.self_attn.o_proj.base_layer
+                    )
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                    self.mlp_linear_add = _IPEXlinearAddRef(
+                        module.mlp.down_proj.base_layer
+                    )
+                    del self.__dict__["_modules"]["mlp"].down_proj
+                if self.config.hidden_act == "silu":
+                    assert module.mlp.gate_up_proj.base_layer.out_features % 2 == 0
+
+                    gate_weights, up_weights = (
+                        module.mlp.gate_up_proj.base_layer.weight.chunk(2, dim=0)
+                    )
+                    has_bias = module.mlp.gate_up_proj.base_layer.bias is not None
+                    gate_linear = torch.nn.Linear(
+                        gate_weights.shape[1], gate_weights.shape[0], has_bias
+                    )
+                    up_linear = torch.nn.Linear(
+                        up_weights.shape[1], up_weights.shape[0], has_bias
+                    )
+                    gate_linear.weight.data = gate_weights
+                    up_linear.weight.data = up_weights
+                    if has_bias:
+                        gate_bias, up_bias = (
+                            module.mlp.gate_up_proj.base_layer.bias.chunk(2, dim=0)
+                        )
+                        gate_linear.bias.data = gate_bias
+                        up_linear.bias.data = up_bias
+                    self.linear_silu_mul = _IPEXlinearSiluMulRef(gate_linear, up_linear)
+                    del self.__dict__["_modules"]["mlp"].gate_up_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
