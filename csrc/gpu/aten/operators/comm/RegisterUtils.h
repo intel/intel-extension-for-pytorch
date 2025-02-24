@@ -143,4 +143,34 @@ inline void resize_out(
   }
 }
 
+inline void check_inplace(
+    const Tensor& self,
+    IntArrayRef sizes,
+    const TensorOptions& options) {
+  TORCH_CHECK(
+      options.dtype() == self.dtype(),
+      "Bad in-place call: ",
+      "input tensor dtype ",
+      self.dtype(),
+      " and output tensor dtype ",
+      options.dtype(),
+      " should match");
+  TORCH_CHECK(
+      options.device() == self.device(),
+      "Bad in-place call: ",
+      "input tensor device ",
+      self.device(),
+      " and output tensor device ",
+      options.device(),
+      " should match");
+  TORCH_CHECK(
+      sizes == self.sizes(),
+      "Bad in-place call: ",
+      "input tensor size ",
+      self.sizes(),
+      " and output tensor size ",
+      sizes,
+      " should match");
+}
+
 } // namespace at::AtenIpexTypeXPU

@@ -45,7 +45,6 @@ Tensor& addmm_out(
       mat1.dtype(),
       " != ",
       mat2.dtype())
-
   int m = mat1.sizes()[0];
   int n = mat2.sizes()[1];
   int k = mat2.sizes()[0];
@@ -72,7 +71,9 @@ Tensor& addmm_out(
       return result.zero_();
     }
     return at::mul_out(
-        result, self, at::native::wrapped_scalar_tensor(at::Scalar(beta)));
+        result,
+        self.expand(result.sizes()),
+        at::native::wrapped_scalar_tensor(at::Scalar(beta)));
   }
   TORCH_CHECK(
       are_expandable(self.sizes(), result_shape),
@@ -1325,15 +1326,70 @@ Tensor matmul_bias_out(
   return output;
 }
 #ifdef USE_OVERRIDE_OP
+void addmm_meta(
+    const Tensor& self,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& output) {
+  TORCH_CHECK(
+      self.scalar_type() == mat2.scalar_type(),
+      "self and mat2 must have the same dtype, but got ",
+      self.scalar_type(),
+      " and ",
+      mat2.scalar_type());
+  TORCH_CHECK(
+      mat1.scalar_type() == mat2.scalar_type(),
+      "mat1 and mat2 must have the same dtype, but got ",
+      mat1.scalar_type(),
+      " and ",
+      mat2.scalar_type());
+  TORCH_CHECK(
+      mat1.dim() == 2, "mat1 must be a matrix, got ", mat1.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat2.dim() == 2, "mat2 must be a matrix, got ", mat2.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat1.sizes()[1] == mat2.sizes()[0],
+      "mat1 and mat2 shapes cannot be multiplied (",
+      mat1.sizes()[0],
+      "x",
+      mat1.sizes()[1],
+      " and ",
+      mat2.sizes()[0],
+      "x",
+      mat2.sizes()[1],
+      ")");
+
+  if (output.defined()) {
+    at::AtenIpexTypeXPU::resize_out(
+        output, {mat1.sizes()[0], mat2.sizes()[1]}, {}, mat1.options());
+  } else {
+    output = at::AtenIpexTypeXPU::create_out(
+        {mat1.sizes()[0], mat2.sizes()[1]}, {}, mat1.options());
+  }
+}
 Tensor addmm(
     const Tensor& self,
     const Tensor& mat1,
     const Tensor& mat2,
     const Scalar& beta,
     const Scalar& alpha) {
-  Tensor r = at::empty({0}, self.options());
+  Tensor r;
+  addmm_meta(self, mat1, mat2, beta, alpha, r);
   at::AtenIpexTypeXPU::addmm_out(self, mat1, mat2, beta, alpha, r);
   return r;
+}
+
+void _addmm_activation_meta(
+    const Tensor& self,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Scalar& beta,
+    const Scalar& alpha,
+    bool use_gelu,
+    Tensor& output) {
+  addmm_meta(self, mat1, mat2, beta, alpha, output);
 }
 Tensor _addmm_activation(
     const Tensor& self,
@@ -1342,7 +1398,8 @@ Tensor _addmm_activation(
     const Scalar& beta,
     const Scalar& alpha,
     bool use_gelu) {
-  Tensor r = at::empty({0}, self.options());
+  Tensor r;
+  _addmm_activation_meta(self, mat1, mat2, beta, alpha, use_gelu, r);
   at::AtenIpexTypeXPU::_addmm_activation_out(
       self, mat1, mat2, beta, alpha, use_gelu, r);
   return r;
@@ -1395,6 +1452,44 @@ at::Tensor addmv(
   Tensor out;
   addmv_meta(self, mat, vec, beta, alpha, out);
   return addmv_out(self, mat, vec, beta, alpha, out);
+}
+
+void addmm__meta(
+    const Tensor& self,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Scalar& beta,
+    const Scalar& alpha,
+    Tensor& output) {
+  TORCH_CHECK(
+      self.scalar_type() == mat2.scalar_type(),
+      "self and mat2 must have the same dtype, but got ",
+      self.scalar_type(),
+      " and ",
+      mat2.scalar_type());
+  TORCH_CHECK(
+      mat1.scalar_type() == mat2.scalar_type(),
+      "mat1 and mat2 must have the same dtype, but got ",
+      mat1.scalar_type(),
+      " and ",
+      mat2.scalar_type());
+  TORCH_CHECK(
+      mat1.dim() == 2, "mat1 must be a matrix, got ", mat1.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat2.dim() == 2, "mat2 must be a matrix, got ", mat2.dim(), "-D tensor");
+  TORCH_CHECK(
+      mat1.sizes()[1] == mat2.sizes()[0],
+      "mat1 and mat2 shapes cannot be multiplied (",
+      mat1.sizes()[0],
+      "x",
+      mat1.sizes()[1],
+      " and ",
+      mat2.sizes()[0],
+      "x",
+      mat2.sizes()[1],
+      ")");
+
+  check_inplace(output, {mat1.sizes()[0], mat2.sizes()[1]}, mat1.options());
 }
 #endif
 } // namespace AtenIpexTypeXPU
@@ -1552,15 +1647,14 @@ at::Tensor& wrapper_XPU_out_addmv_out(
   return at::AtenIpexTypeXPU::addmv_out(self, mat, vec, beta, alpha, out);
 }
 
-at::Tensor wrapper_XPU__mm(const at::Tensor& self, const at::Tensor& mat2) {
+at::Tensor wrapper_XPU_mm(const at::Tensor& self, const at::Tensor& mat2) {
   c10::optional<Device> common_device = nullopt;
   (void)common_device; // Suppress unused variable warning
   c10::impl::check_and_update_common_device(
-      common_device, self, "wrapper_XPU__mm", "self");
+      common_device, self, "wrapper_XPU_mm", "self");
   c10::impl::check_and_update_common_device(
-      common_device, mat2, "wrapper_XPU__mm", "mat2");
+      common_device, mat2, "wrapper_XPU_mm", "mat2");
   const OptionalDeviceGuard device_guard(device_of(self));
-
   return at::AtenIpexTypeXPU::mm(self, mat2);
 }
 
@@ -1577,7 +1671,6 @@ at::Tensor& wrapper_XPU_out_mm_out(
   c10::impl::check_and_update_common_device(
       common_device, mat2, "wrapper_XPU_out_mm_out", "mat2");
   const OptionalDeviceGuard device_guard(device_of(self));
-
   return at::AtenIpexTypeXPU::mm_out(self, mat2, out);
 }
 
@@ -1849,7 +1942,7 @@ at::Tensor& wrapper_XPU_addmm_(
   c10::impl::check_and_update_common_device(
       common_device, mat2, "wrapper_XPU_addmm_", "mat2");
   const OptionalDeviceGuard device_guard(device_of(self));
-
+  addmm__meta(self, mat1, mat2, beta, alpha, self);
   return at::AtenIpexTypeXPU::addmm_out(self, mat1, mat2, beta, alpha, self);
 }
 
@@ -1864,7 +1957,7 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl("addmv", TORCH_FN((&wrapper_XPU_addmv)));
   m.impl("addmv_", TORCH_FN((&wrapper_XPU_addmv_)));
   m.impl("addmv.out", TORCH_FN((&wrapper_XPU_out_addmv_out)));
-  m.impl("mm", TORCH_FN((&wrapper_XPU__mm)));
+  m.impl("mm", TORCH_FN((&wrapper_XPU_mm)));
   m.impl("mm.out", TORCH_FN((&wrapper_XPU_out_mm_out)));
   m.impl("baddbmm", TORCH_FN((&wrapper_XPU__baddbmm)));
   m.impl("baddbmm.out", TORCH_FN((&wrapper_XPU_out_baddbmm_out)));
