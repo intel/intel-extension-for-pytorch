@@ -401,6 +401,37 @@ if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generatio
 num_beams = 1 if args.greedy else 4
 if model_type in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
+if model_type == "phio":
+    prompt = args.prompt
+    _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+    _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+    image_in_prompt = len(re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt))
+    audio_in_prompt = len(re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt))
+    is_vision = image_in_prompt > 0
+    is_speech = audio_in_prompt > 0
+    if is_vision:
+        assert (
+            image_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
+            <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+    if is_speech:
+        assert (
+            audio_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
+            <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+    if not is_vision and not is_speech:
+        config.input_mode = 0
+    elif is_vision and not is_speech:
+        config.input_mode = 1
+    elif not is_vision and is_speech:
+        config.input_mode = 2
+    else:
+        config.input_mode = 3
+
+    assert config.input_mode == int(
+        args.input_mode
+    ), "Input mode in prompt is not consistent with the input mode in the command line."
+
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -434,6 +465,7 @@ elif world_size == 1 or model_type in [
     "yuan",
     "whisper",
     "jamba",
+    "phio",
 ]:
     model = model_class[0].from_pretrained(
         model_name,
@@ -441,6 +473,7 @@ elif world_size == 1 or model_type in [
         low_cpu_mem_usage=True if model_type != "maira2" else False,
         torch_dtype=load_dtype,
         trust_remote_code=True,
+        attn_implementation="eager",
     )
 elif model_type == "maira2":
     model = model_class[0].from_pretrained(
@@ -455,7 +488,9 @@ else:  # Construct model with fake meta tensors, later will be replaced during d
         else:
             model = (
                 model_class[0]
-                .from_config(config, trust_remote_code=True)
+                .from_config(
+                    config, trust_remote_code=True, attn_implementation="eager"
+                )
                 .to(load_dtype)
             )
 
@@ -771,6 +806,23 @@ elif model_type == "mllama":
     input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
     inputs = [prompt] * args.batch_size
+elif model_type == "phio":
+    from PIL import Image
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    import soundfile
+
+    sample = soundfile.read(args.audio)
+    prompt = args.prompt
+    inputs = [prompt] * args.batch_size
 elif model_type == "maira2":
     from PIL import Image
     import requests
@@ -866,6 +918,17 @@ def generate():
             get_grounding=False,
         )
         input_ids = input_tokens["input_ids"]
+    elif model_type == "phio":
+        raw_image = load_image(args.image_url)
+        raw_image = [raw_image] * args.batch_size
+        samples = [sample] * args.batch_size
+        input_tokens = tokenizer(
+            text=inputs[0],
+            images=raw_image if is_vision else None,
+            audios=samples if is_speech else None,
+            return_tensors="pt",
+        )
+        input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"
@@ -892,7 +955,7 @@ def generate():
     gen_text = tokenizer.batch_decode(
         (
             gen_ids[:, input_ids.shape[1] :]
-            if model_type in ["llava", "maira2"]
+            if model_type in ["llava", "maira2", "phio"]
             else gen_ids
         ),
         skip_special_tokens=True,

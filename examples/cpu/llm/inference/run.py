@@ -599,6 +599,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "git": ("/git_local_shard"),
                 "yuan": ("/yuan_local_shard"),
                 "phi-3": ("/phi-3_local_shard"),
+                "phio": ("/phio_local_shard"),
                 "phi": ("/phi_local_shard"),
                 "whisper": ("/whisper_local_shard"),
                 "maira": ("/maira2_local_shard"),
