@@ -452,8 +452,6 @@ def _greedy_search(
                 if self.model_backbone == "Phi3ForCausalLM":
                     model_inputs.pop("inputs_embeds", None)
                     model_inputs.pop("num_logits_to_keep", None)
-                if self.model_backbone == "PhiOForCausalLM":
-                    model_inputs.pop("audio_attention_mask", None)
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:

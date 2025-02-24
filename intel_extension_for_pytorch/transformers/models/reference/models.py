@@ -10,6 +10,7 @@ from transformers.modeling_outputs import (
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
     BaseModelOutput,
+    BaseModelOutputWithPooling,
 )
 import numpy as np
 from ....utils._logger import logger, WarningType
@@ -22,6 +23,7 @@ try:
     from transformers.generation.configuration_utils import GenerationConfig
     from transformers.modeling_attn_mask_utils import (
         _prepare_4d_causal_attention_mask,
+        _prepare_4d_attention_mask,
     )
 
     from transformers.modeling_outputs import (
@@ -6638,6 +6640,82 @@ def PhiOImageEmbedding_forward(
     return hidden_states
 
 
+def SiglipVisionTransformer_forward(
+    self,
+    pixel_values,
+    patch_attention_mask: Optional[torch.BoolTensor] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+):
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    batch_size = pixel_values.size(0)
+    if patch_attention_mask is None:
+        patch_attention_mask = torch.ones(
+            size=(
+                batch_size,
+                pixel_values.size(2) // self.config.patch_size,
+                pixel_values.size(3) // self.config.patch_size,
+            ),
+            dtype=torch.bool,
+            device=pixel_values.device,
+        )
+
+    hidden_states = self.embeddings(
+        pixel_values=pixel_values, patch_attention_mask=patch_attention_mask
+    )
+
+    patch_attention_mask = patch_attention_mask.view(batch_size, -1)
+    # The call to `_upad_input` in `_flash_attention_forward` is expensive
+    # So when the `patch_attention_mask` is full of 1s (i.e. attending to the whole sequence),
+    # avoiding passing the attention_mask, which is equivalent to attending to the full sequence
+    if not torch.any(~patch_attention_mask):
+        attention_mask = None
+    else:
+        attention_mask = _prepare_4d_attention_mask(
+            patch_attention_mask, hidden_states.dtype
+        )
+
+    encoder_outputs = self.encoder(
+        inputs_embeds=hidden_states,
+        attention_mask=attention_mask,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    last_hidden_state = encoder_outputs[0]
+    last_hidden_state = self.post_layernorm(last_hidden_state)
+
+    pooled_output = self.head(
+        hidden_state=last_hidden_state,
+        attention_mask=patch_attention_mask,
+    )
+
+    if not return_dict:
+        return (last_hidden_state, pooled_output) + encoder_outputs[1:]
+
+    return BaseModelOutputWithPooling(
+        last_hidden_state=last_hidden_state,
+        pooler_output=pooled_output,
+        hidden_states=encoder_outputs.hidden_states,
+        attentions=encoder_outputs.attentions,
+    )
+
+
 def PhiOAudioEmbedding_forward(
     self,
     input_ids: torch.LongTensor,
@@ -8165,12 +8243,19 @@ def prepare_inputs_for_generation_phio(
         }
     )
     model_inputs["input_mode"] = input_mode
-    if input_image_embeds is not None:
-        model_inputs["input_image_embeds"] = input_image_embeds
-        model_inputs["image_sizes"] = image_sizes
-        model_inputs["image_attention_mask"] = image_attention_mask
-    if input_audio_embeds is not None:
-        model_inputs["input_audio_embeds"] = input_audio_embeds
-        model_inputs["audio_embed_sizes"] = audio_embed_sizes
-        model_inputs["audio_attention_mask"] = audio_attention_mask
+    model_inputs["input_image_embeds"] = (
+        input_image_embeds if input_image_embeds is not None else torch.empty([])
+    )
+    model_inputs["image_sizes"] = (
+        image_sizes if image_sizes is not None else torch.empty([])
+    )
+    model_inputs["image_attention_mask"] = (
+        image_attention_mask if image_attention_mask is not None else torch.empty([])
+    )
+    model_inputs["input_audio_embeds"] = (
+        input_audio_embeds if input_audio_embeds is not None else torch.empty([])
+    )
+    model_inputs["audio_embed_sizes"] = (
+        audio_embed_sizes if audio_embed_sizes is not None else torch.empty([])
+    )
     return model_inputs

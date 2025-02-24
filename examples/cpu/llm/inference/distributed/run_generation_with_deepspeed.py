@@ -401,7 +401,9 @@ if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generatio
 num_beams = 1 if args.greedy else 4
 if model_type in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
-if model_type == "phio":
+if model_type in ["phio", "phi-4-multimodal"]:
+    if model_type == "phi-4-multimodal":
+        model_type = "phio"
     prompt = args.prompt
     _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
     _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
