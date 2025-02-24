@@ -10,33 +10,28 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-const Tensor& resize_as_(
-    const Tensor& self,
-    const Tensor& the_template,
-    c10::optional<MemoryFormat> memory_format);
-
-#define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)             \
-  template <typename scalar_t>                                   \
-  struct Tensor_##NAME##_##REAL##_Op {                           \
-    inline void operator()(scalar_t& out, scalar_t& in) const {  \
-      out = CFUNC(in);                                           \
-    }                                                            \
-                                                                 \
-    inline void operator()(scalar_t& v) const {                  \
-      v = CFUNC(v);                                              \
-    }                                                            \
-  };                                                             \
-                                                                 \
-  template <typename scalar_t>                                   \
-  void NAME(Tensor& self_, const Tensor& src) {                  \
-    if (self_.is_same(src)) {                                    \
-      DPCPP_tensor_apply1<scalar_t>(                             \
-          self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());       \
-    } else {                                                     \
-      at::AtenIpexTypeXPU::resize_as_(self_, src, c10::nullopt); \
-      DPCPP_tensor_apply2<scalar_t, scalar_t>(                   \
-          self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>());  \
-    }                                                            \
+#define IMPLEMENT_POINTWISE_FUNC_(NAME, CFUNC, REAL)            \
+  template <typename scalar_t>                                  \
+  struct Tensor_##NAME##_##REAL##_Op {                          \
+    inline void operator()(scalar_t& out, scalar_t& in) const { \
+      out = CFUNC(in);                                          \
+    }                                                           \
+                                                                \
+    inline void operator()(scalar_t& v) const {                 \
+      v = CFUNC(v);                                             \
+    }                                                           \
+  };                                                            \
+                                                                \
+  template <typename scalar_t>                                  \
+  void NAME(Tensor& self_, const Tensor& src) {                 \
+    if (self_.is_same(src)) {                                   \
+      DPCPP_tensor_apply1<scalar_t>(                            \
+          self_, Tensor_##NAME##_##REAL##_Op<scalar_t>());      \
+    } else {                                                    \
+      self_.resize_as(src, c10::nullopt);                       \
+      DPCPP_tensor_apply2<scalar_t, scalar_t>(                  \
+          self_, src, Tensor_##NAME##_##REAL##_Op<scalar_t>()); \
+    }                                                           \
   }
 
 #define IMPLEMENT_POINTWISE_1_FUNC(NAME, CFUNC, REAL) \
@@ -102,7 +97,8 @@ const Tensor& resize_as_(
           POINTWISE_OPR_ARGS_##APPLY_NUM,                                     \
           CALLABLE<scalar_t>(CALLABLE_INIT_ARGS_##CALLABLE_ARGS_NUM));        \
     } else {                                                                  \
-      at::AtenIpexTypeXPU::resize_as_(POINTWISE_ARGS_2, c10::nullopt);        \
+      POINTWISE_ARG_FOR_TYPE_1.resize_as_(                                    \
+          POINTWISE_ARG_FOR_TYPE_2, c10::nullopt);                            \
       DPCPP_tensor_apply##APPLY_NUM_EXT<REPEAT_AS_ARGLIST_##APPLY_NUM_EXT(    \
           scalar_t)>(                                                         \
           POINTWISE_ARGS_##APPLY_NUM_EXT,                                     \

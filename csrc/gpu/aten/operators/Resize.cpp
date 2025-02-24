@@ -28,19 +28,7 @@ const Tensor& resize_(
   return self;
 }
 
-const Tensor& resize_as_(const Tensor& self, const Tensor& the_template) {
-  return impl::resize_(self, the_template.sizes(), c10::nullopt);
-}
-
 } // namespace impl
-
-const Tensor& resize_as_(
-    const Tensor& self,
-    const Tensor& the_template,
-    c10::optional<MemoryFormat> memory_format) {
-  impl::resize_(self, the_template.sizes(), memory_format);
-  return self;
-}
 
 bool resize_output_check(const Tensor& output, IntArrayRef shape) {
   // Tests for resizing of tensors with one or more elements
