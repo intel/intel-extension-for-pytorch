@@ -456,17 +456,6 @@ def _greedy_search(
                     model_inputs.pop("audio_attention_mask", None)
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
-                elif (
-                    first_token
-                    and self.model_backbone in ["PhiOForCausalLM"]
-                    and model_inputs["input_mode"] in [3]
-                ):
-                    outputs = self(
-                        **model_inputs,
-                        return_dict=True,
-                        output_attentions=output_attentions,
-                        output_hidden_states=output_hidden_states,
-                    )
                 else:
                     outputs = self.trace_graph(**model_inputs)
             else:
