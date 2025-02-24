@@ -126,6 +126,8 @@ Tensor locations_to_boxes(
     Tensor& priors,
     double center_variance,
     double size_variance) {
+  const OptionalDeviceGuard device_guard(device_of(locations));
+
   RECORD_FUNCTION(
       "locations_to_boxes", std::vector<c10::IValue>({locations, priors}));
 
