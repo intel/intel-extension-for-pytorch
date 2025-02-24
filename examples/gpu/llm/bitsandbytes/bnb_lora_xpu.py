@@ -104,7 +104,7 @@ if args.model_name in ["facebook/opt-6.7b", "Qwen/Qwen2-1.5B"]:
     lora_targets = ["q_proj", "v_proj"]
 elif args.model_name in ["microsoft/Phi-3-mini-4k-instruct"]:
     lora_targets = ["o_proj", "qkv_proj"]
-elif args.model_name in ["meta-llama/Llama-3.1-8B"]:
+elif args.model_name in ["meta-llama/Llama-3.1-8B", "meta-llama/Llama-3.2-3B-Instruct"]:
     lora_targets = [
         "q_proj",
         "k_proj",
@@ -115,6 +115,7 @@ elif args.model_name in ["meta-llama/Llama-3.1-8B"]:
         "down_proj",
         "lm_head",
     ]
+
 assert lora_targets != [], "lora_targets should not be empty. If you use absolute path to load the model, pls manually set the target as above."
 
 config = LoraConfig(
