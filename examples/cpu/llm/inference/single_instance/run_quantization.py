@@ -741,16 +741,16 @@ def get_example_inputs(model):
             example_inputs = example_inputs + (
                 torch.tensor([input_mode]),
                 (
+                    torch.rand(1, 7, 3, 448, 448)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
                     torch.tensor([[896, 1344]])
                     if input_mode in [1, 3]
                     else torch.tensor([])
                 ),
                 torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
-                (
-                    torch.rand(1, 7, 3, 448, 448)
-                    if input_mode in [1, 3]
-                    else torch.tensor([])
-                ),
                 torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
                 torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
             )
@@ -1372,6 +1372,33 @@ elif args.ipex_weight_only_quantization:
             )
             self_jit_next = torch.jit.freeze(self_jit_next.eval())
             self_jit_next.save(args.output_dir + "/" + args.quant_model_name + "2")
+        elif model.name == "phio":
+            if config.input_mode == 1:
+                input_ids = torch.ones(1851).to(torch.long).unsqueeze(0)
+                input_ids[:, 1:1842] = 200010
+                example_inputs[7][:, 3, :, -1] = 0
+            elif config.input_mode == 2:
+                input_ids = torch.ones(96).to(torch.long).unsqueeze(0)
+                input_ids[:, 1:64] = 200011
+            elif config.input_mode == 3:
+                input_ids = torch.ones(1907).to(torch.long).unsqueeze(0)
+                input_ids[:, 1:1842] = 200010
+                input_ids[:, 1842:1905] = 200011
+                example_inputs[7][:, 3, :, -1] = 0
+            if config.input_mode > 0:
+                attention_mask = torch.ones_like(input_ids)
+                position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+                example_inputs = (
+                    input_ids,
+                    attention_mask,
+                    example_inputs[2],
+                    position_ids,
+                ) + example_inputs[4:]
+                self_jit_first = torch.jit.trace(
+                    user_model.eval(), example_inputs, strict=False, check_trace=False
+                )
+                self_jit_first = torch.jit.freeze(self_jit_first.eval())
+                self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 
 if args.benchmark:
@@ -1389,7 +1416,9 @@ if args.benchmark:
         try:
             self_jit = torch.jit.load(args.quantized_model_path)
             self_jit = torch.jit.freeze(self_jit.eval())
-            if model.name in ["yuan", "mllama", "maira2"]:
+            if model.name in ["yuan", "mllama", "maira2"] or (
+                model.name == "phio" and config.input_mode > 0
+            ):
                 self_jit_first = torch.jit.load(args.quantized_model_path + "2")
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
             if model.name in ["jamba"]:
@@ -1398,7 +1427,9 @@ if args.benchmark:
         except Exception as e:
             print("warning: loading failed.", e)
             self_jit = quant_model
-        if model.name in ["yuan", "mllama", "maira2"]:
+        if model.name in ["yuan", "mllama", "maira2"] or (
+            model.name == "phio" and config.input_mode > 0
+        ):
             ipex._set_optimized_model_for_generation(
                 user_model,
                 optimized_model=self_jit,

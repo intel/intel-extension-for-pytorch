@@ -1603,16 +1603,16 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs = sample_inputs + (
                 torch.tensor([input_mode]),
                 (
+                    torch.rand(1, 7, 3, 448, 448)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
                     torch.tensor([[896, 1344]])
                     if input_mode in [1, 3]
                     else torch.tensor([])
                 ),
                 torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
-                (
-                    torch.rand(1, 7, 3, 448, 448)
-                    if input_mode in [1, 3]
-                    else torch.tensor([])
-                ),
                 torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
                 torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
             )
@@ -1904,54 +1904,21 @@ def model_convert_lowering(
                     if _model.config.input_mode == 1:
                         input_ids = torch.ones(1851).to(torch.long).unsqueeze(0)
                         input_ids[:, 1:1842] = 200010
-                        attention_mask = torch.ones_like(input_ids)
-                        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
-                        sample_inputs["input_ids"] = input_ids
-                        sample_inputs["attention_mask"] = attention_mask
-                        sample_inputs["position_ids"] = position_ids
                         sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
-                        trace_model_first = torch.jit.trace(
-                            _model,
-                            example_kwarg_inputs=sample_inputs,
-                            strict=False,
-                            check_trace=False,
-                        )
-                        trace_model_first = torch.jit.freeze(trace_model_first)
-                        _model = _set_optimized_model_for_generation(
-                            _model,
-                            optimized_model=trace_model,
-                            first_token_optimized_model=trace_model_first,
-                        )
                     elif _model.config.input_mode == 2:
                         input_ids = torch.ones(96).to(torch.long).unsqueeze(0)
                         input_ids[:, 1:64] = 200011
-                        attention_mask = torch.ones_like(input_ids)
-                        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
-                        sample_inputs["input_ids"] = input_ids
-                        sample_inputs["attention_mask"] = attention_mask
-                        sample_inputs["position_ids"] = position_ids
-                        trace_model_first = torch.jit.trace(
-                            _model,
-                            example_kwarg_inputs=sample_inputs,
-                            strict=False,
-                            check_trace=False,
-                        )
-                        trace_model_first = torch.jit.freeze(trace_model_first)
-                        _model = _set_optimized_model_for_generation(
-                            _model,
-                            optimized_model=trace_model,
-                            first_token_optimized_model=trace_model_first,
-                        )
                     elif _model.config.input_mode == 3:
                         input_ids = torch.ones(1907).to(torch.long).unsqueeze(0)
                         input_ids[:, 1:1842] = 200010
                         input_ids[:, 1842:1905] = 200011
+                        sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
+                    if _model.config.input_mode > 0:
                         attention_mask = torch.ones_like(input_ids)
                         position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
                         sample_inputs["input_ids"] = input_ids
                         sample_inputs["attention_mask"] = attention_mask
                         sample_inputs["position_ids"] = position_ids
-                        sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
                         trace_model_first = torch.jit.trace(
                             _model,
                             example_kwarg_inputs=sample_inputs,
