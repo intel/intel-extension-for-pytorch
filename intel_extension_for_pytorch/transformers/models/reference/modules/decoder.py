@@ -138,8 +138,11 @@ def SiglipEncoderLayer_forward(
 
     residual = hidden_states
     hidden_states = self.layer_norm2(hidden_states)
-    hidden_states = self.mlp.fc1(hidden_states)
-    hidden_states = self.mlp.activation_fn(hidden_states)
+    if hasattr(self, "linear_newgelu"):
+        hidden_states = self.linear_newgelu(hidden_states)
+    else:
+        hidden_states = self.mlp.fc1(hidden_states)
+        hidden_states = self.mlp.activation_fn(hidden_states)
     if hasattr(self, "mlp_linear_add"):
         hidden_states = self.mlp_linear_add(hidden_states, residual)
     else:
@@ -2800,6 +2803,9 @@ class _IPEXEncoderLayerRef(nn.Module):
                     del self.__dict__["_modules"]["mlp"].fc2
                     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
                     del self.__dict__["_modules"]["self_attn"].out_proj
+                # disable as accuracy issue
+                # self.linear_newgelu = _IPEXlinearNewGeluRef(module.mlp.fc1)
+                # del self.__dict__["_modules"]["mlp"].fc1
             elif module._get_name() == "ConformerEncoderLayer":
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.linear_out)

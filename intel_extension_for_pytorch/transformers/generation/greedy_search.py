@@ -459,7 +459,7 @@ def _greedy_search(
                 elif (
                     first_token
                     and self.model_backbone in ["PhiOForCausalLM"]
-                    and model_inputs["input_mode"] in [1, 2, 3]
+                    and model_inputs["input_mode"] in [2, 3]
                 ):
                     outputs = self(
                         **model_inputs,

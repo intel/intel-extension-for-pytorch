@@ -1900,7 +1900,28 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
-
+                elif _model.config.architectures[0] == "PhiOForCausalLM":
+                    if _model.config.input_mode == 1:
+                        input_ids = torch.ones(1851).to(torch.long).unsqueeze(0)
+                        input_ids[0][1:1842] = 200010
+                        attention_mask = torch.ones_like(input_ids)
+                        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+                        sample_inputs["input_ids"] = input_ids
+                        sample_inputs["attention_mask"] = attention_mask
+                        sample_inputs["position_ids"] = position_ids
+                        sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
+                        trace_model_first = torch.jit.trace(
+                            _model,
+                            example_kwarg_inputs=sample_inputs,
+                            strict=False,
+                            check_trace=False,
+                        )
+                        trace_model_first = torch.jit.freeze(trace_model_first)
+                        _model = _set_optimized_model_for_generation(
+                            _model,
+                            optimized_model=trace_model,
+                            first_token_optimized_model=trace_model_first,
+                        )
                 elif _model.config.architectures[0] == "YuanForCausalLM":
                     sample_inputs.pop("past_key_values", None)
                     batch_size = (

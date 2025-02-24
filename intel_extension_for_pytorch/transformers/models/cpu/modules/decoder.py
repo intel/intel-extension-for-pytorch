@@ -230,8 +230,12 @@ class _IPEXEncoderLayerCPU(nn.Module):
                         module.mha_linear_add.linear, tpp=tpp, woq=woq
                     )
             if hasattr(module, "linear_gelu"):
-                self.linear_silu = _IPEXlinearGeluCPU(
+                self.linear_gelu = _IPEXlinearGeluCPU(
                     module.linear_gelu.linear, tpp=tpp, woq=woq
+                )
+            if hasattr(module, "linear_newgelu"):
+                self.linear_newgelu = _IPEXlinearNewGeluCPU(
+                    module.linear_newgelu.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
