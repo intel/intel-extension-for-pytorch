@@ -6275,7 +6275,7 @@ def ConformerEncoder_forward(self, xs_pad, masks):
         )
     else:
         for i, layer in enumerate(self.encoders):
-            input_tensor, _, _, _ = layer(
+            input_tensor, _, _, _ = layer._checkpoint_wrapped_module(
                 input_tensor,
                 pos_k=pos_k,
                 pos_v=pos_v,
