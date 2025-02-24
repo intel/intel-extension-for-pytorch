@@ -152,6 +152,8 @@ supported:
   - _make_per_tensor_quantized_tensor
   - std.correction_out
   - _int_mm
+  - pad_sequence
 
 autograd:
+  - gru.input
   - _scaled_dot_product_attention_math
