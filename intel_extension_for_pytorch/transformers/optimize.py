@@ -2013,7 +2013,7 @@ def check_xpu_llm_support(model):
     # If the XPU platform has XMX but NO 2D load instructions, such as ATS-M and ARC,
     # ipex.optimize_transformers supports GPT-J, Llama, QWen.
     elif not ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
-        xpu_xmx_supported_pattern = r"GPTJ|llama|QWen|Phi3"
+        xpu_xmx_supported_pattern = r"GPTJ|llama|QWen|Phi3|ChatGLM|GLM"
         xpu_supported_model = re.search(
             xpu_xmx_supported_pattern, model.config.architectures[0], re.IGNORECASE
         )
