@@ -626,6 +626,17 @@ if model.name == "jamba":
             for i in range(user_model.config.num_hidden_layers)
         ]
     )
+if model.name in ["deepseekv2", "deepseekv3"]:
+    global_past_key_value = tuple(
+        [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+            )
+            for i in range(user_model.config.num_hidden_layers)
+        ]
+    )
 
 
 def get_example_inputs(model):
