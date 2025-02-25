@@ -827,7 +827,7 @@ elif model_type == "phio":
 
     import soundfile
 
-    sample = soundfile.read(args.audio)
+    sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
     prompt = args.prompt
     inputs = [prompt] * args.batch_size
 elif model_type == "maira2":
@@ -926,7 +926,7 @@ def generate():
         )
         input_ids = input_tokens["input_ids"]
     elif model_type == "phio":
-        raw_image = load_image(args.image_url)
+        raw_image = load_image(args.image_url) if is_vision else None
         raw_image = [raw_image] * args.batch_size
         samples = [sample] * audio_batch_size
         input_tokens = tokenizer(

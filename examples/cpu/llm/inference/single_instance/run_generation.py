@@ -332,9 +332,12 @@ if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
 
     sample = librosa.load(args.audio, sr=16000)
 if re.search("phio", model.config.architectures[0], re.IGNORECASE):
-    import soundfile
+    if config.input_mode in [2, 3]:
+        import soundfile
 
-    sample = soundfile.read(args.audio)
+        sample = soundfile.read(args.audio)
+    else:
+        sample = None
 
 
 def trace_handler(prof):
@@ -485,7 +488,7 @@ if args.benchmark:
                 input_ids = processed_inputs["input_ids"]
                 output = model.generate(**processed_inputs, **generate_kwargs)
             elif model_type == "phio":
-                raw_image = load_image(args.image_url)
+                raw_image = load_image(args.image_url) if is_vision else None
                 raw_image = [raw_image] * args.batch_size
                 samples = [sample] * audio_batch_size
                 inputs = tokenizer(
@@ -580,7 +583,7 @@ if args.benchmark:
                         )
                         output = model.generate(**processed_inputs, **generate_kwargs)
                     elif model_type == "phio":
-                        raw_image = load_image(args.image_url)
+                        raw_image = load_image(args.image_url) if is_vision else None
                         raw_image = [raw_image] * args.batch_size
                         samples = [sample] * audio_batch_size
                         inputs = tokenizer(

@@ -1510,7 +1510,7 @@ if args.benchmark:
         )
     elif model.name == "phio":
         prompt = args.prompt
-        sample = soundfile.read(args.audio)
+        sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -1595,7 +1595,7 @@ if args.benchmark:
                 input_ids = processed_inputs["input_ids"]
                 output = user_model.generate(**processed_inputs, **generate_kwargs)
             elif model.name == "phio":
-                raw_image = load_image(args.image_url)
+                raw_image = load_image(args.image_url) if is_vision else None
                 raw_image = [raw_image] * args.batch_size
                 samples = [sample] * audio_batch_size
                 inputs = tokenizer(
@@ -1695,7 +1695,7 @@ if args.benchmark:
                     input_ids = processed_inputs["input_ids"]
                     output = user_model.generate(**processed_inputs, **generate_kwargs)
                 elif model.name == "phio":
-                    raw_image = load_image(args.image_url)
+                    raw_image = load_image(args.image_url) if is_vision else None
                     raw_image = [raw_image] * args.batch_size
                     samples = [sample] * audio_batch_size
                     inputs = tokenizer(
