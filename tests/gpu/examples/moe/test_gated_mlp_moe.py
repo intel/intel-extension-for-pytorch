@@ -113,7 +113,7 @@ class TestMoEModule:
     @pytest.mark.parametrize("num_experts", [8, 16])
     def test(self, num_experts):
         top_k = 2
-        hidden_size = 2048
+        hidden_size = 1024
         intermediate_size = 14336
         dtype = torch.float16
         moe_module = (
