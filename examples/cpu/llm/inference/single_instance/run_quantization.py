@@ -441,6 +441,7 @@ elif re.search("phio", config.architectures[0], re.IGNORECASE):
             raw_image = Image.open(image_file)
         return raw_image
 
+    audio_batch_size = args.batch_size
     if args.prompt:
         prompt = args.prompt
         _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
@@ -459,10 +460,13 @@ elif re.search("phio", config.architectures[0], re.IGNORECASE):
             ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
                 <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
         if is_speech:
-            assert (
-                audio_in_prompt == args.batch_size
-            ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
-                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+            if not is_vision:
+                assert (
+                    audio_in_prompt == args.batch_size
+                ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
+                    <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+            else:
+                audio_batch_size = audio_in_prompt
         if not is_vision and not is_speech:
             config.input_mode = 0
         elif is_vision and not is_speech:
@@ -476,6 +480,8 @@ elif re.search("phio", config.architectures[0], re.IGNORECASE):
         ), "Input mode in prompt is not consistent with the input mode in the command line."
     else:
         config.input_mode = int(args.input_mode)
+        if config.input_mode == 3:
+            audio_batch_size = 1
 elif re.search("phi", config.architectures[0], re.IGNORECASE):
     model = PhiConfig(args.model_id)
 elif re.search("yuan", config.architectures[0], re.IGNORECASE):
@@ -522,6 +528,9 @@ if model.name == "mpt" and args.prompt is None:
     config.max_seq_len = max_seq_len
 if model.name in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
+if model.name == "phio":
+    config.batch_size = int(args.batch_size) * num_beams
+    config.audio_batch_size = audio_batch_size * num_beams
 if model.name == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
 
@@ -738,21 +747,35 @@ def get_example_inputs(model):
             example_inputs = example_inputs + (cross_attention_mask,)
         if model.name == "phio":
             input_mode = config.input_mode
+            batch_size = config.batch_size
+            audio_batch_size = config.audio_batch_size
             example_inputs = example_inputs + (
                 torch.tensor([input_mode]),
                 (
-                    torch.rand(1, 7, 3, 448, 448)
+                    torch.rand(1, 7, 3, 448, 448).repeat(batch_size, 1, 1, 1, 1)
                     if input_mode in [1, 3]
                     else torch.tensor([])
                 ),
                 (
-                    torch.tensor([[896, 1344]])
+                    torch.tensor([[896, 1344]]).repeat(batch_size, 1)
                     if input_mode in [1, 3]
                     else torch.tensor([])
                 ),
-                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
-                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
-                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
+                (
+                    torch.ones(1, 7, 32, 32).repeat(batch_size, 1, 1, 1)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.rand(1, 498, 80).repeat(audio_batch_size, 1, 1)
+                    if input_mode in [2, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.tensor([63]).repeat(audio_batch_size)
+                    if input_mode in [2, 3]
+                    else torch.tensor([])
+                ),
             )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
@@ -1373,17 +1396,23 @@ elif args.ipex_weight_only_quantization:
             self_jit_next = torch.jit.freeze(self_jit_next.eval())
             self_jit_next.save(args.output_dir + "/" + args.quant_model_name + "2")
         elif model.name == "phio":
+            batch_size = config.batch_size
+            audio_batch_size = config.audio_batch_size
             if config.input_mode == 1:
-                input_ids = torch.ones(1851).to(torch.long).unsqueeze(0)
-                input_ids[:, 1:1842] = 200010
+                input_ids = torch.ones(1851 * batch_size).to(torch.long).unsqueeze(0)
+                input_ids[:, : 1841 * batch_size] = 200010
                 example_inputs[7][:, 3, :, -1] = 0
             elif config.input_mode == 2:
-                input_ids = torch.ones(96).to(torch.long).unsqueeze(0)
-                input_ids[:, 1:64] = 200011
+                input_ids = (
+                    torch.ones(96 * audio_batch_size).to(torch.long).unsqueeze(0)
+                )
+                input_ids[:, : 63 * audio_batch_size] = 200011
             elif config.input_mode == 3:
-                input_ids = torch.ones(1907).to(torch.long).unsqueeze(0)
-                input_ids[:, 1:1842] = 200010
-                input_ids[:, 1842:1905] = 200011
+                input_ids = torch.ones(1907 * batch_size).to(torch.long).unsqueeze(0)
+                input_ids[:, : 1841 * batch_size] = 200010
+                input_ids[
+                    :, 1841 * batch_size : 1841 * batch_size + 63 * audio_batch_size
+                ] = 200011
                 example_inputs[7][:, 3, :, -1] = 0
             if config.input_mode > 0:
                 attention_mask = torch.ones_like(input_ids)
@@ -1568,7 +1597,7 @@ if args.benchmark:
             elif model.name == "phio":
                 raw_image = load_image(args.image_url)
                 raw_image = [raw_image] * args.batch_size
-                samples = [sample] * args.batch_size
+                samples = [sample] * audio_batch_size
                 inputs = tokenizer(
                     text=prompt[0],
                     images=raw_image if is_vision else None,
@@ -1668,7 +1697,7 @@ if args.benchmark:
                 elif model.name == "phio":
                     raw_image = load_image(args.image_url)
                     raw_image = [raw_image] * args.batch_size
-                    samples = [sample] * args.batch_size
+                    samples = [sample] * audio_batch_size
                     inputs = tokenizer(
                         text=prompt[0],
                         images=raw_image if is_vision else None,

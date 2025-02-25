@@ -1583,27 +1583,43 @@ def get_dummy_input(_model, return_dict=False):
         else:
             sample_inputs = sample_inputs + (cross_attention_mask,)
     if _model.config.architectures[0] == "PhiOForCausalLM":
-        input_mode = _model.config.input_mode
+        input_mode = (
+            _model.config.input_mode if hasattr(_model.config, "input_mode") else 0
+        )
+        batch_size = (
+            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
+        )
+        audio_batch_size = (
+            _model.config.audio_batch_size
+            if hasattr(_model.config, "audio_batch_size")
+            else batch_size
+        )
         if return_dict:
             sample_inputs["input_mode"] = torch.tensor([input_mode])
             sample_inputs["image_sizes"] = (
-                torch.tensor([[896, 1344]])
+                torch.tensor([[896, 1344]]).repeat(batch_size, 1)
                 if input_mode in [1, 3]
                 else torch.tensor([])
             )
             sample_inputs["image_attention_mask"] = (
-                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([])
+                torch.ones(1, 7, 32, 32).repeat(batch_size, 1, 1, 1)
+                if input_mode in [1, 3]
+                else torch.tensor([])
             )
             sample_inputs["input_image_embeds"] = (
-                torch.rand(1, 7, 3, 448, 448)
+                torch.rand(1, 7, 3, 448, 448).repeat(batch_size, 1, 1, 1, 1)
                 if input_mode in [1, 3]
                 else torch.tensor([])
             )
             sample_inputs["input_audio_embeds"] = (
-                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([])
+                torch.rand(1, 498, 80).repeat(audio_batch_size, 1, 1)
+                if input_mode in [2, 3]
+                else torch.tensor([])
             )
             sample_inputs["audio_embed_sizes"] = (
-                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([])
+                torch.tensor([63]).repeat(audio_batch_size)
+                if input_mode in [2, 3]
+                else torch.tensor([])
             )
         else:
             sample_inputs = sample_inputs + (
@@ -1907,17 +1923,44 @@ def model_convert_lowering(
                         first_token_optimized_model=trace_model_first,
                     )
                 elif _model.config.architectures[0] == "PhiOForCausalLM":
+                    batch_size = (
+                        _model.config.batch_size
+                        if hasattr(_model.config, "batch_size")
+                        else 1
+                    )
+                    input_mode = (
+                        _model.config.input_mode
+                        if hasattr(_model.config, "input_mode")
+                        else 0
+                    )
+                    audio_batch_size = (
+                        _model.config.audio_batch_size
+                        if hasattr(_model.config, "audio_batch_size")
+                        else batch_size
+                    )
                     if _model.config.input_mode == 1:
-                        input_ids = torch.ones(1851).to(torch.long).unsqueeze(0)
-                        input_ids[:, 1:1842] = 200010
+                        input_ids = (
+                            torch.ones(1851 * batch_size).to(torch.long).unsqueeze(0)
+                        )
+                        input_ids[:, : 1841 * batch_size] = 200010
                         sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
                     elif _model.config.input_mode == 2:
-                        input_ids = torch.ones(96).to(torch.long).unsqueeze(0)
-                        input_ids[:, 1:64] = 200011
+                        input_ids = (
+                            torch.ones(96 * audio_batch_size)
+                            .to(torch.long)
+                            .unsqueeze(0)
+                        )
+                        input_ids[:, : 63 * audio_batch_size] = 200011
                     elif _model.config.input_mode == 3:
-                        input_ids = torch.ones(1907).to(torch.long).unsqueeze(0)
-                        input_ids[:, 1:1842] = 200010
-                        input_ids[:, 1842:1905] = 200011
+                        input_ids = (
+                            torch.ones(1907 * batch_size).to(torch.long).unsqueeze(0)
+                        )
+                        input_ids[:, : 1841 * batch_size] = 200010
+                        input_ids[
+                            :,
+                            1841 * batch_size : 1841 * batch_size
+                            + 63 * audio_batch_size,
+                        ] = 200011
                         sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
                     if _model.config.input_mode > 0:
                         attention_mask = torch.ones_like(input_ids)

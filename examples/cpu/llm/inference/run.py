@@ -401,6 +401,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd.extend(["--input-tokens", str(args.input_tokens)])
                 quant_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
                 quant_cmd.extend(["--input-mode", str(args.input_mode)])
+                quant_cmd.extend(["--batch-size", str(args.batch_size)])
                 if args.vision_text_model:
                     quant_cmd.extend(["--vision-text-model"])
                 if args.config_file is not None:

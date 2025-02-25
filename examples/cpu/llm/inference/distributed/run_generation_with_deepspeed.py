@@ -411,16 +411,20 @@ if model_type in ["phio", "phi-4-multimodal"]:
     audio_in_prompt = len(re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt))
     is_vision = image_in_prompt > 0
     is_speech = audio_in_prompt > 0
+    audio_batch_size = args.batch_size
     if is_vision:
         assert (
             image_in_prompt == args.batch_size
         ), "Prompt is invalid. For multiple images, the user needs to insert multiple image placeholders in the prompt as below: \
             <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
     if is_speech:
-        assert (
-            audio_in_prompt == args.batch_size
-        ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
-            <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+        if not is_vision:
+            assert (
+                audio_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple audios, the user needs to insert multiple audio placeholders in the prompt as below: \
+                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+        else:
+            audio_batch_size = audio_in_prompt
     if not is_vision and not is_speech:
         config.input_mode = 0
     elif is_vision and not is_speech:
@@ -433,7 +437,8 @@ if model_type in ["phio", "phi-4-multimodal"]:
     assert config.input_mode == int(
         args.input_mode
     ), "Input mode in prompt is not consistent with the input mode in the command line."
-
+    config.batch_size = int(args.batch_size) * num_beams
+    config.audio_batch_size = audio_batch_size
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -923,7 +928,7 @@ def generate():
     elif model_type == "phio":
         raw_image = load_image(args.image_url)
         raw_image = [raw_image] * args.batch_size
-        samples = [sample] * args.batch_size
+        samples = [sample] * audio_batch_size
         input_tokens = tokenizer(
             text=inputs[0],
             images=raw_image if is_vision else None,

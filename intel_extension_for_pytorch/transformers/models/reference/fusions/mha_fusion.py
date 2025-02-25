@@ -267,7 +267,9 @@ class RotaryEmbedding(torch.nn.Module):
 
     def forward(self, seq_len=None):
         rope_type = 0
-        if self.model_backbone == "Phi3ForCausalLM" and hasattr(self, "long_factor"):
+        if self.model_backbone in ["Phi3ForCausalLM", "PhiOForCausalLM"] and hasattr(
+            self, "long_factor"
+        ):
             rope_type = 1
         elif self.model_backbone in ["FalconForCausalLM", "RWForCausalLM"]:
             rope_type = 2

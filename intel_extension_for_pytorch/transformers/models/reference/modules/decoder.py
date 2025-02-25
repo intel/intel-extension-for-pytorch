@@ -2803,9 +2803,8 @@ class _IPEXEncoderLayerRef(nn.Module):
                     del self.__dict__["_modules"]["mlp"].fc2
                     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
                     del self.__dict__["_modules"]["self_attn"].out_proj
-                # disable as accuracy issue
-                # self.linear_newgelu = _IPEXlinearNewGeluRef(module.mlp.fc1)
-                # del self.__dict__["_modules"]["mlp"].fc1
+                self.linear_newgelu = _IPEXlinearNewGeluRef(module.mlp.fc1)
+                del self.__dict__["_modules"]["mlp"].fc1
             elif module._get_name() == "ConformerEncoderLayer":
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.linear_out)
