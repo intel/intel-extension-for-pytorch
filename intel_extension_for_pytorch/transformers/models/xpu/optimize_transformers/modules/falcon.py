@@ -127,15 +127,18 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                 "IPEXAttention dose not support this modelType {} !".format(dtype)
             )
 
-        if self.grouped:
-            self.attn.load_parameter = partial(
-                chatglm_load_attn_params_grouped, self.attn
-            )
-        else:
-            self.attn.load_parameter = partial(load_attn_fused_qkv_params, self.attn)
-            self.attn.transpose_parameter = partial(
-                transpose_attn_fused_qkv_params, self.attn
-            )
+        if not self.new_decoder_architecture:
+            if self.grouped:
+                self.attn.load_parameter = partial(
+                    chatglm_load_attn_params_grouped, self.attn
+                )
+            else:
+                self.attn.load_parameter = partial(
+                    load_attn_fused_qkv_params, self.attn
+                )
+                self.attn.transpose_parameter = partial(
+                    transpose_attn_fused_qkv_params, self.attn
+                )
 
         self.mlp = (
             FalconMLP(config)
@@ -218,11 +221,17 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        self.attn.load_parameter(
-            self.module.self_attention.query_key_value,
-            self.module.self_attention.dense,
-            dtype=self.ipex_config.dtype,
-        )
+        if self.new_decoder_architecture:
+            self.attn.load_parameter(
+                qkv_proj=self.module.self_attention.query_key_value,
+                out_proj=self.module.self_attention.dense,
+            )
+        else:
+            self.attn.load_parameter(
+                self.module.self_attention.query_key_value,
+                self.module.self_attention.dense,
+                dtype=self.ipex_config.dtype,
+            )
 
     def port_mlp_parameter(self):
         if self.new_decoder_architecture:
@@ -255,13 +264,14 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
 
     def transpose_parameter(self):
         if self.new_decoder_architecture:
-            self.mlp.transpose_parameter()
-
-        if not self.grouped:
-            dtype = self.ipex_config.dtype
-            self.attn.transpose_parameter(dtype=dtype)
-        else:
             self.attn.transpose_parameter()
+            self.mlp.transpose_parameter()
+        else:
+            if not self.grouped:
+                dtype = self.ipex_config.dtype
+                self.attn.transpose_parameter(dtype=dtype)
+            else:
+                self.attn.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
         super().port_all_parameters_to_new_module()
@@ -369,7 +379,7 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         next_cache = None
         if use_cache:
             layer_past = outputs[0]
-            outputs = (output, layer_past) + outputs
+            outputs = (output, layer_past) + outputs[1:]
         else:
             outputs = (output,) + outputs[1:]
         return outputs
