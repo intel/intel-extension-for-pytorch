@@ -80,20 +80,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        set +e
-        echo "${VER_TORCH}" | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            echo ""
-            echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
-            exit 4
-        else
-            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
-        fi
+        echo "python -m pip install --pre torch==2.7.0.dev20250218 torchvision==0.22.0.dev20250218 torchaudio==2.6.0.dev20250218 --index-url https://download.pytorch.org/whl/nightly/cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.7.0%2Bgit491c503-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install --pre torch==2.7.0.dev20250218 torchvision==0.22.0.dev20250218 torchaudio==2.6.0.dev20250218 --index-url https://download.pytorch.org/whl/nightly/cpu
+        python -m pip install https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.7.0%2Bgit491c503-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
             VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -134,8 +124,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
                 echo "[Error] Command \"conda\" is not available."
                 exit 5
             else
-                conda install -y sysroot_linux-64 -c conda-forge
-                conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+                conda install -y sysroot_linux-64==2.28 c-compiler cxx-compiler gcc==12.3 gxx==12.3 zstd -c conda-forge
                 if [ -z ${CONDA_BUILD_SYSROOT} ]; then
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
@@ -150,15 +139,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             fi
         fi
 
-        set +e
-        echo ${VER_TORCH} | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        URL_NIGHTLY=""
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            URL_NIGHTLY="nightly/"
-        fi
-        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install --pre torch==2.7.0.dev20250218 torchvision==0.22.0.dev20250218 torchaudio==2.6.0.dev20250218 --index-url https://download.pytorch.org/whl/nightly/cpu" >> ${AUX_INSTALL_SCRIPT}
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh

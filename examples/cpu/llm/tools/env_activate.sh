@@ -69,7 +69,7 @@ if [ ${MODE} == "inference" ]; then
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+    wget -O prompt.json https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.com/miscellaneous/llm/prompt-phi4.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json
