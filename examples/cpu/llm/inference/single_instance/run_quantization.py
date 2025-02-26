@@ -199,7 +199,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4", "NF4"],
+    choices=["INT8", "INT4", "NF4", "FP8"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation"
@@ -1151,13 +1151,27 @@ elif args.ipex_weight_only_quantization:
         WoqWeightQScheme,
     )
 
+    if args.low_precision_checkpoint != "":
+        pathname = args.low_precision_checkpoint
+        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+        low_precision_checkpoint = (low_precision_checkpoint, quant_config)
+
+        if args.gptq_legacy_format:
+            raise AssertionError(
+                "gptq legacy format is deprecated and not supported now."
+            )
+    else:
+        low_precision_checkpoint = None
+
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
     elif args.weight_dtype == "INT4":
         weight_dtype = WoqWeightDtype.INT4
-    else:
-        assert args.weight_dtype == "NF4"
+    elif args.weight_dtype == "NF4":
         weight_dtype = WoqWeightDtype.NF4
+    else:
+        assert args.weight_dtype == "FP8"
+        weight_dtype = WoqWeightDtype.FP8
 
     if args.lowp_mode == "INT8":
         lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -1168,7 +1182,10 @@ elif args.ipex_weight_only_quantization:
     elif args.lowp_mode == "BF16":
         lowp_mode = ipex.quantization.WoqLowpMode.BF16
     else:  # AUTO
-        if args.low_precision_checkpoint != "" or weight_dtype == WoqWeightDtype.INT4:
+        if weight_dtype == WoqWeightDtype.INT4 or (
+            low_precision_checkpoint is not None
+            and low_precision_checkpoint[1]["quant_method"] != "fp8"
+        ):
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
@@ -1195,17 +1212,6 @@ elif args.ipex_weight_only_quantization:
         group_size=args.group_size,
         weight_qscheme=weight_qscheme,
     )
-    if args.low_precision_checkpoint != "":
-        pathname = args.low_precision_checkpoint
-        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
-        low_precision_checkpoint = (low_precision_checkpoint, quant_config)
-
-        if args.gptq_legacy_format:
-            raise AssertionError(
-                "gptq legacy format is deprecated and not supported now."
-            )
-    else:
-        low_precision_checkpoint = None
 
     user_model = ipex.llm.optimize(
         user_model.eval(),

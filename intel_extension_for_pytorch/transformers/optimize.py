@@ -2174,7 +2174,14 @@ def optimize(
                         "ipex.llm.optimize is prepared for the calibration of the static quantization"
                     )
 
-            elif not use_low_precision_checkpoint:  # weight only quantization
+            elif use_low_precision_checkpoint:  # weight only quantization
+                # for non-quantized layers
+                from ..nn.utils._weight_prepack import (
+                    weight_prepack_with_ipex,
+                )
+
+                _model = weight_prepack_with_ipex(_model, None, {})[0]
+            else:
                 # Note that low precision checkpoint is already handled at the beginning.
                 # If checkpoint is not provided, model is quantized here
                 _model = ipex_quantization_flow(

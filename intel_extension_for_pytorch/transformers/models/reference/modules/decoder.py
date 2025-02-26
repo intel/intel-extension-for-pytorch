@@ -2231,32 +2231,38 @@ class _IPEXDecoderLayerRef(nn.Module):
                     self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
                     del self.__dict__["_modules"]["mamba"].out_proj
         elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
-            if not self.distributed:
+            if not self.distributed and hasattr(module.self_attn, "o_proj"):
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
                 if config.n_shared_experts is not None:
-                    if not self.distributed:
+                    if not self.distributed and hasattr(
+                        module.mlp.shared_experts, "down_proj"
+                    ):
                         self.shared_linear_add_add = _IPEXlinearAddAddRef(
                             module.mlp.shared_experts.down_proj
                         )
                         del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
-                    self.shared_linear_silu_mul = _IPEXlinearSiluMulRef(
-                        module.mlp.shared_experts.gate_proj,
-                        module.mlp.shared_experts.up_proj,
-                    )
-                    del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
-                    del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                    if hasattr(module.mlp.shared_experts, "gate_proj") and hasattr(
+                        module.mlp.shared_experts, "up_proj"
+                    ):
+                        self.shared_linear_silu_mul = _IPEXlinearSiluMulRef(
+                            module.mlp.shared_experts.gate_proj,
+                            module.mlp.shared_experts.up_proj,
+                        )
+                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
+                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
             else:  # DeepseekV2MLP
-                if not self.distributed:
+                if not self.distributed and hasattr(module.mlp, "down_proj"):
                     self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
                     del self.__dict__["_modules"]["mlp"].down_proj
-                self.mlp_linear_silu_mul = _IPEXlinearSiluMulRef(
-                    module.mlp.gate_proj, module.mlp.up_proj
-                )
-                del self.__dict__["_modules"]["mlp"].gate_proj
-                del self.__dict__["_modules"]["mlp"].up_proj
+                if hasattr(module.mlp, "gate_proj") and hasattr(module.mlp, "up_proj"):
+                    self.mlp_linear_silu_mul = _IPEXlinearSiluMulRef(
+                        module.mlp.gate_proj, module.mlp.up_proj
+                    )
+                    del self.__dict__["_modules"]["mlp"].gate_proj
+                    del self.__dict__["_modules"]["mlp"].up_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
