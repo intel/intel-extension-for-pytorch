@@ -1227,7 +1227,10 @@ with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
 entry_points = {
     "console_scripts": [
         "ipexrun = {}.launcher:main".format(PACKAGE_NAME),
-    ]
+    ],
+    "torch.backends": [
+        "intel_extension_for_pytorch = intel_extension_for_pytorch:_autoload",
+    ],
 }
 
 
@@ -1245,11 +1248,7 @@ setup(
     zip_safe=False,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
-    entry_points={
-        "torch.backends": [
-            "intel_extension_for_pytorch = intel_extension_for_pytorch:_autoload",
-        ],
-    },
+    entry_points=entry_points,
     license="https://www.apache.org/licenses/LICENSE-2.0",
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
