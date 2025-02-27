@@ -176,7 +176,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument(
         "--weight-dtype",
-        choices=["INT8", "INT4", "NF4"],
+        choices=["INT8", "INT4", "NF4", "FP8"],
         default="INT8",
         type=str,
         help="weight data type for weight only quantization. Unrelated to activation"

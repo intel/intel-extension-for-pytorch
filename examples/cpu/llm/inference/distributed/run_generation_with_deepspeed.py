@@ -143,7 +143,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4", "NF4"],
+    choices=["INT8", "INT4", "NF4", "FP8"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
@@ -565,9 +565,11 @@ if use_ipex:
             weight_dtype = WoqWeightDtype.INT8
         elif args.weight_dtype == "INT4":
             weight_dtype = WoqWeightDtype.INT4
-        else:
-            assert args.weight_dtype == "NF4"
+        elif args.weight_dtype == "NF4":
             weight_dtype = WoqWeightDtype.NF4
+        else:
+            assert args.weight_dtype == "FP8"
+            weight_dtype = WoqWeightDtype.FP8
         if args.lowp_mode == "INT8":
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         elif args.lowp_mode == "FP32":
@@ -577,9 +579,9 @@ if use_ipex:
         elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
         else:  # AUTO
-            if (
-                weight_dtype == WoqWeightDtype.INT4
-                or low_precision_checkpoint is not None
+            if weight_dtype == WoqWeightDtype.INT4 or (
+                low_precision_checkpoint is not None
+                and quant_config["quant_method"] != "fp8"
             ):
                 lowp_mode = ipex.quantization.WoqLowpMode.INT8
             else:

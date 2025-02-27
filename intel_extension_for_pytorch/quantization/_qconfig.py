@@ -148,12 +148,14 @@ class WoqWeightDtype(IntEnum):
     INT8 = 1
     INT4 = 2
     NF4 = 3
+    FP8 = 4
 
 
 WOQ_DTYPE_TO_STR = {
     WoqWeightDtype.INT8: "int8",
     WoqWeightDtype.INT4: "int4",
     WoqWeightDtype.NF4: "nf4",
+    WoqWeightDtype.FP8: "fp8",
 }
 
 

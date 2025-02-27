@@ -155,6 +155,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         torch.qint8,
                         torch.int8,
                         torch.uint8,
+                        torch.float8_e4m3fn,
                     ]:
                         self.moe_linear_type = 4
                     elif (

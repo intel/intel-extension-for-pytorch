@@ -484,6 +484,88 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel_impl(
   return std::make_tuple(topk, topk_weight.to(hidden_states.scalar_type()));
 }
 
+void convert_e4m3_to_bf16_intrinsic(
+    at::Float8_e4m3fn* src_ptr,
+    at::BFloat16* dst_ptr,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+#if defined(CPU_CAPABILITY_AVX512)
+  if (with_denorm) {
+    if (with_lut) {
+      torch_ipex::cpu::kernel::initialize_e4m3_to_16bit_tables<at::BFloat16>();
+      torch_ipex::cpu::kernel::cvt_e4m3_16bit_intrinsic_lut<at::BFloat16>(
+          src_ptr, dst_ptr, len);
+    } else {
+      torch_ipex::cpu::kernel::cvt_e4m3_bf16_intrinsic(
+          src_ptr, dst_ptr, len, with_denorm);
+    }
+  } else {
+    torch_ipex::cpu::kernel::cvt_e4m3_bf16_intrinsic(
+        src_ptr, dst_ptr, len, with_denorm);
+  }
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::BFloat16>(src_ptr[i]);
+  }
+#endif
+}
+
+void convert_e4m3_to_fp32_intrinsic(
+    at::Float8_e4m3fn* src_ptr,
+    float* dst_ptr,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+#if defined(CPU_CAPABILITY_AVX512)
+  if (with_denorm) {
+    if (with_lut) {
+      torch_ipex::cpu::kernel::initialize_e4m3_to_16bit_tables<at::BFloat16>();
+      torch_ipex::cpu::kernel::cvt_e4m3_16bit_intrinsic_lut<float>(
+          src_ptr, dst_ptr, len);
+    }
+  } else {
+    torch_ipex::cpu::kernel::cvt_e4m3_fp32_intrinsic(src_ptr, dst_ptr, len);
+  }
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<float>(src_ptr[i]);
+  }
+#endif
+}
+
+void convert_e4m3_to_fp16_intrinsic(
+    at::Float8_e4m3fn* src_ptr,
+    at::Half* dst_ptr,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+#if defined(CPU_CAPABILITY_AVX512)
+  if (with_lut) {
+    torch_ipex::cpu::kernel::initialize_e4m3_to_16bit_tables<at::Half>();
+    torch_ipex::cpu::kernel::cvt_e4m3_16bit_intrinsic_lut<at::Half>(
+        src_ptr, dst_ptr, len);
+  }
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::Half>(src_ptr[i]);
+  }
+#endif
+}
+
+void convert_e5m2_to_fp16_intrinsic(
+    at::Float8_e5m2* src_ptr,
+    at::Half* dst_ptr,
+    int64_t len) {
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::cvt_e5m2_fp16_intrinsic(src_ptr, dst_ptr, len);
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::Half>(src_ptr[i]);
+  }
+#endif
+}
+
 } // anonymous namespace
 
 IPEX_REGISTER_DISPATCH(
@@ -496,6 +578,18 @@ IPEX_REGISTER_DISPATCH(mixtral_moe_kernel_stub, &mixtral_moe_kernl_impl);
 IPEX_REGISTER_DISPATCH(
     deepseek_moegate_kernel_stub,
     &deepseek_moegate_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    convert_e4m3_to_bf16_intrinsic_stub,
+    &convert_e4m3_to_bf16_intrinsic);
+IPEX_REGISTER_DISPATCH(
+    convert_e4m3_to_fp32_intrinsic_stub,
+    &convert_e4m3_to_fp32_intrinsic);
+IPEX_REGISTER_DISPATCH(
+    convert_e4m3_to_fp16_intrinsic_stub,
+    &convert_e4m3_to_fp16_intrinsic);
+IPEX_REGISTER_DISPATCH(
+    convert_e5m2_to_fp16_intrinsic_stub,
+    &convert_e5m2_to_fp16_intrinsic);
 
 } // namespace cpu
 } // namespace torch_ipex
