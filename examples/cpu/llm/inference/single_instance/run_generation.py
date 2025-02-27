@@ -191,8 +191,8 @@ if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
 if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
-if re.search("phio", config.architectures[0], re.IGNORECASE):
-    model_type = "phio"
+if re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model_type = "phi4mm"
     model_class = MODEL_CLASSES[model_type]
     prompt = args.prompt
     _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
@@ -228,6 +228,7 @@ if re.search("phio", config.architectures[0], re.IGNORECASE):
         args.input_mode
     ), "Input mode in prompt is not consistent with the input mode in the command line."
 if model_type != "llava":
+    config._attn_implementation = "eager"
     model = model_class[0].from_pretrained(
         args.model_id,
         torch_dtype=amp_dtype,
@@ -283,7 +284,7 @@ elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search
         return image
 
 elif re.search("mllama", model.config.architectures[0], re.IGNORECASE) or re.search(
-    "phio", model.config.architectures[0], re.IGNORECASE
+    "phi4mm", model.config.architectures[0], re.IGNORECASE
 ):
     from PIL import Image
 
@@ -324,14 +325,14 @@ if re.search("yuan", model.config.architectures[0], re.IGNORECASE) or re.search(
     "jamba", model.config.architectures[0], re.IGNORECASE
 ):
     model.config.batch_size = int(args.batch_size) * num_beams
-if re.search("phio", model.config.architectures[0], re.IGNORECASE):
+if re.search("phi4mm", model.config.architectures[0], re.IGNORECASE):
     model.config.batch_size = int(args.batch_size) * num_beams
     model.config.audio_batch_size = audio_batch_size * num_beams
 if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
     import librosa
 
     sample = librosa.load(args.audio, sr=16000)
-if re.search("phio", model.config.architectures[0], re.IGNORECASE):
+if re.search("phi4mm", model.config.architectures[0], re.IGNORECASE):
     if config.input_mode in [2, 3]:
         import soundfile
 
@@ -401,7 +402,7 @@ if args.benchmark:
             if hasattr(tokenizer, "process_reporting_input")
             else tokenizer.format_and_preprocess_reporting_input
         )
-    elif model_type == "phio":
+    elif model_type == "phi4mm":
         prompt = args.prompt
     else:
         # input prompt
@@ -487,7 +488,7 @@ if args.benchmark:
                 )
                 input_ids = processed_inputs["input_ids"]
                 output = model.generate(**processed_inputs, **generate_kwargs)
-            elif model_type == "phio":
+            elif model_type == "phi4mm":
                 raw_image = load_image(args.image_url) if is_vision else None
                 raw_image = [raw_image] * args.batch_size
                 samples = [sample] * audio_batch_size
@@ -506,7 +507,7 @@ if args.benchmark:
             gen_text = tokenizer.batch_decode(
                 (
                     gen_ids[:, input_ids.shape[1] :]
-                    if model_type in ["llava", "maira2", "phio"]
+                    if model_type in ["llava", "maira2", "phi4mm"]
                     else gen_ids
                 ),
                 skip_special_tokens=True,
@@ -582,7 +583,7 @@ if args.benchmark:
                             get_grounding=False,
                         )
                         output = model.generate(**processed_inputs, **generate_kwargs)
-                    elif model_type == "phio":
+                    elif model_type == "phi4mm":
                         raw_image = load_image(args.image_url) if is_vision else None
                         raw_image = [raw_image] * args.batch_size
                         samples = [sample] * audio_batch_size

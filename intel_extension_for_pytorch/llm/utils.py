@@ -49,7 +49,6 @@ def _get_relative_imports(module_file):
     # For Baichuan2
     if "quantizer" in relative_imports:
         relative_imports.remove("quantizer")
-
     return list(relative_imports)
 
 

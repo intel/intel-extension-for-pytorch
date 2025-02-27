@@ -401,8 +401,8 @@ if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generatio
 num_beams = 1 if args.greedy else 4
 if model_type in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
-if re.search("phio", config.architectures[0], re.IGNORECASE):
-    model_type = "phio"
+if re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model_type = "phi4mm"
     model_class = MODEL_CLASSES[model_type]
     tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
     prompt = args.prompt
@@ -473,7 +473,7 @@ elif world_size == 1 or model_type in [
     "yuan",
     "whisper",
     "jamba",
-    "phio",
+    "phi4mm",
 ]:
     model = model_class[0].from_pretrained(
         model_name,
@@ -814,7 +814,7 @@ elif model_type == "mllama":
     input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
     inputs = [prompt] * args.batch_size
-elif model_type == "phio":
+elif model_type == "phi4mm":
     from PIL import Image
 
     def load_image(image_file):
@@ -926,7 +926,7 @@ def generate():
             get_grounding=False,
         )
         input_ids = input_tokens["input_ids"]
-    elif model_type == "phio":
+    elif model_type == "phi4mm":
         raw_image = load_image(args.image_url) if is_vision else None
         raw_image = [raw_image] * args.batch_size
         samples = [sample] * audio_batch_size
@@ -963,7 +963,7 @@ def generate():
     gen_text = tokenizer.batch_decode(
         (
             gen_ids[:, input_ids.shape[1] :]
-            if model_type in ["llava", "maira2", "phio"]
+            if model_type in ["llava", "maira2", "phi4mm"]
             else gen_ids
         ),
         skip_special_tokens=True,

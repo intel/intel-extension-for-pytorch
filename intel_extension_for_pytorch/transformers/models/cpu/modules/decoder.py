@@ -40,7 +40,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
         elif self.model_backbone in [
             "WhisperForConditionalGeneration",
             "Phi3ForCausalLM",
-            "PhiOForCausalLM",
+            "Phi4MMForCausalLM",
             "LlavaLlamaForCausalLM",
             "GitForCausalLM",
             "MixtralForCausalLM",
@@ -214,7 +214,7 @@ class _IPEXEncoderLayerCPU(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
         if self.model_backbone in [
             "MllamaForConditionalGeneration",
-            "PhiOForCausalLM",
+            "Phi4MMForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "mlp_linear_add"):

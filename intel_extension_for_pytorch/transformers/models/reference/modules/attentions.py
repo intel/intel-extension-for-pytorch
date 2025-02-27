@@ -2687,7 +2687,7 @@ class _IPEXAttentionRef(nn.Module):
                         and module._get_name() == "CLIPAttention"
                     )
                     or (
-                        self.model_backbone == "PhiOForCausalLM"
+                        self.model_backbone == "Phi4MMForCausalLM"
                         and module._get_name()
                         in ["SiglipAttention", "SiglipFlashAttention2"]
                     )
@@ -2695,7 +2695,7 @@ class _IPEXAttentionRef(nn.Module):
                 ):
                     self.num_key_value_heads = self.num_attention_heads
                 elif (
-                    self.model_backbone == "PhiOForCausalLM"
+                    self.model_backbone == "Phi4MMForCausalLM"
                     and module._get_name() == "MultiHeadedAttention"
                 ):
                     self.num_key_value_heads = self.h_k
@@ -2707,10 +2707,20 @@ class _IPEXAttentionRef(nn.Module):
                     )
             else:
                 self.num_key_value_heads = self.num_attention_heads
-        self.num_key_value_groups = self.num_attention_heads // self.num_key_value_heads
-
-        self.head_dim = self.hidden_size // self.num_attention_heads
-
+        if hasattr(self, "num_key_value_groups"):
+            self.num_attention_heads = (
+                self.num_key_value_heads * self.num_key_value_groups
+            )
+        else:
+            self.num_key_value_groups = (
+                self.num_attention_heads // self.num_key_value_heads
+            )
+        self.num_heads = self.num_attention_heads
+        if hasattr(module, "head_dim"):
+            self.head_dim = module.head_dim
+            self.hidden_size = self.num_attention_heads * self.head_dim
+        else:
+            self.head_dim = self.hidden_size // self.num_attention_heads
         self.max_position_embeddings = (
             config.max_position_embeddings
             if hasattr(config, "max_position_embeddings")
@@ -2726,7 +2736,7 @@ class _IPEXAttentionRef(nn.Module):
                 "MptForCausalLM",
                 "GitForCausalLM",
                 "WhisperForConditionalGeneration",
-                "PhiOForCausalLM",
+                "Phi4MMForCausalLM",
             ]
             or (
                 self.model_backbone == "BaichuanForCausalLM"
@@ -2745,7 +2755,7 @@ class _IPEXAttentionRef(nn.Module):
                 and module._get_name() != "MllamaTextCrossSdpaAttention"
             )
             or (
-                self.model_backbone == "PhiOForCausalLM"
+                self.model_backbone == "Phi4MMForCausalLM"
                 and module._get_name() != "SiglipAttention"
                 and module._get_name() != "SiglipFlashAttention2"
                 and module._get_name() != "MultiHeadedAttention"
@@ -2769,6 +2779,18 @@ class _IPEXAttentionRef(nn.Module):
                 "DeepseekV3ForCausalLM",
             ]:
                 self.pos_embd_dim = self.qk_rope_head_dim
+            elif (
+                hasattr(config, "rope_scaling")
+                and "type" in config.rope_scaling
+                and config.rope_scaling["type"] == "longrope"
+            ):
+                partial_rotary_factor = (
+                    config.partial_rotary_factor
+                    if hasattr(config, "partial_rotary_factor")
+                    else 1.0
+                )
+                head_dim = module.head_dim
+                self.pos_embd_dim = int(head_dim * partial_rotary_factor)
             else:
                 self.pos_embd_dim = self.head_dim
             self.rope_base = 10000
@@ -2832,7 +2854,7 @@ class _IPEXAttentionRef(nn.Module):
             "PhiForCausalLM",
             "Qwen2ForCausalLM",
             "DeepseekV2ForCausalLM",
-            # "PhiOForCausalLM",
+            # "Phi4MMForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
@@ -2869,7 +2891,7 @@ class _IPEXAttentionRef(nn.Module):
                         [module.q_a_proj, module.kv_a_proj_with_mqa]
                     )
                     del module.q_a_proj, module.kv_a_proj_with_mqa
-            if self.model_backbone in ["PhiOForCausalLM"]:
+            if self.model_backbone in ["Phi4MMForCausalLM"]:
                 if (
                     hasattr(module, "linear_q")
                     and hasattr(module, "linear_k")
@@ -2890,7 +2912,7 @@ class _IPEXAttentionRef(nn.Module):
             self.is_mllama_cross_attention = False
         else:
             self.is_mllama_cross_attention = True
-        if self.model_backbone == "PhiOForCausalLM":
+        if self.model_backbone == "Phi4MMForCausalLM":
             if module._get_name() in ["SiglipAttention", "SiglipFlashAttention2"]:
                 self.is_vision_attention = True
             else:
@@ -3325,7 +3347,7 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif self.model_backbone == "PhiOForCausalLM":
+        elif self.model_backbone == "Phi4MMForCausalLM":
             if self.is_vision_attention:
                 return _SiglipAttention_forward(
                     self,

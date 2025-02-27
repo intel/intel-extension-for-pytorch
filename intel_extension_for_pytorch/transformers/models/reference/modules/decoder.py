@@ -2386,7 +2386,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 )
                 del self.__dict__["_modules"]["mlp"].gate_proj
                 del self.__dict__["_modules"]["mlp"].up_proj
-        elif self.model_backbone == "PhiOForCausalLM":
+        elif self.model_backbone == "Phi4MMForCausalLM":
             if config.input_mode == 0:
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(
@@ -2701,7 +2701,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 past_key_value,
             )
-        elif self.model_backbone == "PhiOForCausalLM":
+        elif self.model_backbone == "Phi4MMForCausalLM":
             return PhiODecoderLayer_forward(
                 self,
                 hidden_states,
@@ -2794,7 +2794,7 @@ class _IPEXEncoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc2
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
             del self.__dict__["_modules"]["mlp"].fc1
-        elif self.model_backbone == "PhiOForCausalLM":
+        elif self.model_backbone == "Phi4MMForCausalLM":
             self.is_vision_encoder = False
             if module._get_name() == "SiglipEncoderLayer":
                 self.is_vision_encoder = True
@@ -2830,7 +2830,7 @@ class _IPEXEncoderLayerRef(nn.Module):
                 attention_mask,
                 output_attentions,
             )
-        elif self.model_backbone == "PhiOForCausalLM":
+        elif self.model_backbone == "Phi4MMForCausalLM":
             if self.is_vision_encoder:
                 return SiglipEncoderLayer_forward(
                     self,

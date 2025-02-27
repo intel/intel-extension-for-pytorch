@@ -44,7 +44,7 @@ from llm.inference.utils.model_class.git import GitConfig
 from llm.inference.utils.model_class.llava import LlavaConfig
 from llm.inference.utils.model_class.phi import PhiConfig
 from llm.inference.utils.model_class.phi import Phi3Config
-from llm.inference.utils.model_class.phi import PhiOConfig
+from llm.inference.utils.model_class.phi import Phi4MMConfig
 from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
 from llm.inference.utils.model_class.maira2 import MAIRA2Config
@@ -427,8 +427,8 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         roles = conv.roles
 elif re.search("phi3", config.architectures[0], re.IGNORECASE):
     model = Phi3Config(args.model_id)
-elif re.search("phio", config.architectures[0], re.IGNORECASE):
-    model = PhiOConfig(args.model_id)
+elif re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model = Phi4MMConfig(args.model_id)
     from PIL import Image
     import soundfile
 
@@ -528,7 +528,7 @@ if model.name == "mpt" and args.prompt is None:
     config.max_seq_len = max_seq_len
 if model.name in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
-if model.name == "phio":
+if model.name == "phi4mm":
     config.batch_size = int(args.batch_size) * num_beams
     config.audio_batch_size = audio_batch_size * num_beams
 if model.name == "whisper":
@@ -745,7 +745,7 @@ def get_example_inputs(model):
         if model.name == "mllama":
             cross_attention_mask = torch.ones(1, 32, 1, 4)
             example_inputs = example_inputs + (cross_attention_mask,)
-        if model.name == "phio":
+        if model.name == "phi4mm":
             input_mode = config.input_mode
             batch_size = config.batch_size
             audio_batch_size = config.audio_batch_size
@@ -1395,7 +1395,7 @@ elif args.ipex_weight_only_quantization:
             )
             self_jit_next = torch.jit.freeze(self_jit_next.eval())
             self_jit_next.save(args.output_dir + "/" + args.quant_model_name + "2")
-        elif model.name == "phio":
+        elif model.name == "phi4mm":
             batch_size = config.batch_size
             audio_batch_size = config.audio_batch_size
             if config.input_mode == 1:
@@ -1446,7 +1446,7 @@ if args.benchmark:
             self_jit = torch.jit.load(args.quantized_model_path)
             self_jit = torch.jit.freeze(self_jit.eval())
             if model.name in ["yuan", "mllama", "maira2"] or (
-                model.name == "phio" and config.input_mode > 0
+                model.name == "phi4mm" and config.input_mode > 0
             ):
                 self_jit_first = torch.jit.load(args.quantized_model_path + "2")
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
@@ -1457,7 +1457,7 @@ if args.benchmark:
             print("warning: loading failed.", e)
             self_jit = quant_model
         if model.name in ["yuan", "mllama", "maira2"] or (
-            model.name == "phio" and config.input_mode > 0
+            model.name == "phi4mm" and config.input_mode > 0
         ):
             ipex._set_optimized_model_for_generation(
                 user_model,
@@ -1508,7 +1508,7 @@ if args.benchmark:
             if hasattr(tokenizer, "process_reporting_input")
             else tokenizer.format_and_preprocess_reporting_input
         )
-    elif model.name == "phio":
+    elif model.name == "phi4mm":
         prompt = args.prompt
         sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
     else:
@@ -1594,7 +1594,7 @@ if args.benchmark:
                 )
                 input_ids = processed_inputs["input_ids"]
                 output = user_model.generate(**processed_inputs, **generate_kwargs)
-            elif model.name == "phio":
+            elif model.name == "phi4mm":
                 raw_image = load_image(args.image_url) if is_vision else None
                 raw_image = [raw_image] * args.batch_size
                 samples = [sample] * audio_batch_size
@@ -1613,7 +1613,7 @@ if args.benchmark:
             gen_text = tokenizer.batch_decode(
                 (
                     gen_ids[:, input_ids.shape[1] :]
-                    if model.name in ["llava", "maira2", "phio"]
+                    if model.name in ["llava", "maira2", "phi4mm"]
                     else gen_ids
                 ),
                 skip_special_tokens=True,
@@ -1694,7 +1694,7 @@ if args.benchmark:
                     )
                     input_ids = processed_inputs["input_ids"]
                     output = user_model.generate(**processed_inputs, **generate_kwargs)
-                elif model.name == "phio":
+                elif model.name == "phi4mm":
                     raw_image = load_image(args.image_url) if is_vision else None
                     raw_image = [raw_image] * args.batch_size
                     samples = [sample] * audio_batch_size
@@ -1713,7 +1713,7 @@ if args.benchmark:
                 gen_text = tokenizer.batch_decode(
                     (
                         gen_ids[:, input_ids.shape[1] :]
-                        if model.name in ["llava", "phio"]
+                        if model.name in ["llava", "phi4mm"]
                         else gen_ids
                     ),
                     skip_special_tokens=True,

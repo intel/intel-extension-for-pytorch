@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.46.2"
+    validated_version = "4.48.0"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -1017,7 +1017,7 @@ def model_convert_reference(_model):
             "prepare_inputs_for_generation",
             prepare_inputs_for_generation_phi3,
         )
-    elif _model.config.architectures[0] == "PhiOForCausalLM":
+    elif _model.config.architectures[0] == "Phi4MMForCausalLM":
         import peft
 
         convert_functions(
@@ -1582,7 +1582,7 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs["cross_attention_mask"] = cross_attention_mask
         else:
             sample_inputs = sample_inputs + (cross_attention_mask,)
-    if _model.config.architectures[0] == "PhiOForCausalLM":
+    if _model.config.architectures[0] == "Phi4MMForCausalLM":
         input_mode = (
             _model.config.input_mode if hasattr(_model.config, "input_mode") else 0
         )
@@ -1794,7 +1794,7 @@ def model_convert_lowering(
                 "BaichuanForCausalLM",
                 "YuanForCausalLM",
                 "Phi3ForCausalLM",
-                "PhiOForCausalLM",
+                "Phi4MMForCausalLM",
             ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -1922,7 +1922,7 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
-                elif _model.config.architectures[0] == "PhiOForCausalLM":
+                elif _model.config.architectures[0] == "Phi4MMForCausalLM":
                     batch_size = (
                         _model.config.batch_size
                         if hasattr(_model.config, "batch_size")
@@ -2201,7 +2201,7 @@ def optimize(
                 "YuanForCausalLM",
                 "PhiForCausalLM",
                 "Phi3ForCausalLM",
-                "PhiOForCausalLM",
+                "Phi4MMForCausalLM",
                 "WhisperForConditionalGeneration",
                 "Maira2ForConditionalGeneration",
                 "JambaForCausalLM",

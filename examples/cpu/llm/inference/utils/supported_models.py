@@ -31,7 +31,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi-4-multimodal": (AutoModelForCausalLM, AutoProcessor),
-    "phio": (AutoModelForCausalLM, AutoProcessor),
+    "phi4mm": (AutoModelForCausalLM, AutoProcessor),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
     "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "maira2": (AutoModelForCausalLM, AutoProcessor),

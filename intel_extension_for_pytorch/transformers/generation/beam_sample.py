@@ -173,7 +173,7 @@ def _beam_sample(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
-            "PhiOForCausalLM",
+            "Phi4MMForCausalLM",
             "WhisperForConditionalGeneration",
             "Qwen2ForCausalLM",
             "Maira2ForConditionalGeneration",

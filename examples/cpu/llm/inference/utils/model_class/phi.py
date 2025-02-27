@@ -30,9 +30,9 @@ class Phi3Config(LLMConfig):
         self.use_ipex_autotune = True
 
 
-class PhiOConfig(LLMConfig):
+class Phi4MMConfig(LLMConfig):
     def __init__(self, model_id):
-        self.name = "phio"
+        self.name = "phi4mm"
         self.model_id = model_id
         self.to_channels_last = True
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS

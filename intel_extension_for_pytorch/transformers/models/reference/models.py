@@ -5084,32 +5084,24 @@ def Phi3Model_forward(
     if inputs_embeds is None:
         inputs_embeds = self.embed_tokens(input_ids)
 
-    if self._attn_implementation == "flash_attention_2":
-        # 2d mask is passed through the layers
-        attention_mask = (
-            attention_mask
-            if (attention_mask is not None and 0 in attention_mask)
-            else None
-        )
-    else:
-        if self.config.sliding_window is not None:
-            # 4d mask is passed through the layers
-            if attention_mask is not None and len(attention_mask.shape) == 2:
-                attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
-                    attention_mask,
-                    inputs_embeds,
-                    torch.tensor(past_key_values_length).contiguous(),
-                    torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
-                    self.config.sliding_window,
-                )
-        else:
-            # 4d mask is passed through the layers
-            attention_mask = _prepare_4d_causal_attention_mask(
+    if self.config.sliding_window is not None:
+        # 4d mask is passed through the layers
+        if attention_mask is not None and len(attention_mask.shape) == 2:
+            attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
                 attention_mask,
-                (batch_size, seq_length),
                 inputs_embeds,
-                past_key_values_length,
+                torch.tensor(past_key_values_length).contiguous(),
+                torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+                self.config.sliding_window,
             )
+    else:
+        # 4d mask is passed through the layers
+        attention_mask = _prepare_4d_causal_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
 
     hidden_states = inputs_embeds
 
