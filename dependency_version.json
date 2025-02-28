@@ -24,7 +24,7 @@
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "version": "2025.0"
+      "version": "2025.0.4"
     },
     "mkl-dpcpp": {
       "version": "2025.0.1"
@@ -33,7 +33,7 @@
       "version": "2021.14.1"
     },
     "impi-devel": {
-      "version": "2021.14.0"
+      "version": "2021.14.1"
     },
     "intel-pti": {
       "version": "0.10"
