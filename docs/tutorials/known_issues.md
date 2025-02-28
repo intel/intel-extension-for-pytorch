@@ -117,6 +117,15 @@ Troubleshooting
     pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
     ```
 
+- **Problem**: ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+                torch 2.6.0+xpu requires intel-cmplr-lib-rt==2025.0.2, but you have intel-cmplr-lib-rt 2025.0.4 which is incompatible.
+                torch 2.6.0+xpu requires intel-cmplr-lib-ur==2025.0.2, but you have intel-cmplr-lib-ur 2025.0.4 which is incompatible.
+                torch 2.6.0+xpu requires intel-cmplr-lic-rt==2025.0.2, but you have intel-cmplr-lic-rt 2025.0.4 which is incompatible.
+                torch 2.6.0+xpu requires intel-sycl-rt==2025.0.2, but you have intel-sycl-rt 2025.0.4 which is incompatible.
+  - **Cause**: The intel-extension-for-pytorch v2.6.10+xpu uses Intel Compiler 2025.0.4 for a distributed feature fix, while torch v2.6.0+xpu is pinned with 2025.0.2.
+  - **Solution**: Ignore the Error since actually torch v2.6.0+xpu is compatible with Intel Compiler 2025.0.4.
+
+
 ## Performance Issue
 
 - **Problem**: Extended durations for data transfers from the host system to the device (H2D) and from the device back to the host system (D2H).

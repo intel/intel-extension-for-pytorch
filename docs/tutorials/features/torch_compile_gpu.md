@@ -9,20 +9,10 @@ Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph c
 # Required Dependencies
 
 **Verified version**:
-- `torch` : v2.5
-- `intel_extension_for_pytorch` : v2.5
-- `triton` : v3.1.0+91b14bf559
+- `torch` : v2.6
+- `intel_extension_for_pytorch` : v2.6
 
-
-Install [Intel® oneAPI DPC++/C++ Compiler 2025.0.4](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler-download.html).
-
-Follow [Intel® Extension for PyTorch\* Installation](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) to install `torch` and `intel_extension_for_pytorch` firstly.
-
-Triton could be directly installed using the following command:
-
-```Bash
-pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559 --index-url https://download.pytorch.org/whl/nightly/xpu
-```
+Follow [ https://pytorch-extension.intel.com/installation?platform=gpu&version=v2.6.10%2Bxpu) to install `torch` and `intel_extension_for_pytorch`. Triton is installed along with torch.
 
 The cached files would be generated if you had run `torch.compile` with a previous version of triton, but they are generally conflicting with the new version.
 So, if the folder `~/.triton` exists before your first running of the `torch.compile` script in the current environment, please delete it.
@@ -32,16 +22,7 @@ So, if the folder `~/.triton` exists before your first running of the `torch.com
 rm -rf ~/.triton
 ```
 
-Remember to activate the oneAPI DPC++/C++ Compiler by following commands.
-
-```bash
-# {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest
-source {dpcpproot}/env/vars.sh
-```
-
-
 # Example Usage
-
 
 ## Inferenece with torch.compile
 
