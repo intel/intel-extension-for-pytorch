@@ -9,7 +9,7 @@ dpcpp_device = torch.device("xpu")
 class TestTorchMethod:
 
     def init(self, n_token, n_expert, n_topk):
-        gating_logits = torch.randn(n_token, n_expert, device=dpcpp_device)
+        gating_logits = torch.rand(n_token, n_expert, device=dpcpp_device)
         gating_logits = gating_logits.to(torch.float)
         softmax = torch.nn.functional.softmax(gating_logits, dim=-1, dtype=torch.float)
         topk_weights, topk_indices = torch.topk(softmax, n_topk, dim=-1)
@@ -108,7 +108,7 @@ class TestTorchMethod:
     def test_moe_gather(self, dtype, n_expert, n_token):
         n_channels = 1024
         n_topk = 2
-        activation = torch.randn(
+        activation = torch.rand(
             (n_token * n_topk, n_channels), dtype=dtype, device=dpcpp_device
         )
         topk_weights, topk_indices, token_for_experts, token_offset = self.init(
