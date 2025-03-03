@@ -19,6 +19,36 @@ def load_attn_fused_qkv_params(self, qkv_layer, out_layer, dtype, grouped=False)
         self.out_proj.weight = out_layer.weight
         self.out_proj.bias = out_layer.bias
     elif dtype == "int4":
+        if grouped:
+            num_head = self.num_attn_head
+            num_kv_head = self.num_kv_heads
+            head_dim = self.head_dim
+            group = num_head // num_kv_head + 2
+            embed_dim = qkv_layer.qweight.shape[0]
+            scales_dim = qkv_layer.scales.shape[0]
+
+            qkv_layer.qweight.data = qkv_layer.qweight.view(
+                embed_dim, num_kv_head, group, head_dim
+            )
+            wq = qkv_layer.qweight[:, :, :-2].reshape(embed_dim, -1)
+            wk = qkv_layer.qweight[:, :, -2].reshape(embed_dim, -1)
+            wv = qkv_layer.qweight[:, :, -1].reshape(embed_dim, -1)
+            qkv_layer.qweight.data = torch.concat([wq, wk, wv], dim=1).contiguous()
+
+            qkv_layer.bias.data = qkv_layer.bias.view(num_kv_head, group, head_dim)
+            bq = qkv_layer.bias[:, :-2].reshape(-1)
+            bk = qkv_layer.bias[:, -2].reshape(-1)
+            bv = qkv_layer.bias[:, -1].reshape(-1)
+            qkv_layer.bias.data = torch.concat([bq, bk, bv], dim=0).contiguous()
+
+            qkv_layer.scales.data = qkv_layer.scales.view(
+                scales_dim, num_kv_head, group, head_dim
+            )
+            sq = qkv_layer.scales[:, :, :-2].reshape(scales_dim, -1)
+            sk = qkv_layer.scales[:, :, -2].reshape(scales_dim, -1)
+            sv = qkv_layer.scales[:, :, -1].reshape(scales_dim, -1)
+            qkv_layer.scales.data = torch.concat([sq, sk, sv], dim=1).contiguous()
+
         self.qkv_proj_quant.set_weights_bias(qkv_layer.qweight, qkv_layer.bias)
         self.qkv_proj_quant.set_scales_zps_gidx(qkv_layer.scales, qkv_layer.qzeros)
         self.qkv_proj_quant.blocksize = qkv_layer.blocksize

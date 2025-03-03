@@ -189,7 +189,7 @@ def GLMTransformer_forward(
 
 
 # return repeat_interleave of cache compared to original
-class NewIPEXRotaryEmbedding(nn.Module):
+class NewIPEXChatGLMRotaryEmbedding(nn.Module):
     def __init__(self, module, config, device="xpu"):
         super().__init__()
         dim = module.dim
@@ -309,6 +309,7 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         **kwargs,
     ):
         super().__init__(module, config, dtype, device, module_name)
+        config.num_hidden_layers = config.num_layers
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )

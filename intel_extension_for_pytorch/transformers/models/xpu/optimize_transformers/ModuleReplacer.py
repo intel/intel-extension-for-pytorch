@@ -44,8 +44,9 @@ from .modules.qwen2 import NewIPEXQWEN2DecoderLayer
 from .modules.baichuan import NewIPEXBaichuanBlock
 from .modules.chatglm import (
     NewIPEXCHATGLMBlock,
-    NewIPEXRotaryEmbedding,
+    NewIPEXChatGLMRotaryEmbedding,
 )
+from .modules.glm import NewIPEXGlmBlock, NewIPEXGlmRotaryEmbedding
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 from .modules.bert import NewIPEXBertSelfAttention
 from .modules.phi3 import NewIPEXPhi3DecoderLayer
@@ -69,6 +70,7 @@ def default_replaced_module_dict():
         transformers.models.bert.modeling_bert.BertSelfAttention: NewIPEXBertSelfAttention,
         transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer: NewIPEXQWEN2DecoderLayer,
         transformers.models.mixtral.modeling_mixtral.MixtralDecoderLayer: NewIPEXMixtralBlock,
+        transformers.models.glm.modeling_glm.GlmDecoderLayer: NewIPEXGlmBlock,
         BasicTransformerBlock: NewIPEXBasicTransformerBlock,
     }
     return default_replace_modules
@@ -248,7 +250,18 @@ class ModuleReplacer:
                 model.__class__.__name__ == "ChatGLMModel"
                 and child.__class__.__name__ == "RotaryEmbedding"
             ):
-                new_module = NewIPEXRotaryEmbedding(
+                new_module = NewIPEXChatGLMRotaryEmbedding(
+                    child,
+                    config,
+                    device="xpu",
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+            elif (
+                model.__class__.__name__ == "GlmModel"
+                and child.__class__.__name__ == "GlmRotaryEmbedding"
+            ):
+                new_module = NewIPEXGlmRotaryEmbedding(
                     child,
                     config,
                     device="xpu",

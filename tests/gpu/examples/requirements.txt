@@ -1,4 +1,4 @@
-transformers==4.38.1
+transformers==4.48.3
 diffusers==0.27.2
 einops==0.8.0
 huggingface-hub==0.25.2

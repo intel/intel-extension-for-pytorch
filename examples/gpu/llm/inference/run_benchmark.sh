@@ -239,6 +239,7 @@ Run_benchmark_chatglm3-6b-chat() {
     mv trace.json ${dir}
 }
 
+
 ## Phi3-mini
 Run_benchmark_Phi3-mini() {
     model=microsoft/Phi-3-mini-4k-instruct
@@ -251,6 +252,7 @@ Run_benchmark_Phi3-mini() {
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
+
 
 ## Phi3-small
 Run_benchmark_Phi3-small() {
@@ -265,6 +267,7 @@ Run_benchmark_Phi3-small() {
     mv trace.json ${dir}
 }
 
+
 ## GLM4-9b-chat
 Run_benchmark_glm4-9b-chat() {
     model=THUDM/glm-4-9b-chat
@@ -277,6 +280,21 @@ Run_benchmark_glm4-9b-chat() {
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
+
+
+## GLM4-9b-chat-hf
+Run_benchmark_glm4-9b-chat-hf() {
+    model=THUDM/glm-4-9b-chat-hf
+    sub_model_name=glm-4-9b-hf
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
 
 ## Mistral-7B
 Run_benchmark_Mistral-7B() {
@@ -315,6 +333,7 @@ main() {
     Run_benchmark_Phi3-mini
     Run_benchmark_Phi3-small
     Run_benchmark_glm4-9b-chat
+    Run_benchmark_glm4-9b-chat-hf
     Run_benchmark_Mistral-7B
 }
 

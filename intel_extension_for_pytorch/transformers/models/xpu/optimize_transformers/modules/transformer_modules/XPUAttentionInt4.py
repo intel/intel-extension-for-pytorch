@@ -411,34 +411,19 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 self.qkv_proj_quant.blocksize,
                 self.qkv_proj_quant.g_idx,
             )
-            if self.num_heads > self.num_kv_heads:
-                num_group = self.num_heads // self.num_kv_heads
-                bs, seqlen, _ = hidden_states.size()
-                intermediate_shape = (bs, seqlen, -1, num_group + 2, self.head_dim)
-                qkv_out = qkv_out.view(*intermediate_shape)
-                if IPEXAttention.cache_type == "static":
-                    query = qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
-                    key.copy_(qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1))
-                    value.copy_(qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1))
-                elif IPEXAttention.cache_type == "dynamic":
-                    query = qkv_out[:, :, :, :-2].reshape(bs, seqlen, -1).contiguous()
-                    key = qkv_out[:, :, :, [-2]].reshape(bs, seqlen, -1).contiguous()
-                    value = qkv_out[:, :, :, [-1]].reshape(bs, seqlen, -1).contiguous()
-                return query, key, value
-            else:
-                mq = query.shape[-1]
-                mk = key.shape[-1]
-                # Statice Cache needs to store the key and value in the applied space.
-                # Dynamic Cache will cat the new key and value, so that does not need inplace operation.
-                if IPEXAttention.cache_type == "static":
-                    query = qkv_out[:, :, :mq].contiguous()
-                    key.copy_(qkv_out[:, :, mq : mq + mk])
-                    value.copy_(qkv_out[:, :, mq + mk :])
-                elif IPEXAttention.cache_type == "dynamic":
-                    query = qkv_out[:, :, :mq].contiguous()
-                    key = qkv_out[:, :, mq : mq + mk].contiguous()
-                    value = qkv_out[:, :, mq + mk :].contiguous()
-                return query, key, value
+            mq = query.shape[-1]
+            mk = key.shape[-1]
+            # Statice Cache needs to store the key and value in the applied space.
+            # Dynamic Cache will cat the new key and value, so that does not need inplace operation.
+            if IPEXAttention.cache_type == "static":
+                query = qkv_out[:, :, :mq].contiguous()
+                key.copy_(qkv_out[:, :, mq : mq + mk])
+                value.copy_(qkv_out[:, :, mq + mk :])
+            elif IPEXAttention.cache_type == "dynamic":
+                query = qkv_out[:, :, :mq].contiguous()
+                key = qkv_out[:, :, mq : mq + mk].contiguous()
+                value = qkv_out[:, :, mq + mk :].contiguous()
+            return query, key, value
         else:
             query = torch.ops.torch_ipex.mm_bias_int4(
                 hidden_states,

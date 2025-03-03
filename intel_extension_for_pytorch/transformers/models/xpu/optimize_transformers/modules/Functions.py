@@ -10,10 +10,6 @@ import time
 from .utils import pad_for_gptj_lm_head, is_int4, pad_for_chatglm_output_layer
 from .transformer_modules.CacheUtils import warp_cache_if_needed
 from .transformer_modules.CacheUtils import IPEXStaticCache
-from .gptj import (
-    GPTJModel_forward,
-    GPTJ_prepare_inputs_for_generation,
-)
 from .baichuan import (
     Baichuan_prepare_inputs_for_generation,
     BaichuanModel_forward,
@@ -25,10 +21,6 @@ from .chatglm import (
 )
 from .phi3_small import (
     phi3small_prepare_inputs_for_generation,
-)
-from .falcon import (
-    IPEXFalconModel_forward,
-    Falcon_prepare_inputs_for_generation,
 )
 from .opt import (
     IPEXOPTDecoder_forward,
@@ -55,11 +47,6 @@ def gptj_forward_hook(model):
 
     if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        model.prepare_inputs_for_generation = partial(
-            GPTJ_prepare_inputs_for_generation, model
-        )
-    if type(model) == transformers.models.gptj.modeling_gptj.GPTJModel:
-        model.forward = partial(GPTJModel_forward, model)
 
 
 def mixtral_forward_hook(model):
@@ -93,11 +80,6 @@ def falcon_forward_hook(model):
 
     if type(model) == transformers.models.falcon.modeling_falcon.FalconForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
-        model.prepare_inputs_for_generation = partial(
-            Falcon_prepare_inputs_for_generation, model
-        )
-    if type(model) == transformers.models.falcon.modeling_falcon.FalconModel:
-        model.forward = partial(IPEXFalconModel_forward, model)
 
 
 def baichuan_forward_hook(model):
@@ -842,7 +824,7 @@ def _ipex_beam_search_(
             stopping_criteria,
             generation_config,
             synced_gpus,
-            logits_warper,
+            # logits_warper, #Removed in Transformers 4.48
             **model_kwargs,
         )
     from transformers.generation.utils import (
@@ -2123,6 +2105,7 @@ def _ipex_setup_cache_GLM(
 def ipex_disable_attn_mask_prepare(model):
     import transformers
     import importlib
+    from packaging import version
 
     model_list = {
         transformers.models.llama.modeling_llama.LlamaForCausalLM: "LlamaModel",
@@ -2132,14 +2115,27 @@ def ipex_disable_attn_mask_prepare(model):
     if hasattr(transformers.models, "phi3"):
         model_list[transformers.models.phi3.modeling_phi3.Phi3ForCausalLM] = "Phi3Model"
 
+    if version.parse(transformers.__version__) >= version.parse("4.48"):
+        model_list_new = {
+            transformers.models.gptj.modeling_gptj.GPTJForCausalLM: "GPTJModel",
+            transformers.models.opt.modeling_opt.OPTForCausalLM: "OPTModel",
+            transformers.models.glm.modeling_glm.GlmForCausalLM: "GlmModel",
+        }
+        model_list.update(model_list_new)
+
     if type(model) in model_list.keys():
         base_module = type(model).__base__.__module__
         module_spec = importlib.import_module(base_module)
-        module_spec._prepare_4d_causal_attention_mask_with_cache_position = (
-            lambda attention_mask, *args, **kwargs: attention_mask
-        )
         model_name = model_list[type(model)]
         model_spec = getattr(module_spec, model_name)
+        if version.parse(transformers.__version__) < version.parse("4.48"):
+            module_spec._prepare_4d_causal_attention_mask_with_cache_position = (
+                lambda attention_mask, *args, **kwargs: attention_mask
+            )
+        else:
+            model_spec._prepare_4d_causal_attention_mask_with_cache_position = (
+                lambda self, attention_mask, *args, **kwargs: attention_mask
+            )
         model_spec._update_causal_mask = (
             lambda self, attention_mask, *args: attention_mask
         )

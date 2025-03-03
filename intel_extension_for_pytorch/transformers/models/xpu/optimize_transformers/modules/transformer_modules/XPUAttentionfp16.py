@@ -10,6 +10,7 @@ from .Linear import (
     IPEXQKVFusedGemm,
     IPEXLowbitGemmAdd,
     GemmDtype,
+    IPEXTransformerLinear,
 )
 from transformers.cache_utils import Cache
 from .model_utils import xpu_sdpa_support

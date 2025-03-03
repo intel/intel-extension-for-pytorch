@@ -209,6 +209,10 @@ try:
             """Returns the maximum sequence length of the cached states."""
             return self.max_cache_len
 
+        # Add for Transformers 4.48
+        def get_max_cache_shape(self) -> Optional[int]:
+            return self.max_cache_len
+
         def reset(self):
             """Resets the cache values while preserving the objects"""
             for layer_idx in range(len(self.key_cache)):

@@ -1,8 +1,8 @@
 diff --git a/src/transformers/generation/utils.py b/src/transformers/generation/utils.py
-index 3e3c7803a..59f5d86da 100644
+index 18cbab600..2bf609c33 100644
 --- a/src/transformers/generation/utils.py
 +++ b/src/transformers/generation/utils.py
-@@ -24,6 +24,7 @@ import torch
+@@ -25,6 +25,7 @@ import torch
  import torch.distributed as dist
  from torch import nn
  from torch.nn import functional as F
@@ -10,15 +10,15 @@ index 3e3c7803a..59f5d86da 100644
  
  from ..cache_utils import (
      Cache,
-@@ -1684,6 +1685,7 @@ class GenerationMixin:
-         """
+@@ -2005,6 +2006,7 @@ class GenerationMixin:
+ 
          # 1. Handle `generation_config` and kwargs that might update it, and validate the `.generate()` call
          self._validate_model_class()
 +        self.token_latency = kwargs.pop("token_latency", None)
          tokenizer = kwargs.pop("tokenizer", None)  # Pull this out first, we only use it for stopping criteria
-         generation_config, model_kwargs = self._prepare_generation_config(generation_config, **kwargs)
-         self._validate_model_kwargs(model_kwargs.copy())
-@@ -2933,6 +2935,7 @@ class GenerationMixin:
+         assistant_tokenizer = kwargs.pop("assistant_tokenizer", None)  # only used for assisted generation
+ 
+@@ -3202,6 +3204,7 @@ class GenerationMixin:
              `model.config.is_encoder_decoder=True`.
          """
          # init values
@@ -26,7 +26,7 @@ index 3e3c7803a..59f5d86da 100644
          pad_token_id = generation_config._pad_token_tensor
          output_attentions = generation_config.output_attentions
          output_hidden_states = generation_config.output_hidden_states
-@@ -2971,6 +2974,7 @@ class GenerationMixin:
+@@ -3243,6 +3246,7 @@ class GenerationMixin:
          while self._has_unfinished_sequences(
              this_peer_finished, synced_gpus, device=input_ids.device, cur_len=cur_len, max_length=max_length
          ):
@@ -34,7 +34,7 @@ index 3e3c7803a..59f5d86da 100644
              # prepare model inputs
              model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
  
-@@ -3042,13 +3046,16 @@ class GenerationMixin:
+@@ -3317,13 +3321,16 @@ class GenerationMixin:
              # This is needed to properly delete outputs.logits which may be very large for first iteration
              # Otherwise a reference to outputs is kept which keeps the logits alive in the next iteration
              del outputs
@@ -48,20 +48,20 @@ index 3e3c7803a..59f5d86da 100644
          if return_dict_in_generate:
              if self.config.is_encoder_decoder:
 -                return GenerateEncoderDecoderOutput(
-+                output_result =  GenerateEncoderDecoderOutput(
++                output_result = GenerateEncoderDecoderOutput(
                      sequences=input_ids,
                      scores=scores,
                      logits=raw_logits,
-@@ -3060,7 +3067,7 @@ class GenerationMixin:
+@@ -3335,7 +3342,7 @@ class GenerationMixin:
                      past_key_values=model_kwargs.get("past_key_values"),
                  )
              else:
 -                return GenerateDecoderOnlyOutput(
-+                output_result =  GenerateDecoderOnlyOutput(
++                output_result = GenerateDecoderOnlyOutput(
                      sequences=input_ids,
                      scores=scores,
                      logits=raw_logits,
-@@ -3069,7 +3076,12 @@ class GenerationMixin:
+@@ -3344,7 +3351,12 @@ class GenerationMixin:
                      past_key_values=model_kwargs.get("past_key_values"),
                  )
          else:
@@ -75,7 +75,7 @@ index 3e3c7803a..59f5d86da 100644
  
      def _temporary_reorder_cache(self, past_key_values, beam_idx):
          """
-@@ -3145,6 +3157,7 @@ class GenerationMixin:
+@@ -3415,6 +3427,7 @@ class GenerationMixin:
              `model.config.is_encoder_decoder=True`.
          """
          # init values
@@ -83,7 +83,7 @@ index 3e3c7803a..59f5d86da 100644
          pad_token_id = generation_config._pad_token_tensor
          eos_token_id = generation_config._eos_token_tensor
          output_attentions = generation_config.output_attentions
-@@ -3199,6 +3212,7 @@ class GenerationMixin:
+@@ -3464,6 +3477,7 @@ class GenerationMixin:
          decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
  
          while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
@@ -91,18 +91,17 @@ index 3e3c7803a..59f5d86da 100644
              model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
  
              # prepare variable output controls (note: some models won't accept all output controls)
-@@ -3340,6 +3354,10 @@ class GenerationMixin:
-             if beam_scorer.is_done or all(stopping_criteria(input_ids, scores)):
-                 this_peer_finished = True
- 
+@@ -3593,6 +3607,9 @@ class GenerationMixin:
+             # IMPORTANT: Note that this should appear BEFORE the call to _reorder_cache() to save the maximum memory
+             # (that way the memory peak does not include outputs.logits)
+             del outputs
 +            if self.token_latency:
 +                torch.xpu.synchronize()
 +            latency_list.append(time.time() - tic)
-+
-         sequence_outputs = beam_scorer.finalize(
-             input_ids,
-             beam_scores,
-@@ -3357,7 +3375,7 @@ class GenerationMixin:
+ 
+             if model_kwargs.get("past_key_values", None) is not None:
+                 model_kwargs["past_key_values"] = self._temporary_reorder_cache(
+@@ -3625,7 +3642,7 @@ class GenerationMixin:
                  sequence_outputs["sequence_scores"] = None
  
              if self.config.is_encoder_decoder:
@@ -111,24 +110,18 @@ index 3e3c7803a..59f5d86da 100644
                      sequences=sequence_outputs["sequences"],
                      sequences_scores=sequence_outputs["sequence_scores"],
                      scores=scores,
-@@ -3369,9 +3387,9 @@ class GenerationMixin:
-                     cross_attentions=cross_attentions,
-                     decoder_hidden_states=decoder_hidden_states,
+@@ -3639,7 +3656,7 @@ class GenerationMixin:
                      past_key_values=model_kwargs.get("past_key_values"),
--                )
-+                ), latency_list
+                 )
              else:
 -                return GenerateBeamDecoderOnlyOutput(
 +                output_result = GenerateBeamDecoderOnlyOutput(
                      sequences=sequence_outputs["sequences"],
                      sequences_scores=sequence_outputs["sequence_scores"],
                      scores=scores,
-@@ -3380,9 +3398,14 @@ class GenerationMixin:
-                     attentions=decoder_attentions,
-                     hidden_states=decoder_hidden_states,
+@@ -3650,7 +3667,12 @@ class GenerationMixin:
                      past_key_values=model_kwargs.get("past_key_values"),
--                )
-+                ), latency_list
+                 )
          else:
 -            return sequence_outputs["sequences"]
 +            output_result = sequence_outputs["sequences"]

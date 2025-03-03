@@ -661,6 +661,8 @@ class IPEXTransformerMLPOptimizedInt4SiluChatGLMOneDNN(
             fc_out.scales, fc_out.qzeros, fc_out.g_idx
         )
         self.c_proj_quant.blocksize = fc_out.blocksize
+        self.fc_in_quant.scales.data = self.fc_in_quant.scales.contiguous()
+        self.fc_out_quant.scales.data = self.fc_out_quant.scales.contiguous()
 
         fc_in.qweight = None
         fc_in.bias = None

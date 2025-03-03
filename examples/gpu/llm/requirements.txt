@@ -10,6 +10,6 @@ lm_eval==0.4.2
 huggingface-hub==0.25.2
 py-cpuinfo
 bitsandbytes
-transformers==4.44.2
+transformers==4.48.3
 transformers_stream_generator
 einops

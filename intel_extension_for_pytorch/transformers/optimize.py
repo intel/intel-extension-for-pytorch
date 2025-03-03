@@ -1864,6 +1864,7 @@ def model_convert_lowering(
         from .models.xpu.optimize_transformers.modules.mixtral import (
             NewIPEXMixtralBlock,
         )
+        from .models.xpu.optimize_transformers.modules.glm import NewIPEXGlmBlock
 
         def ref_replace_module_for_xpu(
             module, config, dtype, device, module_name, tp_size, tp_group
@@ -1884,6 +1885,8 @@ def model_convert_lowering(
                 replace_block = NewIPEXFalconBlock
             elif re.search("Mixtral", _model.config.architecture[0], re.IGNORECASE):
                 replace_block = NewIPEXMixtralBlock
+            elif re.search("GLM", _model.config.model_type, re.IGNORECASE):
+                replace_block = NewIPEXGlmBlock
             if replace_block is not None:
                 out_block = replace_block(
                     module,
@@ -1992,9 +1995,7 @@ def check_xpu_llm_support(model):
     # If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,
     # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen, Baichuan, ChatGLM, mixtral
     if ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
-        xpu_2d_load_and_xmx_supported_pattern = (
-            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan|ChatGLM|Phi3|Mistral|Mixtral"
-        )
+        xpu_2d_load_and_xmx_supported_pattern = r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan|ChatGLM|Phi3|Mistral|Mixtral|GLM"
         xpu_supported_model = re.search(
             xpu_2d_load_and_xmx_supported_pattern,
             model.config.architectures[0],
