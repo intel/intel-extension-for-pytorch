@@ -96,6 +96,8 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     bias = state_dict.get(b_key, None)
     g_idx = state_dict.get(g_key, None)
     group_size = -1
+    from intel_extension_for_pytorch.nn.modules import Int4WeightFormat
+
     weight_format = Int4WeightFormat.PLAIN_FORMAT
 
     if qweight is None:
@@ -204,6 +206,11 @@ def _convert_woq_with_low_precision_checkpoint(
         if all(keys_found):
             break
     assert all(keys_found), "Error: Format of checkpoint and config do not match"
+    from intel_extension_for_pytorch.nn.modules import (
+        WeightOnlyQuantizedLinear,
+        IpexWoqLinearAllreduce,
+    )
+
     q_op_map = {
         torch.nn.Linear: WeightOnlyQuantizedLinear,
     }
