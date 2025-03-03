@@ -2337,7 +2337,6 @@ def _DeepseekV2Attention_forward(
     kv_cache = past_key_value[1].contiguous()
     beam_idx = past_key_value[-1].contiguous()
     seq_info = torch.tensor(past_key_value[0].size(-2), dtype=torch.long).contiguous()
-
     (
         attn_output,
         attn_weights,
@@ -2358,6 +2357,7 @@ def _DeepseekV2Attention_forward(
         self.v_head_dim,
         None,
         attention_mask,
+        self.w_scale if hasattr(self, "w_scale") else None,
         False,
     )
 
@@ -2876,8 +2876,12 @@ class _IPEXAttentionRef(nn.Module):
             w_kc, w_vc = kv_b_proj_weight.unflatten(
                 0, (-1, self.qk_nope_head_dim + self.v_head_dim)
             ).split([self.qk_nope_head_dim, self.v_head_dim], dim=1)
-            self.w_kc = w_kc.transpose(-1, -2).contiguous()
-            self.w_vc = w_vc.contiguous()
+            self.w_kc = torch.ops.torch_ipex.convert_weight_packed(
+                w_kc.transpose(-1, -2).contiguous()
+            )
+            self.w_vc = torch.ops.torch_ipex.convert_weight_packed(w_vc.contiguous())
+            if hasattr(self.kv_b_proj, "weight_scale") and self.w_scale is None:
+                self.w_scale = self.kv_b_proj.weight_scale
 
     def forward(
         self,

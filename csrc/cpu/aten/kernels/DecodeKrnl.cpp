@@ -1137,8 +1137,8 @@ void decode_attention_grouped_kernel_impl(
     }
   });
 }
-// query: [bs, cur_len, num_heads, head_size]
-// output: [bs, num_heads, cur_len, head_size]
+// query: [bs*cur_len, num_heads, head_size]
+// output: [bs*cur_len, num_heads, head_size]
 // kv_cache: [max_positions, beam_batch, kv_num_heads, head_size]
 // beam_idx: [bs, offset+cur_len+1]
 // attn_logits: [bs, num_heads, num_kv_splits, head_size_v + 1]
@@ -1154,7 +1154,7 @@ at::Tensor decode_attention(
   RECORD_FUNCTION("ipex::decode_attention", c10::ArrayRef<c10::IValue>({}));
   CHECK_INPUT(query);
   CHECK_INPUT(kv_cache);
-  CHECK_DIM(4, query);
+  CHECK_DIM(3, query);
   CHECK_DIM(4, kv_cache);
   int max_total_num_tokens = kv_cache.size(0) * kv_cache.size(1);
   int bs = query.size(0);

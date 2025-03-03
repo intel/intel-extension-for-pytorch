@@ -71,6 +71,7 @@ deepseekv2_mla_forward_cpu(
     int64_t v_head_dim,
     const c10::optional<at::Tensor>& head_mask /* optional */,
     const c10::optional<at::Tensor>& attention_mask /* optional */,
+    const c10::optional<at::Tensor>& w_scale /* optional */,
     c10::optional<bool> add_casual_mask /* optional */) {
   return deepseekv2_mla_kernel_stub(
       kCPU,
@@ -88,6 +89,7 @@ deepseekv2_mla_forward_cpu(
       v_head_dim,
       head_mask,
       attention_mask,
+      w_scale,
       add_casual_mask);
 }
 at::Tensor prepare_4d_causal_attention_mask_forward_cpu(
@@ -122,7 +124,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "deepseekv2_mla(Tensor query, Tensor kv, Tensor k_pe, Tensor kv_cache, \
        Tensor kv_b_weight, Tensor w_kc, Tensor w_vc, Tensor beam_idx, Tensor seq_info, float scale_attn, int max_positions, \
-       int v_head_dim, Tensor? head_mask, Tensor? attention_mask, bool? add_casual_mask=None)-> (Tensor, Tensor, Tensor, Tensor)");
+       int v_head_dim, Tensor? head_mask, Tensor? attention_mask, Tensor? w_scale, bool? add_casual_mask=None)-> (Tensor, Tensor, Tensor, Tensor)");
   m.impl(
       "deepseekv2_mla",
       c10::DispatchKey::CPU,
