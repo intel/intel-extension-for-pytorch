@@ -6,7 +6,7 @@ from typing import List, Union, Dict
 from .modules import EMA
 from .modules import TransducerLoss, clip_grad_norm_, clip_grad_norm
 import intel_extension_for_pytorch
-import torchvision
+
 
 __all__ = [
     "TransducerLoss",
@@ -38,6 +38,8 @@ def MulAdd(input, other, accumu, alpha=1.0):
 
 
 def nms(dets, scores, iou_threshold):
+    import torchvision
+
     return torchvision.ops.nms(dets, scores, iou_threshold)
 
 
@@ -55,6 +57,8 @@ def roi_align(
     sampling_ratio: int = -1,
     aligned: bool = False,
 ) -> Tensor:
+    import torchvision
+
     return torchvision.ops.roi_align(
         input,
         boxes,
