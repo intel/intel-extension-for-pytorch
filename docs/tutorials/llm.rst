@@ -89,6 +89,18 @@ LLM Inference
      - 
      - ✅
      - 
+   * - Phi3
+     - microsoft/Phi-3-small-128k-instruct
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - Mistral
+     - mistralai/Mistral-7B-Instruct-v0.2
+     - ✅
+     - ✅
+     - ✅
+     - ✅
 
 Platforms
 ~~~~~~~~~~~~~
@@ -109,18 +121,22 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
      - Mixed Precision (BF16+FP32)
      - Full fine-tuning
      - LoRA
+     - QLoRA
    * - Llama2
      - meta-llama/Llama-2-7b-hf
      - ✅
      - ✅
      - ✅
+     - 
    * - Llama2
      - meta-llama/Llama-2-70b-hf
      - ✅
      - 
      - ✅
+     - 
    * - Llama3
      - meta-llama/Meta-Llama-3-8B
+     - ✅
      - ✅
      - ✅
      - ✅
@@ -129,11 +145,13 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
      - ✅
      - ✅
      - ✅
+     - 
    * - Phi-3-mini 3.8B
      - Phi-3-mini-4k-instruct
      - ✅
      - ✅
      - ✅
+     - 
 
 Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.5.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
@@ -181,6 +199,9 @@ cache policy is shown as the following right figure.
   :width: 800
   :alt: The beam idx trace for every step
 
+
+Additionally, Intel® Extension for PyTorch* also supports Hugging Face's native dynamic_cache, ensuring compatibility with the original caching mechanism while providing performance enhancements through its optimized cache management.
+
 Distributed Inference
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -201,6 +222,18 @@ enhances workload accuracies; however, it also leads to significantly
 heavier computations and places higher requirements to the underlying
 hardware. Given that, quantization becomes a more important methodology
 for inference workloads.
+
+Ecosystem Support
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Intel® Extension for PyTorch* offers extensive support for various ecosystems, including vLLM and TGI, with the goal of enhancing performance and flexibility for LLM workloads.
+
+- **vLLM**: `vLLM documentation <https://docs.vllm.ai/en/v0.5.1/getting_started/xpu-installation.html>`_
+- **TGI**: `TGI documentation <https://github.com/huggingface/text-generation-inference/blob/main/docs/source/installation_intel.md>`_
+
+The extension provides support for a variety of **custom kernels**, which include commonly used kernel fusion techniques, such as `rms_norm` and `rotary_embedding`, as well as attention-related kernels like `paged_attention` and `chunked_prefill`. These optimizations enhance the functionality and efficiency of the ecosystem on Intel® GPU platform by improving the execution of key operations.
+
+Additionally, Intel® Extension for PyTorch* provides support for **WOQ INT4 GEMM kernels**, which enables vLLM and TGI to work with models that have been quantized using GPTQ/AWQ techniques. This support extends the ability to run INT4 models, further optimizing performance and reducing memory consumption while maintaining high inference accuracy.
 
 
 Weight Only Quantization INT4

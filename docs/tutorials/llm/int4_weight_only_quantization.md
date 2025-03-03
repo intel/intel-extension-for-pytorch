@@ -26,6 +26,7 @@ To overcome this issue, we propose quantization methods that reduce the size and
  Validation Platforms
  * Intel® Data Center GPU Max Series
  * Intel® Arc™ A-Series Graphics
+ * Intel® Arc™ B-Series Graphics
  * Intel® Core™ Ultra series
 
 > Note: For algorithms marked as 'stay tuned' are highly recommended to wait for the availability of the INT4 models on the HuggingFace Model Hub, since the LLM quantization procedure is significantly constrained by the machine's host memory and computation capabilities.
