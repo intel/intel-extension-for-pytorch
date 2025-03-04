@@ -134,8 +134,8 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 ]
             ],
         ]
-        for quantized_modules, pattern in zip(quantized_modules, patterns):
-            m = M(quantized_modules).eval()
+        for quantized_module, pattern in zip(quantized_modules, patterns):
+            m = M(quantized_module).eval()
 
             x = torch.rand(1, 2, 14, 14)
 

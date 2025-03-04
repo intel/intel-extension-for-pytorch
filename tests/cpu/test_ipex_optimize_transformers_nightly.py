@@ -396,12 +396,12 @@ class OptimizeTransformersNightlyTester(TestCase):
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
         return_dict = [False, True]
-        for m, torchcompile, dtype, jit, return_dict in itertools.product(
+        for m, torchcompile, dtype, jit, ret_dict in itertools.product(
             supported_models, enable_torchcompile, dtypes, deployment_mode, return_dict
         ):
             if torchcompile and deployment_mode:
                 continue
-            self.model_replacement_check(m, dtype, jit, torchcompile, return_dict)
+            self.model_replacement_check(m, dtype, jit, torchcompile, ret_dict)
         _disable_tpp()
 
     def test_load_low_precision_checkpoint(self):

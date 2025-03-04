@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import sys
 
+_IS_WINDOWS = sys.platform == "win32"
+
 
 def check_flake8_errors(base_dir, filepath):
     if shutil.which("flake8") is None:
@@ -51,6 +53,10 @@ def check_flake8_errors(base_dir, filepath):
 
 
 if __name__ == "__main__":
+    if _IS_WINDOWS:
+        print("skip flake8 check for Windows")
+        sys.exit(0)
+
     base_dir = os.path.abspath(
         os.path.dirname(os.path.join(os.path.abspath(__file__), "../../../../"))
     )

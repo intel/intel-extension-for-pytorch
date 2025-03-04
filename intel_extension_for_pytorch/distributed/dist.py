@@ -106,7 +106,7 @@ def init_process_group(
         try:
             import oneccl_bindings_for_pytorch  # noqa
         except ImportError as e:
-            raise RuntimeError("oneccl_bindings_for_pytorch is not installed!")
+            raise RuntimeError("oneccl_bindings_for_pytorch is not installed!") from e
     return dist.init_process_group(
         backend,
         init_method,

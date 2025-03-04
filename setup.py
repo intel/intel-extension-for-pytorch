@@ -138,7 +138,7 @@ elif _get_build_target() in ["develop", "python"]:
         import torch
         from torch.utils.cpp_extension import BuildExtension, CppExtension
     except ImportError as e:
-        raise RuntimeError("Fail to import torch!")
+        raise RuntimeError("Fail to import torch!") from e
 
 
 def _check_env_flag(name, default=""):
@@ -159,7 +159,7 @@ def create_if_not_exist(path_dir):
             Path(path_dir).mkdir(parents=True, exist_ok=True)
         except OSError as exc:  # Guard against race condition
             if exc.errno != errno.EEXIST:
-                raise RuntimeError("Fail to create path {}".format(path_dir))
+                raise RuntimeError("Fail to create path {}".format(path_dir)) from e
 
 
 def get_version_num():

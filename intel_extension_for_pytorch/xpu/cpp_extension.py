@@ -433,7 +433,7 @@ class DpcppBuildExtension(build_ext, object):
             return objects
 
         if self.compiler.compiler_type == "msvc":
-            raise "Not implemented"
+            raise NotImplementedError("Not implemented for ninja build!")
         else:
             if self.use_ninja:
                 self.compiler.compile = unix_wrap_ninja_compile
@@ -1370,11 +1370,15 @@ class _one_api_help:
 
     def check_onemkl_cfg(self):
         if self.__onemkl_root is None:
-            raise "Didn't detect mkl root. Please source <oneapi_dir>/mkl/<version>/env/vars.sh "
+            raise RuntimeError(
+                "Didn't detect mkl root. Please source <oneapi_dir>/mkl/<version>/env/vars.sh "
+            )
 
     def check_onednn_cfg(self):
         if self.__onednn_root is None:
-            raise "Didn't detect dnnl root. Please source <oneapi_dir>/dnnl/<version>/env/vars.sh "
+            raise RuntimeError(
+                "Didn't detect dnnl root. Please source <oneapi_dir>/dnnl/<version>/env/vars.sh "
+            )
         else:
             logger.warning(
                 "This extension has static linked onednn library. Please attaction to \
@@ -1383,7 +1387,9 @@ class _one_api_help:
 
     def check_dpcpp_cfg(self):
         if self.__dpcpp_root is None:
-            raise "Didn't detect dpcpp root. Please source <oneapi_dir>/compiler/<version>/env/vars.sh "
+            raise RuntimeError(
+                "Didn't detect dpcpp root. Please source <oneapi_dir>/compiler/<version>/env/vars.sh "
+            )
 
     def get_default_include_dir(self):
         return [os.path.join(self.__default_root, "include")]
