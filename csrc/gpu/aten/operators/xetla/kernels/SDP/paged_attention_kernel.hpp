@@ -309,6 +309,7 @@ class paged_attention_kernel {
     uint32_t num_kv_heads;
     uint32_t head_size;
     uint32_t max_blocks_per_seq;
+    accum_t softcap;
 
     inline arguments_t(
         accum_t* max_logits,
@@ -325,7 +326,8 @@ class paged_attention_kernel {
         uint32_t num_heads,
         uint32_t num_kv_heads,
         uint32_t head_size,
-        uint32_t max_blocks_per_seq)
+        uint32_t max_blocks_per_seq,
+        accum_t softcap)
         : max_logits(max_logits),
           exp_sums(exp_sums),
           out(out),
@@ -340,7 +342,8 @@ class paged_attention_kernel {
           num_heads(num_heads),
           num_kv_heads(num_kv_heads),
           head_size(head_size),
-          max_blocks_per_seq(max_blocks_per_seq) {}
+          max_blocks_per_seq(max_blocks_per_seq),
+          softcap(softcap) {}
   };
 
  private:
@@ -602,6 +605,12 @@ class paged_attention_kernel {
       }
 
       score_sub *= args.sm_scale;
+      if (args.softcap > 0.0) {
+        score_sub /= args.softcap;
+        score_sub =
+            xetla_tanh<typename score_tile_t::dtype, block_size>(score_sub);
+        score_sub *= args.softcap;
+      }
       uint32_t remained_len = ctx.context_len - bid * block_size;
       if (remained_len < block_size) {
         xetla_mask<block_size> mask =

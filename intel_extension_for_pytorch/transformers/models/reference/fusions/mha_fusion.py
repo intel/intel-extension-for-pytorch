@@ -1170,6 +1170,7 @@ class _IPEXPagedAttentionRef:
         block_size,
         max_context_len,
         alibi_slopes,
+        softcap=-1,
     ) -> None:
         num_heads = value_cache.shape[1]
         head_size = value_cache.shape[2]
@@ -1221,6 +1222,7 @@ class _IPEXPagedAttentionRef:
         block_size,
         max_context_len,
         alibi_slopes,
+        softcap=-1.0,
     ) -> None:
         num_heads = output.size(1)
         num_kv_heads = num_heads // num_queries_per_tokens
@@ -1248,4 +1250,5 @@ class _IPEXPagedAttentionRef:
             block_size,
             max_context_len,
             alibi_slopes,
+            softcap,
         )

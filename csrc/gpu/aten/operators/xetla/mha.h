@@ -75,6 +75,7 @@ struct paged_attention_fwd_kernel_args_t {
   uint32_t block_size;
   uint32_t max_blocks_per_seq;
   uint32_t max_context_len;
+  float softcap = -1.;
 };
 
 struct chunked_prefill_fwd_kernel_args_t {
@@ -100,6 +101,7 @@ struct chunked_prefill_fwd_kernel_args_t {
   int32_t max_blocks_per_seq;
   int32_t block_size;
   bool is_causal;
+  float softcap = -1.;
 };
 
 // * General interface kernel for FSDP

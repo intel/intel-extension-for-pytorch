@@ -525,6 +525,7 @@ class PagedAttention:
                                                             alibi_slopes,
                                                             k_scale,
                                                             v_scale,
+                                                            softcap,
                                                             )
 
     This operator is used to be calculated the scale-dot-product based on the paged attention.
@@ -550,6 +551,7 @@ class PagedAttention:
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
     [class method]: single_query_kv_attention
 
@@ -567,7 +569,8 @@ class PagedAttention:
                                                             context_lens,
                                                             block_size,
                                                             max_context_len,
-                                                            alibi_slopes
+                                                            alibi_slopes,
+                                                            softcap,
                                                             )
 
     This operator is used to be calculated the scale-dot-product based on the paged attention.
@@ -591,6 +594,7 @@ class PagedAttention:
         block_size (int): The block size which means the number of token in every block.
         max_context_len (int): The max sequence length.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
     [class method]: flash_atten_varlen
 
@@ -612,6 +616,7 @@ class PagedAttention:
         alibi_slopes,
         key_cache,
         val_cache,
+        softcap,
     )
 
     Args:
@@ -633,6 +638,7 @@ class PagedAttention:
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
+        softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
     """
 
@@ -696,6 +702,7 @@ class PagedAttention:
         alibi_slopes: torch.Tensor,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
+        softcap: float = -1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -713,6 +720,7 @@ class PagedAttention:
             alibi_slopes,
             k_scale,
             v_scale,
+            softcap,
         )
 
     @classmethod
@@ -729,6 +737,7 @@ class PagedAttention:
         block_size: int,
         max_context_len: int,
         alibi_slopes: torch.Tensor,
+        softcap: float = -1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -744,6 +753,7 @@ class PagedAttention:
             block_size,
             max_context_len,
             alibi_slopes,
+            softcap,
         )
 
     @classmethod
@@ -763,6 +773,7 @@ class PagedAttention:
         alibi_slopes: torch.Tensor,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
+        softcap: float = -1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -781,6 +792,7 @@ class PagedAttention:
             alibi_slopes,
             k_scale,
             v_scale,
+            softcap,
         )
 
 

@@ -62,6 +62,7 @@ class TestChunkedPrefill(TestCase):
         scale: float,
         alibi_slopes: Optional[torch.Tensor],
         causal: bool = True,
+        softcap: float = -1.0,
     ) -> None:
         query = query.to("xpu")
         key_cache = key_cache.to("xpu")
@@ -155,6 +156,8 @@ class TestChunkedPrefill(TestCase):
         # [b, h, f, t]
         attn_weights = torch.einsum("bhqd,bhkd->bhqk", pad_q, pad_k)
         attn_weights *= scale
+        if softcap > 0:
+            attn_weights = torch.tanh(attn_weights / softcap) * softcap
         attn_mask = attn_mask.float()
         attn_weights = attn_weights + attn_mask
         if causal:
@@ -229,6 +232,7 @@ class TestChunkedPrefill(TestCase):
         is_causal,
         version,
         dtype,
+        softcap,
     ) -> None:
         seed = 0
 
@@ -305,6 +309,7 @@ class TestChunkedPrefill(TestCase):
             scale,
             alibi_slopes,
             is_causal,
+            softcap,
         )
 
         ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
@@ -320,6 +325,7 @@ class TestChunkedPrefill(TestCase):
             is_causal,
             block_tables_xpu,
             alibi_slopes_xpu,
+            softcap=softcap,
         )
 
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
@@ -335,6 +341,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False, True])
     @parametrize("dtype", [torch.float16])
+    @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
         reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
@@ -349,6 +356,7 @@ class TestChunkedPrefill(TestCase):
         use_alibi,
         is_causal,
         dtype,
+        softcap,
     ):
         self.chunk_prefill(
             num_gen_seqs,
@@ -360,6 +368,7 @@ class TestChunkedPrefill(TestCase):
             is_causal,
             "chunked_prefill",
             dtype,
+            softcap,
         )
 
     @parametrize("num_gen_seqs", [1, 3, 8])
@@ -373,6 +382,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False])
     @parametrize("dtype", [torch.float16])
+    @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
         reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
@@ -387,6 +397,7 @@ class TestChunkedPrefill(TestCase):
         use_alibi,
         is_causal,
         dtype,
+        softcap,
     ):
         self.chunk_prefill(
             num_gen_seqs,
@@ -398,6 +409,7 @@ class TestChunkedPrefill(TestCase):
             is_causal,
             "flash_decoding",
             dtype,
+            softcap,
         )
 
 

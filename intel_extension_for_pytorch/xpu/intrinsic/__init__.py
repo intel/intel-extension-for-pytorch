@@ -322,6 +322,7 @@ def paged_attention_v2(
     block_size,
     max_context_len,
     alibi_scopes,
+    softcap=-1,
 ):
     return torch.ops.torch_ipex.xetla_paged_attention_v2(
         max_logits,
@@ -338,6 +339,7 @@ def paged_attention_v2(
         block_size,
         max_context_len,
         alibi_scopes,
+        softcap,
     )
 
 
@@ -353,6 +355,7 @@ def paged_attention_v1(
     block_size,
     max_context_len,
     alibi_scopes,
+    softcap=-1,
 ):
     return torch.ops.torch_ipex.xetla_paged_attention_v1(
         out,
@@ -366,6 +369,7 @@ def paged_attention_v1(
         block_size,
         max_context_len,
         alibi_scopes,
+        softcap,
     )
 
 

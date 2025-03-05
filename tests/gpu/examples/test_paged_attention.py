@@ -34,12 +34,15 @@ class TestPagedAttention(TestCase):
         value: torch.Tensor,
         scale: float,
         attn_mask: Optional[torch.Tensor] = None,
+        softcap: float = -1.0,
     ) -> torch.Tensor:
         query = query.float()
         key = key.float()
         value = value.float()
 
         attn_weights = scale * torch.einsum("qhd,khd->hqk", query, key)
+        if softcap > 0:
+            attn_weights = torch.tanh(attn_weights / softcap) * softcap
         if attn_mask is not None:
             attn_mask = attn_mask.float()
             attn_weights = attn_weights + attn_mask
@@ -58,6 +61,7 @@ class TestPagedAttention(TestCase):
         context_lens: torch.Tensor,
         scale: float,
         alibi_slopes: Optional[torch.Tensor],
+        softcap: float = -1.0,
     ) -> None:
         num_query_heads = query.shape[1]
         num_kv_heads = value_cache.shape[1]
@@ -97,7 +101,7 @@ class TestPagedAttention(TestCase):
                 alibi_bias = (position_ids - context_len + 1).float()
                 alibi_bias = alibi_slopes.view(-1, 1, 1) * alibi_bias.view(1, 1, -1)
 
-            out = self.ref_masked_attention(q, keys, values, scale, alibi_bias)
+            out = self.ref_masked_attention(q, keys, values, scale, alibi_bias, softcap)
             out = out.view(num_query_heads, head_size)
             output[i].copy_(out, non_blocking=True)
 
@@ -149,7 +153,7 @@ class TestPagedAttention(TestCase):
         return key_caches, value_caches
 
     def paged_attention(
-        self, version, dtype_, seqlens, head_size, num_heads, block_size
+        self, version, dtype_, seqlens, head_size, num_heads, block_size, softcap
     ) -> None:
         num_seqs = 4
         num_heads = [16, 16]
@@ -225,6 +229,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes_xpu,
+                softcap,
             )
 
             ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
@@ -239,6 +244,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes,
+                softcap=softcap,
             )
 
             ipex.llm.modules.PagedAttention.single_query_kv_attention(
@@ -253,6 +259,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes,
+                softcap,
             )
         elif version == "v2":
             num_partitions = (max_context_len + PARTITION_SIZE - 1) // PARTITION_SIZE
@@ -283,6 +290,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes,
+                softcap=softcap,
             )
             ipex.llm.modules.PagedAttention.single_query_kv_attention(
                 output_xpu_clone,
@@ -296,6 +304,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes,
+                softcap,
             )
             torch.xpu.paged_attention_v2(
                 output_xpu,
@@ -312,6 +321,7 @@ class TestPagedAttention(TestCase):
                 block_size,
                 max_context_len,
                 alibi_slopes_xpu,
+                softcap,
             )
         else:
             assert False, f"Unknown version: {version}"  # noqa
@@ -331,6 +341,7 @@ class TestPagedAttention(TestCase):
             context_lens,
             scale,
             alibi_slopes,
+            softcap,
         )
         torch.testing.assert_close(
             actual_output, ref_output.float(), atol=1e-3, rtol=1e-2
@@ -347,9 +358,10 @@ class TestPagedAttention(TestCase):
     @parametrize("head_size", [128, 256])
     @parametrize("num_heads", [[16, 16], [32, 32]])
     @parametrize("block_size", [32, 49])
-    def test_fp16(self, version, seqlens, head_size, num_heads, block_size):
+    @parametrize("softcap", [-1, 50.0])
+    def test_fp16(self, version, seqlens, head_size, num_heads, block_size, softcap):
         self.paged_attention(
-            version, torch.float16, seqlens, head_size, num_heads, block_size
+            version, torch.float16, seqlens, head_size, num_heads, block_size, softcap
         )
 
     @pytest.mark.skipif(
@@ -360,9 +372,10 @@ class TestPagedAttention(TestCase):
     @parametrize("head_size", [256])
     @parametrize("num_heads", [[16, 16]])
     @parametrize("block_size", [32])
-    def test_bf16(self, version, seqlens, head_size, num_heads, block_size):
+    @parametrize("softcap", [-1, 50.0])
+    def test_bf16(self, version, seqlens, head_size, num_heads, block_size, softcap):
         self.paged_attention(
-            version, torch.bfloat16, seqlens, head_size, num_heads, block_size
+            version, torch.bfloat16, seqlens, head_size, num_heads, block_size, softcap
         )
 
 

@@ -106,7 +106,8 @@ cgfs_t launch_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
               fwd_args.num_heads,
               fwd_args.num_kv_heads,
               fwd_args.head_size,
-              fwd_args.max_blocks_per_seq);
+              fwd_args.max_blocks_per_seq,
+              fwd_args.softcap);
 
           kernel_fn(item, args);
         });
@@ -146,7 +147,8 @@ cgfs_t launch_kernels(chunked_prefill_fwd_kernel_args_t fwd_args) {
               fwd_args.head_size,
               fwd_args.max_blocks_per_seq,
               1,
-              fwd_args.is_causal);
+              fwd_args.is_causal,
+              fwd_args.softcap);
 
           kernel_fn(item, args);
         });

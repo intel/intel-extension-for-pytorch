@@ -409,6 +409,7 @@ class _IPEXPagedAttentionXPU:
         alibi_slopes,
         k_scale=1.0,
         v_scale=1.0,
+        softcap=-1.0,
     ):
         num_queries_per_tokens = (head_mapping == 0).sum()
         query = query.contiguous()
@@ -424,6 +425,7 @@ class _IPEXPagedAttentionXPU:
             block_size,
             max_context_len,
             alibi_slopes,
+            softcap,
         )
 
     @classmethod
@@ -440,6 +442,7 @@ class _IPEXPagedAttentionXPU:
         block_size,
         max_context_len,
         alibi_slopes,
+        softcap=-1.0,
     ):
         query = query.contiguous()
         torch.ops.torch_ipex.paged_attention(
@@ -454,6 +457,7 @@ class _IPEXPagedAttentionXPU:
             block_size,
             max_context_len,
             alibi_slopes,
+            softcap,
         )
 
     @classmethod
@@ -473,6 +477,7 @@ class _IPEXPagedAttentionXPU:
         alibi_slopes=None,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
+        softcap: float = -1.0,
     ):
         head_dim = query.size(-1)
         pad_query = query
@@ -506,6 +511,7 @@ class _IPEXPagedAttentionXPU:
             is_causal,
             False,
             None,
+            softcap,
         )
         if head_dim % 64 != 0:
             output.copy_(pad_output[:, :, :head_dim])

@@ -129,6 +129,7 @@ class PagedAttentionTest(TestCase):
         qtype: torch.dtype,
         seed: int,
     ) -> None:
+        softcap = -1
         k_scale = 1.0
         v_scale = 1.0
 
@@ -204,6 +205,7 @@ class PagedAttentionTest(TestCase):
             alibi_slopes,
             k_scale,
             v_scale,
+            softcap,
         )
 
         # Run the reference implementation.

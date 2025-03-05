@@ -76,6 +76,7 @@ class blocked_attention_kernel {
     uint32_t max_blocks_per_seq;
     uint32_t max_num_partitions;
     bool is_causal;
+    float softcap;
 
     inline arguments_t(
         scalar_t* out,
@@ -100,7 +101,8 @@ class blocked_attention_kernel {
         uint32_t head_size,
         uint32_t max_blocks_per_seq,
         uint32_t max_num_partitions,
-        bool is_causal)
+        bool is_causal,
+        float softcap)
         : out(out),
           max_logits(max_logits),
           exp_sums(exp_sums),
@@ -122,11 +124,13 @@ class blocked_attention_kernel {
           head_size(head_size),
           max_blocks_per_seq(max_blocks_per_seq),
           max_num_partitions(max_num_partitions),
-          is_causal(is_causal) {
+          is_causal(is_causal),
+          softcap(softcap) {
       // atoms = atoms_; // reinterpret_cast<AttentionAtom*>(atoms_);
       head_groups = num_heads / num_kv_heads;
     }
   };
+  using tanh_t = typename subgroup::tanh_op_t;
 
  private:
   // -------------------- // Compute policy // -------------------- //
@@ -405,6 +409,12 @@ class blocked_attention_kernel {
       }
 
       score_sub.reg *= args.sm_scale;
+      if (args.softcap > 0.0) {
+        score_sub.reg /= args.softcap;
+        tanh_t tanh;
+        tanh(score_sub, 0);
+        score_sub.reg *= args.softcap;
+      }
       // TODO: handle remained_len before the loop and reverse bid loope
       using tile_mask = fmha::tile_mask_t<score_acc_tile_t>;
       uint32_t remained_len = std::max(int(ctx.seq_k_end) - int(cu_seqlen), 0);

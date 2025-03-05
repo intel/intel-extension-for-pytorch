@@ -377,7 +377,9 @@ class _IPEXPagedAttentionCPU:
         alibi_slopes,
         k_scale=1.0,
         v_scale=1.0,
+        softcap=-1.0,
     ):
+        assert softcap == -1.0, "ipex does not support softcap on CPU"
         torch.ops.torch_ipex.single_query_cached_kv_attention(
             output,
             query,
@@ -408,7 +410,9 @@ class _IPEXPagedAttentionCPU:
         block_size,
         max_context_len,
         alibi_slopes,
+        softcap=-1.0,
     ):
+        assert softcap == -1.0, "ipex does not support softcap on CPU"
         num_heads = output.size(1)
         num_kv_heads = num_heads // num_queries_per_tokens
         head_mapping = (
@@ -453,7 +457,9 @@ class _IPEXPagedAttentionCPU:
         alibi_slopes=None,
         k_scale=1.0,
         v_scale=1.0,
+        softcap=-1.0,
     ):
+        assert softcap == -1.0, "ipex does not support softcap on CPU"
         torch.ops.torch_ipex.flash_attn_varlen_func(
             output,
             query,

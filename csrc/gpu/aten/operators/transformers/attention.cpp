@@ -1485,7 +1485,8 @@ void xetla_paged_attention_impl_v1(
     const double head_scale,
     const int64_t block_size,
     const int64_t max_context_len,
-    const c10::optional<Tensor>& alibi_slopes) {
+    const c10::optional<Tensor>& alibi_slopes,
+    const double softcap = -1.) {
   uint32_t num_seqs = query.size(0);
   uint32_t num_heads = query.size(1);
   uint32_t head_size = query.size(2);
@@ -1521,7 +1522,8 @@ void xetla_paged_attention_impl_v1(
        head_size,
        block_size,
        max_num_blocks_per_seq,
-       max_context_len});
+       max_context_len,
+       softcap});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 
 #else
@@ -1540,7 +1542,8 @@ void xetla_paged_attention_v1(
     const double head_scale,
     const int64_t block_size,
     const int64_t max_context_len,
-    const c10::optional<Tensor>& alibi_slopes) {
+    const c10::optional<Tensor>& alibi_slopes,
+    const double softcap = -1.) {
   RECORD_FUNCTION("xetla_paged_attention_v1", {});
 
   xetla_paged_attention_impl_v1(
@@ -1571,7 +1574,8 @@ void xetla_paged_attention_impl_v2(
     const double head_scale,
     const int64_t block_size,
     const int64_t max_context_len,
-    const c10::optional<Tensor>& alibi_slopes) {
+    const c10::optional<Tensor>& alibi_slopes,
+    const double softcap = -1.) {
   uint32_t num_seqs = query.size(0);
   uint32_t num_heads = query.size(1);
   uint32_t head_size = query.size(2);
@@ -1607,7 +1611,8 @@ void xetla_paged_attention_impl_v2(
        head_size,
        block_size,
        max_num_blocks_per_seq,
-       max_context_len});
+       max_context_len,
+       softcap});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
@@ -1628,7 +1633,8 @@ void xetla_paged_attention_v2(
     const double head_scale,
     const int64_t block_size,
     const int64_t max_context_len,
-    const c10::optional<Tensor>& alibi_slopes) {
+    const c10::optional<Tensor>& alibi_slopes,
+    const double softcap = -1.) {
   RECORD_FUNCTION("xetla_paged_attention_v2", {});
 
   xetla_paged_attention_impl_v2(
@@ -1645,7 +1651,8 @@ void xetla_paged_attention_v2(
       head_scale,
       block_size,
       max_context_len,
-      alibi_slopes);
+      alibi_slopes,
+      softcap);
 }
 
 void paged_attention(
@@ -1659,7 +1666,8 @@ void paged_attention(
     const double head_scale,
     const int64_t block_size,
     const int64_t max_context_len,
-    const c10::optional<Tensor>& alibi_slopes) {
+    const c10::optional<Tensor>& alibi_slopes,
+    const double softcap = -1.) {
   // This partition size follows the vllm's paged attention implementation
   int32_t partition_size = 512;
   if (max_context_len > partition_size) {
@@ -1689,7 +1697,8 @@ void paged_attention(
         head_scale,
         block_size,
         max_context_len,
-        alibi_slopes);
+        alibi_slopes,
+        softcap);
   } else {
     xetla_paged_attention_v1(
         output,
@@ -1702,7 +1711,8 @@ void paged_attention(
         head_scale,
         block_size,
         max_context_len,
-        alibi_slopes);
+        alibi_slopes,
+        softcap);
   }
 }
 
@@ -1724,7 +1734,8 @@ Tensor chunked_prefill(
     const bool zero_tensors,
     bool is_causal,
     const bool return_softmax,
-    c10::optional<at::Generator> gen_) {
+    c10::optional<at::Generator> gen_,
+    const double softcap = -1.0) {
   // Check datatype
   TORCH_CHECK(
       !seqused_k.has_value(), "We do not support seqused_k feature currently!");
@@ -1877,7 +1888,7 @@ Tensor chunked_prefill(
          true, // use_varlen
          (uint64_t)0,
          (uint64_t)0,
-         -1., // softcap
+         softcap,
          block_table.data_ptr<int32_t>(), // block_tables
          num_max_seq_block, // max_blocks_per_seq
          block_size}); // block_size
@@ -1923,7 +1934,8 @@ Tensor chunked_prefill(
            head_dim,
            num_max_seq_block,
            block_size,
-           is_causal});
+           is_causal,
+           softcap});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     } else {
       // slice kv
@@ -1952,7 +1964,8 @@ Tensor chunked_prefill(
            head_dim,
            num_max_seq_block,
            block_size,
-           is_causal});
+           is_causal,
+           softcap});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     }
   }
