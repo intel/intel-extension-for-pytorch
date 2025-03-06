@@ -28,34 +28,6 @@ Run_benchmark_gpt-j-6b() {
 }
 
 
-## Llama-7b
-Run_benchmark_llama-7b() {
-    model=decapoda-research/llama-7b-hf
-    sub_model_name=llama-7b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
-    mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
-    mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
-    mv profile*pt ${dir}
-    mv trace.json ${dir}
-}
-
-
-## Llama-13b
-Run_benchmark_llama-13b() {
-    model=decapoda-research/llama-13b-hf
-    sub_model_name=llama-13b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
-    mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
-    mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
-    mv profile*pt ${dir}
-    mv trace.json ${dir}
-}
-
-
 ## Llama2-7b
 Run_benchmark_llama2-7b() {
     model=meta-llama/Llama-2-7b-hf
@@ -186,8 +158,6 @@ main() {
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
     
     Run_benchmark_gpt-j-6b
-    Run_benchmark_llama-7b
-    Run_benchmark_llama-13b
     Run_benchmark_llama2-7b
     Run_benchmark_llama2-13b
     Run_benchmark_llama2-70b

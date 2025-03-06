@@ -2,7 +2,7 @@
 
 Here you can find benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as ChatGLMv3-6B, Baichuan2-13B and Phi3-mini. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as Baichuan2-13B and Phi3-mini. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
@@ -28,7 +28,7 @@ docker run -it --rm --privileged -v /dev/dri/by-path:/dev/dri/by-path ipex-llm:2
 cd llm
 
 # Activate environment variables
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 ```
 
 ### Conda-based environment setup with prebuilt wheel files
@@ -54,7 +54,7 @@ cd examples/gpu/llm
 bash ./tools/env_setup.sh 0x07
 conda deactivate
 conda activate llm
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 ```
 
 ### Docker-based environment setup with compilation from source
@@ -77,7 +77,7 @@ docker run -it --rm --privileged -v /dev/dri/by-path:/dev/dri/by-path ipex-llm:2
 cd llm
 
 # Activate environment variables
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 ```
 
 ### Conda-based environment setup with compilation from source
@@ -106,7 +106,7 @@ bash ./tools/env_setup.sh 3 <ONEAPI_ROOT_DIR> <AOT>
 
 conda deactivate
 conda activate llm
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 ```
 
 where <br />
@@ -122,3 +122,5 @@ Inference and fine-tuning are supported in individual directories.
 For inference example scripts, visit the [inference](./inference/) directory.
 
 For fine-tuning example scripts, visit the [fine-tuning](./fine-tuning/) directory.
+
+For fine-tuning with quantized model, visit the [bitsandbytes](./bitsandbytes/) directory.

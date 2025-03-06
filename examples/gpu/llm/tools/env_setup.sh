@@ -159,7 +159,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         echo "rm -rf wheels" >> ${AUX_INSTALL_SCRIPT}
     fi
     echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install dpcpp-cpp-rt==2025.0.4" >> ${AUX_INSTALL_SCRIPT}
 
     # Return back to llm directory
     cd ${BASEFOLDER}/..

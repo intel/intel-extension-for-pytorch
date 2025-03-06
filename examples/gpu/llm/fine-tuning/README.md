@@ -54,7 +54,7 @@ Here we mainly focus on the memory-constrained fine-tuning on single GPU, and pr
 
 ### Profile the finetuning
 
-For profiling the process of finetuning, Apply the `patches/transformers.patch` to transformers v4.41.2 and set the following VARIABLE before finetuning.
+For profiling the process of finetuning, Apply the `patches/transformers.patch` to transformers v4.44.2 and set the following VARIABLE before finetuning.
 
 ```bash
 export PROFILE=1

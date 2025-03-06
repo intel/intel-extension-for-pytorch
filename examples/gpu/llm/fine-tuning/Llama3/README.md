@@ -18,34 +18,6 @@ huggingface-cli login --token <your_token_here>
 wandb login
 ```
 
-### Fine-tuning on single card
-
-**Note**:
-Full-finetuning on single card will cause OOM.
-
-Example: Llama 3 8B LoRA fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `llama3_ft.py`.
-
-```bash
-export TORCH_LLM_ALLREDUCE=1
-
-export model="meta-llama/Meta-Llama-3-8B"
-
-python llama3_ft.py \
-    --model_name_or_path ${model} \
-    --use_flashattn True \
-    --custom_mp True \
-    --use_peft True \
-    --max_seq_length 128 \
-    --output_dir="output" \
-    --evaluation_strategy="epoch" \
-    --learning_rate=1e-3 \
-    --auto_find_batch_size=True \
-    --num_train_epochs=1 \
-    --save_steps=500 \
-    --logging_steps=1 \
-    --save_total_limit=8
-```
-
 ### Fine-tuning on multi-GPU
 
 **Note**:
