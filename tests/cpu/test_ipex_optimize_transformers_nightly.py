@@ -22,6 +22,7 @@ from hf_configs.phi3.modeling_phi3 import Phi3ForCausalLM
 from hf_configs.maira2.modeling_maira2 import Maira2ForConditionalGeneration
 from hf_configs.deepseekv2.modeling_deepseek import DeepseekV2ForCausalLM
 from hf_configs.deepseekv3.modeling_deepseek import DeepseekV3ForCausalLM
+from hf_configs.phi4.modeling_phi4mm import Phi4MMForCausalLM
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 from intel_extension_for_pytorch.llm.utils import load_low_precision_checkpoint
 from intel_extension_for_pytorch.utils.weight_only_quantization import (
@@ -36,7 +37,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.46.2"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.48.0"]
     )
     import transformers
     from transformers import AutoConfig
@@ -241,6 +242,13 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "phi4",
+        Phi4MMForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -252,6 +260,7 @@ class OptimizeTransformersNightlyTester(TestCase):
             f"{curpath}/hf_configs/{m.name}",
             return_dict=return_dict,
             trust_remote_code=True,
+            _attn_implementation="eager",
         )
         model = m.model_class(config).eval()
         if m.name == "falcon":
@@ -358,13 +367,20 @@ class OptimizeTransformersNightlyTester(TestCase):
             input_dict["output_router_logits"] = torch.tensor(False)
             input_dict["num_logits_to_keep"] = torch.tensor(1)
             model.config.dtype = dtype
-
+        if m.name == "phi4":
+            input_dict.pop("use_cache", None)
+            input_dict["input_mode"] = torch.tensor([0])
+            input_dict["image_sizes"] = torch.tensor([])
+            input_dict["image_attention_mask"] = torch.tensor([])
+            input_dict["input_image_embeds"] = torch.tensor([])
+            input_dict["input_audio_embeds"] = torch.tensor([])
+            input_dict["audio_embed_sizes"] = torch.tensor([])
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
             dtype=dtype,
         ):
             key_hf = ref_m(**input_dict)
-        if m.name == "jamba":
+        if m.name in ["jamba", "phi4"]:
             input_dict["past_key_values"] = ipex.transformers.optimize.get_dummy_input(
                 model, True
             )["past_key_values"]

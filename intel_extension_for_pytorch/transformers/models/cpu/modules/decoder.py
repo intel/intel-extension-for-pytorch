@@ -40,6 +40,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
         elif self.model_backbone in [
             "WhisperForConditionalGeneration",
             "Phi3ForCausalLM",
+            "Phi4MMForCausalLM",
             "LlavaLlamaForCausalLM",
             "GitForCausalLM",
             "MixtralForCausalLM",
@@ -214,6 +215,7 @@ class _IPEXEncoderLayerCPU(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
         if self.model_backbone in [
             "MllamaForConditionalGeneration",
+            "Phi4MMForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "mlp_linear_add"):
@@ -224,9 +226,17 @@ class _IPEXEncoderLayerCPU(nn.Module):
                     self.mlp_linear_mul = _IPEXlinearMulCPU(
                         module.mlp_linear_mul.linear, tpp=tpp, woq=woq
                     )
+                if hasattr(module, "mha_linear_add"):
+                    self.mha_linear_add = _IPEXlinearAddCPU(
+                        module.mha_linear_add.linear, tpp=tpp, woq=woq
+                    )
             if hasattr(module, "linear_gelu"):
-                self.linear_silu = _IPEXlinearGeluCPU(
+                self.linear_gelu = _IPEXlinearGeluCPU(
                     module.linear_gelu.linear, tpp=tpp, woq=woq
+                )
+            if hasattr(module, "linear_newgelu"):
+                self.linear_newgelu = _IPEXlinearNewGeluCPU(
+                    module.linear_newgelu.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

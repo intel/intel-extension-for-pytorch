@@ -219,6 +219,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " quantization with INT4 weight.",
     )
     parser.add_argument(
+        "--input-mode",
+        default="0",
+        choices=["0", "1", "2", "3"],
+        type=str,
+        help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+    )
+    parser.add_argument(
         "--gptq",
         action="store_true",
         help="Deprecated. Run GPTQ calibration to generate optimized INT4 weight for weight-only quantization."
@@ -347,6 +354,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
             infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
+            infer_cmd.extend(["--input-mode", str(args.input_mode)])
             if args.vision_text_model:
                 infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
@@ -392,6 +400,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
                 quant_cmd.extend(["--input-tokens", str(args.input_tokens)])
                 quant_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
+                quant_cmd.extend(["--input-mode", str(args.input_mode)])
+                quant_cmd.extend(["--batch-size", str(args.batch_size)])
                 if args.vision_text_model:
                     quant_cmd.extend(["--vision-text-model"])
                 if args.config_file is not None:
@@ -529,6 +539,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
+            infer_cmd.extend(["--input-mode", str(args.input_mode)])
             if args.vision_text_model:
                 infer_cmd.extend(["--vision-text-model"])
             if args.quant_with_amp:
@@ -589,6 +600,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "git": ("/git_local_shard"),
                 "yuan": ("/yuan_local_shard"),
                 "phi-3": ("/phi-3_local_shard"),
+                "phi4mm": ("/phi4mm_local_shard"),
                 "phi": ("/phi_local_shard"),
                 "whisper": ("/whisper_local_shard"),
                 "maira": ("/maira2_local_shard"),
@@ -646,6 +658,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
         infer_cmd.extend(["--batch-size", str(args.batch_size)])
         infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
+        infer_cmd.extend(["--input-mode", str(args.input_mode)])
         if args.local_rank is not None:
             infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:

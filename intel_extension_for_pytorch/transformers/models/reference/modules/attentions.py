@@ -1256,6 +1256,53 @@ def _MptAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _PhiOAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value=None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    qkv = self.qkv_proj(hidden_states)
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    query_states, key_states, value_states = self._IPEXROPE(
+        qkv,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.pos_embd_dim // 2,
+        self.pos_embd_dim,
+        kv_seq_len,
+        3,
+    )
+    value_states = value_states.view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
+    )
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+        add_casual_mask=False,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    # attn_output = self.o_proj(attn_output)
+    if not output_attentions:
+        attn_weights = None
+    return attn_output, attn_weights, past_key_value
+
+
 def _relative_position_bucket(
     self, relative_position, bidirectional=True, num_buckets=32, max_distance=128
 ):
@@ -2480,6 +2527,112 @@ def _MllamaTextCrossAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _SiglipAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    """Input shape: Batch x Time x Channel"""
+    batch_size, q_len, hidden_size = hidden_states.size()
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        query_states, key_states, value_states = concat_qkv.split(
+            self.hidden_size, dim=-1
+        )
+    else:
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(
+        batch_size, q_len, self.num_heads, self.head_dim
+    ).transpose(1, 2)
+    key_states = key_states.view(
+        batch_size, q_len, self.num_heads, self.head_dim
+    ).transpose(1, 2)
+    value_states = value_states.view(
+        batch_size, q_len, self.num_heads, self.head_dim
+    ).transpose(1, 2)
+
+    if attention_mask is not None:  # no matter the length, we just slice it
+        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+    else:
+        causal_mask = None
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=causal_mask,
+        dropout_p=0.0,
+        is_causal=False,
+    )
+    attn_weights = None
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(batch_size, q_len, self.embed_dim)
+
+    # attn_output = self.out_proj(attn_output)
+
+    return attn_output, attn_weights
+
+
+def _ConformerAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    pos_k: torch.Tensor,
+    pos_v: torch.Tensor,
+    mask: Optional[torch.Tensor],
+    relative_attention_bias: Optional[torch.Tensor] = None,
+):
+    n_batch = hidden_states.size(0)
+
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        q, k, v = concat_qkv.split(
+            [self.h * self.d_k, self.h_k * self.d_k, self.h_k * self.d_k], dim=-1
+        )
+    else:
+        q = self.linear_q(hidden_states)
+        k = self.linear_k(hidden_states)
+        v = self.linear_v(hidden_states)
+
+    q = q.view(n_batch, -1, self.h, self.d_k).transpose(1, 2)
+    k = k.view(n_batch, -1, self.h_k, self.d_k).transpose(
+        1, 2
+    )  # (batch, head_k, time2, d_k)
+    v = v.view(n_batch, -1, self.h_k, self.d_k).transpose(
+        1, 2
+    )  # (batch, head_k, time2, d_k)
+
+    attn_mask = None
+    if mask is not None:
+        mask = mask.unsqueeze(1)
+        if relative_attention_bias is not None:
+            attn_mask = mask + relative_attention_bias
+        else:
+            attn_mask = mask
+        if mask.dtype != q.dtype:
+            attn_mask = attn_mask.to(q.dtype)
+
+    x = torch.nn.functional.scaled_dot_product_attention(
+        q,
+        k,
+        v,
+        attn_mask=attn_mask,
+        dropout_p=self.dropout_rate,
+        is_causal=False,
+    )
+    x = (
+        x.transpose(1, 2).contiguous().view(n_batch, -1, self.h_k * self.d_k)
+    )  # (batch, time1, d_model)
+
+    # return self.linear_out(x)  # (batch, time1, d_model)
+    return x
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -2513,6 +2666,16 @@ class _IPEXAttentionRef(nn.Module):
             self.hidden_size = module.d_model
         elif hasattr(module, "all_head_size"):
             self.hidden_size = module.all_head_size
+        elif hasattr(module, "q_proj"):
+            if hasattr(module.q_proj, "weight"):
+                self.hidden_size = module.q_proj.weight.shape[0]
+            else:
+                self.hidden_size = module.q_proj.linear.weight.shape[0]
+        elif hasattr(module, "o_proj"):
+            if hasattr(module.o_proj, "weight"):
+                self.hidden_size = module.o_proj.weight.shape[0]
+            else:
+                self.hidden_size = module.o_proj.linear.weight.shape[0]
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):
@@ -2523,16 +2686,37 @@ class _IPEXAttentionRef(nn.Module):
             self.num_attention_heads = module.num_attention_heads_per_partition
         elif hasattr(module, "n_heads"):
             self.num_attention_heads = module.n_heads
+        elif hasattr(module, "head_dim"):
+            self.num_attention_heads = self.hidden_size // module.head_dim
 
         if hasattr(module, "num_key_value_heads"):
             self.num_key_value_heads = module.num_key_value_heads
+        elif hasattr(module, "num_key_value_groups"):
+            self.num_key_value_heads = (
+                self.num_attention_heads // module.num_key_value_groups
+            )
         else:
             if hasattr(config, "num_key_value_heads"):
                 if (
-                    self.model_backbone == "LlavaLlamaForCausalLM"
-                    and module._get_name() == "CLIPAttention"
-                ) or config.num_key_value_heads == config.num_attention_heads:
+                    (
+                        self.model_backbone == "LlavaLlamaForCausalLM"
+                        and module._get_name() == "CLIPAttention"
+                    )
+                    or (
+                        self.model_backbone == "Phi4MMForCausalLM"
+                        and module._get_name()
+                        in ["SiglipAttention", "SiglipFlashAttention2"]
+                    )
+                    or config.num_key_value_heads == config.num_attention_heads
+                ):
                     self.num_key_value_heads = self.num_attention_heads
+                elif (
+                    self.model_backbone == "Phi4MMForCausalLM"
+                    and module._get_name() == "MultiHeadedAttention"
+                ):
+                    self.num_key_value_heads = self.h_k
+                    self.num_attention_heads = self.h
+                    self.hidden_size = self.d_k
                 else:
                     raise ValueError(
                         "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
@@ -2540,9 +2724,8 @@ class _IPEXAttentionRef(nn.Module):
             else:
                 self.num_key_value_heads = self.num_attention_heads
         self.num_key_value_groups = self.num_attention_heads // self.num_key_value_heads
-
+        self.num_heads = self.num_attention_heads
         self.head_dim = self.hidden_size // self.num_attention_heads
-
         self.max_position_embeddings = (
             config.max_position_embeddings
             if hasattr(config, "max_position_embeddings")
@@ -2558,6 +2741,7 @@ class _IPEXAttentionRef(nn.Module):
                 "MptForCausalLM",
                 "GitForCausalLM",
                 "WhisperForConditionalGeneration",
+                "Phi4MMForCausalLM",
             ]
             or (
                 self.model_backbone == "BaichuanForCausalLM"
@@ -2574,6 +2758,12 @@ class _IPEXAttentionRef(nn.Module):
             or (
                 self.model_backbone == "MllamaForConditionalGeneration"
                 and module._get_name() != "MllamaTextCrossSdpaAttention"
+            )
+            or (
+                self.model_backbone == "Phi4MMForCausalLM"
+                and module._get_name() != "SiglipAttention"
+                and module._get_name() != "SiglipFlashAttention2"
+                and module._get_name() != "MultiHeadedAttention"
             )
         ):
             if hasattr(module, "rotary_dim"):
@@ -2594,6 +2784,19 @@ class _IPEXAttentionRef(nn.Module):
                 "DeepseekV3ForCausalLM",
             ]:
                 self.pos_embd_dim = self.qk_rope_head_dim
+            elif (
+                hasattr(config, "rope_scaling")
+                and config.rope_scaling is not None
+                and "type" in config.rope_scaling
+                and config.rope_scaling["type"] == "longrope"
+            ):
+                partial_rotary_factor = (
+                    config.partial_rotary_factor
+                    if hasattr(config, "partial_rotary_factor")
+                    else 1.0
+                )
+                head_dim = module.head_dim
+                self.pos_embd_dim = int(head_dim * partial_rotary_factor)
             else:
                 self.pos_embd_dim = self.head_dim
             self.rope_base = 10000
@@ -2657,6 +2860,7 @@ class _IPEXAttentionRef(nn.Module):
             "PhiForCausalLM",
             "Qwen2ForCausalLM",
             "DeepseekV2ForCausalLM",
+            # "Phi4MMForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
@@ -2693,6 +2897,16 @@ class _IPEXAttentionRef(nn.Module):
                         [module.q_a_proj, module.kv_a_proj_with_mqa]
                     )
                     del module.q_a_proj, module.kv_a_proj_with_mqa
+            if self.model_backbone in ["Phi4MMForCausalLM"]:
+                if (
+                    hasattr(module, "linear_q")
+                    and hasattr(module, "linear_k")
+                    and hasattr(module, "linear_v")
+                ):
+                    self.concat_qkv = _IPEXConcatLinearRef(
+                        [module.linear_q, module.linear_k, module.linear_v]
+                    )
+                    del module.linear_q, module.linear_k, module.linear_v
         if not (
             self.model_backbone == "MllamaForConditionalGeneration"
             and (
@@ -2704,6 +2918,15 @@ class _IPEXAttentionRef(nn.Module):
             self.is_mllama_cross_attention = False
         else:
             self.is_mllama_cross_attention = True
+        if self.model_backbone == "Phi4MMForCausalLM":
+            if module._get_name() in ["SiglipAttention", "SiglipFlashAttention2"]:
+                self.is_vision_attention = True
+            else:
+                self.is_vision_attention = False
+            if module._get_name() == "MultiHeadedAttention":
+                self.is_speech_attention = True
+            else:
+                self.is_speech_attention = False
         if (
             self.model_backbone == "FalconForCausalLM"
             or self.model_backbone == "RWForCausalLM"
@@ -2874,6 +3097,7 @@ class _IPEXAttentionRef(nn.Module):
         vision: Optional[bool] = False,
         cross_attention_states: Optional[torch.Tensor] = None,
         cache_position=None,
+        **kwargs,
     ):
         if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(
@@ -3121,6 +3345,30 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "Phi3ForCausalLM":
             return _Phi3Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Phi4MMForCausalLM":
+            if self.is_vision_attention:
+                return _SiglipAttention_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    output_attentions,
+                )
+            if self.is_speech_attention:
+                return _ConformerAttention_forward(
+                    self,
+                    hidden_states,
+                    mask=mask,
+                    **kwargs,
+                )
+            return _PhiOAttention_forward(
                 self,
                 hidden_states,
                 attention_mask,

@@ -70,6 +70,7 @@ if args.local_rank == 0:
             torch_dtype=load_dtype,
             low_cpu_mem_usage=True if model_type != "maira2" else False,
             trust_remote_code=True,
+            _attn_implementation="eager",
         )
     else:
         tokenizer, model, image_processor, context_len = load_pretrained_model(
@@ -80,6 +81,8 @@ if args.local_rank == 0:
         max_shard_size=args.max_shard_size,
         safe_serialization=False,
     )
+    if model_type == "phi4mm":
+        tokenizer.chat_template = None
     tokenizer.save_pretrained(save_directory=args.save_path)
     if model_type == "llava":
         image_processor.save_pretrained(save_directory=args.save_path)

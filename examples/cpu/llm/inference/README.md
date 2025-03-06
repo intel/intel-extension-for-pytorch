@@ -43,6 +43,8 @@
 |Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ |   | ✅ | ✅ |
+|Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ |   | ✅ | ✅ |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Maira| microsoft/maira-2 | ✅ | ✅ |   | ✅ | ✅ |
 |Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
@@ -116,6 +118,8 @@ python run.py --help # for more detailed usages
 | generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
 | streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
 | KV Cache dtype |   default: auto, use "--kv-cache-dtype=fp8_e5m2" to enable e5m2 KV Cache. More information refer to [vLLM FP8 E5M2 KV Cache](https://docs.vllm.ai/en/v0.6.6/quantization/fp8_e5m2_kvcache.html) |
+| input mode | default: 0, use "--input-mode" to choose input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision and speech |
+| input audios | default: None, use "--audio" to choose the audio link address for speech tasks |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
