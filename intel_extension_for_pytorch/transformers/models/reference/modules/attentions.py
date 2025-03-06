@@ -2871,7 +2871,39 @@ class _IPEXAttentionRef(nn.Module):
             else:
                 self.norm_factor_value = 1 / self.norm_factor
         if self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
-            kv_b_proj_weight = self.kv_b_proj.weight.detach()
+            if (
+                hasattr(self.kv_b_proj, "_op_context")
+                and self.kv_b_proj._op_context is not None
+            ):
+                kv_b_proj_weight = self.kv_b_proj._op_context.to_public(
+                    self.kv_b_proj._op_context.get_weight()
+                )
+                if self.kv_b_proj._group_size > 1:
+                    from intel_extension_for_pytorch.quantization._quantize_utils import (
+                        dequantize_per_block,
+                    )
+
+                    kv_b_proj_weight = dequantize_per_block(
+                        kv_b_proj_weight,
+                        self.kv_b_proj._op_context.get_scales(),
+                        self.kv_b_proj._op_context.get_zero_points(),
+                        self.kv_b_proj.dtype,
+                        self.kv_b_proj._group_size,
+                    )
+                else:
+                    from intel_extension_for_pytorch.quantization._quantize_utils import (
+                        dequantize_per_channel,
+                    )
+
+                    kv_b_proj_weight = dequantize_per_channel(
+                        kv_b_proj_weight,
+                        self.kv_b_proj._op_context.get_scales(),
+                        self.kv_b_proj._op_context.get_zero_points(),
+                        self.kv_b_proj.dtype,
+                    )
+                kv_b_proj_weight = kv_b_proj_weight.bfloat16()
+            else:
+                kv_b_proj_weight = self.kv_b_proj.weight.detach()
             self.kv_b_proj_weight = kv_b_proj_weight.transpose(0, 1).contiguous()
             w_kc, w_vc = kv_b_proj_weight.unflatten(
                 0, (-1, self.qk_nope_head_dim + self.v_head_dim)

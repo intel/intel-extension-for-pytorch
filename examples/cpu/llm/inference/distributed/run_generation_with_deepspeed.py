@@ -761,7 +761,9 @@ elif model_type == "mllama":
     elif args.input_tokens in prompt_pool[model_type]:
         current_prompt = [prompt_pool[model_type][args.input_tokens][0]]
         for i in range(1, args.batch_size):
-            current_prompt = current_prompt + [prompt_pool[model_type][args.input_tokens][i]]
+            current_prompt = current_prompt + [
+                prompt_pool[model_type][args.input_tokens][i]
+            ]
         prompt = current_prompt
     else:
         raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")

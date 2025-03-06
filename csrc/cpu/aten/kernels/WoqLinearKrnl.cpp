@@ -26,6 +26,7 @@ IPEX_DEFINE_DISPATCH(woq_int8_gemm_pre_tensor_kernel_stub);
 IPEX_DEFINE_DISPATCH(woq_int8_gemm_pre_k_block_kernel_stub);
 IPEX_DEFINE_DISPATCH(woq_int8_gemm_pre_m_block_kernel_stub);
 IPEX_DEFINE_DISPATCH(woq_int8_gemm_pre_m_k_block_kernel_stub);
+IPEX_DEFINE_DISPATCH(fp8_bmm_stub);
 
 /**
  * @brief Weight only quantization GEMM kernel. Here we dispatch to different
@@ -68,6 +69,22 @@ at::Tensor qlinear_woq_affine(
     int64_t quant_block_k = 0,
     const c10::optional<at::Tensor>& compensation = c10::nullopt,
     const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
+  if (qw_type == WOQ_DTYPE_FP8 && lowp_mode == LOWP_MODE_BF16) {
+    auto x_shape = x.sizes().vec();
+    auto x_view = x;
+    if (x_shape.size() == 2) {
+      x_view = x.unsqueeze(0);
+    }
+    auto out_shape = x_view.sizes().vec();
+    out_shape.back() = qw.size(0);
+    auto out = at::empty(out_shape, x.options());
+    auto scale = std::make_optional(scales_list[0]);
+    auto qw_view = qw.unsqueeze(0);
+    fp8_bmm_stub(kCPU, out, x_view, qw_view, true, scale);
+    auto out_shape_ = x.sizes().vec();
+    out_shape_.back() = qw.size(0);
+    return out.view(out_shape_);
+  }
   auto K = x.size(-1);
   auto M = x.numel() / K;
   auto act_dtype = x.scalar_type();
