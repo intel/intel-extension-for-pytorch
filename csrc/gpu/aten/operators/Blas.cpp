@@ -507,41 +507,7 @@ Tensor& addmv_(
     const Tensor& vec,
     const at::Scalar& beta,
     const at::Scalar& alpha) {
-  Tensor self_v;
-  TORCH_CHECK(
-      (mat.dim() == 2 && vec.dim() == 1 && self.dim() <= 1),
-      "vector + matrix @ vector expected, got ",
-      self.dim(),
-      ", ",
-      mat.dim(),
-      ", ",
-      vec.dim());
-  if (self.dim() == 1 && self.size(0) != 1) {
-    TORCH_CHECK(
-        (mat.size(1) == vec.size(0) && mat.size(0) == self.size(0)),
-        "size mismatch, get ",
-        self.size(0),
-        ", ",
-        mat.size(0),
-        "x",
-        mat.size(1),
-        ",",
-        vec.size(0));
-    self_v = self.view({self.size(0), 1});
-  } else {
-    TORCH_CHECK(
-        (mat.size(1) == vec.size(0)),
-        "size mismatch, get ",
-        mat.size(0),
-        "x",
-        mat.size(1),
-        ",",
-        vec.size(0));
-    self_v = self;
-  }
-  Tensor vec_v = vec.view({vec.size(0), 1});
-  self_v.addmm_(mat, vec_v, beta, alpha);
-  return self;
+  return addmv_out(self, mat, vec, beta, alpha, self);
 }
 
 Tensor tensordot(
