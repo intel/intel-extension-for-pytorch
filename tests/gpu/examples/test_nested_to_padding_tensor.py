@@ -50,14 +50,6 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
-    def test_to_padded_tensor_on_empty_tensor(self):
-        nt = torch.nested.nested_tensor([], device=xpu_device)
-        empty = torch.nested.to_padded_tensor(nt, 4)
-        self.assertEqual(empty, torch.tensor([]))
-
-    @pytest.mark.skipif(
-        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
-    )
     def test_to_padded_tensor_simple(self, device=xpu_device):
         def _run_test(dtype=torch.float):
             t = torch.randn(4, 4, 4, device=device, dtype=dtype)

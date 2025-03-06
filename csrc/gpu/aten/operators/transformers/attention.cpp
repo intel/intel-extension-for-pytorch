@@ -2689,8 +2689,7 @@ std::tuple<Tensor, Tensor> _native_multi_head_attention(
     native::debug_assert_shape(__LINE__, qkv, {B, T, 3 * D});
   }
 
-  auto q_k_v = AtenIpexTypeNestedTensorXPU::_transform_bias_rescale_qkv(
-      qkv, qkv_bias, num_head);
+  auto q_k_v = at::_transform_bias_rescale_qkv(qkv, qkv_bias, num_head);
   qkv = Tensor(); // Not used any more, allow free
   auto& q = std::get<0>(q_k_v);
   const auto& k = std::get<1>(q_k_v);
@@ -2743,8 +2742,7 @@ std::tuple<Tensor, Tensor, Tensor> _transform_bias_rescale_qkv(
     const Tensor& qkv,
     const Tensor& qkv_bias,
     int64_t num_head) {
-  return at::AtenIpexTypeNestedTensorXPU::_transform_bias_rescale_qkv(
-      qkv, qkv_bias, num_head);
+  return at::_transform_bias_rescale_qkv(qkv, qkv_bias, num_head);
 }
 
 std::tuple<Tensor, Tensor> _native_multi_head_attention(
@@ -2763,7 +2761,7 @@ std::tuple<Tensor, Tensor> _native_multi_head_attention(
     bool need_weights,
     bool average_attn_weights,
     const c10::optional<int64_t> mask_type) {
-  return at::AtenIpexTypeNestedTensorXPU::_native_multi_head_attention(
+  return at::_native_multi_head_attention(
       query,
       key,
       value,
@@ -2800,18 +2798,6 @@ IPEX_LIBRARY_FRAGMENT() {
 }
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
-      "_transform_bias_rescale_qkv",
-      at::AtenIpexTypeXPU::_transform_bias_rescale_qkv,
-      c10::DispatchKey::XPU);
-}
-
-IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
-      "_native_multi_head_attention",
-      at::AtenIpexTypeXPU::_native_multi_head_attention,
-      c10::DispatchKey::XPU)
-
   IPEX_OP_REGISTER_DISPATCH(
       "chunked_prefill",
       at::AtenIpexTypeXPU::chunked_prefill,

@@ -131,18 +131,11 @@ supported:
   - multilabel_margin_loss_forward
   - multilabel_margin_loss_forward.output
 ####################################
-  - _convert_indices_from_coo_to_csr.out
-  - _convert_indices_from_csr_to_coo.out
   - _linalg_det.result
   - _linalg_slogdet.sign
-  - _nested_from_padded
   - _scaled_dot_product_efficient_attention
   - _scaled_dot_product_efficient_attention_backward
-  - _thnn_fused_gru_cell
-  - _thnn_fused_gru_cell_backward
-  - _transformer_encoder_layer_fwd
   - _validate_compressed_sparse_indices
-  - _weight_int4pack_mm
   - linalg_eigvals.out
   - quantize_per_channel
   - quantize_per_tensor
@@ -150,10 +143,17 @@ supported:
   - quantize_per_tensor_dynamic
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
-  - std.correction_out
   - _int_mm
   - pad_sequence
 
+# - _convert_indices_from_coo_to_csr.out
+# - _convert_indices_from_csr_to_coo.out
+  - _nested_from_padded # Temporarily reserved, and will be removed after merging https://github.com/intel/torch-xpu-ops/pull/1341
+# - _thnn_fused_gru_cell
+# - _thnn_fused_gru_cell_backward
+# - _transformer_encoder_layer_fwd
+# - _weight_int4pack_mm
+# - std.correction_out
 autograd:
   - gru.input
   - _scaled_dot_product_attention_math
