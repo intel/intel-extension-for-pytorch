@@ -5,7 +5,7 @@
 #
 set -eo pipefail
 
-VER_IPEX=xpu-main
+VER_IPEX="v2.6.10+xpu"
 ENABLE_ONEAPI_INTEGRATION=1
 
 if [[ $# -lt 2 ]]; then
