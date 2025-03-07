@@ -176,8 +176,8 @@ class CachingDeviceAllocator final {
   void find_cached_blocks_bound(
       DeviceId di,
       BlockPool& pool,
-      BlockPool::iterator begin,
-      BlockPool::iterator end);
+      BlockPool::iterator& begin,
+      BlockPool::iterator& end);
 
   void free_cached_blocks(DeviceId di);
 

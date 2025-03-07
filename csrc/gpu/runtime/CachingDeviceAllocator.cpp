@@ -633,8 +633,8 @@ void CachingDeviceAllocator::free_blocks(
 void CachingDeviceAllocator::find_cached_blocks_bound(
     DeviceId di,
     BlockPool& pool,
-    BlockPool::iterator begin,
-    BlockPool::iterator end) {
+    BlockPool::iterator& begin,
+    BlockPool::iterator& end) {
   bool find_begin = false;
   bool find_end = false;
   // pool is a set stored as an ascending by device index. We would like to find
@@ -678,7 +678,9 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   for (auto it = graph_pools_freeable.begin();
        it != graph_pools_freeable.end();) {
     TORCH_INTERNAL_ASSERT(it->second->use_count == 0);
+    find_cached_blocks_bound(di, it->second->small_blocks, begin, end);
     free_blocks(it->second->small_blocks, begin, end);
+    find_cached_blocks_bound(di, it->second->large_blocks, begin, end);
     free_blocks(it->second->large_blocks, begin, end);
     auto erase_count = graph_pools.erase(it->first);
     TORCH_INTERNAL_ASSERT(erase_count == 1);
