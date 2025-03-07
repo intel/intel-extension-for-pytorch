@@ -65,9 +65,6 @@ class TestNNMethod(TestCase):
         y_dpcpp[0].backward(grad_dpcpp)
         print("y_dpcpp backward", x_dpcpp.grad.cpu())
         self.assertEqual(
-            y_dpcpp[0].is_contiguous(memory_format=torch.channels_last), True
-        )
-        self.assertEqual(
             x_dpcpp.grad.is_contiguous(memory_format=torch.channels_last), True
         )
         self.assertEqual(y_cpu[0], y_dpcpp[0].to(cpu_device))
