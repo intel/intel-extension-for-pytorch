@@ -12,11 +12,6 @@
     color: #000000;
 }
 
-/* Footer privacy links */
-a#wap_dns {
-   display: none;
-}
-
 /* replace the copyright to eliminate the copyright symbol enforced by
    the ReadTheDocs theme */
    div[role=contentinfo] {
