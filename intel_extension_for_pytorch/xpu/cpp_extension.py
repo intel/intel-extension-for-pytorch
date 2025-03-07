@@ -1287,6 +1287,7 @@ def _jit_compile(
         build_arguments=[extra_cflags, extra_ldflags, extra_include_paths],
         build_directory=build_directory,
         with_cuda=False,
+        with_sycl=False,
         is_python_module=is_python_module,
         is_standalone=is_standalone,
     )
