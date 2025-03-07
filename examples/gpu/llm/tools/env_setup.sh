@@ -149,6 +149,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
         bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT} ${MPI_ROOT} ${PTI_ROOT} ${AOT} 9
         find . -name "dist" -exec bash -c "cp {}/*.whl ${WHEELFOLDER}" \;
+        mkdir -p ${WHEELFOLDER}/ipex_wheel
+        find ${WHEELFOLDER} -name "intel_extension_for_pytorch*.whl" -exec mv {} ${WHEELFOLDER}/ipex_wheel \;
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl patchelf
         if [ -d pytorch ]; then
             rm -rf pytorch
@@ -156,6 +158,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/xpu" >> ${AUX_INSTALL_SCRIPT}
         fi
         echo "python -m pip install ./wheels/*.whl" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install ./wheels/ipex_wheel/*.whl" >> ${AUX_INSTALL_SCRIPT}
         echo "rm -rf wheels" >> ${AUX_INSTALL_SCRIPT}
     fi
     echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
