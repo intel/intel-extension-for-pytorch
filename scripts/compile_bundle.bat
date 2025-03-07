@@ -30,6 +30,21 @@ if %argC% LSS 2 (
     exit /b 1
 )
 
+rem Check required packages version
+if not exist intel-extension-for-pytorch (
+    git clone https://github.com/intel/intel-extension-for-pytorch.git intel-extension-for-pytorch
+    cd intel-extension-for-pytorch
+    if not "%VER_IPEX%"=="" (
+        git rm -rf .
+        git clean -fxd
+        git reset
+        git checkout .
+        git fetch
+        git checkout %VER_IPEX%
+    )
+    cd ..
+)
+
 set "DPCPP_ROOT=NA"
 set "ONEMKL_ROOT=NA"
 
@@ -98,6 +113,7 @@ rem )
 
 echo AOT flags:[%AOT%]
 
+
 if %BUILD_IPEX_ONLY% equ 1 (
     echo Building IPEX only
     set IPEX_ROOT=intel-extension-for-pytorch
@@ -132,22 +148,6 @@ set "VS%VSVER%INSTALLDIR=%VSINSTALLDIR%"
 rem Save current directory path
 set "BASEFOLDER=%~dp0"
 cd "%BASEFOLDER%"
-
-rem Check required packages version
-if not exist intel-extension-for-pytorch (
-    git clone https://github.com/intel/intel-extension-for-pytorch.git
-    cd intel-extension-for-pytorch
-    if not "%VER_IPEX%"=="" (
-        git rm -rf .
-        git clean -fxd
-        git reset
-        git checkout .
-        git checkout main
-        git pull
-        git checkout %VER_IPEX%
-    )
-    cd ..
-)
 
 rem Checkout the latest Intel(R) Extension for PyTorch source
 echo Update IPEX submodule
@@ -240,8 +240,10 @@ if not exist %OUTPUT_FOLDER% mkdir %OUTPUT_FOLDER%
 echo "Clear folder %OUTPUT_FOLDER%"
 del /F/Q "%OUTPUT_FOLDER%\*.*"
 
-if %BUILD_IPEX_ONLY% NEQ 1 (
-
+if %BUILD_IPEX_ONLY% EQU 1 (
+    echo Install packages: torch==%PYTORCH_VER% torchvision==%VISION_VER% torchaudio==%AUDIO_VER%
+    python -m pip install torch==%PYTORCH_VER% torchvision==%VISION_VER% torchaudio==%AUDIO_VER% --index-url https://download.pytorch.org/whl/xpu
+) else (
     python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch
 
     rem remove the packages installed by last buliding & Sanity test. Avoid to impact next building.
@@ -408,11 +410,46 @@ rem show built whl files
 echo All created WHL files are saved to folder: %OUTPUT_FOLDER%
 dir %OUTPUT_FOLDER%
 
+pip list | findstr torch
+
+set PYTHON_FILE=test_build.bat
+echo Create Test Script: %PYTHON_FILE%
+
+call:create_test_py_file %PYTHON_FILE%
 echo "Sanity Test"
-python -c "import torch; print(f'torch_version:       {torch.__version__}'); import torchvision;  print(f'torchvision_version: {torchvision.__version__}'); import torchaudio; print(f'torchaudio_version:  {torchaudio.__version__}'); import intel_extension_for_pytorch as ipex;   print(f'ipex_version:        {ipex.__version__}');print(f'ipex_aot:            {ipex.__build_aot__}');"
+python %PYTHON_FILE%
+echo Remove %PYTHON_FILE%
+del %PYTHON_FILE%
 
 endlocal
 exit /b 0
+
+:create_test_py_file
+SETLOCAL ENABLEDELAYEDEXPANSION
+    set "PYTHON_FILE=%~1"
+    echo try: >%PYTHON_FILE%
+    echo ^    ^import torch >>%PYTHON_FILE%
+    echo ^    ^print(f^'torch version:       {torch.__version__}^') >>%PYTHON_FILE%
+    echo except: >>%PYTHON_FILE%
+    echo ^    ^print(f^'torch version:       Can\^'t import torch^') >>%PYTHON_FILE%
+    echo try: >>%PYTHON_FILE%
+    echo ^    ^import torchvision >>%PYTHON_FILE%
+    echo ^    ^print(f^'torchvision version: {torchvision.__version__}^') >>%PYTHON_FILE%
+    echo except: >>%PYTHON_FILE%
+    echo ^    ^print(f^'torchvision version: Can\^'t import torchvision^') >>%PYTHON_FILE%
+    echo try: >>%PYTHON_FILE%
+    echo ^    ^import torchaudio >>%PYTHON_FILE%
+    echo ^    ^print(f^'torchaudio version:  {torchaudio.__version__}^') >>%PYTHON_FILE%
+    echo except: >>%PYTHON_FILE%
+    echo ^    ^print(f^'torchaudio version:  Can\^'t import torchaudio^') >>%PYTHON_FILE%
+    echo try: >>%PYTHON_FILE%
+    echo ^    ^import intel_extension_for_pytorch as ipex >>%PYTHON_FILE%
+    echo ^    ^print(f'ipex version:        {ipex.__version__}') >>%PYTHON_FILE%
+    echo ^    ^print(f'ipex_aot:            {ipex.__build_aot__}') >>%PYTHON_FILE%
+    echo except: >>%PYTHON_FILE%
+    echo ^    ^print(f^'ipex version:        Can\^'t import intel_extension_for_pytorch^') >>%PYTHON_FILE%
+ENDLOCAL
+goto:eof
 
 :calcu_time
 SETLOCAL ENABLEDELAYEDEXPANSION
