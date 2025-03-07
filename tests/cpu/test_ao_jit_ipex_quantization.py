@@ -583,6 +583,29 @@ class TestIpexOps(JitLlgaTestCase):
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
             self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
+    def test_conv3d_with_padding(self):
+        class M(nn.Module):
+            def __init__(self, padding_mode):
+                super(M, self).__init__()
+                self.conv = nn.Conv3d(
+                    3, 3, 2, padding=1, bias=True, padding_mode=padding_mode
+                )
+
+            def forward(self, x):
+                x = self.conv(x)
+                return x
+
+        x = torch.rand(3, 3, 4, 2, 10)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+        ]
+        for padding_mode in ["circular", "replicate", "reflect"]:
+            m = M(padding_mode=padding_mode).eval()
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.checkPatterns(graph, patterns)
+
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
     def test_inplace_preapre(self):
