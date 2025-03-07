@@ -382,16 +382,23 @@ class TestIpexOps(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.f = ipex.nn.functional.interaction
 
-            def forward(self, x1, x2, x3):
-                x = self.f(x1.relu(), x2.relu(), x3.relu())
+            def forward(self, *args):
+                relu_args = [arg.relu() for arg in args]
+                x = self.f(*relu_args)
                 return x
 
-        m = M()
-        inputs = []
-        for i in range(0, 3):
-            inputs.append(torch.randn([128, 128]) * 0.1)
-        graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
-        self.assertGraphContainsExactly(graph, "ipex::qinteraction", 1)
+        feature_nums = [3, 27]
+        lens = [128, 224]
+        for fnum in feature_nums:
+            for len in lens:
+                m = M()
+                inputs = []
+                for _ in range(0, fnum):
+                    inputs.append(torch.randn([len, len]) * 0.1)
+                graph = self.checkQuantizeTrace(
+                    m, inputs, atol=1e-2, qconfig=static_qconfig[1]
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qinteraction", 1)
 
     # Besides its primary objective, this UT also implicitly tests if mayRevertDtypeAttributeInsertion
     # in csrc/jit/codegen/onednn/prepare_binary.cpp works well.

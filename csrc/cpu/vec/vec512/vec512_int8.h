@@ -732,10 +732,10 @@ static IPEX_FORCE_INLINE int8_t _dot_s8s8_scale_s32s8(
     float scale) {
   int32_t c = 0;
   size_t i = 0;
-  for (; i < len - 127; i += 128) {
+  for (; (i + 127) < len; i += 128) {
     c += mul_and_sum_int8_128(a + i, b + i);
   }
-  if ((len - i) > 63) {
+  if ((i + 63) < len) {
     c += mul_and_sum_int8_64(a + i, b + i);
     i += 64;
   }
