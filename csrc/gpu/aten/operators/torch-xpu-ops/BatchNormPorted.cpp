@@ -249,14 +249,14 @@ wrapper_XPU__native_batch_norm_backward(
       eps,
       output_mask);
 }
-IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("native_batch_norm", TORCH_FN((&wrapper_XPU__native_batch_norm)));
-  m.impl(
-      "native_batch_norm.out",
-      TORCH_FN((&wrapper_XPU_out_native_batch_norm_out)));
-  m.impl(
-      "native_batch_norm_backward",
-      TORCH_FN((&wrapper_XPU__native_batch_norm_backward)));
-}
+// IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+//   m.impl("native_batch_norm", TORCH_FN((&wrapper_XPU__native_batch_norm)));
+//   m.impl(
+//       "native_batch_norm.out",
+//       TORCH_FN((&wrapper_XPU_out_native_batch_norm_out)));
+//   m.impl(
+//       "native_batch_norm_backward",
+//       TORCH_FN((&wrapper_XPU__native_batch_norm_backward)));
+// }
 } // namespace
 #endif
