@@ -35,14 +35,6 @@ static inline void make_offset2bag(
   offset2bag = offset2bag.cumsum(0); // offset2bag = [0 0 1 1 2]
 }
 
-// To save compute, if we are going to go down the fast path case for the 'sum'
-// mode, we skip calculating offset2bag, since it is not going to be used.
-static inline bool is_bfloat16_tensor(const Tensor tensor_) {
-  if (tensor_.scalar_type() == kBFloat16)
-    return true;
-  return false;
-}
-
 template <typename T>
 static inline Tensor _embedding_bag_index_add_select_fast(
     const Tensor indices,
@@ -92,10 +84,15 @@ Tensor embedding_bag_kernel_impl(
     const Tensor& offsets,
     bool include_last_offset) {
   Tensor offsets_ = offsets.is_contiguous() ? offsets : offsets.contiguous();
-
   Tensor output;
-  if (is_bfloat16_tensor(weight)) {
+  // To save compute, if we are going to go down the fast path case for the
+  // 'sum' mode, we skip calculating offset2bag, since it is not going to be
+  // used.
+  if (weight.scalar_type() == kBFloat16) {
     output = _embedding_bag_index_add_select_fast<BFloat16>(
+        indices, weight, offsets_, include_last_offset);
+  } else if (weight.scalar_type() == kHalf) {
+    output = _embedding_bag_index_add_select_fast<Half>(
         indices, weight, offsets_, include_last_offset);
   } else {
     output = _embedding_bag_index_add_select_fast<float>(
@@ -269,16 +266,22 @@ Tensor embedding_bag_backward_kernel_impl(
     int64_t num_weights,
     bool sparse) {
   if (sparse) {
-    if (is_bfloat16_tensor(grad)) {
+    if (grad.scalar_type() == kBFloat16) {
       return embedding_bag_sparse_backward_sum_fast<BFloat16>(
+          grad, indices, offsets, num_weights);
+    } else if (grad.scalar_type() == kHalf) {
+      return embedding_bag_sparse_backward_sum_fast<Half>(
           grad, indices, offsets, num_weights);
     } else {
       return embedding_bag_sparse_backward_sum_fast<float>(
           grad, indices, offsets, num_weights);
     }
   } else {
-    if (is_bfloat16_tensor(grad)) {
+    if (grad.scalar_type() == kBFloat16) {
       return embedding_bag_dense_backward_sum_fast<BFloat16>(
+          grad, indices, offsets, num_weights);
+    } else if (grad.scalar_type() == kHalf) {
+      return embedding_bag_dense_backward_sum_fast<Half>(
           grad, indices, offsets, num_weights);
     } else {
       return embedding_bag_dense_backward_sum_fast<float>(
