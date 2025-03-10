@@ -7,13 +7,13 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.7.0.dev20250308+cpu"
+    "version": "2.7.0.dev20250309+cpu"
   },
   "torchaudio": {
-    "version": "2.6.0.dev20250308+cpu"
+    "version": "2.6.0.dev20250309+cpu"
   },
   "torchvision": {
-    "version": "0.22.0.dev20250307+cpu"
+    "version": "0.22.0.dev20250308+cpu"
   },
   "torch-ccl": {
     "commit": "torch_ccl_dev_2.6",
