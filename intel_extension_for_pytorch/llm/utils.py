@@ -691,165 +691,84 @@ def _preprocess_deepseek_v3_checkpoint(checkpoint, quant_config):
             new_data = torch.repeat_interleave(data, block_n, 0)
             # weight shape may not be divisible by block_n
             w_key = ".".join([*key.split(".")[:-1], "weight"])
-            N = checkpoint[w_key].size(0)
-            new_data = new_data[:N, :].contiguous()
+            if w_key in checkpoint:
+                N = checkpoint[w_key].size(0)
+                new_data = new_data[:N, :].contiguous()
             checkpoint[key] = new_data
             del data
 
 
-def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
+def load_low_precision_checkpoint(
+    pathname: Union[str, os.PathLike],
+    rank: int = 0,
+    world_size: int = 1,
+):
     r"""
     Load low precision checkpoint from a file or a directory containing multiple files.
     Supported file format: .pt, .bin, .pth, .safetensors.
     Args:
         pathname (str or os.PathLike): Path to the checkpoint file or directory containing multiple checkpoint files.
+        rank (int, optional): Rank of the current process for Tensor Parallel. Default: 0.
+        world_size (int, optional): World size for Tensor Parallel. Default: 1.
     Returns:
         Tuple[Dict[str, torch.Tensor], Dict[str, Any]]: A tuple of low precision checkpoint and quantization config.
         The quantization config contains quantization method, group size and desc_act.
     """
-    assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
-    if os.path.isfile(pathname):
-        low_precision_checkpoint = None
-        if pathname.endswith((".pt", ".pth", ".bin")):
-            low_precision_checkpoint = torch.load(pathname, weights_only=True)
-        elif pathname.endswith(".safetensors"):
-            try:
-                import safetensors
-            except ImportError:
-                print(
-                    "Please install safetensors package to load safetensors checkpoint."
-                )
-                exit(1)
-            low_precision_checkpoint = safetensors.torch.load_file(pathname)
-        assert (
-            low_precision_checkpoint is not None
-        ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth, .bin or .safetensors file."
+    assert os.path.exists(pathname), f"Checkpoint path does not exist: {pathname}"
+    assert os.path.isdir(pathname), f"checkpoint path should be a directory: {pathname}"
+    file_types = ["*.pt", "*.pth", "*.bin", "*.safetensors"]
+    checkpoint_files = []
+    file_type = None
+    for pattern in file_types:
+        checkpoint_files = list(pathlib.Path(pathname).glob(pattern))
+        if checkpoint_files:
+            file_type = pattern
+            break
+    assert checkpoint_files, f"Cannot find checkpoint files in path {pathname}."
+    config_file = pathname + "/config.json"
+    assert os.path.exists(config_file), f"Cannot find config.json in path: {pathname}."
 
-        quant_method = "gptq"
-        prefix_key = next(
-            (
-                key[: -len("qweight")]
-                for key in low_precision_checkpoint
-                if key.endswith("qweight")
-            ),
-            None,
-        )
-        qweight_key = prefix_key + "qweight"
-        scales_key = prefix_key + "scales"
-        group_size = int(
-            low_precision_checkpoint[qweight_key].shape[0]
-            * 8
-            / low_precision_checkpoint[scales_key].shape[0]
-        )
-        desc_act = False
-
-    elif os.path.isdir(pathname):
-        low_precision_checkpoint = {}
-        quant_method = None
-        group_size = None
-        desc_act = None
-        backend = None  # needed by intel/auto-round
-        weight_block_size = None  # needed by DeepSeek-V3/R1 fp8
-        for pattern in ["*.pt", "*.pth", "*.bin"]:
-            files = list(pathlib.Path(pathname).glob(pattern))
-            if files:
-                for f in files:
-                    data_f = torch.load(f, weights_only=True)
-                    low_precision_checkpoint.update(data_f)
-                break
-        if not low_precision_checkpoint:
-            files = list(pathlib.Path(pathname).glob("*.safetensors"))
-            if files:
-                try:
-                    import safetensors
-                except ImportError:
-                    print(
-                        "Please install safetensors package to load safetensors checkpoint."
-                    )
-                    exit(1)
-                for f in files:
-                    data_f = safetensors.torch.load_file(f)
-                    low_precision_checkpoint.update(data_f)
-        assert (
-            len(low_precision_checkpoint) > 0
-        ), f"Cannot find checkpoint (.pt/.pth/.bin/.safetensors) files in path {pathname}."
+    load_fn = partial(torch.load, weights_only=True)
+    if file_type == "*.safetensors":
         try:
-            assert (
-                os.path.exists(pathname + "/config.json")
-                or os.path.exists(pathname + "/quant_config.json")
-                or os.path.exists(pathname + "/quantize_config.json")
-            ), "Cannot find config.json or quant_config.json or quantize_config.json in path."
-            model_config = None
-            if os.path.exists(pathname + "/config.json"):
-                with open(pathname + "/config.json", "r", encoding="utf-8") as file:
-                    model_config = json.load(file)
-                quantization_config = model_config["quantization_config"]
-                quant_method = quantization_config.get("quant_method", None)
-                group_size = quantization_config.get("group_size", None)
-                desc_act = quantization_config.get("desc_act", None)
-                backend = quantization_config.get("backend", None)
-                if quant_method == "fp8":
-                    arch = model_config["architectures"][0]
-                    assert arch == "DeepseekV3ForCausalLM", (
-                        "DeepseekV3ForCausalLM is the only supported architecture for fp8 quantization."
-                        " Found: " + arch
-                    )
-                    weight_block_size = quantization_config.get(
-                        "weight_block_size", None
-                    )
-                    assert (
-                        isinstance(weight_block_size, list)
-                        and len(weight_block_size) == 2
-                    ), (
-                        "weight_block_size should be a list of two integers."
-                        " Found: " + str(weight_block_size)
-                    )
-                    group_size = weight_block_size[1]
-                    assert (
-                        weight_block_size is not None
-                    ), "weight_block_size should not be None for Deepseek-V3/R1 fp8"
-                    _preprocess_deepseek_v3_checkpoint(
-                        low_precision_checkpoint, quantization_config
-                    )
-            config_path = None
-            if os.path.exists(pathname + "/quant_config.json"):
-                config_path = pathname + "/quant_config.json"
-            if os.path.exists(pathname + "/quantize_config.json"):
-                config_path = pathname + "/quantize_config.json"
-            if config_path is not None:
-                with open(config_path, "r", encoding="utf-8") as file:
-                    quant_model_config = json.load(file)
-                if group_size is None:
-                    group_size = quant_model_config.get("group_size", None)
-                if quant_method is None:
-                    quant_method = quant_model_config.get("quant_method", None)
-                if desc_act is None:
-                    desc_act = quant_model_config.get("desc_act", None)
-                if backend is None:
-                    backend = quant_model_config.get("backend", None)
+            import safetensors
+        except ImportError:
+            print("Please install safetensors package to load safetensors checkpoint.")
+            exit(1)
+        load_fn = safetensors.torch.load_file
 
-        except Exception as e:
-            print(
-                "warning: loading HF config.json to get `config` failed, due to ",
-                e,
-            )
-            print(
-                "warning: specifying `quant_method` = `gptq`,`group_size` = 64,`desc_act` = `False` by default."
-            )
-            quant_method = "gptq"
-            group_size = 64
-            desc_act = False
+    # load config.json and find quantization_config
+    model_config = None
+    quantization_config = None
+    with open(config_file, "r", encoding="utf-8") as file:
+        model_config = json.load(file)
+    if "quantization_config" in model_config:
+        quantization_config = model_config["quantization_config"]
     else:
-        raise AssertionError(
-            f"Invalid low-precision-checkpoint: {pathname}."
-            " Should be a .pt/.pth/.safetensors file or a directory containing them."
-        )
-    assert group_size is not None, "group_size should not be None"
-    assert quant_method is not None, "quant_method should not be None"
+        for file in ["quant_config.json", "quantize_config.json"]:
+            config_file = pathname + "/" + file
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as file:
+                    quantization_config = json.load(file)
+                break
+    assert (
+        quantization_config is not None
+    ), f"Cannot find quantization config in path: {pathname}."
+
+    # read quantization config
+    quant_method = quantization_config.get("quant_method", None)
+    group_size = quantization_config.get("group_size", None)
+    desc_act = quantization_config.get("desc_act", None)
+    backend = quantization_config.get("backend", None)
+    bits = quantization_config.get("bits", None)
+    weight_block_size = quantization_config.get("weight_block_size", None)
+    assert quant_method is not None, "Cannot find quant_method in quantization config."
     if quant_method == "gptq":
-        assert desc_act is not None, "group_size should not be None"
+        assert desc_act is not None, "group_size should not be None for GPTQ"
+        bits = 4 if bits is None else bits
     elif quant_method == "awq":
         desc_act = False
+        bits = 4 if bits is None else bits
     elif quant_method == "intel/auto-round":
         if backend is None or "gptq" in backend:
             quant_method = "gptq"
@@ -861,8 +780,30 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
                 f"Unsupported backend: {backend} of intel/auto-round",
             )
         desc_act = False
+        bits = 4 if bits is None else bits
     elif quant_method == "fp8":
+        arch = model_config["architectures"][0]
+        assert arch == "DeepseekV3ForCausalLM", (
+            "DeepseekV3ForCausalLM is the only supported architecture for fp8 quantization."
+            " Found: " + arch
+        )
+        assert (
+            weight_block_size is not None
+        ), "weight_block_size should not be None for Deepseek-V3/R1 fp8"
+        assert (
+            isinstance(weight_block_size, list) and len(weight_block_size) == 2
+        ), "weight_block_size should be a list of two integers." " Found: " + str(
+            weight_block_size
+        )
+        group_size = weight_block_size[1]
         desc_act = False
+        bits = 8 if bits is None else bits
+    elif quant_method == "rtn":
+        desc_act = False
+        bits = 8 if bits is None else bits
+    elif quant_method == "int8":
+        desc_act = False
+        bits = 8 if bits is None else bits
     else:
         raise (NotImplementedError, f"Unsupported quantization method: {quant_method}")
     quant_config = {
@@ -870,8 +811,36 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
         "group_size": group_size,
         "desc_act": desc_act,
         "weight_block_size": weight_block_size,
+        "bits": bits,
     }
-    return (low_precision_checkpoint, quant_config)
+
+    # load checkpoint files and shard if necessary
+    low_precision_checkpoint = {}
+    tp_grain_size = group_size if group_size > 0 else 64
+    logger.debug(
+        f"Loading {len(checkpoint_files)} checkpoint files on rank {rank}/{world_size}"
+    )
+    for ckpt in checkpoint_files:
+        data_f = load_fn(ckpt)
+        if quant_method == "fp8":
+            _preprocess_deepseek_v3_checkpoint(data_f, quant_config)
+        if world_size > 1:
+            data_f_shard = shard_low_precision_checkpoint(
+                data_f,
+                model_config,
+                rank,
+                world_size,
+                quant_method,
+                tp_grain_size,
+                desc_act,
+                bits,
+            )
+            low_precision_checkpoint.update(data_f_shard)
+        else:
+            low_precision_checkpoint.update(data_f)
+    logger.debug(f"loading checkpoint files done on rank {rank}/{world_size}")
+
+    return low_precision_checkpoint, quant_config
 
 
 def shard_low_precision_checkpoint(
@@ -882,21 +851,23 @@ def shard_low_precision_checkpoint(
     quantization_method,
     tp_grain_size,
     desc_act,
+    bits,
 ):
     r"""
     Shard low-precision checkpoint for autoTP.
     Sharding policy:
+        Attention:
+            Divide N or K by num_k_v_heads if available or num_attention_heads
+            Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+            - 2:1:1 policy: 4 heads for 3 ranks, the first rank gets 2 and others get 1.
+        MLP:
+            Divide N or K by tp_grain_size
+            Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+    Tensor shapes for different quantization methods:
         AWQ:
             qweight shape: [K, N // 8]
             scales shape: [K // G, N]
             qzeros shape: [K // G, N // 8]
-            Attention:
-                Divide N or K by num_k_v_heads if available or num_attention_heads
-                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
-                - 2:1:1 policy: 4 heads for 3 ranks, the first rank gets 2 and others get 1.
-            MLP:
-                Divide N or K by tp_grain_size
-                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
         GPTQ:
             qweight shape: [K // 8, N]
             scales shape: [K // G, N]
@@ -916,24 +887,34 @@ def shard_low_precision_checkpoint(
         FP8:
             qweight shape: [N, K]
             weight_scale_inv shape: [N // block_n, K // block_k], block_n = block_k = 128 for DeepSeek-V3/R1
+        RTN (INC):
+            qweight shape: [K // 4, N]
+            scales shape: [K // G, N] or [1, N]
+            qzeros shape: [K // G, N // 4] or [1, N]
+        INT8 (meituan/DeepSeek-R1-Channel-INT8):
+            qweight shape: [N, K]
+            scales shape: [N, 1]
+            qzeros shape: None
 
     Args:
         low_precision_checkpoint (dict): Model's low_precision_checkpoint as a state dict.
-        model_config (object): HuggingFace model config.
+        model_config (dict): HuggingFace model config as a dict.
         rank (int): current rank for tp.
+        world_size (int): total number of ranks.
         quantization_method (str): "awq" or "gptq".
         tp_grain_size (int): Grain size for MLP sharding. Usually equal to group size for
             quantization. Must be a multiple of 8.
-        desc_act (bool): desc_act (a.k.a. act_order) for GPTQ. False for AWQ.
+        desc_act (bool): desc_act (a.k.a. act_order) for GPTQ. False for others.
+        bits: Number of bits for quantization.
 
     Returns:
         A sharded checkpoint dict.
 
     """
     assert tp_grain_size % 8 == 0, "tp_grain_size must be a multiple of 8"
-    num_heads = model_config.num_attention_heads
-    if hasattr(model_config, "num_key_value_heads"):
-        num_heads = model_config.num_key_value_heads
+    num_heads = model_config["num_attention_heads"]
+    if "num_key_value_heads" in model_config:
+        num_heads = model_config["num_key_value_heads"]
     local_rank = rank
 
     mha_layers_split_by_N = [
@@ -996,7 +977,9 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     :, q_head_start * dim : q_head_end * dim
                 ].contiguous()
-            elif quantization_method == "gptq":
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
                 # qweight shape: [K // 8, N]
                 # scales shape: [K // G, N]
                 # qzeros shape: [K // G, N // 8]
@@ -1018,6 +1001,35 @@ def shard_low_precision_checkpoint(
             elif quantization_method == "fp8":
                 # weight shape: [N, K]
                 # weight_scale_inv shape: [N // block_n, K // block_k]
+                if data.shape[0] % head_range[-1] == 0:
+                    dim = data.shape[0] // head_range[-1]
+                else:
+                    assert data.shape[0] % world_size == 0
+                    dim = data.shape[0] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    q_head_start * dim : q_head_end * dim, :
+                ].contiguous()
+            elif quantization_method == "rtn" and bits == 8:
+                # from INC, using GPTQ-like format
+                # qweight shape: [K // 4, N]
+                # scales shape: [K // G, N] or [1, N]
+                # qzeros shape: [K // G, N // 4] or [1, N // 4]
+                if data.shape[-1] % head_range[-1] == 0:
+                    dim = data.shape[-1] // head_range[-1]
+                else:
+                    assert data.shape[-1] % world_size == 0
+                    dim = data.shape[-1] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    :, q_head_start * dim : q_head_end * dim
+                ].contiguous()
+            elif quantization_method == "int8":
+                # qweight shape: [N, K]
+                # scales shape: [N, 1]
+                # qzeros shape: None
                 if data.shape[0] % head_range[-1] == 0:
                     dim = data.shape[0] // head_range[-1]
                 else:
@@ -1061,7 +1073,9 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     :, grains_start * dim : grains_end * dim
                 ].contiguous()
-            elif quantization_method == "gptq":
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
                 # qweight shape: [K // 8, N]
                 # scales shape: [K // G, N]
                 # qzeros shape: [K // G, N // 8]
@@ -1116,6 +1130,53 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     grains_start * dim : grains_end * dim, :
                 ].contiguous()
+            elif quantization_method == "rtn" and bits == 8:
+                # from INC, using GPTQ-like format
+                # qweight shape: [K // 4, N]
+                # scales shape: [K // G, N] or [1, N]
+                # qzeros shape: [K // G, N // 4] or [1, N // 4]
+                comp_ratio = 4
+                if "qzeros" in key:
+                    assert (
+                        data.shape[-1] * comp_ratio
+                    ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                    grains = data.shape[-1] // (tp_grain_size // comp_ratio)
+                    dim = tp_grain_size // comp_ratio
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    :, grains_start * dim : grains_end * dim
+                ].contiguous()
+            elif quantization_method == "int8":
+                # qweight shape: [N, K]
+                # scales shape: [N, 1]
+                # qzeros shape: None
+                assert (
+                    data.shape[0] % tp_grain_size == 0
+                ), "N must be divisible by tp_grain_size"
+                grains = data.shape[0] // tp_grain_size
+                dim = tp_grain_size
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    grains_start * dim : grains_end * dim, :
+                ].contiguous()
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mha_layers_split_by_K):
@@ -1136,7 +1197,9 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     q_head_start * dim : q_head_end * dim
                 ].contiguous()
-            elif quantization_method == "gptq":
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
                 # qweight shape: [K // 8, N]
                 # scales shape: [K // G, N]
                 # qzeros shape: [K // G, N // 8]
@@ -1162,6 +1225,39 @@ def shard_low_precision_checkpoint(
             elif quantization_method == "fp8":
                 # weight shape: [N, K]
                 # weight_scale_inv shape: [N // block_n, K // block_k]
+                if data.shape[-1] % head_range[-1] == 0:
+                    dim = data.shape[-1] // head_range[-1]
+                else:
+                    assert data.shape[-1] % world_size == 0
+                    dim = data.shape[-1] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    :, q_head_start * dim : q_head_end * dim
+                ].contiguous()
+            elif quantization_method == "rtn" and bits == 8:
+                # from INC, using GPTQ-like format
+                # qweight shape: [K // 4, N]
+                # scales shape: [K // G, N] or [1, N]
+                # qzeros shape: [K // G, N // 4] or [1, N // 4]
+                if data.shape[0] == 1:
+                    continue
+                if data.shape[0] % head_range[-1] == 0:
+                    dim = data.shape[0] // head_range[-1]
+                else:
+                    assert data.shape[0] % world_size == 0
+                    dim = data.shape[0] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    q_head_start * dim : q_head_end * dim
+                ].contiguous()
+            elif quantization_method == "int8":
+                # qweight shape: [N, K]
+                # scales shape: [N, 1]
+                # qzeros shape: None
+                if data.shape[-1] == 1:
+                    continue
                 if data.shape[-1] % head_range[-1] == 0:
                     dim = data.shape[-1] // head_range[-1]
                 else:
@@ -1204,7 +1300,9 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     grains_start * dim : grains_end * dim
                 ].contiguous()
-            elif quantization_method == "gptq":
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
                 # qweight shape: [K // 8, N]
                 # scales shape: [K // G, N]
                 # qzeros shape: [K // G, N // 8]
@@ -1255,6 +1353,61 @@ def shard_low_precision_checkpoint(
                 else:
                     grains = data.shape[-1]
                     dim = 1
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    :, grains_start * dim : grains_end * dim
+                ].contiguous()
+            elif quantization_method == "rtn" and bits == 8:
+                # from INC, using GPTQ-like format
+                # qweight shape: [K // 4, N]
+                # scales shape: [K // G, N] or [1, N]
+                # qzeros shape: [K // G, N // 4] or [1, N // 4]
+                if data.shape[0] == 1:
+                    continue
+                comp_ratio = 4
+                if "qweight" in key:
+                    assert (
+                        data.shape[0] * comp_ratio % tp_grain_size == 0
+                    ), "K must be divisible by tp_grain_size"
+                    grains = data.shape[0] // (tp_grain_size // comp_ratio)
+                    dim = tp_grain_size // comp_ratio
+                else:
+                    grains = data.shape[0]
+                    dim = 1
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    grains_start * dim : grains_end * dim
+                ].contiguous()
+            elif quantization_method == "int8":
+                # qweight shape: [N, K]
+                # scales shape: [N, 1]
+                # qzeros shape: None
+                if data.shape[-1] == 1:
+                    continue
+                if "scales" in key:
+                    grains = data.shape[-1]
+                    dim = 1
+                else:
+                    grains = data.shape[-1] // tp_grain_size
+                    dim = tp_grain_size
                 grains_per_rank = grains // world_size
                 grains_rem = grains % world_size
                 grains_start = grains_per_rank * local_rank + min(

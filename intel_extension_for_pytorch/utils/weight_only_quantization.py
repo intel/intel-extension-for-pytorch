@@ -3,7 +3,7 @@ import torch
 from intel_extension_for_pytorch.nn.modules import (
     WeightOnlyQuantizedLinear,
     IpexWoqLinearAllreduce,
-    Int4WeightFormat,
+    WoqWeightFormat,
 )
 from intel_extension_for_pytorch.quantization import (
     QConfigWoq,
@@ -38,11 +38,28 @@ AWQ_LOWP_CHECKPOINT_CONFIG = {
     "bias_key": "bias",
 }
 
+RTN_LOWP_CHECKPOINT_CONFIG = {
+    "name": "rtn",
+    "weight_key": "qweight",
+    "scale_key": "scales",
+    "zero_point_key": "qzeros",
+    "bias_key": "bias",
+}
+
 # For now, it is for DeepSeek-V3/R1 only
 FP8_LOWP_CHECKPOINT_CONFIG = {
     "name": "fp8",
     "weight_key": "weight",
     "scale_key": "weight_scale_inv",
+    "zero_point_key": "qzeros",
+    "bias_key": "bias",
+}
+
+# For now, it is for meituan/DeepSeek-R1-Channel-INT8 only
+INT8_LOWP_CHECKPOINT_CONFIG = {
+    "name": "int8",
+    "weight_key": "weight",
+    "scale_key": "weight_scale",
     "zero_point_key": "qzeros",
     "bias_key": "bias",
 }
@@ -117,13 +134,14 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config, quant_confi
     bias = state_dict.get(b_key, None)
     g_idx = state_dict.get(g_key, None)
     group_size = -1
-    weight_format = Int4WeightFormat.PLAIN_FORMAT
+    weight_format = WoqWeightFormat.PLAIN_FORMAT
+    quant_method = quant_config["quant_method"]
     weight_block_size = quant_config.get("weight_block_size", None)
 
     if qweight is None:
         return weight, scales, qzeros, bias, group_size, g_idx, weight_format
 
-    if checkpoint_config["name"] == "gptq":
+    if quant_method == "gptq":
         # weight shape = [K // 8, N]
         # scales shape = [K // G, N]
         # qzeros shape = [K // G, N // 8]
@@ -145,6 +163,8 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config, quant_confi
             dummy = torch.tensor([i // group_size for i in range(K)], dtype=torch.int32)
             if torch.equal(g_idx, dummy):
                 g_idx = None
+            elif g_idx.nonzero().numel() == 0:
+                g_idx = None
 
         # if g_idx is None, pack weight with GPTQ format directly
         # Otherwise, convert GPTQ format to plain format then pack
@@ -155,18 +175,18 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config, quant_confi
             )
         else:
             scales, qzeros = _convert_gptq_scales_qzeros(scales, qzeros)
-            weight_format = Int4WeightFormat.GPTQ_FORMAT
+            weight_format = WoqWeightFormat.GPTQ_FORMAT
 
-    elif checkpoint_config["name"] == "awq":
+    elif quant_method == "awq":
         if scales is not None:
             assert (
                 qweight.size(0) % scales.size(0) == 0
             ), "Uneven group sizes are not supported"
             group_size = qweight.size(0) // scales.size(0)
             scales, qzeros = _convert_awq_scales_qzeros(scales, qzeros)
-            weight_format = Int4WeightFormat.AWQ_FORMAT
+            weight_format = WoqWeightFormat.AWQ_FORMAT
             g_idx = None
-    elif checkpoint_config["name"] == "fp8":
+    elif quant_method == "fp8":
         if scales is not None:
             block_n = weight_block_size[0]
             block_k = weight_block_size[1]
@@ -181,6 +201,23 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config, quant_confi
                 scales = torch.repeat_interleave(scales, block_n, 0)
                 scales = scales[: qweight.size(0), :].contiguous()
             group_size = block_k
+    elif quant_method == "rtn":
+        # weight shape = [K // 4, N] in int32
+        # scales shape = [K // G, N] or [1, N] in float
+        # qzeros shape = [K // G, N // 4] or [1, N // 4] in int32
+        assert scales.shape[0] == qzeros.shape[0]
+        if scales.shape[0] == 1:
+            scales = scales.squeeze(0)
+            qzeros = qzeros.squeeze(0).view(torch.uint8)
+        else:
+            scales = scales.t().contiguous()
+            qzeros = qzeros.view(torch.uint8).t().contiguous()
+        qzeros += 1
+        qzeros = qzeros.view(torch.int8)
+        g_idx = None
+        qweight = qweight.t().contiguous().view(torch.int8)
+        weight_format = WoqWeightFormat.GPTQ_FORMAT
+
     return qweight, scales, qzeros, bias, group_size, g_idx, weight_format
 
 
@@ -220,6 +257,14 @@ def _convert_woq_with_low_precision_checkpoint(
     elif quantization_method == "fp8":
         checkpoint_config = _fp8_lowp_checkpoint_config()
         target_weight_dtype = WoqWeightDtype.FP8
+    elif quantization_method == "rtn":
+        checkpoint_config = RTN_LOWP_CHECKPOINT_CONFIG
+        bits = quant_config.get("bits", 8)
+        target_weight_dtype = WoqWeightDtype.INT8 if bits == 8 else WoqWeightDtype.INT4
+    elif quantization_method == "int8":
+        checkpoint_config = INT8_LOWP_CHECKPOINT_CONFIG
+        bits = quant_config.get("bits", 8)
+        target_weight_dtype = WoqWeightDtype.INT8
     else:
         raise AssertionError(
             f"{quantization_method} is not supported, quantization_method choice in [`gptq`, `awq`, `fp8`]."

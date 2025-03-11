@@ -248,10 +248,10 @@ def get_low_precision_checkpoint(args, model_config):
 def maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs):
     tp_grain_size = 64
     # Need to check if this attr is available. Old DeepSpeep does not have it.
-    if (
-        "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig())
-        and quant_config is not None
-    ):
+    assert "tp_grain_size" in dir(
+        deepspeed.inference.config.DeepSpeedTPConfig()
+    ), "Old DeepSpeed version detected. Please update to the recommended version."
+    if quant_config is not None:
         assert "group_size" in quant_config
         group_size = quant_config["group_size"]
         if group_size > 0:
@@ -490,7 +490,7 @@ class HuggingFaceModel(BaseLM):
                 else:  # AUTO
                     if weight_dtype == WoqWeightDtype.INT4 or (
                         low_precision_checkpoint is not None
-                        and quant_config["quant_method"] != "fp8"
+                        and quant_config["bits"] == 4
                     ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
@@ -525,6 +525,7 @@ class HuggingFaceModel(BaseLM):
                     assert "desc_act" in quant_config
                     quant_method = quant_config["quant_method"]
                     desc_act = quant_config["desc_act"]
+                    bits = quant_config["bits"]
                     if (
                         world_size > 1
                         and desc_act
@@ -541,6 +542,7 @@ class HuggingFaceModel(BaseLM):
                         quant_method,
                         tp_grain_size,
                         desc_act,
+                        bits,
                     )
                     low_precision_ckpt = (low_precision_ckpt, quant_config)
             self.model = ipex.llm.optimize(
@@ -1368,7 +1370,7 @@ class LMMS(lmms):
                 else:  # AUTO
                     if weight_dtype == WoqWeightDtype.INT4 or (
                         low_precision_checkpoint is not None
-                        and quant_config["quant_method"] != "fp8"
+                        and quant_config["bits"] == 4
                     ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
@@ -1403,6 +1405,7 @@ class LMMS(lmms):
                     assert "desc_act" in quant_config
                     quant_method = quant_config["quant_method"]
                     desc_act = quant_config["desc_act"]
+                    bits = quant_config["bits"]
                     if (
                         world_size > 1
                         and desc_act
@@ -1419,6 +1422,7 @@ class LMMS(lmms):
                         quant_method,
                         tp_grain_size,
                         desc_act,
+                        bits,
                     )
                     low_precision_ckpt = (low_precision_ckpt, quant_config)
             self._model = ipex.llm.optimize(
@@ -2173,7 +2177,7 @@ class LibriSpeech:
                 else:  # AUTO
                     if weight_dtype == WoqWeightDtype.INT4 or (
                         low_precision_checkpoint is not None
-                        and quant_config["quant_method"] != "fp8"
+                        and quant_config["bits"] == 4
                     ):
                         lowp_mode = ipex.quantization.WoqLowpMode.INT8
                     else:
@@ -2208,6 +2212,7 @@ class LibriSpeech:
                     assert "desc_act" in quant_config
                     quant_method = quant_config["quant_method"]
                     desc_act = quant_config["desc_act"]
+                    bits = quant_config["bits"]
                     if (
                         world_size > 1
                         and desc_act
@@ -2224,6 +2229,7 @@ class LibriSpeech:
                         quant_method,
                         tp_grain_size,
                         desc_act,
+                        bits,
                     )
                     low_precision_ckpt = (low_precision_ckpt, quant_config)
             self.model = ipex.llm.optimize(

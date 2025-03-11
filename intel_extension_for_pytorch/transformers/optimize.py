@@ -1742,12 +1742,14 @@ def model_convert_lowering(
                 enabled=True if dtype in [torch.bfloat16, torch.half] else False,
                 dtype=dtype,
             ):
+                logger.debug("Doing jit.trace")
                 trace_model = torch.jit.trace(
                     _model,
                     example_kwarg_inputs=sample_inputs,
                     strict=False,
                     check_trace=False,
                 )
+                logger.debug("Doing jit.freeze")
                 trace_model = torch.jit.freeze(trace_model)
                 if _model.config.architectures[0] == "MllamaForConditionalGeneration":
                     pixel_values = torch.rand(
@@ -2097,12 +2099,16 @@ def optimize(
                     "quant_method": "gptq",
                     "group_size": None,
                 }
+            logger.debug(
+                "ipex.llm.optimize is converting with low_precision_checkpoint"
+            )
             _model = _convert_woq_with_low_precision_checkpoint(
                 _model, quantization_config, state_dict, quant_config
             )
             use_low_precision_checkpoint = True
 
         # model reference conversion
+        logger.debug("ipex.llm.optimize is converting model to reference model")
         _model = model_convert_reference(_model)
 
         # model quantization if needed
@@ -2192,11 +2198,14 @@ def optimize(
 
             elif use_low_precision_checkpoint:  # weight only quantization
                 # for non-quantized layers
-                from ..nn.utils._weight_prepack import (
-                    weight_prepack_with_ipex,
-                )
+                from ..frontend import optimize as ipex_optimize
 
-                _model = weight_prepack_with_ipex(_model, None, {})[0]
+                _model = ipex_optimize(
+                    _model,
+                    dtype=dtype,
+                    inplace=True,
+                    auto_kernel_selection=True if dtype == torch.float else None,
+                )
             else:
                 # Note that low precision checkpoint is already handled at the beginning.
                 # If checkpoint is not provided, model is quantized here
@@ -2209,6 +2218,7 @@ def optimize(
                 )
 
         # model lowering conversion
+        logger.debug("ipex.llm.optimize is lowering model")
         _model = model_convert_lowering(
             _model,
             device,

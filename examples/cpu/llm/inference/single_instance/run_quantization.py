@@ -20,6 +20,10 @@ import os
 
 sys.path.append(sys.path[0] + "/../../../")
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from llm.inference.utils.model_class.llm import EXAMPLE_INPUTS_MODE
 from llm.inference.utils.model_class.llama import LLAMAConfig
@@ -279,7 +283,16 @@ parser.add_argument(
     help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
     " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
 )
+parser.add_argument(
+    "--verbose",
+    action="store_true",
+    help="Print verbose information for debugging",
+)
 args = parser.parse_args()
+
+if args.verbose:
+    logger.setLevel(logging.DEBUG)
+    ipex.set_logging_level(logging.DEBUG)
 
 
 # disable
@@ -486,7 +499,9 @@ if (
 load_to_meta_device = args.benchmark or (
     args.ipex_weight_only_quantization and args.low_precision_checkpoint != ""
 )
+logger.debug(f"get user model with load_to_meta_device = {load_to_meta_device}")
 user_model = model.get_user_model(config, load_to_meta_device)
+logger.debug("get user model done")
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
@@ -626,7 +641,7 @@ if model.name == "jamba":
             for i in range(user_model.config.num_hidden_layers)
         ]
     )
-if model.name in ["deepseekv2", "deepseekv3"]:
+if model.name in ["deepseekv2", "deepseekv3", "deepseekr1"]:
     global_past_key_value = tuple(
         [
             (
@@ -1166,6 +1181,7 @@ elif args.ipex_weight_only_quantization:
 
     if args.low_precision_checkpoint != "":
         pathname = args.low_precision_checkpoint
+        logger.debug(f"Loading low precision checkpoint from {pathname}")
         low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
         low_precision_checkpoint = (low_precision_checkpoint, quant_config)
 
@@ -1197,7 +1213,7 @@ elif args.ipex_weight_only_quantization:
     else:  # AUTO
         if weight_dtype == WoqWeightDtype.INT4 or (
             low_precision_checkpoint is not None
-            and low_precision_checkpoint[1]["quant_method"] != "fp8"
+            and low_precision_checkpoint[1]["bits"] == 4
         ):
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         else:
@@ -1226,6 +1242,7 @@ elif args.ipex_weight_only_quantization:
         weight_qscheme=weight_qscheme,
     )
 
+    logger.debug("doing ipex.llm.optimize")
     user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=amp_dtype,
@@ -1239,10 +1256,13 @@ elif args.ipex_weight_only_quantization:
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled,
     ):
+        logger.debug("doing jit trace")
         self_jit = torch.jit.trace(
             user_model.eval(), example_inputs, strict=False, check_trace=False
         )
+        logger.debug("doing jit freeze")
         self_jit = torch.jit.freeze(self_jit.eval())
+        logger.debug("saving jit model")
         pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/" + args.quant_model_name)
         quant_model = self_jit

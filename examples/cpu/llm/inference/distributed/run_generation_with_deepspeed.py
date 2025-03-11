@@ -45,7 +45,6 @@ except ImportError:
     pass
 from intel_extension_for_pytorch.llm.utils import (
     load_low_precision_checkpoint,
-    shard_low_precision_checkpoint,
 )
 
 # the Deepspeed team made these so it's super fast to load (~1 minute), rather than wait 10-20min loading time.
@@ -221,10 +220,17 @@ parser.add_argument(
     " INT4 weights, scales, zero points, etc. For better accuracy of weight only"
     " quantization with INT4 weight.",
 )
+parser.add_argument(
+    "--verbose",
+    action="store_true",
+    help="Print verbose information for debugging",
+)
 
 
 args = parser.parse_args()
 
+if args.verbose:
+    logger.setLevel(logging.DEBUG)
 
 num_tokens = args.max_new_tokens
 use_ipex = args.ipex or args.ipex_weight_only_quantization
@@ -232,6 +238,9 @@ use_ipex = args.ipex or args.ipex_weight_only_quantization
 # import extension
 if use_ipex:
     import intel_extension_for_pytorch as ipex
+
+    if args.verbose:
+        ipex.set_logging_level(logging.DEBUG)
 
     torch._C._jit_set_texpr_fuser_enabled(False)
     try:
@@ -509,14 +518,19 @@ if (
     args.low_precision_checkpoint = args.model_id
 if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
     pathname = args.low_precision_checkpoint
-    low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+    logger.debug(
+        f"Loading low precision checkpoint from {pathname} for rank {local_rank}/{world_size}"
+    )
+    low_precision_checkpoint, quant_config = load_low_precision_checkpoint(
+        pathname, local_rank, world_size
+    )
 
 tp_grain_size = 64
 # Need to check if this attr is available. Old DeepSpeep does not have it.
-if (
-    "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig())
-    and quant_config is not None
-):
+assert "tp_grain_size" in dir(
+    deepspeed.inference.config.DeepSpeedTPConfig()
+), "Old DeepSpeed version detected. Please update to the recommended version."
+if quant_config is not None:
     assert "group_size" in quant_config
     group_size = quant_config["group_size"]
     if group_size > 0:
@@ -533,6 +547,7 @@ if (
 if not args.ipex_weight_only_quantization or low_precision_checkpoint is None:
     kwargs.update({"checkpoint": checkpoints_json})
 
+logger.debug(f"deepspeed init_inference on rank {local_rank}/{world_size}")
 model = deepspeed.init_inference(
     model,
     mp_size=world_size,
@@ -580,8 +595,7 @@ if use_ipex:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
         else:  # AUTO
             if weight_dtype == WoqWeightDtype.INT4 or (
-                low_precision_checkpoint is not None
-                and quant_config["quant_method"] != "fp8"
+                low_precision_checkpoint is not None and quant_config["bits"] == 4
             ):
                 lowp_mode = ipex.quantization.WoqLowpMode.INT8
             else:
@@ -610,10 +624,6 @@ if use_ipex:
             weight_qscheme=weight_qscheme,
         )
         if low_precision_checkpoint is not None:
-            rank = local_rank
-            assert "quant_method" in quant_config
-            assert "desc_act" in quant_config
-            quant_method = quant_config["quant_method"]
             desc_act = quant_config["desc_act"]
             if (
                 world_size > 1
@@ -623,19 +633,11 @@ if use_ipex:
                 raise AssertionError(
                     "Lowp-mode INT8 is not supported for TP with desc_act = True"
                 )
-            low_precision_checkpoint = shard_low_precision_checkpoint(
-                low_precision_checkpoint,
-                model.config,
-                rank,
-                world_size,
-                quant_method,
-                tp_grain_size,
-                desc_act,
-            )
             low_precision_checkpoint = (low_precision_checkpoint, quant_config)
         else:
             low_precision_checkpoint = None
 
+    logger.debug(f"Applying ipex.llm.optimize on rank {local_rank}/{world_size}")
     model = ipex.llm.optimize(
         model.eval(),
         dtype=infer_dtype,
@@ -645,6 +647,7 @@ if use_ipex:
         cache_weight_for_large_batch=args.cache_weight_for_large_batch,
         low_precision_checkpoint=low_precision_checkpoint,
     )
+    logger.debug(f"Applying ipex.llm.optimize done on rank {local_rank}/{world_size}")
 # Generate
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
@@ -928,6 +931,7 @@ else:
     deepspeed.runtime.utils.see_memory_usage("end-of-run", force=True)
 
     print_rank0("*** Running benchmark")
+    logger.debug(f"Running benchmark on rank {local_rank}/{world_size}")
     total_time = 0.0
     cycles = args.num_iter
     warmup = args.num_warmup
