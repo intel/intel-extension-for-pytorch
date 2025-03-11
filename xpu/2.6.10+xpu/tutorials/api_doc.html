@@ -1,0 +1,815 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; Intel&amp;#174 Extension for PyTorch* 2.6.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Contribution" href="contribution.html" />
+    <link rel="prev" title="Examples" href="examples.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../">2.6.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.get_fp32_math_mode"><code class="docutils literal notranslate"><span class="pre">get_fp32_math_mode()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.set_fp32_math_mode"><code class="docutils literal notranslate"><span class="pre">set_fp32_math_mode()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#memory-management">Memory management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.empty_cache"><code class="docutils literal notranslate"><span class="pre">empty_cache()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.mem_get_info"><code class="docutils literal notranslate"><span class="pre">mem_get_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_stats"><code class="docutils literal notranslate"><span class="pre">memory_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_summary"><code class="docutils literal notranslate"><span class="pre">memory_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_snapshot"><code class="docutils literal notranslate"><span class="pre">memory_snapshot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_allocated"><code class="docutils literal notranslate"><span class="pre">memory_allocated()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.max_memory_allocated"><code class="docutils literal notranslate"><span class="pre">max_memory_allocated()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_reserved"><code class="docutils literal notranslate"><span class="pre">memory_reserved()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.max_memory_reserved"><code class="docutils literal notranslate"><span class="pre">max_memory_reserved()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.reset_peak_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_peak_memory_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_stats_as_nested_dict"><code class="docutils literal notranslate"><span class="pre">memory_stats_as_nested_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.reset_accumulated_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_accumulated_memory_stats()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#quantization">Quantization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.fp8.fp8_autocast"><code class="docutils literal notranslate"><span class="pre">fp8_autocast()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#c-api">C++ API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODEE"><code class="docutils literal notranslate"><span class="pre">FP32_MATH_MODE</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4FP32E"><code class="docutils literal notranslate"><span class="pre">FP32</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4TF32E"><code class="docutils literal notranslate"><span class="pre">TF32</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4BF32E"><code class="docutils literal notranslate"><span class="pre">BF32</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MINE"><code class="docutils literal notranslate"><span class="pre">FP32_MATH_MODE_MIN</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MAXE"><code class="docutils literal notranslate"><span class="pre">FP32_MATH_MODE_MAX</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu18set_fp32_math_modeE14FP32_MATH_MODE"><code class="docutils literal notranslate"><span class="pre">set_fp32_math_mode()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/api_doc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Link to this heading"></a></h1>
+<section id="general">
+<h2>General<a class="headerlink" href="#general" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_linear</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Link to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given model (nn.Module), as
+well as the given optimizer (optional). If the optimizer is given,
+optimizations will be applied for training. Otherwise, optimization will be
+applied for inference. Optimizations include <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding (for
+inference only), weight prepacking and so on.</p>
+<p>Weight prepacking is a technique to accelerate performance of oneDNN
+operators. In order to achieve better vectorization and cache reuse, onednn
+uses a specific memory layout called <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>. Although the
+calculation itself with <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code> is fast enough, from memory usage
+perspective it has drawbacks. Running with the <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>, oneDNN
+splits one or several dimensions of data into blocks with fixed size each
+time the operator is executed. More details information about oneDNN data
+mermory format is available at <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html">oneDNN manual</a>.
+To reduce this overhead, data will be converted to predefined block shapes
+prior to the execution of oneDNN operator execution. In runtime, if the data
+shape matches oneDNN operator execution requirements, oneDNN won’t perform
+memory layout conversion but directly go to calculation. Through this
+methodology, called <code class="docutils literal notranslate"><span class="pre">weight</span> <span class="pre">prepacking</span></code>, it is possible to avoid runtime
+weight data format convertion and thus increase performance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations on.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.half</span></code> a.k.a <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code>.
+Model parameters will be casted to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.half</span></code>
+according to dtype of settings. The default value is None, meaning do nothing.
+Note: Data type conversion is only applied to <code class="docutils literal notranslate"><span class="pre">nn.Conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code>
+and <code class="docutils literal notranslate"><span class="pre">nn.ConvTranspose2d</span></code> for both training and inference cases. For
+inference mode, additional data type conversion is applied to the weights
+of <code class="docutils literal notranslate"><span class="pre">nn.Embedding</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code>.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>level</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>. No optimizations are applied with
+<code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code>. The optimizer function just returns the original model and
+optimizer. With <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>, the following optimizations are applied:
+conv+bn folding, weights prepack, dropout removal (inferenc model),
+master weight split and fused optimizer update step (training model).
+The optimization options can be further overridden by setting the
+following options explicitly. The default value is <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>.</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is
+<code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>conv_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">conv_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>linear_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">linear_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>weights_prepack</strong> (<em>bool</em>) – Whether to perform weight prepack for convolution
+and linear to avoid oneDNN weights reorder. The default value is
+<code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob. Weight prepack works for CPU only.</p></li>
+<li><p><strong>replace_dropout_with_identity</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.Dropout</span></code>
+with <code class="docutils literal notranslate"><span class="pre">nn.Identity</span></code>. If replaced, the <code class="docutils literal notranslate"><span class="pre">aten::dropout</span></code> won’t be
+included in the JIT graph. This may provide more fusion opportunites
+on the graph. This only works for inference model. The default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>optimize_lstm</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code> with <code class="docutils literal notranslate"><span class="pre">IPEX</span> <span class="pre">LSTM</span></code>
+which takes advantage of oneDNN kernels to get better performance.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>split_master_weight_for_bf16</strong> (<em>bool</em>) – Whether to split master weights
+update for BF16 training. This saves memory comparing to master
+weight update solution. Split master weights update methodology
+doesn’t support all optimizers. The default value is None. The
+default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites
+the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>fuse_update_step</strong> (<em>bool</em>) – Whether to use fused params update for training
+which have better performance. It doesn’t support all optimizers.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>sample_input</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – Whether to feed sample input data to ipex.optimize. The shape of
+input data will impact the block format of packed weight. If not feed a sample
+input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
+If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
+best block format. Sample input works for CPU only.</p></li>
+<li><p><strong>auto_kernel_selection</strong> (<em>bool</em>) – Different backends may have
+different performances with different dtypes/shapes. Default value
+is False. Intel® Extension for PyTorch* will try to optimize the
+kernel selection for better performance if this knob is set to
+<code class="docutils literal notranslate"><span class="pre">True</span></code>. You might get better performance at the cost of extra memory usage.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the
+configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob. Auto kernel selection works for CPU only.</p></li>
+<li><p><strong>graph_mode</strong> – (bool) [prototype]: It will automatically apply a combination of methods
+to generate graph or multiple subgraphs if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>concat_linear</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">concat_linear</span></code>. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Model and optimizer (if given) modified according to the <code class="docutils literal notranslate"><span class="pre">level</span></code> knob
+or other user settings. <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding may take place and
+<code class="docutils literal notranslate"><span class="pre">dropout</span></code> may be replaced by <code class="docutils literal notranslate"><span class="pre">identity</span></code>. In inference scenarios,
+convolutuon, linear and lstm will be replaced with the optimized
+counterparts in Intel® Extension for PyTorch* (weight prepack for
+convolution and linear) for good performance. In bfloat16 or float16 scenarios,
+parameters of convolution and linear will be casted to bfloat16 or float16 dtype.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
+training scenario.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function deepcopys the original model. If DDP is invoked
+before <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function, DDP is applied on the origin model, rather
+than the one returned from <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function. In this case, some
+operators in DDP, like allreduce, will not be invoked and thus may cause
+unpredictable accuracy loss.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+<p><cite>torch.xpu.optimize()</cite> is an alternative of optimize API in Intel® Extension for PyTorch*,
+to provide identical usage for XPU device only. The motivation of adding this alias is
+to unify the coding style in user scripts base on torch.xpu modular.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.llm.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quantization_config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qconfig_summary_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low_precision_checkpoint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deployment_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_weight_for_large_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.optimize" title="Link to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given transformers model (nn.Module).
+This API focus on transformers models, especially for generation tasks inference.</p>
+<p>Well supported model family with full functionalities:
+Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
+T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper, Maira2, Jamba, DeepSeekV2.</p>
+<p>For the model that is not in the scope of supported model family above, will try to
+apply default ipex.optimize transparently to get benifits (not include quantizations,
+only works for dtypes of torch.bfloat16 and torch.half and torch.float).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Now it works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>.
+The default value is <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>. When working with quantization, it means the mixed dtype with quantization.</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>device</strong> (<em>str</em>) – Specifying the device on which the optimization will be performed-either ‘CPU’ or ‘XPU.</p></li>
+<li><p><strong>quantization_config</strong> (<em>object</em>) – Defining the IPEX quantization recipe (Weight only quant or static quant).
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>.
+Once used, meaning using IPEX quantizatization model for model.generate().(only works on CPU)</p></li>
+<li><p><strong>qconfig_summary_file</strong> (<em>str</em>) – Path to the IPEX static quantization config json file. (only works on CPU)
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Work with quantization_config under static quantization use case.
+Need to do IPEX static quantization calibration and generate this file. (only works on CPU)</p></li>
+<li><p><strong>low_precision_checkpoint</strong> (<em>dict</em><em> or </em><em>tuple</em><em> of </em><em>dict</em>) – For weight only quantization with INT4 weights.
+If it’s a dict, it should be the state_dict of checkpoint generated by GPTQ by default.
+If a tuple is provided, it should be <cite>(checkpoint, quant_method)</cite>,
+where <cite>checkpoint</cite> is the state_dict and <cite>quant_method</cite> is dict specifying the quantization
+method including GPTQ or AWQ, e,g, quant_method = {<cite>quant_method</cite>: <cite>gptq</cite>}.</p></li>
+<li><p><strong>sample_inputs</strong> (<em>Tuple tensors</em>) – sample inputs used for model quantization or torchscript.
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, and for well supported model, we provide this sample inputs automaticlly. (only works on CPU)</p></li>
+<li><p><strong>deployment_mode</strong> (<em>bool</em>) – Whether to apply the optimized model for deployment of model generation.
+It means there is no need to further apply optimization like torchscirpt. Default value is <code class="docutils literal notranslate"><span class="pre">True</span></code>. (only works on CPU)</p></li>
+<li><p><strong>cache_weight_for_large_batch</strong> (<em>bool</em>) – Whether to cache the dedicated weight for large batch to speed up
+its inference (e.g., prefill phase) with extra memory usage. It is only valid for non-quantization cases
+where dtype = bfloat16 and weight-only quantization cases where lowp-mode=BF16/INT8. In other cases, an
+error will be raised. Default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>optimized model object for model.generate(), also workable with model.forward</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function AFTER invoking DeepSpeed in Tensor Parallel
+inference scenario.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 generation inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="o">.</span><span class="n">generate</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.get_fp32_math_mode">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">get_fp32_math_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.get_fp32_math_mode" title="Link to this definition"></a></dt>
+<dd><p>Get the current fpmath_mode setting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">cpu</span></code>, <code class="docutils literal notranslate"><span class="pre">xpu</span></code></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Fpmath mode
+The value will be <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>, <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code> or <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> (GPU ONLY).
+oneDNN fpmath mode will be disabled by default if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>.
+The implicit <code class="docutils literal notranslate"><span class="pre">FP32</span></code> to <code class="docutils literal notranslate"><span class="pre">TF32</span></code> data type conversion will be enabled if dtype is set
+to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code>. The implicit <code class="docutils literal notranslate"><span class="pre">FP32</span></code> to <code class="docutils literal notranslate"><span class="pre">BF16</span></code> data type conversion will be
+enabled if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to get the current fpmath mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">get_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.get_fp32_math_mode()</span></code> is an alternative function in Intel® Extension for PyTorch*,
+to provide identical usage for XPU device only. The motivation of adding this alias is
+to unify the coding style in user scripts base on <code class="docutils literal notranslate"><span class="pre">torch.xpu</span></code> modular.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to get the current fpmath mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">get_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.set_fp32_math_mode">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">set_fp32_math_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">FP32MathMode.FP32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.set_fp32_math_mode" title="Link to this definition"></a></dt>
+<dd><p>Enable or disable implicit data type conversion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mode</strong> (<em>FP32MathMode</em>) – <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>, <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code> or
+<code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> (GPU ONLY). oneDNN fpmath mode will be disabled by default if dtype
+is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>. The implicit <code class="docutils literal notranslate"><span class="pre">FP32</span></code> to <code class="docutils literal notranslate"><span class="pre">TF32</span></code> data type conversion
+will be enabled if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code>. The implicit <code class="docutils literal notranslate"><span class="pre">FP32</span></code>
+to <code class="docutils literal notranslate"><span class="pre">BF16</span></code> data type conversion will be enabled if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>.</p></li>
+<li><p><strong>device</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">cpu</span></code>, <code class="docutils literal notranslate"><span class="pre">xpu</span></code></p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the implicit data type conversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">BF32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to disable the implicit data type conversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">FP32</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_fp32_math_mode()</span></code> is an alternative function in Intel® Extension for PyTorch*,
+to provide identical usage for XPU device only. The motivation of adding this alias is
+to unify the coding style in user scripts base on <code class="docutils literal notranslate"><span class="pre">torch.xpu</span></code> modular.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the implicit data type conversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">BF32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to disable the implicit data type conversion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_fp32_math_mode</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">FP32MathMode</span><span class="o">.</span><span class="n">FP32</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="memory-management">
+<h2>Memory management<a class="headerlink" href="#memory-management" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.empty_cache">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">empty_cache</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.empty_cache" title="Link to this definition"></a></dt>
+<dd><p>Releases all unoccupied cached memory currently held by the caching
+allocator so that those can be used in other GPU application and visible in
+sysman toolkit.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="xref py py-func docutils literal notranslate"><span class="pre">empty_cache()</span></code> doesn’t increase the amount of GPU
+memory available for PyTorch. However, it may help reduce fragmentation
+of GPU memory in certain cases. See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for
+more details about GPU memory management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.mem_get_info">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">mem_get_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.mem_get_info" title="Link to this definition"></a></dt>
+<dd><p>Return the estimated value of global free and total GPU memory for a given device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default) or if the device index is not specified.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.memory_stats" title="Link to this definition"></a></dt>
+<dd><p>Returns a dictionary of XPU memory allocator statistics for a
+given device.</p>
+<p>The return value of this function is a dictionary of statistics, each of
+which is a non-negative integer.</p>
+<p>Core statistics:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;allocated.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of allocation requests received by the memory allocator.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;allocated_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of allocated memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;segment.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of reserved segments from <code class="docutils literal notranslate"><span class="pre">xpuMalloc()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;reserved_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of reserved memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;active.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of active memory blocks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;active_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of active memory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;inactive_split.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+number of inactive, non-releasable memory blocks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;inactive_split_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}&quot;</span></code>:
+amount of inactive, non-releasable memory.</p></li>
+</ul>
+<p>For these core statistics, values are broken down as follows.</p>
+<p>Pool type:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">all</span></code>: combined statistics across all memory pools.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">large_pool</span></code>: statistics for the large allocation pool
+(as of October 2019, for size &gt;= 1MB allocations).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">small_pool</span></code>: statistics for the small allocation pool
+(as of October 2019, for size &lt; 1MB allocations).</p></li>
+</ul>
+<p>Metric type:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">current</span></code>: current value of this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">peak</span></code>: maximum value of this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">allocated</span></code>: historical total increase in this metric.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">freed</span></code>: historical total decrease in this metric.</p></li>
+</ul>
+<p>In addition to the core statistics, we also provide some simple event
+counters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_alloc_retries&quot;</span></code>: number of failed <code class="docutils literal notranslate"><span class="pre">xpuMalloc</span></code> calls that
+result in a cache flush and retry.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;num_ooms&quot;</span></code>: number of out-of-memory errors thrown.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistics for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_summary">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviated</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#torch.xpu.memory_summary" title="Link to this definition"></a></dt>
+<dd><p>Returns a human-readable printout of the current memory allocator
+statistics for a given device.</p>
+<p>This can be useful to display periodically during training, or when
+handling out-of-memory exceptions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+printout for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p></li>
+<li><p><strong>abbreviated</strong> (<em>bool</em><em>, </em><em>optional</em>) – whether to return an abbreviated summary
+(default: False).</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_snapshot">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_snapshot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.memory_snapshot" title="Link to this definition"></a></dt>
+<dd><p>Returns a snapshot of the XPU memory allocator state across all devices.</p>
+<p>Interpreting the output of this function requires familiarity with the
+memory allocator internals.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_allocated">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_allocated</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.memory_allocated" title="Link to this definition"></a></dt>
+<dd><p>Returns the current GPU memory occupied by tensors in bytes for a given
+device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is likely less than the amount shown in sysman toolkit since some
+unused memory can be held by the caching allocator and some context
+needs to be created on GPU. See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more
+details about GPU memory management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.max_memory_allocated">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">max_memory_allocated</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.max_memory_allocated" title="Link to this definition"></a></dt>
+<dd><p>Returns the maximum GPU memory occupied by tensors in bytes for a given
+device.</p>
+<p>By default, this returns the peak allocated memory since the beginning of
+this program. <code class="xref py py-func docutils literal notranslate"><span class="pre">reset_peak_stats()</span></code> can be used to
+reset the starting point in tracking this metric. For example, these two
+functions can measure the peak allocated memory usage of each iteration in a
+training loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_reserved">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_reserved</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.memory_reserved" title="Link to this definition"></a></dt>
+<dd><p>Returns the current GPU memory managed by the caching allocator in bytes
+for a given device.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.max_memory_reserved">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">max_memory_reserved</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.max_memory_reserved" title="Link to this definition"></a></dt>
+<dd><p>Returns the maximum GPU memory managed by the caching allocator in bytes
+for a given device.</p>
+<p>By default, this returns the peak cached memory since the beginning of this
+program. <code class="xref py py-func docutils literal notranslate"><span class="pre">reset_peak_stats()</span></code> can be used to reset
+the starting point in tracking this metric. For example, these two functions
+can measure the peak cached memory amount of each iteration in a training
+loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.reset_peak_memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">reset_peak_memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.reset_peak_memory_stats" title="Link to this definition"></a></dt>
+<dd><p>Resets the “peak” stats tracked by the XPU memory allocator.</p>
+<p>See <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> for details. Peak stats correspond to the
+<cite>“peak”</cite> key in each individual stat dict.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.memory_stats_as_nested_dict">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">memory_stats_as_nested_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#torch.xpu.memory_stats_as_nested_dict" title="Link to this definition"></a></dt>
+<dd><p>Returns the result of <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> as a nested dictionary.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch.xpu.reset_accumulated_memory_stats">
+<span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">reset_accumulated_memory_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.reset_accumulated_memory_stats" title="Link to this definition"></a></dt>
+<dd><p>Resets the “accumulated” (historical) stats tracked by the XPU memory allocator.</p>
+<p>See <code class="xref py py-func docutils literal notranslate"><span class="pre">memory_stats()</span></code> for details. Accumulated stats correspond to
+the <cite>“allocated”</cite> and <cite>“freed”</cite> keys in each individual stat dict, as well as
+<cite>“num_alloc_retries”</cite> and <cite>“num_ooms”</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>device</strong> (<em>torch.device</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – selected device. Returns
+statistic for the current device, given by <code class="xref py py-func docutils literal notranslate"><span class="pre">current_device()</span></code>,
+if <code class="xref py py-attr docutils literal notranslate"><span class="pre">device</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="technical_details.html#xpu-memory-management"><span class="std std-ref">Memory Management [GPU]</span></a> for more details about GPU memory
+management.</p>
+</div>
+</dd></dl>
+
+</section>
+<section id="quantization">
+<h2>Quantization<a class="headerlink" href="#quantization" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.fp8.fp8_autocast">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.fp8.</span></span><span class="sig-name descname"><span class="pre">fp8_autocast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrating</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fp8_recipe</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DelayedScaling</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fp8_group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ProcessGroup</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'xpu'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#ipex.quantization.fp8.fp8_autocast" title="Link to this definition"></a></dt>
+<dd><p>Context manager for FP8 usage.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fp8_autocast</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>enabled</strong> (bool, default = <cite>True</cite>) – whether or not to enable fp8</p></li>
+<li><p><strong>calibrating</strong> (bool, default = <cite>False</cite>) – calibration mode allows collecting statistics such as amax and scale
+data of fp8 tensors even when executing without fp8 enabled.</p></li>
+<li><p><strong>fp8_recipe</strong> (recipe.DelayedScaling, default = <cite>None</cite>) – recipe used for FP8 training.</p></li>
+<li><p><strong>fp8_group</strong> (torch._C._distributed_c10d.ProcessGroup, default = <cite>None</cite>) – distributed group over which amaxes for the fp8 tensors
+are reduced at the end of each training step.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="c-api">
+<h2>C++ API<a class="headerlink" href="#c-api" title="Link to this heading"></a></h2>
+<dl class="cpp enum">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODEE">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODEE"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODEE"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_ipex</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">FP32_MATH_MODE</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODEE" title="Link to this definition"></a><br /></dt>
+<dd><p>specifies the available DPCCP packet types </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4FP32E">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODE4FP32E"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODE4FP32E"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1a6534449e705ad126a1da2172c0f00176"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FP32</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4FP32E" title="Link to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to FP32. </p>
+</dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4TF32E">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODE4TF32E"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODE4TF32E"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1aa64ad7461cafbefd356233593dae5c32"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TF32</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4TF32E" title="Link to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to TF32. </p>
+</dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4BF32E">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODE4BF32E"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODE4BF32E"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1a51eb44e21faf8d20830a1d9421fa67db"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">BF32</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE4BF32E" title="Link to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode to BF32. </p>
+</dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MINE">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MINE"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MINE"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1a729edd9df578cb1bc4222e817b91ecd1"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FP32_MATH_MODE_MIN</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MINE" title="Link to this definition"></a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MAXE">
+<span id="_CPPv3N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MAXE"></span><span id="_CPPv2N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MAXE"></span><span class="target" id="Settings_8h_1a78256f36e9f3fee4a12d6ca8c8e134e1a462b34da23636a2db36ba05357cbe2a7"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">FP32_MATH_MODE_MAX</span></span></span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODE18FP32_MATH_MODE_MAXE" title="Link to this definition"></a><br /></dt>
+<dd><p>set floating-point math mode. </p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N10torch_ipex3xpu18set_fp32_math_modeE14FP32_MATH_MODE">
+<span id="_CPPv3N10torch_ipex3xpu18set_fp32_math_modeE14FP32_MATH_MODE"></span><span id="_CPPv2N10torch_ipex3xpu18set_fp32_math_modeE14FP32_MATH_MODE"></span><span id="torch_ipex::xpu::set_fp32_math_mode__FP32_MATH_MODE"></span><span class="target" id="Settings_8h_1aa6eb14ee4dd323c3b1963b018355bf18"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_ipex</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">set_fp32_math_mode</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N10torch_ipex3xpu14FP32_MATH_MODEE" title="torch_ipex::xpu::FP32_MATH_MODE"><span class="n"><span class="pre">FP32_MATH_MODE</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">mode</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N10torch_ipex3xpu18set_fp32_math_modeE14FP32_MATH_MODE" title="Link to this definition"></a><br /></dt>
+<dd><p>Enable or disable implicit floating-point type conversion during computation for oneDNN kernels. Set <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code> will disable floating-point / type conversion. Set <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> will enable implicit / down-conversion from <code class="docutils literal notranslate"><span class="pre">fp32</span></code> to <code class="docutils literal notranslate"><span class="pre">tf32</span></code>. Set <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code> will / enable implicit down-conversion from <code class="docutils literal notranslate"><span class="pre">fp32</span></code> to <code class="docutils literal notranslate"><span class="pre">bf16</span></code>. / / refer to <a class="reference external" href="https://oneapi-src.github.io/ / oneDNN/dev_guide_attributes_fpmath_mode.html">Primitive Attributes: floating / -point math mode</a> for detail description about the definition and / numerical behavior of floating-point math modes. /</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mode</strong> – (FP32MathMode): Only works for <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>, / <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32</span></code> and <code class="docutils literal notranslate"><span class="pre">FP32MathMode.BF32</span></code>. / oneDNN fpmath mode will be disabled by default if dtype is set to / <code class="docutils literal notranslate"><span class="pre">FP32MathMode.FP32</span></code>. The implicit FP32 to TF32 data type conversion / will be enabled if dtype is set to <code class="docutils literal notranslate"><span class="pre">FP32MathMode.TF32`.</span> <span class="pre">The</span> <span class="pre">implicit</span> <span class="pre">FP32</span> <span class="pre">to</span> <span class="pre">BF16</span> <span class="pre">data</span> <span class="pre">type</span> <span class="pre">conversion</span> <span class="pre">will</span> <span class="pre">be</span> <span class="pre">enabled</span> <span class="pre">if</span> <span class="pre">dtype</span> <span class="pre">is</span> <span class="pre">set</span> <span class="pre">to</span> </code>FP32MathMode.BF32`. </p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="examples.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="contribution.html" class="btn btn-neutral float-right" title="Contribution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7172a43ce560> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a><a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a><a href='/#' data-wap_ref='dns' id='wap_dns'><small>| Your Privacy Choices</small><span style='height:10px;width:28px;display:inline-block;position:relative;'><svg style='position:absolute;width:28px;bottom:-2px;' version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 30 14' xml:space='preserve'><title>California Consumer Privacy Act (CCPA) Opt-Out Icon</title><style type='text/css'> .st0 { fill-rule: evenodd; clip-rule: evenodd; fill: #FFFFFF; } .st1 { fill-rule: evenodd; clip-rule: evenodd; fill: #0066FF; } .st2 { fill: #FFFFFF; } .st3 { fill: #0066FF; } </style><g><g id='final---dec.11-2020_1_'><g id='_x30_208-our-toggle_2_' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2_2_' transform='translate(1275.000000, 200.000000)'><path class='st0' d='M7.4,12.8h6.8l3.1-11.6H7.4C4.2,1.2,1.6,3.8,1.6,7S4.2,12.8,7.4,12.8z'></path></g></g></g><g id='final---dec.11-2020'><g id='_x30_208-our-toggle' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2' transform='translate(1275.000000, 200.000000)'><path class='st1' d='M22.6,0H7.4c-3.9,0-7,3.1-7,7s3.1,7,7,7h15.2c3.9,0,7-3.1,7-7S26.4,0,22.6,0z M1.6,7c0-3.2,2.6-5.8,5.8-5.8 h9.9l-3.1,11.6H7.4C4.2,12.8,1.6,10.2,1.6,7z'></path><path id='x' class='st2' d='M24.6,4c0.2,0.2,0.2,0.6,0,0.8l0,0L22.5,7l2.2,2.2c0.2,0.2,0.2,0.6,0,0.8c-0.2,0.2-0.6,0.2-0.8,0 l0,0l-2.2-2.2L19.5,10c-0.2,0.2-0.6,0.2-0.8,0c-0.2-0.2-0.2-0.6,0-0.8l0,0L20.8,7l-2.2-2.2c-0.2-0.2-0.2-0.6,0-0.8 c0.2-0.2,0.6-0.2,0.8,0l0,0l2.2,2.2L23.8,4C24,3.8,24.4,3.8,24.6,4z'></path><path id='y' class='st3' d='M12.7,4.1c0.2,0.2,0.3,0.6,0.1,0.8l0,0L8.6,9.8C8.5,9.9,8.4,10,8.3,10c-0.2,0.1-0.5,0.1-0.7-0.1l0,0 L5.4,7.7c-0.2-0.2-0.2-0.6,0-0.8c0.2-0.2,0.6-0.2,0.8,0l0,0L8,8.6l3.8-4.5C12,3.9,12.4,3.9,12.7,4.1z'></path></g></g></g></g></svg></span></a><a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref='nac' id='wap_nac'><small>| Notice at Collection</small></a></div><p></p><div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>.</div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

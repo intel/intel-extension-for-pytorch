@@ -1,0 +1,243 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DLPack Solution &mdash; Intel&amp;#174 Extension for PyTorch* 2.6.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="DPC++ Extension" href="DPC%2B%2B_Extension.html" />
+    <link rel="prev" title="Horovod with PyTorch (Prototype)" href="horovod.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../../">2.6.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">DLPack Solution</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-case">Use Case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#design">Design</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#import-dlpack-capsule">Import DLPack Capsule</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#export-dlpack-capsule">Export DLPack Capsule</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#dldevice-and-data-pointer"><code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> and <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">pointer</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#asynchronous-programming">Asynchronous Programming</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#example-case">Example Case</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-log-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">DLPack Solution</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/DLPack.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dlpack-solution">
+<h1>DLPack Solution<a class="headerlink" href="#dlpack-solution" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p><a class="reference external" href="https://dmlc.github.io/dlpack/latest/">DLPack</a> defines a stable in-memory data structure for sharing tensors among frameworks. It is a solution with wide community adoption and supports Numpy, PyTorch, and other popular frameworks in deep learning domain. Intel® Extension for PyTorch* extends DLPack support in PyTorch for XPU backend particularly, in order to share tensor data without copy when interoperating with other libraries via DLPack solution. The current supported DLPack version is <a class="reference external" href="https://github.com/dmlc/dlpack/releases/tag/v0.7">v0.7</a>.</p>
+</section>
+<section id="use-case">
+<h2>Use Case<a class="headerlink" href="#use-case" title="Link to this heading"></a></h2>
+<p>The following use case demonstrates two typical DLPack usages relate to Intel® Extension for PyTorch*. One is to import external tensor to Intel® Extension for PyTorch*. The tensor from an external library is packed in DLPack capsule, then converted to PyTorch tensor on XPU, to be operable in Intel® Extension for PyTorch*. The other is to export PyTorch tensor on XPU to an external library. The PyTorch tensor on XPU is packed in DLPack capsule, so that the external library can operate on this shared tensor via DLPack solution.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils.dlpack</span>
+
+<span class="c1"># create DLPack capsule from external</span>
+<span class="n">capsule</span> <span class="o">=</span> <span class="o">...</span>
+
+<span class="c1"># Usage 1: convert DLPack capsule to PyTorch tensor on XPU</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_dlpack</span><span class="p">(</span><span class="n">capsule</span><span class="p">)</span>
+
+<span class="c1"># create PyTorch tensor on XPU</span>
+<span class="n">t2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="mi">10</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;xpu&#39;</span><span class="p">)</span>
+
+<span class="c1"># Usage 2: convert PyTorch tensor on XPU to DLPack capsule</span>
+<span class="n">capsule2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">to_dlpack</span><span class="p">(</span><span class="n">t2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="design">
+<h2>Design<a class="headerlink" href="#design" title="Link to this heading"></a></h2>
+<p>When import an external tensor which is in <code class="docutils literal notranslate"><span class="pre">DLManagedTensor</span></code> format, a PyTorch tensor is created and other required information such as <code class="docutils literal notranslate"><span class="pre">dim</span></code>, <code class="docutils literal notranslate"><span class="pre">sizes</span></code>, and <code class="docutils literal notranslate"><span class="pre">strides</span></code> are parsed and extracted from the external tensor to PyTorch tensor by Stock PyTorch. The <code class="docutils literal notranslate"><span class="pre">data_ptr</span></code> points to the original memory allocation and a data copy is not required. Here Intel® Extension for PyTorch* is responsible for converting device type and id from <code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> to ATen device for XPU backend. <br/></p>
+<section id="import-dlpack-capsule">
+<h3>Import DLPack Capsule<a class="headerlink" href="#import-dlpack-capsule" title="Link to this heading"></a></h3>
+<p><img alt="fig-1-DLPack-import" src="../../_images/figure1_DLPack_import.svg" /></p>
+<p>When exporting PyTorch tensor, a <code class="docutils literal notranslate"><span class="pre">ATenDLMTensor</span></code> is created with its <code class="docutils literal notranslate"><span class="pre">handle</span></code> pointing to the original PyTorch tensor and its <code class="docutils literal notranslate"><span class="pre">tensor</span></code> contains the exported tensor in <code class="docutils literal notranslate"><span class="pre">DLManagedTensor</span></code> format. The required information such as <code class="docutils literal notranslate"><span class="pre">ndim</span></code>, <code class="docutils literal notranslate"><span class="pre">shape</span></code>, and <code class="docutils literal notranslate"><span class="pre">strides</span></code> are parsed and extracted from PyTorch tensor to external tensor. The <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">pointer</span></code> points to the original memory allocation and data copy is not required. Here Intel® Extension for PyTorch* is responsible for converting device type and id from ATen device to <code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> for XPU backend. <br/></p>
+</section>
+<section id="export-dlpack-capsule">
+<h3>Export DLPack Capsule<a class="headerlink" href="#export-dlpack-capsule" title="Link to this heading"></a></h3>
+<p><img alt="fig-2-DLPack-import" src="../../_images/figure2_DLPack_export.svg" /></p>
+<p>Note: The used <code class="docutils literal notranslate"><span class="pre">DLManagedTensor</span></code> format in above figures is from https://dmlc.github.io/dlpack/latest/python_spec.html.</p>
+</section>
+<section id="dldevice-and-data-pointer">
+<h3><code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> and <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">pointer</span></code><a class="headerlink" href="#dldevice-and-data-pointer" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">DLDeviceType</span></code> in <code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> is <code class="docutils literal notranslate"><span class="pre">kDLOneAPI</span></code> for sharing memory between Intel® Extension for PyTorch* and other libraries. It is not <code class="docutils literal notranslate"><span class="pre">kDLSycl</span></code> since it relies on oneAPI SYCL extensions filter_selector and default platform context to operate. The <code class="docutils literal notranslate"><span class="pre">device_id</span></code> in <code class="docutils literal notranslate"><span class="pre">DLDevice</span></code> is one of the SYCL runtime device ids, which may be different from the actual framework device in use. When producing a DLPack capsule, DPC++ runtime will get the device where memory allocation was original made. If the device has parent device, we will find its parent device index enumerated in <code class="docutils literal notranslate"><span class="pre">sycl::device::get_devices()</span></code> then put to <code class="docutils literal notranslate"><span class="pre">device_id</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">pointer</span></code> points to the shared data via DLPack to be accessed by consumer. Only USM allocations are valid in <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">pointer</span></code> when <code class="docutils literal notranslate"><span class="pre">DLDeviceType</span></code> is <code class="docutils literal notranslate"><span class="pre">kDLOneAPI</span></code>. <a class="reference external" href="https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html">SYCL 2020 Specification</a> defines three types of USM allocations: <code class="docutils literal notranslate"><span class="pre">sycl::usm::host</span></code>, <code class="docutils literal notranslate"><span class="pre">sycl::usm::device</span></code>, and <code class="docutils literal notranslate"><span class="pre">sycl::usm::shared</span></code>. <code class="docutils literal notranslate"><span class="pre">sycl::usm::device</span></code> is the only supported type. Also the USM allocations in <code class="docutils literal notranslate"><span class="pre">sycl::usm::device</span></code> are valid in DLPack only when the memory allocation was made under <a class="reference external" href="https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/supported/sycl_ext_oneapi_default_context.asciidoc">default SYCL context</a> per SYCL platform.</p>
+</section>
+</section>
+<section id="asynchronous-programming">
+<h2>Asynchronous Programming<a class="headerlink" href="#asynchronous-programming" title="Link to this heading"></a></h2>
+<p>So far, DLPack defines how the producer shares memory allocations in DLPack capsule format and how consumer recognizes the shared memory allocations. It does not define the synchronization method between producer and consumer so that both sides know when it is safe to access the data in shared memory allocations. Under the situation that the producer and the consumer probably have different implementation for supporting asynchronous programming, it is hard to define a general solution for various scenarios. It is up to consumer to monitor the execution flow of Intel® Extension for PyTorch* and find out when the data is ready to use.</p>
+<p>The following example shows one possible solution for the consumer to safely use USM allocations from Intel® Extension for PyTorch*.</p>
+<section id="example-case">
+<h3>Example Case<a class="headerlink" href="#example-case" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils.dlpack</span>
+
+<span class="c1"># Get shared tensor from Intel® Extension for PyTorch* via DLPack</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_dlpack</span><span class="p">(</span><span class="n">capsule</span><span class="p">)</span>
+
+<span class="c1"># Wait for the data ready to use</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+
+<span class="c1"># Use the data in shared tensor</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="horovod.html" class="btn btn-neutral float-left" title="Horovod with PyTorch (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="DPC%2B%2B_Extension.html" class="btn btn-neutral float-right" title="DPC++ Extension" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x71729f73cfa0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a><a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a><a href='/#' data-wap_ref='dns' id='wap_dns'><small>| Your Privacy Choices</small><span style='height:10px;width:28px;display:inline-block;position:relative;'><svg style='position:absolute;width:28px;bottom:-2px;' version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 30 14' xml:space='preserve'><title>California Consumer Privacy Act (CCPA) Opt-Out Icon</title><style type='text/css'> .st0 { fill-rule: evenodd; clip-rule: evenodd; fill: #FFFFFF; } .st1 { fill-rule: evenodd; clip-rule: evenodd; fill: #0066FF; } .st2 { fill: #FFFFFF; } .st3 { fill: #0066FF; } </style><g><g id='final---dec.11-2020_1_'><g id='_x30_208-our-toggle_2_' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2_2_' transform='translate(1275.000000, 200.000000)'><path class='st0' d='M7.4,12.8h6.8l3.1-11.6H7.4C4.2,1.2,1.6,3.8,1.6,7S4.2,12.8,7.4,12.8z'></path></g></g></g><g id='final---dec.11-2020'><g id='_x30_208-our-toggle' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2' transform='translate(1275.000000, 200.000000)'><path class='st1' d='M22.6,0H7.4c-3.9,0-7,3.1-7,7s3.1,7,7,7h15.2c3.9,0,7-3.1,7-7S26.4,0,22.6,0z M1.6,7c0-3.2,2.6-5.8,5.8-5.8 h9.9l-3.1,11.6H7.4C4.2,12.8,1.6,10.2,1.6,7z'></path><path id='x' class='st2' d='M24.6,4c0.2,0.2,0.2,0.6,0,0.8l0,0L22.5,7l2.2,2.2c0.2,0.2,0.2,0.6,0,0.8c-0.2,0.2-0.6,0.2-0.8,0 l0,0l-2.2-2.2L19.5,10c-0.2,0.2-0.6,0.2-0.8,0c-0.2-0.2-0.2-0.6,0-0.8l0,0L20.8,7l-2.2-2.2c-0.2-0.2-0.2-0.6,0-0.8 c0.2-0.2,0.6-0.2,0.8,0l0,0l2.2,2.2L23.8,4C24,3.8,24.4,3.8,24.6,4z'></path><path id='y' class='st3' d='M12.7,4.1c0.2,0.2,0.3,0.6,0.1,0.8l0,0L8.6,9.8C8.5,9.9,8.4,10,8.3,10c-0.2,0.1-0.5,0.1-0.7-0.1l0,0 L5.4,7.7c-0.2-0.2-0.2-0.6,0-0.8c0.2-0.2,0.6-0.2,0.8,0l0,0L8,8.6l3.8-4.5C12,3.9,12.4,3.9,12.7,4.1z'></path></g></g></g></g></svg></span></a><a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref='nac' id='wap_nac'><small>| Notice at Collection</small></a></div><p></p><div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>.</div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

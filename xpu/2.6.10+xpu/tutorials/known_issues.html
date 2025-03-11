@@ -1,0 +1,331 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Troubleshooting &mdash; Intel&amp;#174 Extension for PyTorch* 2.6.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="License" href="license.html" />
+    <link rel="prev" title="Releases" href="releases.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../">2.6.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-usage">General Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#library-dependencies">Library Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#performance-issue">Performance Issue</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Troubleshooting</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/known_issues.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="troubleshooting">
+<h1>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h1>
+<section id="general-usage">
+<h2>General Usage<a class="headerlink" href="#general-usage" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: FP64 data type is unsupported on current platform.</p>
+<ul>
+<li><p><strong>Cause</strong>: FP64 is not natively supported by the <a class="reference external" href="https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html">Intel® Data Center GPU Flex Series</a> and <a class="reference external" href="https://www.intel.com/content/www/us/en/products/details/discrete-gpus/arc.html">Intel® Arc™ A-Series Graphics</a> platforms.
+If you run any AI workload on that platform and receive this error message, it means a kernel requires FP64 instructions that are not supported and the execution is stopped.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Runtime error <code class="docutils literal notranslate"><span class="pre">invalid</span> <span class="pre">device</span> <span class="pre">pointer</span></code> if <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">horovod.torch</span> <span class="pre">as</span> <span class="pre">hvd</span></code> before <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">intel_extension_for_pytorch</span></code>.</p>
+<ul>
+<li><p><strong>Cause</strong>: Intel® Optimization for Horovod* uses utilities provided by Intel® Extension for PyTorch*. The improper import order causes Intel® Extension for PyTorch* to be unloaded before Intel®
+Optimization for Horovod* at the end of the execution and triggers this error.</p></li>
+<li><p><strong>Solution</strong>: Do <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">intel_extension_for_pytorch</span></code> before <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">horovod.torch</span> <span class="pre">as</span> <span class="pre">hvd</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Number of dpcpp devices should be greater than zero.</p>
+<ul>
+<li><p><strong>Cause</strong>: If you use Intel® Extension for PyTorch* in a conda environment, you might encounter this error. Conda also ships the libstdc++.so dynamic library file that may conflict with the one shipped in the OS.</p></li>
+<li><p><strong>Solution</strong>: Export the <code class="docutils literal notranslate"><span class="pre">libstdc++.so</span></code> file path in the OS to an environment variable <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: <code class="docutils literal notranslate"><span class="pre">-997</span> <span class="pre">runtime</span> <span class="pre">error</span></code> when running some AI models on Intel® Arc™ Graphics family.</p>
+<ul>
+<li><p><strong>Cause</strong>:  Some of the <code class="docutils literal notranslate"><span class="pre">-997</span> <span class="pre">runtime</span> <span class="pre">error</span></code> are actually out-of-memory errors. As Intel® Arc™ Graphics GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
+Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as <code class="docutils literal notranslate"><span class="pre">-997</span> <span class="pre">runtime</span> <span class="pre">error</span></code> most likely. This is expected. Memory usage optimization is working in progress to allow Intel® Arc™ Graphics GPUs to support more AI models.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Building from source for Intel® Arc™ A-Series GPUs fails on WSL2 without any error thrown.</p>
+<ul>
+<li><p><strong>Cause</strong>: Your system probably does not have enough RAM, so Linux kernel’s Out-of-memory killer was invoked. You can verify this by running <code class="docutils literal notranslate"><span class="pre">dmesg</span></code> on bash (WSL2 terminal).</p></li>
+<li><p><strong>Solution</strong>: If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment
+variable <code class="docutils literal notranslate"><span class="pre">MAX_JOBS</span></code> (by default, it’s equal to the number of logical CPU cores. So, setting <code class="docutils literal notranslate"><span class="pre">MAX_JOBS</span></code> to 1 is a very conservative approach that would slow things down a lot).</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: Some workloads terminate with an error <code class="docutils literal notranslate"><span class="pre">CL_DEVICE_NOT_FOUND</span></code> after some time on WSL2.</p>
+<ul>
+<li><p><strong>Cause</strong>:  This issue is due to the <a class="reference external" href="https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay">TDR feature</a> on Windows.</p></li>
+<li><p><strong>Solution</strong>: Try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: RuntimeError: Can’t add devices across platforms to a single context. -33 (PI_ERROR_INVALID_DEVICE).</p>
+<ul>
+<li><p><strong>Cause</strong>: If you run Intel® Extension for PyTorch* in a Windows environment where Intel® discrete GPU and integrated GPU co-exist, and the integrated GPU is not supported by Intel® Extension for PyTorch* but is wrongly identified as the first GPU platform.</p></li>
+<li><p><strong>Solution</strong>: Disable the integrated GPU in your environment to work around. For long term, Intel® Graphics Driver will always enumerate the discrete GPU as the first device so that Intel® Extension for PyTorch* could provide the fastest device to end framework users in such co-exist scenario based on that.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: RuntimeError: Failed to load the backend extension: intel_extension_for_pytorch. You can disable extension auto-loading with TORCH_DEVICE_BACKEND_AUTOLOAD=0.</p>
+<ul>
+<li><p><strong>Cause</strong>: If you import any third party library such as Transformers before <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch</span></code>, and the third party library has dependency to torch and then implicitly autoloads intel_extension_for_pytorch, which introduces circle import.</p></li>
+<li><p><strong>Solution</strong>: Disable extension auto-loading with TORCH_DEVICE_BACKEND_AUTOLOAD=0.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="library-dependencies">
+<h2>Library Dependencies<a class="headerlink" href="#library-dependencies" title="Link to this heading"></a></h2>
+<ul>
+<li><p><strong>Problem</strong>: Cannot find oneMKL library when building Intel® Extension for PyTorch* without oneMKL.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_sycl
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_intel_ilp64
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_core
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_tbb_thread
+dpcpp:<span class="w"> </span>error:<span class="w"> </span>linker<span class="w"> </span><span class="nb">command</span><span class="w"> </span>failed<span class="w"> </span>with<span class="w"> </span><span class="nb">exit</span><span class="w"> </span>code<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="o">(</span>use<span class="w"> </span>-v<span class="w"> </span>to<span class="w"> </span>see<span class="w"> </span>invocation<span class="o">)</span>
+</pre></div>
+</div>
+<ul>
+<li><p><strong>Cause</strong>: When PyTorch* is built with oneMKL library and Intel® Extension for PyTorch* is built without MKL library, this linker issue may occur.</p></li>
+<li><p><strong>Solution</strong>: Resolve the issue by setting:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">USE_ONEMKL</span><span class="o">=</span>OFF
+<span class="nb">export</span><span class="w"> </span><span class="nv">MKL_DPCPP_ROOT</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/intel/oneapi/mkl/latest
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Then clean build Intel® Extension for PyTorch*.</p>
+</li>
+<li><p><strong>Problem</strong>: Undefined symbol: <code class="docutils literal notranslate"><span class="pre">mkl_lapack_dspevd</span></code>. Intel MKL FATAL ERROR: cannot load <code class="docutils literal notranslate"><span class="pre">libmkl_vml_avx512.so.2</span></code> or `libmkl_vml_def.so.2.</p>
+<ul>
+<li><p><strong>Cause</strong>: This issue may occur when Intel® Extension for PyTorch* is built with oneMKL library and PyTorch* is not build with any MKL library. The oneMKL kernel may run into CPU backend incorrectly
+and trigger this issue.</p></li>
+<li><p><strong>Solution</strong>: Resolve the issue by installing the oneMKL library from conda:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>install<span class="w"> </span>mkl
+conda<span class="w"> </span>install<span class="w"> </span>mkl-include
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Then clean build PyTorch*.</p>
+</li>
+<li><p><strong>Problem</strong>: OSError: <code class="docutils literal notranslate"><span class="pre">libmkl_intel_lp64.so.2</span></code>: cannot open shared object file: No such file or directory.</p>
+<ul>
+<li><p><strong>Cause</strong>: Wrong MKL library is used when multiple MKL libraries exist in system.</p></li>
+<li><p><strong>Solution</strong>: Preload oneMKL by:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_lp64.so.2:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_ilp64.so.2:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_gnu_thread.so.2:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_core.so.2:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_sycl.so.2
+</pre></div>
+</div>
+<p>If you continue seeing similar issues for other shared object files, add the corresponding files under <code class="docutils literal notranslate"><span class="pre">${MKL_DPCPP_ROOT}/lib/intel64/</span></code> by <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.</p>
+</li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: If you encounter issues related to MPI environment variable configuration when running distributed tasks.</p>
+<ul>
+<li><p><strong>Cause</strong>: MPI environment variable configuration not correct.</p></li>
+<li><p><strong>Solution</strong>: <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">deactivate</span></code> and then <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span></code> to activate the correct MPI environment variable automatically.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">deactivate</span>
+<span class="n">conda</span> <span class="n">activate</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: If you encounter issues Runtime error related to C++ compiler with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>. Runtime Error: Failed to find C++ compiler. Please specify via CXX environment variable.</p>
+<ul>
+<li><p><strong>Cause</strong>: Not install and activate DPC++/C++ Compiler correctly.</p></li>
+<li><p><strong>Solution</strong>: <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler-download.html">Install DPC++/C++ Compiler</a> and activate it by following commands.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest</span>
+<span class="nb">source</span><span class="w"> </span><span class="o">{</span>dpcpproot<span class="o">}</span>/env/vars.sh
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: LoweringException: ImportError: cannot import name ‘intel’ from ‘triton._C.libtriton’</p>
+<ul>
+<li><p><strong>Cause</strong>: Installing Triton causes pytorch-triton-xpu to stop working.</p></li>
+<li><p><strong>Solution</strong>: Resolve the issue with following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>triton
+<span class="c1"># If triton related packages are listed, remove them</span>
+pip<span class="w"> </span>uninstall<span class="w"> </span>triton
+pip<span class="w"> </span>uninstall<span class="w"> </span>pytorch-triton-xpu
+<span class="c1"># Reinstall correct version of pytorch-triton-xpu</span>
+pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>pytorch-triton-xpu<span class="o">==</span><span class="m">3</span>.1.0+91b14bf559<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/xpu
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: ERROR: can not install dpcpp-cpp-rt and torch==2.6.0 because these packages version has conflicting dependencies.</p>
+<ul>
+<li><p><strong>Cause</strong>: The intel-extension-for-pytorch v2.6.10+xpu uses Intel DPC++ Compiler 2025.0.4 to get a crucial bug fix in unified runtime, while torch v2.6.0+xpu is pinned with 2025.0.2, so we can not install PyTorch and intel-extension-for-pytorch in one pip installation command.</p></li>
+<li><p><strong>Solution</strong>: Install PyTorch and intel-extension-for-pytorch with seperate commands.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">torch</span> <span class="n">torchvision</span> <span class="n">torchaudio</span> <span class="o">--</span><span class="n">index</span><span class="o">-</span><span class="n">url</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">download</span><span class="o">.</span><span class="n">pytorch</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="n">whl</span><span class="o">/</span><span class="n">xpu</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">intel</span><span class="o">-</span><span class="n">extension</span><span class="o">-</span><span class="k">for</span><span class="o">-</span><span class="n">pytorch</span><span class="o">==</span><span class="mf">2.6.10</span><span class="o">+</span><span class="n">xpu</span> <span class="n">oneccl_bind_pt</span><span class="o">==</span><span class="mf">2.6.0</span><span class="o">+</span><span class="n">xpu</span> <span class="o">--</span><span class="n">extra</span><span class="o">-</span><span class="n">index</span><span class="o">-</span><span class="n">url</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">pytorch</span><span class="o">-</span><span class="n">extension</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">release</span><span class="o">-</span><span class="n">whl</span><span class="o">/</span><span class="n">stable</span><span class="o">/</span><span class="n">xpu</span><span class="o">/</span><span class="n">us</span><span class="o">/</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: ERROR: pip’s dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span> <span class="mf">2.6.0</span><span class="o">+</span><span class="n">xpu</span> <span class="n">requires</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lib</span><span class="o">-</span><span class="n">rt</span><span class="o">==</span><span class="mf">2025.0.2</span><span class="p">,</span> <span class="n">but</span> <span class="n">you</span> <span class="n">have</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lib</span><span class="o">-</span><span class="n">rt</span> <span class="mf">2025.0.4</span> <span class="n">which</span> <span class="ow">is</span> <span class="n">incompatible</span><span class="o">.</span>
+<span class="n">torch</span> <span class="mf">2.6.0</span><span class="o">+</span><span class="n">xpu</span> <span class="n">requires</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lib</span><span class="o">-</span><span class="n">ur</span><span class="o">==</span><span class="mf">2025.0.2</span><span class="p">,</span> <span class="n">but</span> <span class="n">you</span> <span class="n">have</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lib</span><span class="o">-</span><span class="n">ur</span> <span class="mf">2025.0.4</span> <span class="n">which</span> <span class="ow">is</span> <span class="n">incompatible</span><span class="o">.</span>
+<span class="n">torch</span> <span class="mf">2.6.0</span><span class="o">+</span><span class="n">xpu</span> <span class="n">requires</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lic</span><span class="o">-</span><span class="n">rt</span><span class="o">==</span><span class="mf">2025.0.2</span><span class="p">,</span> <span class="n">but</span> <span class="n">you</span> <span class="n">have</span> <span class="n">intel</span><span class="o">-</span><span class="n">cmplr</span><span class="o">-</span><span class="n">lic</span><span class="o">-</span><span class="n">rt</span> <span class="mf">2025.0.4</span> <span class="n">which</span> <span class="ow">is</span> <span class="n">incompatible</span><span class="o">.</span>
+<span class="n">torch</span> <span class="mf">2.6.0</span><span class="o">+</span><span class="n">xpu</span> <span class="n">requires</span> <span class="n">intel</span><span class="o">-</span><span class="n">sycl</span><span class="o">-</span><span class="n">rt</span><span class="o">==</span><span class="mf">2025.0.2</span><span class="p">,</span> <span class="n">but</span> <span class="n">you</span> <span class="n">have</span> <span class="n">intel</span><span class="o">-</span><span class="n">sycl</span><span class="o">-</span><span class="n">rt</span> <span class="mf">2025.0.4</span> <span class="n">which</span> <span class="ow">is</span> <span class="n">incompatible</span><span class="o">.</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Cause</strong>: The intel-extension-for-pytorch v2.6.10+xpu uses Intel DPC++ Compiler 2025.0.4 to get a crucial bug fix in unified runtime, while torch v2.6.0+xpu is pinned with 2025.0.2.</p></li>
+<li><p><strong>Solution</strong>: Ignore the Error since actually torch v2.6.0+xpu is compatible with Intel Compiler 2025.0.4.</p></li>
+</ul>
+</li>
+<li><p><strong>Problem</strong>: RuntimeError: oneCCL: ze_handle_manager.cpp:226 get_ptr: EXCEPTION: unknown memory type, when executing DLRMv2 BF16 training on 4 cards Intel® Data Center GPU Max platform.</p>
+<ul class="simple">
+<li><p><strong>Cause</strong>: Issue exists in the default sycl path of oneCCL 2021.14 which uses two IPC exchanges.</p></li>
+<li><p><strong>Solution</strong>: Use <code class="docutils literal notranslate"><span class="pre">export</span> <span class="pre">CCL_ATL_TRANSPORT=ofi</span></code> to work around.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="performance-issue">
+<h2>Performance Issue<a class="headerlink" href="#performance-issue" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Problem</strong>: Extended durations for data transfers from the host system to the device (H2D) and from the device back to the host system (D2H).</p>
+<ul>
+<li><p><strong>Cause</strong>: Absence of certain Dynamic Kernel Module Support (DKMS) packages on Ubuntu 22.04 or earlier versions.</p></li>
+<li><p><strong>Solution</strong>: For those running Ubuntu 22.04 or below, it’s crucial to follow all the recommended installation procedures, including those labeled as <a class="reference external" href="https://dgpu-docs.intel.com/driver/client/overview.html#optional-out-of-tree-kernel-mode-driver-install">optional</a>. These steps are likely necessary to install the missing DKMS packages and ensure your system is functioning optimally. The Kernel Mode Driver (KMD) package that addresses this issue has been integrated into the Linux kernel for Ubuntu 23.04 and subsequent releases.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="releases.html" class="btn btn-neutral float-left" title="Releases" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="license.html" class="btn btn-neutral float-right" title="License" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x71729f7441f0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a><a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a><a href='/#' data-wap_ref='dns' id='wap_dns'><small>| Your Privacy Choices</small><span style='height:10px;width:28px;display:inline-block;position:relative;'><svg style='position:absolute;width:28px;bottom:-2px;' version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 30 14' xml:space='preserve'><title>California Consumer Privacy Act (CCPA) Opt-Out Icon</title><style type='text/css'> .st0 { fill-rule: evenodd; clip-rule: evenodd; fill: #FFFFFF; } .st1 { fill-rule: evenodd; clip-rule: evenodd; fill: #0066FF; } .st2 { fill: #FFFFFF; } .st3 { fill: #0066FF; } </style><g><g id='final---dec.11-2020_1_'><g id='_x30_208-our-toggle_2_' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2_2_' transform='translate(1275.000000, 200.000000)'><path class='st0' d='M7.4,12.8h6.8l3.1-11.6H7.4C4.2,1.2,1.6,3.8,1.6,7S4.2,12.8,7.4,12.8z'></path></g></g></g><g id='final---dec.11-2020'><g id='_x30_208-our-toggle' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2' transform='translate(1275.000000, 200.000000)'><path class='st1' d='M22.6,0H7.4c-3.9,0-7,3.1-7,7s3.1,7,7,7h15.2c3.9,0,7-3.1,7-7S26.4,0,22.6,0z M1.6,7c0-3.2,2.6-5.8,5.8-5.8 h9.9l-3.1,11.6H7.4C4.2,12.8,1.6,10.2,1.6,7z'></path><path id='x' class='st2' d='M24.6,4c0.2,0.2,0.2,0.6,0,0.8l0,0L22.5,7l2.2,2.2c0.2,0.2,0.2,0.6,0,0.8c-0.2,0.2-0.6,0.2-0.8,0 l0,0l-2.2-2.2L19.5,10c-0.2,0.2-0.6,0.2-0.8,0c-0.2-0.2-0.2-0.6,0-0.8l0,0L20.8,7l-2.2-2.2c-0.2-0.2-0.2-0.6,0-0.8 c0.2-0.2,0.6-0.2,0.8,0l0,0l2.2,2.2L23.8,4C24,3.8,24.4,3.8,24.6,4z'></path><path id='y' class='st3' d='M12.7,4.1c0.2,0.2,0.3,0.6,0.1,0.8l0,0L8.6,9.8C8.5,9.9,8.4,10,8.3,10c-0.2,0.1-0.5,0.1-0.7-0.1l0,0 L5.4,7.7c-0.2-0.2-0.2-0.6,0-0.8c0.2-0.2,0.6-0.2,0.8,0l0,0L8,8.6l3.8-4.5C12,3.9,12.4,3.9,12.7,4.1z'></path></g></g></g></g></svg></span></a><a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref='nac' id='wap_nac'><small>| Notice at Collection</small></a></div><p></p><div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>.</div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
