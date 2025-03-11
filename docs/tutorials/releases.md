@@ -39,6 +39,7 @@ Intel® Extension for PyTorch\* v2.6.10+xpu is the new release which supports In
 ### Breaking Changes
 
 - Intel® Data Center GPU Flex Series support is being deprecated and will no longer be available starting from the release after v2.6.10+xpu.
+- Channels Last 1D support on XPU is being deprecated and will no longer be available starting from the release after v2.6.10+xpu.
 
 ### Known Issues
 
