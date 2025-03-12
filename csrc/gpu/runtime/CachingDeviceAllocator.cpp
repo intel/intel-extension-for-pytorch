@@ -18,9 +18,6 @@ constexpr size_t kSmallBuffer = 2097152;
 constexpr size_t kLargeBuffer = 20971520;
 constexpr size_t kMinLargeAlloc = 10485760;
 constexpr size_t kRoundLarge = 2097152;
-// Single allocation must be less than 4GB with stateful memory management in
-// underlying runtime.
-constexpr size_t kStatefulLimit = 4294967296;
 
 static std::string format_size(uint64_t size) {
   std::ostringstream os;
@@ -177,29 +174,6 @@ void CachingDeviceAllocator::malloc(
   auto size = (asize < kMinBlockSize)
       ? kMinBlockSize
       : (kMinBlockSize * ((asize + kMinBlockSize - 1) / kMinBlockSize));
-
-  if ((!Settings::I().has_2d_block_array(curDevID)) &&
-      (asize > kStatefulLimit)) {
-    size_t device_total = dpcppGlobalMemSize(curDevID);
-    DeviceStats& stats = get_stats_for_device(curDevID);
-    TORCH_CHECK(
-        false,
-        "Current platform can NOT allocate memory block with size larger than 4GB! Tried to allocate ",
-        format_size(asize),
-        " (GPU  ",
-        (int)curDevID,
-        "; ",
-        format_size(device_total),
-        " total capacity; ",
-        format_size(
-            stats.allocated_bytes[static_cast<size_t>(StatType::AGGREGATE)]
-                .current),
-        " already allocated; ",
-        format_size(
-            stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)]
-                .current),
-        " reserved in total by PyTorch)");
-  }
 
   BlockPool* pool = nullptr;
   PrivatePool* private_pool = nullptr;

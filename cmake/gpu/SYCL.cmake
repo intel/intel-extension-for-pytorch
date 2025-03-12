@@ -184,6 +184,9 @@ set(IPEX_OFFLINE_OPTIONS "${IPEX_OFFLINE_OPTIONS} -cl-intel-enable-auto-large-GR
 # data type operations, and finish/return WITHOUT any computations.
 set(IPEX_OFFLINE_OPTIONS "${IPEX_OFFLINE_OPTIONS} -cl-poison-unsupported-fp64-kernels")
 
+# If the kernel requires more than 4GB buffer, this option is required.
+set(IPEX_OFFLINE_OPTIONS "${IPEX_OFFLINE_OPTIONS} -cl-intel-greater-than-4GB-buffer-required")
+
 set(IPEX_OFFLINE_OPTIONS "-options '${IPEX_OFFLINE_OPTIONS}'")
 
 # Set AOT targt list in offline options
