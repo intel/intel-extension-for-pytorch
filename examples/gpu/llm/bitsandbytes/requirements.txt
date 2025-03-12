@@ -1,0 +1,4 @@
+transformers==v4.48.3
+tf-keras
+accelerate==1.1.1
+peft==0.14.0

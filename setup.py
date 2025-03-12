@@ -280,11 +280,15 @@ def get_cpack_command():
 
 
 def get_ipex_git_head_sha(base_dir):
-    ipex_git_sha = (
-        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=base_dir)
-        .decode("ascii")
-        .strip()
-    )
+    ipex_git_sha = "N/A"
+    try:
+        ipex_git_sha = (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=base_dir)
+            .decode("ascii")
+            .strip()
+        )
+    except Exception:
+        pass
     return ipex_git_sha
 
 
@@ -312,14 +316,17 @@ def get_torch_git_head_sha():
 def get_submodule_commit(base_dir, submodule_dir):
     if not os.path.isdir(submodule_dir):
         return ""
-    return (
-        subprocess.check_output(
-            ["git", "submodule", "status", submodule_dir], cwd=base_dir
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "submodule", "status", submodule_dir], cwd=base_dir
+            )
+            .decode("ascii")
+            .strip()
+            .split()[0]
         )
-        .decode("ascii")
-        .strip()
-        .split()[0]
-    )
+    except Exception:
+        return "N/A"
 
 
 def get_build_version(ipex_git_sha):

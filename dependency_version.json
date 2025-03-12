@@ -19,12 +19,12 @@
     "commit": "v0.21.0"
   },
   "torch-ccl": {
-    "version": "2.5.0+xpu",
-    "commit": "v2.5.0+xpu"
+    "version": "2.6.0+xpu",
+    "commit": "v2.6.0+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "version": "2025.0.4"
+      "version": "2025.0"
     },
     "mkl-dpcpp": {
       "version": "2025.0.1"

@@ -12,29 +12,6 @@ Accuracy_lmeval_gpt-j-6b() {
     mv log_acc ${dir}
 }
 
-
-## Llama-7b
-Accuracy_lmeval_llama-7b() {
-    model=decapoda-research/llama-7b-hf
-    sub_model_name=llama-7b
-    dir=accuracy/${model}/task${task}
-    mkdir -p ${dir}
-    LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1 | tee log_acc
-    mv log_acc ${dir}
-}
-
-
-## Llama-13b
-Accuracy_lmeval_llama-13b() {
-    model=decapoda-research/llama-13b-hf
-    sub_model_name=llama-13b
-    dir=accuracy/${model}/task${task}
-    mkdir -p ${dir}
-    LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --sub-model-name ${sub_model_name} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1 | tee log_acc
-    mv log_acc ${dir}
-}
-
-
 ## Llama2-7b
 Accuracy_lmeval_llama2-7b() {
     model=meta-llama/Llama-2-7b-hf
@@ -84,8 +61,6 @@ main() {
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
 
     Accuracy_lmeval_gpt-j-6b
-    Accuracy_lmeval_llama-7b
-    Accuracy_lmeval_llama-13b
     Accuracy_lmeval_llama2-7b
     Accuracy_lmeval_llama2-13b
     Accuracy_lmeval_opt-6.7b

@@ -13,3 +13,5 @@ bitsandbytes
 transformers==4.48.3
 transformers_stream_generator
 einops
+hjson
+msgpack
