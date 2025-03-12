@@ -210,7 +210,7 @@ Large Language Models (LLMs) have shown remarkable performance in various natura
 
 However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements. 
 
-To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WoQ), which only quantizes the weights statically. WoQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WoQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
+To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/neural-compressor/blob/master/docs/source/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WoQ), which only quantizes the weights statically. WoQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WoQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
 
 For more detailed information, check `WoQ INT4 <llm/int4_weight_only_quantization.html>`_.
 

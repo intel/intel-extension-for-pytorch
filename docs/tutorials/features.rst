@@ -103,7 +103,7 @@ The default settings for Intel® Extension for PyTorch* are sufficient for most 
 
 For more detailed information, check `Advanced Configuration <features/advanced_configuration.md>`_.
 
-A driver environment variable `ZE_FLAT_DEVICE_HIERARCHY` is currently used to select the device hierarchy model with which the underlying hardware is exposed. By default, each GPU tile is used as a device. Check the `Level Zero Specification Documentation <https://spec.oneapi.io/level-zero/latest/core/PROG.html#environment-variables>`_ for more details.
+A driver environment variable `ZE_FLAT_DEVICE_HIERARCHY` is currently used to select the device hierarchy model with which the underlying hardware is exposed. By default, each GPU tile is used as a device. Check the `Level Zero Specification Documentation <https://oneapi-src.github.io/level-zero-spec/level-zero/latest/core/PROG.html#environment-variables>`_ for more details.
 
 .. toctree::
    :hidden:

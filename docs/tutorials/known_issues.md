@@ -11,17 +11,8 @@ Troubleshooting
     Optimization for Horovod\* at the end of the execution and triggers this error.
   - **Solution**: Do `import intel_extension_for_pytorch` before `import horovod.torch as hvd`.
 - **Problem**: Number of dpcpp devices should be greater than zero.
-  - **Cause**: If you use Intel® Extension for PyTorch\* in a conda environment, you might encounter this error. Conda also ships the libstdc++.so dynamic library file that may conflict with the one shipped
-    in the OS.
+  - **Cause**: If you use Intel® Extension for PyTorch\* in a conda environment, you might encounter this error. Conda also ships the libstdc++.so dynamic library file that may conflict with the one shipped in the OS.
   - **Solution**: Export the `libstdc++.so` file path in the OS to an environment variable `LD_PRELOAD`.
-- **Problem**: Symbol undefined caused by `_GLIBCXX_USE_CXX11_ABI`.
-    ```bash
-    ImportError: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
-    ```
-  - **Cause**: Intel® Extension for PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is
-    compiled with `_GLIBCXX_USE_CXX11_ABI=0`.
-  - **Solution**: Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels
-    in [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/us/) to avoid this issue.
 - **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ Graphics family.
   - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ Graphics GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
     Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is working in progress to allow Intel® Arc™ Graphics GPUs to support more AI models.
@@ -32,6 +23,12 @@ Troubleshooting
 - **Problem**: Some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time on WSL2.
   - **Cause**:  This issue is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) on Windows.
   - **Solution**: Try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
+- **Problem**: RuntimeError: Can't add devices across platforms to a single context. -33 (PI_ERROR_INVALID_DEVICE).
+  - **Cause**: If you run Intel® Extension for PyTorch\* in a Windows environment where Intel® discrete GPU and integrated GPU co-exist, and the integrated GPU is not supported by Intel® Extension for PyTorch\* but is wrongly identified as the first GPU platform.
+  - **Solution**: Disable the integrated GPU in your environment to work around. For long term, Intel® Graphics Driver will always enumerate the discrete GPU as the first device so that Intel® Extension for PyTorch\* could provide the fastest device to end framework users in such co-exist scenario based on that.
+- **Problem**: RuntimeError: Failed to load the backend extension: intel_extension_for_pytorch. You can disable extension auto-loading with TORCH_DEVICE_BACKEND_AUTOLOAD=0.
+  - **Cause**: If you import any third party library such as Transformers before `import torch`, and the third party library has dependency to torch and then implicitly autoloads intel_extension_for_pytorch, which introduces circle import.
+  - **Solution**: Disable extension auto-loading with TORCH_DEVICE_BACKEND_AUTOLOAD=0.
 
 ## Library Dependencies
 
@@ -95,15 +92,6 @@ Troubleshooting
     source {dpcpproot}/env/vars.sh
     ```
 
-- **Problem**: RuntimeError: Cannot find a working triton installation. Either the package is not installed or it is too old. More information on installing Triton can be found at https://github.com/openai/triton
-  - **Cause**: No pytorch-triton-xpu installed
-  - **Solution**: Resolve the issue with following command:
-
-    ```bash
-    # Install correct version of pytorch-triton-xpu
-    pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
-    ```
-
 - **Problem**: LoweringException: ImportError: cannot import name 'intel' from 'triton._C.libtriton'
   - **Cause**: Installing Triton causes pytorch-triton-xpu to stop working.
   - **Solution**: Resolve the issue with following command:
@@ -116,6 +104,30 @@ Troubleshooting
     # Reinstall correct version of pytorch-triton-xpu
     pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
     ```
+
+- **Problem**: ERROR: can not install dpcpp-cpp-rt and torch==2.6.0 because these packages version has conflicting dependencies.
+  - **Cause**: The intel-extension-for-pytorch v2.6.10+xpu uses Intel DPC++ Compiler 2025.0.4 to get a crucial bug fix in unified runtime, while torch v2.6.0+xpu is pinned with 2025.0.2, so we can not install PyTorch and intel-extension-for-pytorch in one pip installation command.
+  - **Solution**: Install PyTorch and intel-extension-for-pytorch with seperate commands.
+    ```
+    python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/xpu
+    python -m pip install intel-extension-for-pytorch==2.6.10+xpu oneccl_bind_pt==2.6.0+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+    ```
+    
+- **Problem**: ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+
+  ```
+  torch 2.6.0+xpu requires intel-cmplr-lib-rt==2025.0.2, but you have intel-cmplr-lib-rt 2025.0.4 which is incompatible.
+  torch 2.6.0+xpu requires intel-cmplr-lib-ur==2025.0.2, but you have intel-cmplr-lib-ur 2025.0.4 which is incompatible.
+  torch 2.6.0+xpu requires intel-cmplr-lic-rt==2025.0.2, but you have intel-cmplr-lic-rt 2025.0.4 which is incompatible.
+  torch 2.6.0+xpu requires intel-sycl-rt==2025.0.2, but you have intel-sycl-rt 2025.0.4 which is incompatible.
+  ```
+  
+  - **Cause**: The intel-extension-for-pytorch v2.6.10+xpu uses Intel DPC++ Compiler 2025.0.4 to get a crucial bug fix in unified runtime, while torch v2.6.0+xpu is pinned with 2025.0.2.
+  - **Solution**: Ignore the Error since actually torch v2.6.0+xpu is compatible with Intel Compiler 2025.0.4.
+
+- **Problem**: RuntimeError: oneCCL: ze_handle_manager.cpp:226 get_ptr: EXCEPTION: unknown memory type, when executing DLRMv2 BF16 training on 4 cards Intel® Data Center GPU Max platform. 
+  - **Cause**: Issue exists in the default sycl path of oneCCL 2021.14 which uses two IPC exchanges. 
+  - **Solution**: Use `export CCL_ATL_TRANSPORT=ofi` to work around. 
 
 ## Performance Issue
 

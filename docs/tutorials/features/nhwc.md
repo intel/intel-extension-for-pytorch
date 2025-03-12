@@ -195,7 +195,9 @@ auto src_mem = memory(src_md, src_data_ptr, engine);
 * **NCHW** - create `memory::desc` with *any* card for 'input', 'output' and 'weight'; query proposed `memory::desc` from convolution primitive;
 * **NHWC** - create `memory::desc` with `format_tag::nhwc` for 'input' and 'output', use *any* for 'weight'; if we use `hwio` for 'weight' convolution primitive will be created with gemm rather jit avx512.
 
-## Channels Last 1D support on XPU
+## Channels Last 1D support on XPU (Deprecated)
+
+**Note:** Channels Last 1D support on XPU APIs `torch.xpu.to_channels_last_1d()` and `torch.xpu.is_contiguous_channels_last_1d()` will be deprecated in future releases.
 
 Both stock PyTorch and Intel® Extension for PyTorch\* support Channels Last(2D) and Channels Last 3D, however, regarding Channels Last 1D, they are different. Stock PyTorch doesn't support Channels Last 1D, while XPU could supply limited support for Channels Last 1D.
 We only support Channels Last 1D memory format in these operators: Conv1D, BatchNorm1D, MaxPool1D, Concat, binary add, binary div, upsample linear and upsample nearest.

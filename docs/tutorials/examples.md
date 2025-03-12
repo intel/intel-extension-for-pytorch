@@ -299,4 +299,4 @@ Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users 
 
 ## Intel® AI Reference Models
 
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/v3.1.1) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [Use Cases](https://github.com/IntelAI/models/tree/v3.1.1?tab=readme-ov-file#use-cases) section. Models verified on Intel GPUs are marked in the `Model Documentation` column. You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [Use Cases](https://github.com/IntelAI/models/tree/v3.1.1?tab=readme-ov-file#use-cases) section. Models verified on Intel GPUs are marked in the `Model Documentation` column. You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.

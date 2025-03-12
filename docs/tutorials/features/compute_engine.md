@@ -5,7 +5,7 @@ Compute Engine (Experimental feature for debug)
 
 Compute engine provides the capacity to choose specific backend for operators with multiple implementations. For example, with compute engine set, we can prefer to using SYCL than oneDNN implementation for concatenation. The feature can help user to customize model forward behavior for better performance or special requirement.
 
-We currently support 5 compute engines, namely, `RECOMMEND`, `BASIC`, `ONEDNN`, `ONEMKL`, `XETLA`. Each op with multiple implementations has a recommend one based on our empirical experience. The `RECOMMEND` engine would guarantee performance on most shape input ideally.  `BASIC` engines refers to SYCL implementation. `ONEDNN`, `ONEMKL`, `XETLA` refers to optimized implementation provided by library [Intel® oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), [Intel® oneAPI Math Kernel Library (oneMKL)](https://github.com/oneapi-src/oneMKL) and [Intel® Xe Templates for Linear Algebra](https://github.com/intel/xetla).
+We currently support 5 compute engines, namely, `RECOMMEND`, `BASIC`, `ONEDNN`, `ONEMKL`, `XETLA`. Each op with multiple implementations has a recommend one based on our empirical experience. The `RECOMMEND` engine would guarantee performance on most shape input ideally.  `BASIC` engines refers to SYCL implementation. `ONEDNN`, `ONEMKL` refers to optimized implementation provided by library [Intel® oneAPI Deep Neural Network Library (oneDNN)](https://github.com/oneapi-src/oneDNN), [Intel® oneAPI Math Kernel Library (oneMKL)](https://github.com/oneapi-src/oneMKL).
 
 ## Use Case
 

@@ -1,6 +1,50 @@
 Releases
 =============
 
+## 2.6.10+xpu
+
+Intel® Extension for PyTorch\* v2.6.10+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Max Series, Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 Mobile Processors and Intel® Data Center GPU Flex Series) based on PyTorch* 2.6.0.
+
+### Highlights
+
+- Intel® oneDNN v3.7 integration
+- Official PyTorch 2.6 prebuilt binaries support
+
+  Starting this release, Intel® Extension for PyTorch\* supports official PyTorch prebuilt binaries, as they are built with `_GLIBCXX_USE_CXX11_ABI=1` since PyTorch\* 2.6 and hence ABI compatible with Intel® Extension for PyTorch\* prebuilt binaries which are always built with `_GLIBCXX_USE_CXX11_ABI=1`.
+  
+- Large Language Model (LLM) optimization
+
+  Intel® Extension for PyTorch\* provides support for a variety of custom kernels, which include commonly used kernel fusion techniques, such as `rms_norm` and `rotary_embedding`, as well as attention-related kernels like `paged_attention` and `chunked_prefill`, and `punica` kernel for serving multiple LoRA finetuned LLM. It also provides the MoE (Mixture of Experts) custom kernels including `topk_softmax`, `moe_gemm`, `moe_scatter`, `moe_gather`, etc. These optimizations enhance the functionality and efficiency of the ecosystem on Intel® GPU platform by improving the execution of key operations.
+
+  Besides that, Intel® Extension for PyTorch\* optimizes more LLM models for inference and finetuning, such as Phi3-vision-128k, phi3-small-128k, llama3.2-11B-vision, etc. A full list of optimized models can be found at [LLM Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html).
+
+- Serving framework support
+  
+  Intel® Extension for PyTorch\* offers extensive support for various ecosystems, including [vLLM](https://github.com/vllm-project/vllm) and [TGI](https://github.com/huggingface/text-generation-inference), with the goal of enhancing performance and flexibility for LLM workloads on Intel® GPU platforms (intensively verified on Intel® Data Center GPU Max Series and Intel® Arc™ B-Series graphics on Linux). The vLLM/TGI features like chunked prefill, MoE (Mixture of Experts) etc. are supported by the backend kernels provided in Intel® Extension for PyTorch*. The support to low precision such as Weight Only Quantization (WOQ) INT4 is also enhanced in this release:
+  -  The performance of INT4 GEMM kernel based on Generalized Post-Training Quantization (GPTQ) algorithm has been improved by approximately 1.3× compared with previous release. During the prefill stage, it achieves similar performance to FP16, while in the decode stage, it outperforms FP16 by approximately 1.5×.
+  -  The support of Activation-aware Weight Quantization (AWQ) algorithm is added and the performance is on par with GPTQ without g_idx.
+  
+- [Prototype] NF4 QLoRA finetuning using BitsAndBytes
+
+  Intel® Extension for PyTorch\* now supports QLoRA finetuning with BitsAndBytes on Intel® GPU platforms. It enables efficient adaptation of LLMs using NF4 4-bit quantization with LoRA, reducing memory usage while maintaining accuracy.
+
+- [Beta] Intel® Core™ Ultra Series 2 Mobile Processors support on Windows
+
+  Intel® Extension for PyTorch\* provides beta quality support of Intel® Core™ Ultra Series 2 Mobile Processors (codename Arrow Lake-H) on Windows in this release, based on redistributed PyTorch 2.6 prebuilt binaries with additional AOT compilation target for Arrow Lake-H in the [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/us/).
+  
+- Hybrid ATen operator implementation
+  
+  Intel® Extension for PyTorch\* uses ATen operators available in [Torch XPU Operators](https://github.com/intel/torch-xpu-ops) as much as possible and overrides very limited operators for better performance and broad data type support.
+
+### Breaking Changes
+
+- Intel® Data Center GPU Flex Series support is being deprecated and will no longer be available starting from the release after v2.6.10+xpu.
+- Channels Last 1D support on XPU is being deprecated and will no longer be available starting from the release after v2.6.10+xpu.
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.5.10+xpu
 
 Intel® Extension for PyTorch\* v2.5.10+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Max Series, Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics and Intel® Data Center GPU Flex Series) based on PyTorch* 2.5.1.
