@@ -8,17 +8,15 @@
 #include <ATen/native/TensorIterator.h>
 #include <ATen/ops/from_blob.h>
 #include <ATen/xpu/XPUContext.h>
+
 #include "aten/operators/torch-xpu-ops/comm/SYCLContext.h"
 #include "aten/operators/torch-xpu-ops/comm/XPUMathCompat.h"
 #include "aten/operators/torch-xpu-ops/comm/xpu_aten.h"
+#include "aten/operators/torch-xpu-ops/sycl/BatchNormKernels.h"
 #include "aten/operators/torch-xpu-ops/sycl/Loops.h"
 #include "aten/operators/torch-xpu-ops/sycl/Reduce.h"
 #include "aten/operators/torch-xpu-ops/sycl/ResizeKernel.h"
 #include "aten/operators/torch-xpu-ops/sycl/WelfordNorm.h"
-
-#include "aten/operators/ReduceOpStdVar.h"
-
-#include "aten/operators/torch-xpu-ops/sycl/BatchNormKernels.h"
 
 namespace at {
 namespace native {

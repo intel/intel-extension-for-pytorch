@@ -14,7 +14,6 @@
 #include "BitonicMergeSort.h"
 #include "Loops.h"
 #include "PSTLFunctions.h"
-#include "ReduceOpStdVar.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
@@ -139,16 +138,6 @@ Tensor empty_strided(
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
   return AtenIpexTypeXPU::impl::empty_strided_dpcpp(size, stride, options);
-}
-
-Tensor& std_out(
-    const at::Tensor& self,
-    at::OptionalIntArrayRef _dim,
-    const c10::optional<at::Scalar>& _correction,
-    bool keepdim,
-    Tensor& out) {
-  return at::AtenIpexTypeXPU::std_var_out(
-      "std", out, self, _dim, _correction, keepdim, true);
 }
 
 } // namespace AtenIpexTypeXPU
