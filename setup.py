@@ -283,7 +283,9 @@ def get_ipex_git_head_sha(base_dir):
     ipex_git_sha = "N/A"
     try:
         ipex_git_sha = (
-            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=base_dir)
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], cwd=base_dir
+            )
             .decode("ascii")
             .strip()
         )
