@@ -7,7 +7,7 @@ Large Language Models (LLMs) have shown remarkable performance in various natura
 
 However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements. 
 
-To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike [normal quantization](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md), such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WOQ), which only quantizes the weights statically. WOQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WOQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
+To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike [normal quantization](https://github.com/intel/neural-compressor/blob/master/docs/source/quantization.md), such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WOQ), which only quantizes the weights statically. WOQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WOQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
 
 ## Supported Framework Model Matrix
 
@@ -128,14 +128,12 @@ After the policy is selected, Intel® Extension for PyTorch\* will use `HGEMM_IN
 Intel® Extension for PyTorch\* implements Weight-Only Quantization for Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics with Intel® Extension for Transformers\*. Below section uses Qwen-7B to demonstrate the detailed usage.
 
 ### Environment Setup
-Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup).
+
+Please refer to the [env setup](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.10%2Bxpu/examples/gpu/llm/inference/README.md).
+
+Example can be found at [Learn WOQ](https://github.com/intel/intel-extension-for-pytorch/tree/v2.6.10%2Bxpu/examples/gpu/llm/inference#learn-to-quantize-llm-and-run-inference).
 
 ### Run Weight-Only Quantization LLM on Intel® GPU
-#### Install Neural-compressor
-
-```python
-pip install neural-compressor
-```
 
 #### Quantize Model and Inference
 
@@ -183,7 +181,8 @@ output = loaded_model.generate(inputs)
 
 ```
 
-#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/examples/gpu/inference/python/llm/run_benchmark_woq.sh)
+
+#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.10%2Bxpu/examples/gpu/llm/inference/run_benchmark_woq.sh)
 
 ```python
 bash run_benchmark_woq.sh

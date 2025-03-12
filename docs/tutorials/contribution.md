@@ -88,7 +88,7 @@ If you want to reinstall, make sure that you uninstall Intel® Extension for PyT
 
 All Python test suites are located in the `tests/gpu` folder and start with `test_`. Run individual test suites using the command `python tests/gpu/${Sub_Folder}/FILENAME.py`, where `FILENAME` represents the file containing the test suite you wish to run and `${Sub_Folder}` is one of the following folders:
 - examples: unit tests created during op development
-- experimental: ported [test suites](https://github.com/pytorch/pytorch/tree/v1.10.0/test) from Stock PyTorch 1.10
+- experimental: ported [test suites](https://github.com/pytorch/pytorch/tree/main/test) from Stock PyTorch.
 - regression: unit tests created during bug fix to avoid future regression
 
 ### Better local unit tests with `pytest`
