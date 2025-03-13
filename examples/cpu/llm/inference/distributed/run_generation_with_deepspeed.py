@@ -389,6 +389,14 @@ elif args.kv_cache_dtype == "fp8_e5m2":
     kv_cache_dtype = torch.float8_e5m2
 config.kv_cache_dtype = kv_cache_dtype
 
+# For DeepSeek models
+if not args.ipex_weight_only_quantization and args.ipex and args.dtype == "bfloat16":
+    config.use_fused_moe = True
+    config.use_fused_moe_woq = False
+if args.ipex_weight_only_quantization and args.weight_dtype == "INT8":
+    config.use_fused_moe = True
+    config.use_fused_moe_woq = True
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:

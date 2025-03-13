@@ -11,6 +11,48 @@ from ...cpu.fusions.linear_fusion import (
 )
 
 
+def woq_quant_and_pack(weight, group_size):
+    from intel_extension_for_pytorch.quantization import (
+        WoqWeightDtype,
+        WoqLowpMode,
+        WoqActQuantMode,
+        quantize_per_channel,
+        quantize_per_block,
+    )
+
+    dtype = WoqWeightDtype.INT8
+    assert group_size == -1, "current fused MOE WOQ only support group size = -1"
+    if group_size == -1:
+        qweight, scales, zero_points = quantize_per_channel(
+            weight, dtype, None, None, False
+        )
+    else:
+        qweight, scales, zero_points = quantize_per_block(
+            weight, dtype, group_size, None, None, False
+        )
+
+    _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
+        qweight,
+        dtype,
+        [weight.shape[0], weight.shape[1]],
+        scales,
+        zero_points,
+        None,  # bias
+        None,  # g_idx
+        None,  # batch size
+        group_size,
+        WoqLowpMode.BF16,  # lowp-mode
+        WoqActQuantMode.NONE,  # act_quant_mode
+        False,  # cache_weight_for_large_batch
+    )
+    # qweight: {N/block_n, K/block_k, block_k, block_n}
+    return (
+        _op_context.get_weight(),
+        _op_context.get_scales(),
+        _op_context.get_zero_points(),
+    )
+
+
 class _IPEXDecoderLayerCPU(nn.Module):
     def __init__(self, module, config, tpp=False, woq=False):
         super().__init__()
@@ -149,56 +191,238 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 "DeepseekV3ForCausalLM",
             ]:
                 if hasattr(self.mlp, "experts"):
-                    # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
-                    self.moe_linear_type = 0
-                    if self.mlp.experts[0].gate_proj.weight.dtype in [
-                        torch.qint8,
-                        torch.int8,
-                        torch.uint8,
-                        torch.float8_e4m3fn,
-                    ]:
-                        self.moe_linear_type = 4
-                    elif (
-                        hasattr(self.mlp.experts[0].gate_proj, "use_tpp")
-                        and self.mlp.experts[0].gate_proj.use_tpp
-                    ):
-                        if not self.mlp.experts[0].gate_proj.tpp_fallback:
-                            self.moe_linear_type = 1
-                    elif hasattr(self.mlp.experts[0].gate_proj, "use_dnnl"):
-                        if self.mlp.experts[0].gate_proj.use_dnnl:
-                            self.moe_linear_type = 2
-                        else:
-                            self.moe_linear_type = 3
-                    self.gate_weights = []
-                    self.up_weights = []
-                    self.down_weights = []
-                    self.gate_ctx = []
-                    self.up_ctx = []
-                    self.down_ctx = []
-                    offset = self.mlp.ep_rank * self.mlp.experts_per_rank
-                    for expert_idx in range(len(self.mlp.experts)):
-                        expert_layer = self.mlp.experts[expert_idx + offset]
-                        if self.moe_linear_type in [0, 1]:
-                            self.gate_weights.append(expert_layer.gate_proj.weight)
-                            self.up_weights.append(expert_layer.up_proj.weight)
-                            self.down_weights.append(expert_layer.down_proj.weight)
-                        elif self.moe_linear_type in [2, 3]:
-                            self.gate_weights.append(
-                                expert_layer.gate_proj._get_forward_weight()
+                    if self.deepseek_lowbit_load:
+                        w13_qweight_list = []
+                        w13_scale_list = []
+                        w13_zp_list = []
+                        w2_qweight_list = []
+                        w2_scale_list = []
+                        w2_zp_list = []
+                        group_size = -1
+                        dtype = torch.bfloat16
+                        from intel_extension_for_pytorch.quantization._quantize_utils import (
+                            dequantize_per_channel,
+                            dequantize_per_block
+                        )
+                        for idx in range(config.n_routed_experts):
+                            moe_gate_proj = module.mlp.experts[idx].gate_proj._op_context.to_public(
+                                module.mlp.experts[idx].gate_proj._op_context.get_weight()
                             )
-                            self.up_weights.append(
-                                expert_layer.up_proj._get_forward_weight()
+                            if module.mlp.experts[idx].gate_proj._group_size > 1:
+                                moe_gate_proj = dequantize_per_block(
+                                    moe_gate_proj,
+                                    module.mlp.experts[idx].gate_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].gate_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].gate_proj.dtype,
+                                    module.mlp.experts[idx].gate_proj._group_size,
+                                )
+                            else:
+                                moe_gate_proj = dequantize_per_channel(
+                                    moe_gate_proj,
+                                    module.mlp.experts[idx].gate_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].gate_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].gate_proj.dtype,
+                                )
+                            del self.__dict__["_modules"]["mlp"].experts[idx].gate_proj    
+                            moe_gate_proj = moe_gate_proj.bfloat16()
+
+                            moe_up_proj = module.mlp.experts[idx].up_proj._op_context.to_public(
+                                module.mlp.experts[idx].up_proj._op_context.get_weight()
                             )
-                            self.down_weights.append(
-                                expert_layer.down_proj._get_forward_weight()
+                            if module.mlp.experts[idx].up_proj._group_size > 1:
+                                moe_up_proj = dequantize_per_block(
+                                    moe_gate_proj,
+                                    module.mlp.experts[idx].up_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].up_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].up_proj.dtype,
+                                    module.mlp.experts[idx].up_proj._group_size,
+                                )
+                            else:
+                                moe_up_proj = dequantize_per_channel(
+                                    moe_up_proj,
+                                    module.mlp.experts[idx].up_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].up_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].up_proj.dtype,
+                                )
+                            del self.__dict__["_modules"]["mlp"].experts[idx].up_proj
+                            moe_up_proj = moe_up_proj.bfloat16()
+                            weights_list = [
+                                moe_gate_proj,
+                                moe_up_proj,
+                            ]
+                            concat_weight = torch.concat(weights_list, 0)
+                            w13_qweight, w13_scale, w13_zp = woq_quant_and_pack(
+                                concat_weight, group_size
                             )
-                            self.gate_ctx.append(expert_layer.gate_proj.ctx)
-                            self.up_ctx.append(expert_layer.up_proj.ctx)
-                            self.down_ctx.append(expert_layer.down_proj.ctx)
-                        else:
-                            self.gate_ctx.append(expert_layer.gate_proj._op_context)
-                            self.up_ctx.append(expert_layer.up_proj._op_context)
-                            self.down_ctx.append(expert_layer.down_proj._op_context)
+                            w13_qweight_list.append(w13_qweight)
+                            w13_scale_list.append(w13_scale)
+                            w13_zp_list.append(w13_zp)
+                            
+
+                            moe_down_proj = module.mlp.experts[idx].down_proj._op_context.to_public(
+                                module.mlp.experts[idx].down_proj._op_context.get_weight()
+                            )
+                            if module.mlp.experts[idx].down_proj._group_size > 1:
+                                moe_down_proj = dequantize_per_block(
+                                    moe_down_proj,
+                                    module.mlp.experts[idx].down_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].down_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].down_proj.dtype,
+                                    module.mlp.experts[idx].down_proj._group_size,
+                                )
+                            else:
+                                moe_down_proj = dequantize_per_channel(
+                                    moe_down_proj,
+                                    module.mlp.experts[idx].down_proj._op_context.get_scales(),
+                                    module.mlp.experts[idx].down_proj._op_context.get_zero_points(),
+                                    module.mlp.experts[idx].down_proj.dtype,
+                                )
+                            del self.__dict__["_modules"]["mlp"].experts[idx].down_proj
+                            moe_down_proj = moe_down_proj.bfloat16()
+                            w2_qweight, w2_scale, w2_zp = woq_quant_and_pack(
+                                moe_down_proj, group_size
+                            )
+                            w2_qweight_list.append(w2_qweight)
+                            w2_scale_list.append(w2_scale)
+                            w2_zp_list.append(w2_zp)
+
+                        self.w13_weight = torch.stack(w13_qweight_list).detach()
+                        self.w13_scale = (
+                            torch.stack(w13_scale_list).detach().to(dtype)
+                        )
+                        self.w13_zp = (
+                            torch.stack(w13_zp_list).detach().to(dtype)
+                        )
+                        self.w2_weight = torch.stack(w2_qweight_list).detach()
+                        self.w2_scale = (
+                            torch.stack(w2_scale_list).detach().to(dtype)
+                        )
+                        self.w2_zp = torch.stack(w2_zp_list).detach().to(dtype)
+
+                        print("[INFO] Using fused MOE WOQ INT8 lowbit weights path...")
+                    else:
+                        if (
+                            self.use_fused_moe or self.use_fused_moe_woq
+                        ) and self.mlp.experts[0].w13_weight.device.type != "meta":
+                            dtype = self.mlp.experts[0].w13_weight.dtype
+                            if not self.use_fused_moe_woq:
+                                w13_weight = torch.stack(
+                                    [
+                                        self.mlp.experts[idx].w13_weight
+                                        for idx in range(len(self.mlp.experts))
+                                    ]
+                                ).detach()
+                                self.w13_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed(w13_weight)
+                                )
+                                for idx in range(len(self.mlp.experts)):
+                                    del self.mlp.experts[idx].w13_weight
+                                w2_weight = torch.stack(
+                                    [
+                                        self.mlp.experts[idx].w2_weight
+                                        for idx in range(len(self.mlp.experts))
+                                    ]
+                                ).detach()
+                                self.w2_weight = torch.ops.torch_ipex.convert_weight_packed(
+                                    w2_weight
+                                )
+                                for idx in range(len(self.mlp.experts)):
+                                    del self.mlp.experts[idx].w2_weight
+                                # dummy scale/zps
+                                self.w13_scale = torch.tensor(0).to(dtype)
+                                self.w13_zp = torch.tensor(0).to(dtype)
+                                self.w2_scale = torch.tensor(0).to(dtype)
+                                self.w2_zp = torch.tensor(0).to(dtype)
+                                print("[INFO] Using fused MOE bf16 path...")
+                            else:
+                                w13_qweight_list = []
+                                w13_scale_list = []
+                                w13_zp_list = []
+                                w2_qweight_list = []
+                                w2_scale_list = []
+                                w2_zp_list = []
+                                group_size = -1
+                                for idx in range(len(self.mlp.experts)):
+                                    w13_qweight, w13_scale, w13_zp = woq_quant_and_pack(
+                                        self.mlp.experts[idx].w13_weight, group_size
+                                    )
+                                    del self.mlp.experts[idx].w13_weight
+                                    w13_qweight_list.append(w13_qweight)
+                                    w13_scale_list.append(w13_scale)
+                                    w13_zp_list.append(w13_zp)
+                                    w2_qweight, w2_scale, w2_zp = woq_quant_and_pack(
+                                        self.mlp.experts[idx].w2_weight, group_size
+                                    )
+                                    del self.mlp.experts[idx].w2_weight
+
+                                    w2_qweight_list.append(w2_qweight)
+                                    w2_scale_list.append(w2_scale)
+                                    w2_zp_list.append(w2_zp)
+                                self.w13_weight = torch.stack(w13_qweight_list).detach()
+                                self.w13_scale = (
+                                    torch.stack(w13_scale_list).detach().to(dtype)
+                                )
+                                self.w13_zp = (
+                                    torch.stack(w13_zp_list).detach().to(dtype)
+                                )
+                                self.w2_weight = torch.stack(w2_qweight_list).detach()
+                                self.w2_scale = (
+                                    torch.stack(w2_scale_list).detach().to(dtype)
+                                )
+                                self.w2_zp = torch.stack(w2_zp_list).detach().to(dtype)
+
+                                print("[INFO] Using fused MOE WOQ INT8 path...")
+                        elif not (self.use_fused_moe or self.use_fused_moe_woq):
+                            # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
+                            self.moe_linear_type = 0
+                            if self.mlp.experts[0].gate_proj.weight.dtype in [
+                                torch.qint8,
+                                torch.int8,
+                                torch.uint8,
+                                torch.float8_e4m3fn,
+                            ]:
+                                self.moe_linear_type = 4
+                            elif (
+                                hasattr(self.mlp.experts[0].gate_proj, "use_tpp")
+                                and self.mlp.experts[0].gate_proj.use_tpp
+                            ):
+                                if not self.mlp.experts[0].gate_proj.tpp_fallback:
+                                    self.moe_linear_type = 1
+                            elif hasattr(self.mlp.experts[0].gate_proj, "use_dnnl"):
+                                if self.mlp.experts[0].gate_proj.use_dnnl:
+                                    self.moe_linear_type = 2
+                                else:
+                                    self.moe_linear_type = 3
+                            self.gate_weights = []
+                            self.up_weights = []
+                            self.down_weights = []
+                            self.gate_ctx = []
+                            self.up_ctx = []
+                            self.down_ctx = []
+                            offset = self.mlp.ep_rank * self.mlp.experts_per_rank
+                            for expert_idx in range(len(self.mlp.experts)):
+                                expert_layer = self.mlp.experts[expert_idx + offset]
+                                if self.moe_linear_type in [0, 1]:
+                                    self.gate_weights.append(expert_layer.gate_proj.weight)
+                                    self.up_weights.append(expert_layer.up_proj.weight)
+                                    self.down_weights.append(expert_layer.down_proj.weight)
+                                elif self.moe_linear_type in [2, 3]:
+                                    self.gate_weights.append(
+                                        expert_layer.gate_proj._get_forward_weight()
+                                    )
+                                    self.up_weights.append(
+                                        expert_layer.up_proj._get_forward_weight()
+                                    )
+                                    self.down_weights.append(
+                                        expert_layer.down_proj._get_forward_weight()
+                                    )
+                                    self.gate_ctx.append(expert_layer.gate_proj.ctx)
+                                    self.up_ctx.append(expert_layer.up_proj.ctx)
+                                    self.down_ctx.append(expert_layer.down_proj.ctx)
+                                else:
+                                    self.gate_ctx.append(expert_layer.gate_proj._op_context)
+                                    self.up_ctx.append(expert_layer.up_proj._op_context)
+                                    self.down_ctx.append(expert_layer.down_proj._op_context)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 

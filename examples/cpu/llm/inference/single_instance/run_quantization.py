@@ -330,6 +330,12 @@ else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=True, trust_remote_code=True
     )
+
+# For DeepSeek models
+if args.ipex_weight_only_quantization and args.weight_dtype == "INT8":
+    config.use_fused_moe = True
+    config.use_fused_moe_woq = True
+
 if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
     "rw", config.architectures[0], re.IGNORECASE
 ):

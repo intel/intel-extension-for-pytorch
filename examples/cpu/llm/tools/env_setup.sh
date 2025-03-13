@@ -187,7 +187,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         if [ -d DeepSpeed ]; then
             rm -rf DeepSpeed
         fi
-        git clone https://github.com/microsoft/DeepSpeed.git
+        git clone https://github.com/Yejing-Lai/DeepSpeed
         cd DeepSpeed
         git checkout ${COMMIT_DS_SYCL}
         python -m pip install -r requirements/requirements.txt

@@ -165,6 +165,10 @@ else:
         trust_remote_code=True,
         torch_dtype=amp_dtype,
     )
+# For DeepSeek models
+if args.ipex and args.dtype == "bfloat16":
+    config.use_fused_moe = True
+    config.use_fused_moe_woq = False
 
 if args.kv_cache_dtype == "auto":
     kv_cache_dtype = None
@@ -299,6 +303,7 @@ if args.ipex:
         deployment_mode=args.deployment_mode,
         cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
+# breakpoint()
 if args.torch_compile:
     if args.deployment_mode:
         raise SystemExit(

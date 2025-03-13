@@ -316,6 +316,24 @@ inline void _vec_store_two_floats_as_bfloat16(
   TLA_ASSERT(false, "not implemented");
 #endif
 };
+
+inline __m512i  _vec_store_two_floats_as_bfloat16_no_addr(
+  __m512 v0,
+  __m512 v1) {
+#ifdef __AVX512BF16__
+// convert lower 16 float32 values to bfloat16
+auto v0_bf16 = reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(v0));
+// convert higher 16 float32 values to bfloat16
+auto v1_bf16 = reinterpret_cast<__m256i>(_mm512_cvtneps_pbh(v1));
+// combine the lower 16 and higher 16 bfloat16 values
+auto v = _mm512_castsi256_si512(v0_bf16);
+v = _mm512_inserti64x4(v, v1_bf16, 1);
+return v;
+#else
+// TODO(jgong5): emuclate AVX512BF16 downcast
+TLA_ASSERT(false, "not implemented");
+#endif
+};
 #endif // __AVX512F__
 
 // TODO(jgong5): support prefetch hint?

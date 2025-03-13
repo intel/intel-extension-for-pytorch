@@ -5845,9 +5845,7 @@ def JambaForCausalLM_forward(
 
 def Deepseek_MoEGate_forward(self, hidden_states):
     # compute gating score
-    logits = torch.nn.functional.linear(
-        hidden_states.type(torch.float32), self.weight.type(torch.float32), None
-    )
+    logits = torch.nn.functional.linear(hidden_states, self.weight, None)
 
     if self.scoring_func == "softmax":
         scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
