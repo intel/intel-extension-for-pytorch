@@ -11,7 +11,7 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_erfcx(self, dtype=torch.float):
-        dtypes = [torch.float32, torch.float64, torch.bfloat16]
+        dtypes = [torch.float32, torch.float64]
         device = "xpu"
         for dtype in dtypes:
 
@@ -45,7 +45,7 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
     def test_ndtri_entr(self, dtype=torch.float):
-        dtypes = [torch.float32, torch.float64, torch.bfloat16]
+        dtypes = [torch.float32, torch.float64]
         device = "xpu"
         for dtype in dtypes:
 

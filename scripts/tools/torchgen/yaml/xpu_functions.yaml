@@ -21,8 +21,6 @@ supported:
 # - index_copy_
 # - fractional_max_pool2d
 # - fractional_max_pool3d
-# - special_erfcx
-# - special_ndtri
 ################## override below ops due to performance issues
 # - convolution_overrideable
 # - convolution_backward_overrideable
