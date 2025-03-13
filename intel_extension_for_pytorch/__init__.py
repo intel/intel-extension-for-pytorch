@@ -39,7 +39,7 @@ if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
         + f"{ipex_version}.*, but PyTorch {torch.__version__} is found. "
         + "Please switch to the matching version and run again."
     )
-    os.exit(127)
+    os._exit(127)
 
 
 import os
