@@ -467,6 +467,10 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_ds_kernel_enabled();
   });
 
+  m.def("_is_bnb_kernel_enabled", []() {
+    return Settings::I().is_bnb_kernel_enabled();
+  });
+
   auto module = m.ptr();
   PyModule_AddFunctions(module, _THPModule_methods);
 

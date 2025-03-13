@@ -53,6 +53,11 @@ if(USE_DS_KERNELS)
   add_subdirectory(${IPEX_GPU_DEEPSPEED_SRC_DIR})
 endif()
 
+if(USE_BNB_KERNELS)
+  set(IPEX_GPU_BITSANDBYTES_SRC_DIR "${IPEX_GPU_ROOT_DIR}/bitsandbytes")
+  add_subdirectory(${IPEX_GPU_BITSANDBYTES_SRC_DIR})
+endif()
+
 if(NOT DEFINED SYCL_INCLUDE_DIR)
   message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
@@ -106,6 +111,13 @@ if(USE_DS_KERNELS)
   target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${SYCL_INCLUDE_DIR})
 endif()
 
+if(USE_BNB_KERNELS)
+  target_include_directories(intel-ext-pt-gpu-bitsandbytes PUBLIC ${TORCH_INCLUDE_DIRS})
+  target_include_directories(intel-ext-pt-gpu-bitsandbytes PUBLIC ${SYCL_INCLUDE_DIR})
+endif()
+
+
+
 add_library(intel-ext-pt-gpu SHARED ${IPEX_GPU_CORE_SRC})
 
 target_include_directories(intel-ext-pt-gpu PUBLIC ${IPEX_INCLUDE_DIRS})
@@ -146,6 +158,10 @@ target_link_libraries(intel-ext-pt-gpu PUBLIC esimd_kernels)
 
 if(USE_DS_KERNELS)
   target_link_libraries(intel-ext-pt-gpu PUBLIC intel-ext-pt-gpu-deepspeed)
+endif()
+
+if(USE_BNB_KERNELS)
+  target_link_libraries(intel-ext-pt-gpu PUBLIC intel-ext-pt-gpu-bitsandbytes)
 endif()
 
 set(IPEX_COMPILE_DEFINITIONS)
@@ -192,6 +208,10 @@ if (USE_DS_KERNELS)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_DS_KERNELS")
 endif()
 
+if (USE_BNB_KERNELS)
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_BNB_KERNELS")
+endif()
+
 list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_IPEX_MAIN_LIB")
 
 if (USE_ONEMKL)
@@ -212,6 +232,10 @@ if (USE_ONEMKL)
           target_link_libraries(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEMKL_GPU_LIBS})
           target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEMKL_INCLUDE_DIR})
         endif()
+        if(USE_BNB_KERNELS)
+          target_link_libraries(intel-ext-pt-gpu-bitsandbytes PUBLIC ${ONEMKL_GPU_LIBS})
+          target_include_directories(intel-ext-pt-gpu-bitsandbytes PUBLIC ${ONEMKL_INCLUDE_DIR})
+        endif()
     else()
         message(FATAL_ERROR "Cannot find oneMKL!")
     endif()
@@ -231,6 +255,10 @@ endif()
 if(USE_DS_KERNELS)
   target_link_libraries(intel-ext-pt-gpu-deepspeed PUBLIC spdlog::spdlog_header_only)
   target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${SPDLOG_INCLUDE_DIRS})
+endif()
+if(USE_BNB_KERNELS)
+  target_link_libraries(intel-ext-pt-gpu-bitsandbytes PUBLIC spdlog::spdlog_header_only)
+  target_include_directories(intel-ext-pt-gpu-bitsandbytes PUBLIC ${SPDLOG_INCLUDE_DIRS})
 endif()
   target_link_libraries(intel-ext-pt-gpu PUBLIC spdlog::spdlog_header_only)
   target_include_directories(intel-ext-pt-gpu PUBLIC ${SPDLOG_INCLUDE_DIRS})
@@ -261,6 +289,9 @@ if(ONEDNN_FOUND)
   endif()
   if(USE_DS_KERNELS)
     target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEDNN_INCLUDE_DIR})
+  endif()
+  if(USE_BNB_KERNELS)
+    target_include_directories(intel-ext-pt-gpu-bitsandbytes PUBLIC ${ONEDNN_INCLUDE_DIR})
   endif()
   if(BUILD_SEPARATE_OPS)
     # Use same lib path with op libs to avoid link errors;
@@ -298,6 +329,10 @@ if(USE_DS_KERNELS)
   target_compile_definitions(intel-ext-pt-gpu-deepspeed PUBLIC ${IPEX_COMPILE_DEFINITIONS})
 endif()
 
+if(USE_BNB_KERNELS)
+  target_compile_definitions(intel-ext-pt-gpu-bitsandbytes PUBLIC ${IPEX_COMPILE_DEFINITIONS})
+endif()
+
 if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-gpu PROPERTIES LINK_FLAGS_RELEASE -s)
   if(BUILD_SEPARATE_OPS)
@@ -308,6 +343,10 @@ if(BUILD_STRIPPED_BIN)
 
   if(USE_DS_KERNELS)
     set_target_properties(intel-ext-pt-gpu-deepspeed PROPERTIES LINK_FLAGS_RELEASE -s)
+  endif()
+
+  if(USE_BNB_KERNELS)
+    set_target_properties(intel-ext-pt-gpu-bitsandbytes PROPERTIES LINK_FLAGS_RELEASE -s)
   endif()
 endif()
 
@@ -357,6 +396,14 @@ if(USE_DS_KERNELS)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   list(APPEND LIBRARIES_INSTALL intel-ext-pt-gpu-deepspeed)
+endif()
+
+if(USE_BNB_KERNELS)
+  install(TARGETS intel-ext-pt-gpu-bitsandbytes
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  list(APPEND LIBRARIES_INSTALL intel-ext-pt-gpu-bitsandbytes)
 endif()
 
 install(TARGETS intel-ext-pt-gpu

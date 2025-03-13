@@ -105,6 +105,7 @@ class IPEX_API Settings final {
   bool is_pti_enabled() const;
 
   bool is_ds_kernel_enabled() const;
+  bool is_bnb_kernel_enabled() const;
 
   int64_t get_compiler_version() const;
 

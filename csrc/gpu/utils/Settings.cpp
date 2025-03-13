@@ -440,6 +440,14 @@ bool Settings::is_ds_kernel_enabled() const {
 #endif
 }
 
+bool Settings::is_bnb_kernel_enabled() const {
+#ifdef USE_BNB_KERNELS
+  return true;
+#else
+  return false;
+#endif
+}
+
 int64_t Settings::get_compiler_version() const {
   return __INTEL_LLVM_COMPILER;
 }

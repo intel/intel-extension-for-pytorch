@@ -20,6 +20,7 @@ parser.add_argument("--per_device_train_batch_size", default=2, type=int)
 parser.add_argument("--gradient_accumulation_steps", default=4, type=int)
 parser.add_argument("--max_steps", default=300, type=int)
 parser.add_argument("--do_eval", action="store_true")
+parser.add_argument("--optim_8bit", action="store_true")
 
 args = parser.parse_args()
 
@@ -41,7 +42,7 @@ elif args.quant_type == "nf4":
 
 # Loading the model and tokenizer
 device_map={'':torch.xpu.current_device()} if args.device == 'xpu' else None
-model = AutoModelForCausalLM.from_pretrained(args.model_name ,quantization_config=bnb_config, device_map=device_map)
+model = AutoModelForCausalLM.from_pretrained(args.model_name, quantization_config=bnb_config, device_map=device_map)
 tokenizer = AutoTokenizer.from_pretrained(
     args.model_name,
     model_max_length=args.max_seq_length,
@@ -138,11 +139,7 @@ output_dir = "./" + run_name
 tokenizer.pad_token = tokenizer.eos_token
 ipex_update_causal_mask(model)
 
-trainer = transformers.Trainer(
-    model=model,
-    train_dataset=tokenized_train_dataset,
-    eval_dataset=tokenized_val_dataset if args.do_eval else None,
-    args=transformers.TrainingArguments(
+training_args = transformers.TrainingArguments(
         output_dir=output_dir,
         warmup_steps=5,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -159,8 +156,21 @@ trainer = transformers.Trainer(
         do_eval=args.do_eval,                # Perform evaluation at the end of training
         report_to='tensorboard',           # set to 'wandb' for weights & baises logging
         run_name=f"{run_name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",          # Name of the W&B run (optional)
-    ),
+    )
+
+if args.optim_8bit:
+    import bitsandbytes as bnb
+    # Enable 8-bit Adam with blockwise=True
+    optimizer = bnb.optim.Adam8bit(model.parameters(), betas=(training_args.adam_beta1, training_args.adam_beta2), block_wise=True)
+
+
+trainer = transformers.Trainer(
+    model=model,
+    train_dataset=tokenized_train_dataset,
+    eval_dataset=tokenized_val_dataset if args.do_eval else None,
+    args=training_args,
     data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
+    optimizers=(optimizer, None) if args.optim_8bit else (None, None),
 )
 model.config.use_cache = False  # silence the warnings. Please re-enable for inference!
 trainer.train()

@@ -20,6 +20,16 @@ huggingface-cli login --token <your_token_here>
 ### Environment Set Up
 Set up environment by following [LLM Environment Set Up](../README.md).
 
+### installation bitsandbytes
+```bash
+git clone --depth 1 -b multi-backend-refactor https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes/
+pip install intel_extension_for_pytorch
+cmake -DCOMPUTE_BACKEND=cpu -S .
+make
+pip install -e .   # `-e` for "editable" install, when developing BNB (otherwise leave that out)
+```
+Reference in huggingface document [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/en/installation?backend=Intel+CPU+%2B+GPU#multi-backend)
+
 
 ### Run Qlora finetuning with quantized model using Bash Script
 
