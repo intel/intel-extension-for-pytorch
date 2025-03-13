@@ -349,7 +349,15 @@ class _IPEXFastLayerNormCPU(nn.Module):
 class _IPEXPagedAttentionCPU:
     @classmethod
     def reshape_and_cache(
-        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+        cls,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype="auto",
+        k_scale=1.0,
+        v_scale=1.0,
     ):
         torch.ops.torch_ipex.reshape_and_cache(
             key,

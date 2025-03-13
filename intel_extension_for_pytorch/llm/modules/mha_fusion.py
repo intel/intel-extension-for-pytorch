@@ -652,13 +652,21 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
     ):
         cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -669,10 +677,22 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
+        kv_cache_dtype: str = "auto",
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
-        ).reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping)
+        ).reshape_and_cache_flash(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
+        )
 
     @classmethod
     def swap_blocks(cls, src, dst, block_map):
@@ -700,6 +720,7 @@ class PagedAttention:
         block_size: int,
         max_context_len: int,
         alibi_slopes: torch.Tensor,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -718,6 +739,7 @@ class PagedAttention:
             block_size,
             max_context_len,
             alibi_slopes,
+            kv_cache_dtype,
             k_scale,
             v_scale,
             softcap,
@@ -771,6 +793,7 @@ class PagedAttention:
         is_cusal: bool,
         block_tables: torch.Tensor,
         alibi_slopes: torch.Tensor,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -790,6 +813,7 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
+            kv_cache_dtype,
             k_scale,
             v_scale,
             softcap,

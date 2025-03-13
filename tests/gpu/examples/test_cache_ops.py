@@ -313,3 +313,176 @@ def test_reshape_and_cache(
     )
     torch.set_default_device("cpu")
     torch.xpu.empty_cache()
+
+
+@pytest.mark.parametrize("num_tokens", NUM_TOKENS)
+@pytest.mark.parametrize("num_heads", NUM_HEADS)
+@pytest.mark.parametrize("head_size", HEAD_SIZES)
+@pytest.mark.parametrize("block_size", BLOCK_SIZES)
+@pytest.mark.parametrize("num_blocks", NUM_BLOCKS)
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("seed", SEEDS)
+@pytest.mark.parametrize("cache_format", CACHE_FORMAT)
+@pytest.mark.parametrize("qtype", [torch.float8_e5m2, torch.float8_e4m3fn])
+@torch.inference_mode()
+def test_reshape_and_cache_fp8(
+    num_tokens: int,
+    num_heads: int,
+    head_size: int,
+    block_size: int,
+    num_blocks: int,
+    dtype: torch.dtype,
+    seed: int,
+    cache_format: KVCacheFormat,
+    qtype: torch.dtype,
+    device: str = "xpu",
+    # qtype: torch.dtype = torch.float8_e5m2,
+) -> None:
+    random.seed(seed)
+    torch.random.manual_seed(seed)
+    torch.set_default_device(device)
+
+    if qtype == torch.float8_e5m2:
+        k_scale = 1.0
+        v_scale = 1.0
+        qtype_str = "fp8_e5m2"
+    else:
+        k_scale = 2.0
+        v_scale = 2.0
+        qtype_str = "fp8_e4m3"
+
+    # Create a random slot mapping.
+    num_slots = block_size * num_blocks
+    slot_mapping = random.sample(range(num_slots), num_tokens)
+    slot_mapping = torch.tensor(slot_mapping, dtype=torch.long)
+
+    qkv = torch.randn(num_tokens, 3, num_heads, head_size, dtype=dtype)
+    _, key, value = qkv.unbind(dim=1)
+    key = key.to(qtype).to(dtype)
+    value = value.to(qtype).to(dtype)
+
+    # Create the KV caches.
+    key_caches, value_caches = kv_cache_factory(
+        num_blocks,
+        block_size,
+        1,
+        num_heads,
+        head_size,
+        dtype,
+        seed,
+        "cpu",
+        cache_format,
+    )
+    key_cache, value_cache = key_caches[0], value_caches[0]
+
+    key_cache = key_cache.to(qtype).to(dtype)
+    value_cache = value_cache.to(qtype).to(dtype)
+
+    key_cache_xpu = key_cache.to(device)
+    value_cache_xpu = value_cache.to(device)
+
+    # Clone the KV caches.
+    cloned_key_cache = key_cache.clone().to(device)
+    cloned_value_cache = value_cache.clone().to(device)
+    key_cache_fp8 = key_cache.to(qtype).to(device)
+    value_cache_fp8 = value_cache.to(qtype).to(device)
+
+    cloned_key_cache_1 = key_cache.clone().to(device)
+    cloned_value_cache_1 = value_cache.clone().to(device)
+    key_cache_fp8_1 = key_cache.to(qtype).to(device)
+    value_cache_fp8_1 = value_cache.to(qtype).to(device)
+    assert torch.allclose(
+        key_cache_fp8_1.to(dtype), key_cache_xpu, atol=1e-2, rtol=1e-2
+    )
+
+    key = key.to(device)
+    value = value.to(device)
+
+    # Call the reshape_and_cache kernel.
+    if cache_format == KVCacheFormat.Paged:
+        # print(key)
+        # print(key_cache_fp8_1)
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key,
+            value,
+            key_cache_fp8_1,
+            value_cache_fp8_1,
+            slot_mapping,
+            qtype_str,
+            k_scale,
+            v_scale,
+        )
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key,
+            value,
+            key_cache_fp8,
+            value_cache_fp8,
+            slot_mapping.to(torch.int32),
+            qtype_str,
+            k_scale,
+            v_scale,
+        )
+    else:
+        ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+            key,
+            value,
+            key_cache_fp8_1,
+            value_cache_fp8_1,
+            slot_mapping,
+            qtype_str,
+            k_scale,
+            v_scale,
+        )
+        ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+            key,
+            value,
+            key_cache_fp8,
+            value_cache_fp8,
+            slot_mapping.to(torch.int32),
+            qtype_str,
+            k_scale,
+            v_scale,
+        )
+
+    # Run the reference implementation.
+    block_indicies = torch.div(slot_mapping, block_size, rounding_mode="floor")
+    block_indicies = block_indicies.cpu().tolist()
+    block_offsets = slot_mapping % block_size
+    block_offsets = block_offsets.cpu().tolist()
+    if cache_format == KVCacheFormat.Chunked:
+        for i in range(num_tokens):
+            block_idx = block_indicies[i]
+            block_offset = block_offsets[i]
+            cloned_key_cache[block_idx, block_offset, :, :] = key[i] * k_scale
+            cloned_value_cache[block_idx, block_offset, :, :] = value[i] * v_scale
+    else:
+        reshaped_key = key.reshape(num_tokens, *key_cache[0, :, :, 0, :].shape)
+        for i in range(num_tokens):
+            block_idx = block_indicies[i]
+            block_offset = block_offsets[i]
+            cloned_key_cache[block_idx, :, :, block_offset, :] = (
+                reshaped_key[i] * k_scale
+            )
+            cloned_value_cache[block_idx, :, :, block_offset] = value[i] * v_scale
+
+    assert torch.allclose(
+        key_cache_fp8_1.to(dtype), cloned_key_cache, atol=1e-2, rtol=1e-2
+    )
+    assert torch.allclose(
+        value_cache_fp8_1.to(dtype),
+        cloned_value_cache,
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    assert torch.allclose(
+        key_cache_fp8.to(dtype), cloned_key_cache, atol=1e-2, rtol=1e-2
+    )
+    assert torch.allclose(
+        value_cache_fp8.to(dtype),
+        cloned_value_cache,
+        atol=1e-2,
+        rtol=1e-2,
+    )
+
+    torch.set_default_device("cpu")
+    torch.xpu.empty_cache()

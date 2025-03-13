@@ -330,6 +330,118 @@ class TestChunkedPrefill(TestCase):
 
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
 
+    def chunk_prefill_fp8(
+        self,
+        num_seqs,
+        max_seqlen,
+        num_heads,
+        head_size,
+        block_size,
+        use_alibi,
+        is_causal,
+        version,
+        dtype,
+        qtype,
+    ) -> None:
+        seed = 0
+
+        random.seed(seed)
+        torch.random.manual_seed(seed)
+        torch.manual_seed(seed)
+
+        scale = float(1.0 / (head_size**0.5))
+        # TODO: support GQA
+        num_query_heads, num_kv_heads = num_heads
+        assert num_query_heads % num_kv_heads == 0
+        num_queries_per_kv = num_query_heads // num_kv_heads
+        alibi_slopes = None
+        if use_alibi:
+            alibi_slopes = torch.rand(
+                num_seqs, max_seqlen, max_seqlen, device="cpu", dtype=dtype
+            )
+        context_lens = [random.randint(1, max_seqlen) for _ in range(num_seqs)]
+
+        max_seqlen_k = max(context_lens)
+        context_lens = [0] + context_lens
+        context_lens = torch.tensor(context_lens, dtype=torch.int, device="cpu")
+
+        # Create the block tables.NUM_PREFILL_SEQS
+        max_num_blocks_per_seq = (max_seqlen_k + block_size - 1) // block_size
+        block_tables = []
+        for _ in range(num_seqs):
+            block_table = [
+                random.randint(0, max_num_blocks_per_seq - 1)
+                for i in range(max_num_blocks_per_seq)
+            ]
+            block_tables.append(block_table)
+        block_tables = torch.tensor(block_tables, dtype=torch.int, device="cpu")
+        cu_seqlen_k = torch.cumsum(context_lens, 0)
+        q_lens = context_lens[1:] if version == "chunked_prefill" else [1] * num_seqs
+        q_lens = [random.randint(1, max_lens) for max_lens in q_lens]
+        max_seqlen_q = max(q_lens)
+        q_lens = [0] + q_lens
+        q_lens_tensor = torch.tensor(q_lens, dtype=torch.int, device="cpu")
+        cu_seqlen_q = torch.cumsum(q_lens_tensor, 0)
+
+        query = self.create_q_buffer(cu_seqlen_q, num_query_heads, head_size, dtype)
+        key_caches, value_caches = self.create_kv_caches(
+            max_num_blocks_per_seq, block_size, 1, num_kv_heads, head_size, dtype, seed
+        )
+        key_cache, value_cache = key_caches[0], value_caches[0]
+        key_cache = key_cache.to(qtype)
+        value_cache = value_cache.to(qtype)
+        # Call the paged attention kernel.
+        output = torch.zeros_like(query)
+
+        xpu_device = torch.device("xpu")
+        cu_seqlen_q_xpu = cu_seqlen_q.to(xpu_device).int()
+        cu_seqlen_k_xpu = cu_seqlen_k.to(xpu_device).int()
+        output_xpu = output.to(xpu_device)
+        query_xpu = query.to("xpu")
+        key_cache_xpu = key_cache.to(xpu_device)
+        value_cache_xpu = value_cache.to(xpu_device)
+        block_tables_xpu = block_tables.to(xpu_device)
+
+        key_cache = key_cache.to(dtype)
+        value_cache = value_cache.to(dtype)
+
+        alibi_slopes_xpu = None
+
+        # execute ref path of chunked prefill
+        output = output.to("xpu")
+        self.ref_chunked_prefill(
+            output,
+            query,
+            num_queries_per_kv,
+            key_cache,
+            value_cache,
+            block_tables,
+            cu_seqlen_q,
+            cu_seqlen_k,
+            max_seqlen_q,
+            max_seqlen_k,
+            scale,
+            alibi_slopes,
+            is_causal,
+        )
+
+        ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
+            output_xpu,
+            query_xpu,
+            key_cache_xpu,
+            value_cache_xpu,
+            cu_seqlen_q_xpu,
+            cu_seqlen_k_xpu,
+            max_seqlen_q,
+            max_seqlen_k,
+            scale,
+            is_causal,
+            block_tables_xpu,
+            alibi_slopes_xpu,
+        )
+
+        torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
+
     # @parametrize("num_gen_seqs", [1, 3, 8, 13])
     @parametrize("num_gen_seqs", [1, 3, 8])
     @parametrize("max_seqlen_k", [8, 1024, 2088])
@@ -410,6 +522,47 @@ class TestChunkedPrefill(TestCase):
             "flash_decoding",
             dtype,
             softcap,
+        )
+
+    @parametrize("num_gen_seqs", [1, 3, 8])
+    # @parametrize("num_gen_seqs", [13])
+    @parametrize("max_seqlen_k", [8, 76, 512, 2088])
+    # @parametrize("max_seqlen_k", [76])
+    @parametrize("num_heads", [(16, 16)])
+    @parametrize("head_size", [64, 70, 96, 128, 256])
+    # @parametrize("head_size", [64])
+    @parametrize("block_size", [16, 32, 64, 128])
+    @parametrize("use_alibi", [False])
+    @parametrize("is_causal", [False])
+    @parametrize("dtype", [torch.float16])
+    @parametrize("qtype", [torch.float8_e5m2, torch.float8_e4m3fn])
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(),
+        reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
+    )
+    def test_flash_decode_fp8(
+        self,
+        num_gen_seqs,
+        max_seqlen_k,
+        num_heads,
+        head_size,
+        block_size,
+        use_alibi,
+        is_causal,
+        dtype,
+        qtype,
+    ):
+        self.chunk_prefill_fp8(
+            num_gen_seqs,
+            max_seqlen_k,
+            num_heads,
+            head_size,
+            block_size,
+            use_alibi,
+            is_causal,
+            "flash_decoding",
+            dtype,
+            qtype,
         )
 
 

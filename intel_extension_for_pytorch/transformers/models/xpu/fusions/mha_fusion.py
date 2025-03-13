@@ -4,6 +4,48 @@ from ...reference.fusions.mha_fusion import RotaryEmbedding
 from typing import Optional, Dict
 
 
+def convert_from_fp8(
+    q_dtype, key_cache, value_cache, k_scale=1.0, v_scale=1.0, kv_dtype="auto"
+):
+    """
+    Convert key_cache and value_cache from FP8 or uint8 to the specified q_dtype.
+
+    Args:
+        q_dtype: Target data type for conversion.
+        key_cache: Key cache tensor.
+        value_cache: Value cache tensor.
+        k_scale: Scaling factor for key cache.
+        v_scale: Scaling factor for value cache.
+        kv_dtype: Data type of key/value cache if uint8.
+
+    Returns:
+        Converted key_cache and value_cache tensors.
+    """
+    if key_cache.dtype != q_dtype:
+        if key_cache.dtype == torch.float8_e4m3fn:
+            key_cache = key_cache.to(q_dtype) * k_scale
+            value_cache = value_cache.to(q_dtype) * v_scale
+        elif key_cache.dtype == torch.float8_e5m2:
+            key_cache = key_cache.to(q_dtype)
+            value_cache = value_cache.to(q_dtype)
+        elif key_cache.dtype == torch.uint8:
+            if kv_dtype in ["float8_e4m3fn", "fp8"]:
+                key_cache_fp8 = torch.empty_like(key_cache, dtype=torch.float8_e4m3fn)
+                value_cache_fp8 = torch.empty_like(
+                    value_cache, dtype=torch.float8_e4m3fn
+                )
+            else:
+                key_cache_fp8 = torch.empty_like(key_cache, dtype=torch.float8_e5m2)
+                value_cache_fp8 = torch.empty_like(value_cache, dtype=torch.float8_e5m2)
+
+            key_cache_fp8.copy_(key_cache)
+            value_cache_fp8.copy_(value_cache)
+            key_cache = key_cache_fp8.to(q_dtype) * k_scale
+            value_cache = value_cache_fp8.to(q_dtype) * v_scale
+
+    return key_cache, value_cache
+
+
 class _IPEXRopeXPU(nn.Module):
     def __init__(
         self,
@@ -381,16 +423,48 @@ class _IPEXPagedAttentionXPU:
 
     @classmethod
     def reshape_and_cache(
-        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+        cls,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype="auto",
+        k_scale=1.0,
+        v_scale=1.0,
     ):  # todo, k_scale and v_scale not implement here. tmply add arguments for frontend alignment with CPU
         torch.ops.torch_ipex.reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
-    def reshape_and_cache_flash(cls, key, value, key_cache, value_cache, slot_mapping):
+    def reshape_and_cache_flash(
+        cls,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype="auto",
+        k_scale=1.0,
+        v_scale=1.0,
+    ):
         torch.ops.torch_ipex.reshape_and_cache_flash(
-            key, value, key_cache, value_cache, slot_mapping
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -407,10 +481,14 @@ class _IPEXPagedAttentionXPU:
         block_size,
         max_context_len,
         alibi_slopes,
+        ky_dtype="auto",
         k_scale=1.0,
         v_scale=1.0,
         softcap=-1.0,
     ):
+        key_cache, value_cache = convert_from_fp8(
+            query.dtype, key_cache, value_cache, k_scale, v_scale, ky_dtype
+        )
         num_queries_per_tokens = (head_mapping == 0).sum()
         query = query.contiguous()
         torch.ops.torch_ipex.paged_attention(
@@ -445,6 +523,7 @@ class _IPEXPagedAttentionXPU:
         softcap=-1.0,
     ):
         query = query.contiguous()
+        key_cache, value_cache = convert_from_fp8(query.dtype, key_cache, value_cache)
         torch.ops.torch_ipex.paged_attention(
             output,
             query,
@@ -475,10 +554,14 @@ class _IPEXPagedAttentionXPU:
         is_causal,
         block_table,
         alibi_slopes=None,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
     ):
+        k_cache, v_cache = convert_from_fp8(
+            query.dtype, k_cache, v_cache, k_scale, v_scale, kv_cache_dtype
+        )
         head_dim = query.size(-1)
         pad_query = query
         pad_k_cache = k_cache

@@ -50,6 +50,7 @@ void reshape_and_cache_cpu(
     at::Tensor& key_cache,
     at::Tensor& value_cache,
     at::Tensor& slot_mapping,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale) {
   return reshape_and_cache_kernel_stub(

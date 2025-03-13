@@ -2,6 +2,8 @@
 #include <ATen/DeviceGuard.h>
 #include <ATen/record_function.h>
 #include <c10/core/ScalarType.h>
+#include <c10/util/Float8_e4m3fn.h>
+#include <c10/util/Float8_e5m2.h>
 #include <core/Device.h>
 #include <core/detail/ListUtils.h>
 #include <runtime/Utils.h>
@@ -50,7 +52,8 @@ void swap_blocks(
     int64_t dst_block_number = block_map_data[i * 2 + 1];
     int64_t src_offset = src_block_number * block_size;
     int64_t dst_offset = dst_block_number * block_size;
-    dpcppMemcpy(dst_ptr + dst_offset, src_ptr + src_offset, block_size, cpy_kind);
+    dpcppMemcpy(
+        dst_ptr + dst_offset, src_ptr + src_offset, block_size, cpy_kind);
   }
   return;
 }
@@ -67,7 +70,7 @@ struct CopyBlockFunctor {
         mappings_(mappings),
         copy_number_(copy_number) {}
 
-  void operator()(const sycl::nd_item<2> item_id) const{
+  void operator()(const sycl::nd_item<2> item_id) const {
     int64_t local_id = item_id.get_local_id(0);
     int64_t local_range = item_id.get_local_range(0);
     int64_t group_id_x = item_id.get_group(0);
@@ -82,16 +85,20 @@ struct CopyBlockFunctor {
     int vector_cpy_total = vector_cpy_num * vec_size;
     int scalar_cpy_num = copy_number_ % vec_size;
     for (int i = local_id; i < vector_cpy_num; i += local_range) {
-      reinterpret_cast<vec_type*>(k_block_ptr + dst_offset)[i] = reinterpret_cast<vec_type*>(k_block_ptr + src_offset)[i];
+      reinterpret_cast<vec_type*>(k_block_ptr + dst_offset)[i] =
+          reinterpret_cast<vec_type*>(k_block_ptr + src_offset)[i];
     }
     for (int i = local_id; i < scalar_cpy_num; i += local_range) {
-        k_block_ptr[dst_offset + i + vector_cpy_total] = k_block_ptr[src_offset + i + vector_cpy_total];
+      k_block_ptr[dst_offset + i + vector_cpy_total] =
+          k_block_ptr[src_offset + i + vector_cpy_total];
     }
     for (int i = local_id; i < vector_cpy_num; i += local_range) {
-      reinterpret_cast<vec_type*>(v_block_ptr + dst_offset)[i] = reinterpret_cast<vec_type*>(v_block_ptr + src_offset)[i];
+      reinterpret_cast<vec_type*>(v_block_ptr + dst_offset)[i] =
+          reinterpret_cast<vec_type*>(v_block_ptr + src_offset)[i];
     }
     for (int i = local_id; i < scalar_cpy_num; i += local_range) {
-      v_block_ptr[dst_offset + i + vector_cpy_total] = v_block_ptr[src_offset + i + vector_cpy_total];
+      v_block_ptr[dst_offset + i + vector_cpy_total] =
+          v_block_ptr[src_offset + i + vector_cpy_total];
     }
   }
 
@@ -116,24 +123,25 @@ void dpcpp_copy_block_kernel(
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int vec_size = 16;
   for (int i = 0; i < k_cache_vec.size(); ++i) {
-    auto k_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(dev_id, reinterpret_cast<char*>(k_cache_vec[i]));
-    auto v_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(dev_id, reinterpret_cast<char*>(v_cache_vec[i]));
+    auto k_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
+        dev_id, reinterpret_cast<char*>(k_cache_vec[i]));
+    auto v_vec_size = at::native::Memory::can_vectorize_up_to<scalar_t>(
+        dev_id, reinterpret_cast<char*>(v_cache_vec[i]));
     vec_size = std::min(std::min(k_vec_size, v_vec_size), vec_size);
   }
   int max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int wg_size = std::min(max_wg_size, copy_number / vec_size);
-#define COPY_BLOCK_KERNEL(vec_sz)                                   \
-  using vec_type =                                                  \
-      at::native::Memory::aligned_vector_loop<scalar_t, vec_sz>;    \
-  auto cgf = DPCPP_Q_CGF(cgh) {                                     \
-    auto kfn = CopyBlockFunctor<scalar_t, vec_type, vec_sz>(        \
-        key_caches, value_caches, mappings, copy_number);           \
-    cgh.parallel_for(                                               \
-        sycl::nd_range<2>(                                          \
-            sycl::range<2>(num_pairs * wg_size, num_layers),        \
-            sycl::range<2>(wg_size, 1)),                            \
-        kfn);                                                       \
-  };                                                                \
+#define COPY_BLOCK_KERNEL(vec_sz)                                             \
+  using vec_type = at::native::Memory::aligned_vector_loop<scalar_t, vec_sz>; \
+  auto cgf = DPCPP_Q_CGF(cgh) {                                               \
+    auto kfn = CopyBlockFunctor<scalar_t, vec_type, vec_sz>(                  \
+        key_caches, value_caches, mappings, copy_number);                     \
+    cgh.parallel_for(                                                         \
+        sycl::nd_range<2>(                                                    \
+            sycl::range<2>(num_pairs * wg_size, num_layers),                  \
+            sycl::range<2>(wg_size, 1)),                                      \
+        kfn);                                                                 \
+  };                                                                          \
   DPCPP_Q_SUBMIT(queue, cgf);
 
   switch (vec_size) {
@@ -158,14 +166,12 @@ void dpcpp_copy_block_kernel(
       break;
     }
     default:
-    TORCH_INTERNAL_ASSERT(
-      false,
-      "Unexpected vectorization size for copy blocks. vec size ",
-      vec_size
-    );
+      TORCH_INTERNAL_ASSERT(
+          false,
+          "Unexpected vectorization size for copy blocks. vec size ",
+          vec_size);
   }
-  #undef COPY_BLOCK_KERNEL
-
+#undef COPY_BLOCK_KERNEL
 }
 
 void copy_blocks(
@@ -215,26 +221,37 @@ void copy_blocks(
       });
 }
 
+enum class Fp8KVCacheDataType {
+  kAuto = 0,
+  kFp8E4M3 = 1,
+  kFp8E5M2 = 2,
+};
 
 enum class ReshapeAndCacheOp {
   kChunkedPrefill = 0,
   kPagedAttention = 1,
 };
-template <typename scalar_t, typename slot_type, ReshapeAndCacheOp op>
+template <
+    typename scalar_t,
+    typename cache_t,
+    typename slot_type,
+    Fp8KVCacheDataType kv_dt>
 struct ReshapeAndCache {
   ReshapeAndCache(
       const scalar_t* key,
       const scalar_t* value,
-      scalar_t* key_cache,
-      scalar_t* value_cache,
+      cache_t* key_cache,
+      cache_t* value_cache,
       const slot_type* slot_mapping,
       int num_tokens,
-      int key_stride,
-      int value_stride,
-      int num_head,
-      int head_size,
-      int block_size,
-      int x)
+      const int key_stride,
+      const int value_stride,
+      const int num_head,
+      const int head_size,
+      const int block_size,
+      const int x,
+      const float k_scale,
+      const float v_scale)
       : key_(key),
         value_(value),
         key_cache_(key_cache),
@@ -246,7 +263,9 @@ struct ReshapeAndCache {
         num_head_(num_head),
         head_size_(head_size),
         block_size_(block_size),
-        x_(x) {}
+        x_(x),
+        k_scale(k_scale),
+        v_scale(v_scale) {}
 
   void operator()(const sycl::nd_item<1> item_id) const {
     int group_idx = item_id.get_group(0);
@@ -262,102 +281,366 @@ struct ReshapeAndCache {
     for (int i = local_idx; i < n; i += local_range) {
       const int src_key_idx = group_idx * key_stride_ + i;
       const int src_value_idx = group_idx * value_stride_ + i;
-      if constexpr (op == ReshapeAndCacheOp::kPagedAttention) {
-        const int head_idx = i / head_size_;
-        const int head_offset = i % head_size_;
-        const int x_idx = head_offset / x_;
-        const int x_offset = head_offset % x_;
-        const int dst_key_idx = block_idx * n * block_size_ +
-            head_idx * head_size_ * block_size_ + x_idx * block_size_ * x_ +
-            block_offset * x_ + x_offset;
-        const int dst_value_idx = block_idx * n * block_size_ +
-            head_idx * head_size_ * block_size_ + head_offset * block_size_ +
-            block_offset;
-        key_cache_[dst_key_idx] = key_[src_key_idx];
-        value_cache_[dst_value_idx] = value_[src_value_idx];
-      } else {
       const int head_idx = i / head_size_;
       const int head_offset = i % head_size_;
-      const int dst_idx = block_idx * block_size_ * n + block_offset * n + head_idx * head_size_ + head_offset;
-      key_cache_[dst_idx] = key_[src_key_idx];
-      value_cache_[dst_idx] = value_[src_value_idx];
+      const int x_idx = head_offset / x_;
+      const int x_offset = head_offset % x_;
+      const int dst_key_idx = block_idx * n * block_size_ +
+          head_idx * head_size_ * block_size_ + x_idx * block_size_ * x_ +
+          block_offset * x_ + x_offset;
+      const int dst_value_idx = block_idx * n * block_size_ +
+          head_idx * head_size_ * block_size_ + head_offset * block_size_ +
+          block_offset;
+      scalar_t tgt_key = key_[src_key_idx];
+      scalar_t tgt_value = value_[src_value_idx];
+      if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E5M2) {
+        key_cache_[dst_key_idx] =
+            static_cast<at::Float8_e5m2>(tgt_key * k_scale);
+        value_cache_[dst_value_idx] =
+            static_cast<at::Float8_e5m2>(tgt_value * v_scale);
+      } else if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E4M3) {
+        key_cache_[dst_key_idx] =
+            static_cast<at::Float8_e4m3fn>(tgt_key * k_scale);
+        value_cache_[dst_value_idx] =
+            static_cast<at::Float8_e4m3fn>(tgt_value * v_scale);
+      } else { // kv_dt == Fp8KVCacheDataType::kAuto
+        key_cache_[dst_key_idx] = tgt_key;
+        value_cache_[dst_value_idx] = tgt_value;
+      }
     }
-  }
   }
 
  private:
   const scalar_t* key_;
   const scalar_t* value_;
-  scalar_t* key_cache_;
-  scalar_t* value_cache_;
+  cache_t* key_cache_;
+  cache_t* value_cache_;
   const slot_type* slot_mapping_;
   int num_tokens_;
-  int key_stride_;
-  int value_stride_;
-  int num_head_;
-  int head_size_;
-  int block_size_;
-  int x_;
+  const int key_stride_;
+  const int value_stride_;
+  const int num_head_;
+  const int head_size_;
+  const int block_size_;
+  const int x_;
+  const float k_scale;
+  const float v_scale;
 };
 
-template <typename scalar_t, typename slot_type>
+template <
+    typename scalar_t,
+    typename cache_t,
+    typename slot_type,
+    Fp8KVCacheDataType kv_dt>
+struct ReshapeAndCacheFlash {
+  ReshapeAndCacheFlash(
+      const scalar_t* key,
+      const scalar_t* value,
+      cache_t* key_cache,
+      cache_t* value_cache,
+      const slot_type* slot_mapping,
+      int num_tokens,
+      const int block_stride,
+      const int key_stride,
+      const int value_stride,
+      const int num_head,
+      const int head_size,
+      const int block_size,
+      const float k_scale,
+      const float v_scale)
+      : key_(key),
+        value_(value),
+        key_cache_(key_cache),
+        value_cache_(value_cache),
+        slot_mapping_(slot_mapping),
+        num_tokens_(num_tokens),
+        block_stride_(block_stride),
+        key_stride_(key_stride),
+        value_stride_(value_stride),
+        num_head_(num_head),
+        head_size_(head_size),
+        block_size_(block_size),
+        k_scale(k_scale),
+        v_scale(v_scale) {}
+
+  void operator()(const sycl::nd_item<1> item_id) const {
+    int group_idx = item_id.get_group(0);
+    int local_idx = item_id.get_local_id(0);
+    int local_range = item_id.get_local_range(0);
+    int slot_idx = slot_mapping_[group_idx];
+    if (slot_idx < 0)
+      return;
+
+    const int block_idx = slot_idx / block_size_;
+    const int block_offset = slot_idx % block_size_;
+    const int n = num_head_ * head_size_;
+    for (int i = local_idx; i < n; i += local_range) {
+      const int src_key_idx = group_idx * key_stride_ + i;
+      const int src_value_idx = group_idx * value_stride_ + i;
+      const int head_idx = i / head_size_;
+      const int head_offset = i % head_size_;
+      const int dst_idx = block_idx * block_stride_ + block_offset * n +
+          head_idx * head_size_ + head_offset;
+      scalar_t tgt_key = key_[src_key_idx];
+      scalar_t tgt_value = value_[src_value_idx];
+      if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E4M3) {
+        key_cache_[dst_idx] = static_cast<at::Float8_e4m3fn>(tgt_key * k_scale);
+        value_cache_[dst_idx] =
+            static_cast<at::Float8_e4m3fn>(tgt_value * v_scale);
+      } else if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E5M2) {
+        key_cache_[dst_idx] = static_cast<at::Float8_e5m2>(tgt_key * k_scale);
+        value_cache_[dst_idx] =
+            static_cast<at::Float8_e5m2>(tgt_value * v_scale);
+      } else {
+        key_cache_[dst_idx] = tgt_key;
+        value_cache_[dst_idx] = tgt_value;
+      }
+    }
+  }
+
+ private:
+  const scalar_t* key_;
+  const scalar_t* value_;
+  cache_t* key_cache_;
+  cache_t* value_cache_;
+  const slot_type* slot_mapping_;
+  int num_tokens_;
+  const int block_stride_;
+  const int key_stride_;
+  const int value_stride_;
+  const int num_head_;
+  const int head_size_;
+  const int block_size_;
+  const float k_scale;
+  const float v_scale;
+};
+
+template <
+    typename scalar_t,
+    typename cache_t,
+    typename slot_type,
+    Fp8KVCacheDataType kv_dt>
 void dpcpp_reshape_and_cache_kernel(
     const scalar_t* key,
     const scalar_t* value,
-    scalar_t* key_cache,
-    scalar_t* value_cache,
+    cache_t* key_cache,
+    cache_t* value_cache,
     const slot_type* slot_mapping,
     int num_tokens,
-    int key_stride,
-    int value_stride,
-    int num_head,
-    int head_size,
-    int block_size,
-    int x,
-    ReshapeAndCacheOp op) {
+    const int key_stride,
+    const int value_stride,
+    const int num_head,
+    const int head_size,
+    const int block_size,
+    const int x,
+    const float k_scale,
+    const float v_scale) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int wg = std::min(max_wg_size, int(num_head * head_size));
   auto cgf = DPCPP_Q_CGF(cgh) {
-    if (op == ReshapeAndCacheOp::kPagedAttention) {
-      auto kfn = ReshapeAndCache<scalar_t, slot_type, ReshapeAndCacheOp::kPagedAttention>(
-          key,
-          value,
-          key_cache,
-          value_cache,
-          slot_mapping,
-          num_tokens,
-          key_stride,
-          value_stride,
-          num_head,
-          head_size,
-          block_size,
-          x);
-      cgh.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
-          kfn);
-    } else {
-      auto kfn = ReshapeAndCache<scalar_t, slot_type, ReshapeAndCacheOp::kChunkedPrefill>(
-          key,
-          value,
-          key_cache,
-          value_cache,
-          slot_mapping,
-          num_tokens,
-          key_stride,
-          value_stride,
-          num_head,
-          head_size,
-          block_size,
-          x);
-      cgh.parallel_for(
-          sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
-          kfn);
-    }
+    auto kfn = ReshapeAndCache<scalar_t, cache_t, slot_type, kv_dt>(
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        num_tokens,
+        key_stride,
+        value_stride,
+        num_head,
+        head_size,
+        block_size,
+        x,
+        k_scale,
+        v_scale);
+    cgh.parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
+        kfn);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
+
+template <
+    typename scalar_t,
+    typename cache_t,
+    typename slot_type,
+    Fp8KVCacheDataType kv_dt>
+void dpcpp_reshape_and_cache_flash_kernel(
+    const scalar_t* key,
+    const scalar_t* value,
+    cache_t* key_cache,
+    cache_t* value_cache,
+    const slot_type* slot_mapping,
+    int num_tokens,
+    const int block_stride,
+    const int key_stride,
+    const int value_stride,
+    const int num_head,
+    const int head_size,
+    const int block_size,
+    const float k_scale,
+    const float v_scale) {
+  auto& queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int wg = std::min(max_wg_size, int(num_head * head_size));
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    auto kfn = ReshapeAndCacheFlash<scalar_t, cache_t, slot_type, kv_dt>(
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        num_tokens,
+        block_stride,
+        key_stride,
+        value_stride,
+        num_head,
+        head_size,
+        block_size,
+        k_scale,
+        v_scale);
+    cgh.parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
+        kfn);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+// The following macro is used to dispatch the conversion function based on
+// the data type of the key and value cache. The FN is a macro that calls a
+// function with template<typename scalar_t, typename cache_t,
+// Fp8KVCacheDataType kv_dt>.
+#define DISPATCH_BY_KV_CACHE_DTYPE(SRC_DTYPE, KV_DTYPE, FN)                    \
+  if (KV_DTYPE == "auto") {                                                    \
+    if (SRC_DTYPE == at::ScalarType::Float) {                                  \
+      FN(float, float, Fp8KVCacheDataType::kAuto);                             \
+    } else if (SRC_DTYPE == at::ScalarType::Half) {                            \
+      FN(at::Half, at::Half, Fp8KVCacheDataType::kAuto);                       \
+    } else if (SRC_DTYPE == at::ScalarType::BFloat16) {                        \
+      FN(at::BFloat16, at::BFloat16, Fp8KVCacheDataType::kAuto);               \
+    } else {                                                                   \
+      TORCH_CHECK(false, "Unsupported input type of kv cache: ", SRC_DTYPE);   \
+    }                                                                          \
+  } else {                                                                     \
+    if (KV_DTYPE == "fp8" || KV_DTYPE == "fp8_e4m3") {                         \
+      if (SRC_DTYPE == at::ScalarType::Float) {                                \
+        FN(float, at::Float8_e4m3fn, Fp8KVCacheDataType::kFp8E4M3);            \
+      } else if (SRC_DTYPE == at::ScalarType::Half) {                          \
+        FN(at::Half, at::Float8_e4m3fn, Fp8KVCacheDataType::kFp8E4M3);         \
+      } else if (SRC_DTYPE == at::ScalarType::BFloat16) {                      \
+        FN(at::BFloat16, at::Float8_e4m3fn, Fp8KVCacheDataType::kFp8E4M3);     \
+      } else {                                                                 \
+        TORCH_CHECK(false, "Unsupported input type of kv cache: ", SRC_DTYPE); \
+      }                                                                        \
+    } else if (KV_DTYPE == "fp8_e5m2") {                                       \
+      if (SRC_DTYPE == at::ScalarType::Float) {                                \
+        FN(float, at::Float8_e5m2, Fp8KVCacheDataType::kFp8E5M2);              \
+      } else if (SRC_DTYPE == at::ScalarType::Half) {                          \
+        FN(at::Half, at::Float8_e5m2, Fp8KVCacheDataType::kFp8E5M2);           \
+      } else if (SRC_DTYPE == at::ScalarType::BFloat16) {                      \
+        FN(at::BFloat16, at::Float8_e5m2, Fp8KVCacheDataType::kFp8E5M2);       \
+      } else {                                                                 \
+        TORCH_CHECK(false, "Unsupported input type of kv cache: ", SRC_DTYPE); \
+      }                                                                        \
+    } else {                                                                   \
+      TORCH_CHECK(false, "Unsupported data type of kv cache: ", KV_DTYPE);     \
+    }                                                                          \
+  }
+
+// KV_T is the stored data type of kv-cache.
+// CACHE_T is the data type of key and value tensors.
+// KV_DTYPE is the real data type of kv-cache.
+#define CALL_RESHAPE_AND_CACHE(KV_T, CACHE_T, KV_DTYPE)                       \
+  IPEX_DISPATCH_ALL_TYPES_AND2(                                               \
+      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", [&] { \
+        if (slot_map.scalar_type() == at::kLong)                              \
+          dpcpp_reshape_and_cache_kernel<KV_T, CACHE_T, int64_t, KV_DTYPE>(   \
+              reinterpret_cast<KV_T*>(key.data_ptr()),                        \
+              reinterpret_cast<KV_T*>(value.data_ptr()),                      \
+              reinterpret_cast<CACHE_T*>(key_cache.data_ptr()),               \
+              reinterpret_cast<CACHE_T*>(value_cache.data_ptr()),             \
+              slot_map.data_ptr<int64_t>(),                                   \
+              num_tokens,                                                     \
+              key_stride,                                                     \
+              value_stride,                                                   \
+              num_heads,                                                      \
+              head_size,                                                      \
+              block_size,                                                     \
+              x,                                                              \
+              k_scale,                                                        \
+              v_scale);                                                       \
+        else                                                                  \
+          dpcpp_reshape_and_cache_kernel<KV_T, CACHE_T, int32_t, KV_DTYPE>(   \
+              reinterpret_cast<KV_T*>(key.data_ptr()),                        \
+              reinterpret_cast<KV_T*>(value.data_ptr()),                      \
+              reinterpret_cast<CACHE_T*>(key_cache.data_ptr()),               \
+              reinterpret_cast<CACHE_T*>(value_cache.data_ptr()),             \
+              slot_map.data_ptr<int32_t>(),                                   \
+              num_tokens,                                                     \
+              key_stride,                                                     \
+              value_stride,                                                   \
+              num_heads,                                                      \
+              head_size,                                                      \
+              block_size,                                                     \
+              x,                                                              \
+              k_scale,                                                        \
+              v_scale);                                                       \
+      });
+
+// KV_T is the stored data type of kv-cache.
+// CACHE_T is the data type of key and value tensors.
+// KV_DTYPE is the real data type of kv-cache.
+#define CALL_RESHAPE_AND_CACHE_FLASH(KV_T, CACHE_T, KV_DTYPE)     \
+  IPEX_DISPATCH_ALL_TYPES_AND2(                                   \
+      at::kHalf,                                                  \
+      at::kBFloat16,                                              \
+      key.scalar_type(),                                          \
+      "reshape_and_cache_flash",                                  \
+      [&] {                                                       \
+        if (slot_map.scalar_type() == at::kLong)                  \
+          dpcpp_reshape_and_cache_flash_kernel<                   \
+              KV_T,                                               \
+              CACHE_T,                                            \
+              int64_t,                                            \
+              KV_DTYPE>(                                          \
+              reinterpret_cast<KV_T*>(key.data_ptr()),            \
+              reinterpret_cast<KV_T*>(value.data_ptr()),          \
+              reinterpret_cast<CACHE_T*>(key_cache.data_ptr()),   \
+              reinterpret_cast<CACHE_T*>(value_cache.data_ptr()), \
+              slot_map.data_ptr<int64_t>(),                       \
+              num_tokens,                                         \
+              block_stride,                                       \
+              key_stride,                                         \
+              value_stride,                                       \
+              num_heads,                                          \
+              head_size,                                          \
+              block_size,                                         \
+              k_scale,                                            \
+              v_scale);                                           \
+        else                                                      \
+          dpcpp_reshape_and_cache_flash_kernel<                   \
+              KV_T,                                               \
+              CACHE_T,                                            \
+              int32_t,                                            \
+              KV_DTYPE>(                                          \
+              reinterpret_cast<KV_T*>(key.data_ptr()),            \
+              reinterpret_cast<KV_T*>(value.data_ptr()),          \
+              reinterpret_cast<CACHE_T*>(key_cache.data_ptr()),   \
+              reinterpret_cast<CACHE_T*>(value_cache.data_ptr()), \
+              slot_map.data_ptr<int32_t>(),                       \
+              num_tokens,                                         \
+              block_stride,                                       \
+              key_stride,                                         \
+              value_stride,                                       \
+              num_heads,                                          \
+              head_size,                                          \
+              block_size,                                         \
+              k_scale,                                            \
+              v_scale);                                           \
+      });
 
 void reshape_and_cache(
     at::Tensor& key, // [num_tokens, num_heads, head_size]
@@ -366,11 +649,11 @@ void reshape_and_cache(
         key_cache, // [num_blocks, num_heads, head_size/x, block_size, x]
     at::Tensor& value_cache, // [num_blocks, num_heads, head_size, block_size]
     at::Tensor& slot_map, // [num_tokens]
-    const double k_scale=1.0, // align signature with cpu op, no implementation
-    const double v_scale=1.0) // align signature with cpu op, no implementation
-{
+    const std::string& kv_cache_dtype,
+    const double k_scale,
+    const double v_scale) {
   at::DeviceGuard device_guard(key.device());
-  int num_tokens = key.size(0);
+  int num_tokens = slot_map.size(0);
   int num_heads = key.size(1);
   int head_size = key.size(2);
   int block_size = key_cache.size(3);
@@ -378,100 +661,42 @@ void reshape_and_cache(
 
   int key_stride = key.stride(0);
   int value_stride = value.stride(0);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", 
-      [&] {
-        if (slot_map.scalar_type() == at::kLong)
-          dpcpp_reshape_and_cache_kernel(
-              key.data_ptr<scalar_t>(),
-              value.data_ptr<scalar_t>(),
-              key_cache.data_ptr<scalar_t>(),
-              value_cache.data_ptr<scalar_t>(),
-              slot_map.data_ptr<int64_t>(),
-              num_tokens,
-              key_stride,
-              value_stride,
-              num_heads,
-              head_size,
-              block_size,
-              x,
-              ReshapeAndCacheOp::kPagedAttention);
-        else
-          dpcpp_reshape_and_cache_kernel(
-              key.data_ptr<scalar_t>(),
-              value.data_ptr<scalar_t>(),
-              key_cache.data_ptr<scalar_t>(),
-              value_cache.data_ptr<scalar_t>(),
-              slot_map.data_ptr<int32_t>(),
-              num_tokens,
-              key_stride,
-              value_stride,
-              num_heads,
-              head_size,
-              block_size,
-              x,
-              ReshapeAndCacheOp::kPagedAttention);
-      });
+  DISPATCH_BY_KV_CACHE_DTYPE(
+      key.dtype(), kv_cache_dtype, CALL_RESHAPE_AND_CACHE)
 }
 
 void reshape_and_cache_flash(
     at::Tensor& key, // [num_tokens, num_heads, head_size]
     at::Tensor& value, // [num_tokens, num_heads, head_size]
-    at::Tensor&
-        key_cache, // [num_blocks, block_size, num_heads, head_size]
+    at::Tensor& key_cache, // [num_blocks, block_size, num_heads, head_size]
     at::Tensor& value_cache, // [num_blocks, block_size, num_heads, head_size]
-    at::Tensor& slot_map) // [num_tokens]
-{
+    at::Tensor& slot_map, // [num_tokens]
+    const std::string& kv_cache_dtype,
+    const double k_scale,
+    const double v_scale) {
   at::DeviceGuard device_guard(key.device());
-  int num_tokens = key.size(0);
+  int num_tokens = slot_map.size(0);
   int num_heads = key.size(1);
   int head_size = key.size(2);
   int block_size = key_cache.size(1);
 
   int key_stride = key.stride(0);
   int value_stride = value.stride(0);
-  // ReshapeAndCacheOp cache_op = ReshapeAndCacheOp::kChunkedPrefill;
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", 
-      [&] {
-        if (slot_map.scalar_type() == at::kLong)
-          dpcpp_reshape_and_cache_kernel(
-              key.data_ptr<scalar_t>(),
-              value.data_ptr<scalar_t>(),
-              key_cache.data_ptr<scalar_t>(),
-              value_cache.data_ptr<scalar_t>(),
-              slot_map.data_ptr<int64_t>(),
-              num_tokens,
-              key_stride,
-              value_stride,
-              num_heads,
-              head_size,
-              block_size,
-              1,
-              ReshapeAndCacheOp::kChunkedPrefill);
-        else
-          dpcpp_reshape_and_cache_kernel(
-              key.data_ptr<scalar_t>(),
-              value.data_ptr<scalar_t>(),
-              key_cache.data_ptr<scalar_t>(),
-              value_cache.data_ptr<scalar_t>(),
-              slot_map.data_ptr<int32_t>(),
-              num_tokens,
-              key_stride,
-              value_stride,
-              num_heads,
-              head_size,
-              block_size,
-              1,
-              ReshapeAndCacheOp::kChunkedPrefill);
-      });
+  int block_stride = key_cache.stride(0);
+  TORCH_CHECK(key_cache.stride(0) == value_cache.stride(0));
+  DISPATCH_BY_KV_CACHE_DTYPE(
+      key.dtype(), kv_cache_dtype, CALL_RESHAPE_AND_CACHE_FLASH)
 }
 
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH("swap_blocks", swap_blocks, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH("copy_blocks", copy_blocks, c10::DispatchKey::XPU);
-  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache", reshape_and_cache, c10::DispatchKey::XPU);
-  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache_flash", reshape_and_cache_flash, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "reshape_and_cache", reshape_and_cache, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "reshape_and_cache_flash",
+      reshape_and_cache_flash,
+      c10::DispatchKey::XPU);
 }
 } // namespace cache_op
 } // namespace AtenIpexTypeXPU
