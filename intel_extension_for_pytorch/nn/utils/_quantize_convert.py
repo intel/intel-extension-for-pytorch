@@ -523,7 +523,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 self.g_idx,
             )
 
-    def set_weights_bias(self, weight_data, bias=None):
+    def set_weights_bias(self, weight_data, bias=None, update_g_idx=True):
         qweight = ParamsLowBits(
             data=weight_data,
             requires_grad=False,
@@ -540,7 +540,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             self.bias = torch.nn.Parameter(
                 bias.contiguous().to(torch.float16), requires_grad=False
             )
-        if hasattr(self, "g_idx") and self.g_idx is not None:
+        if hasattr(self, "g_idx") and self.g_idx is not None and update_g_idx:
             # The prerequisite for this to work is that set_scales_zps_gidx is called first.
             assert self.qweight.data.dtype == torch.int32
             shuf_weight = GPTQShuffle(self.bits, self.blocksize)
