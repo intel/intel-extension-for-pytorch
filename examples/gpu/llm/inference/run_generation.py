@@ -14,6 +14,8 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     LlamaForCausalLM,
+    LlavaForConditionalGeneration,
+    AutoProcessor,
     AutoTokenizer,
 )
 
@@ -33,6 +35,7 @@ MODEL_CLASSES = {
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "glm-4": (AutoModelForCausalLM, AutoTokenizer),
     "mistral": (AutoModelForCausalLM, AutoTokenizer),
+    "llava": (LlavaForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -53,6 +56,11 @@ parser.add_argument(
 parser.add_argument('--sub-model-name',
     type=str,
     help="the sub model name for accuracy check"
+)
+parser.add_argument(
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
 )
 parser.add_argument(
     "--device",
@@ -79,6 +87,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--prompt", default=None, type=str, help="input prompt for self-defined if needed"
+)
+parser.add_argument(
+    "--image-url", default="./image/australia.jpg", type=str, help="image url for image-to-text task"
 )
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
@@ -266,6 +277,11 @@ current_path = pathlib.Path(__file__).parent.resolve()
 with open(str(current_path) + "/prompt.json", encoding="utf8") as f:
     prompt_pool = json.load(f)
 
+if args.vision_text_model:
+    from PIL import Image
+    import requests
+    image = Image.open(args.image_url)
+
 def run_generate(num_tokens, num_input_tokens, num_beams):
     print(f"*** Starting to generate {num_tokens} tokens for {num_input_tokens} tokens with num_beams={num_beams}")
     if args.prompt is not None:
@@ -282,7 +298,10 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     else:
         raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
 
-    input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+    if args.vision_text_model:
+        input_size = tokenizer(text=prompt, images=image, return_tensors="pt").input_ids.size(dim=1)
+    else:
+        input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
     print("---- Prompt size:", input_size)
 
     if args.token_latency:
@@ -295,7 +314,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     ref_prompt=None
     ref_prompt_cuda=None
     token_support = [(32, 32), (1024, 128)]
-    if (int(num_input_tokens), num_tokens) in token_support:
+    if (int(num_input_tokens), num_tokens) in token_support and not args.vision_text_model:
         ref_prompt = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"{num_beams}"]
         try:
             ref_prompt_cuda = prompt_json[args.sub_model_name][f"{num_input_tokens}-{num_tokens}"][f"cuda-result: {num_beams}"]
@@ -324,10 +343,18 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                     record_shapes=True,
                 )
             ) as prof:
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-                output = model.generate(
-                    input_ids, max_new_tokens=int(args.max_new_tokens), min_new_tokens=int(args.max_new_tokens), **generate_kwargs
-                )
+                if args.vision_text_model:
+                    inputs = tokenizer(text=prompt, images=image, return_tensors="pt")
+                    input_ids = inputs.input_ids.to(device)
+                    pixel_values = inputs.pixel_values.to(device)
+                    output = model.generate(
+                        input_ids, max_new_tokens=int(args.max_new_tokens), min_new_tokens=int(args.max_new_tokens), pixel_values=pixel_values, **generate_kwargs
+                    )
+                else:
+                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                    output = model.generate(
+                        input_ids, max_new_tokens=int(args.max_new_tokens), min_new_tokens=int(args.max_new_tokens), **generate_kwargs
+                    )
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
                 if args.device == "xpu":
