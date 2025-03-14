@@ -2160,7 +2160,7 @@ def optimize(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.44.2"
+        validated_version = "4.48.3"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "optimize_transformers requires transformers package with version at least {} , fallback".format(
