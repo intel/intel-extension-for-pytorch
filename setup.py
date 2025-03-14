@@ -1237,9 +1237,6 @@ entry_points = {
     "console_scripts": [
         "ipexrun = {}.launcher:main".format(PACKAGE_NAME),
     ],
-    "torch.backends": [
-        "intel_extension_for_pytorch = intel_extension_for_pytorch:_autoload",
-    ],
 }
 
 
