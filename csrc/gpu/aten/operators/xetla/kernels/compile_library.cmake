@@ -7,8 +7,12 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
     -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}
   )
 
+  # Enable device code compression
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} --offload-compress)
+
   if (AOT_DEVLIST)
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -flink-huge-device-code)
   endif()
 
   # set RPATH

@@ -29,7 +29,7 @@ set(USE_XETLA "ON" CACHE STRING "Use XeTLA based customer kernels; Specify a com
 set(USE_ONEDNN_DIR "" CACHE STRING "Specify oneDNN source path which contains its include directory and lib directory")
 set(USE_XETLA_SRC "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla/kernels/" CACHE STRING "Specify XETLA source path which contains its include dir")
 
-option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)" OFF)
+option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with AOT enabled)" OFF)
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 #FIXME: For now oneDNN is not ready to support strided source
