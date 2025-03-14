@@ -6,6 +6,7 @@ import importlib
 import intel_extension_for_pytorch as ipex
 import os
 import pytest
+import torch
 import transformers
 from transformers import AutoConfig
 
@@ -19,7 +20,9 @@ common_params = {
     "use_static_cache": [True, False],
     "num_beams": [1, 4],
     "input_tokens_length": [32, 1024],
-    "max_new_tokens": [long_sequence_len],
+    "input_tokens_length_for_win": [32],
+    "max_new_tokens": [512],
+    "max_new_tokens_for_win": [32],
 }
 
 need_recover_models_list = {
@@ -32,6 +35,12 @@ need_recover_models_list = {
 def get_module_structure(model) -> str:
     structure = sorted((name, type(module).__name__) for name, module in model.named_modules())
     return str(structure).encode('utf-8')
+
+def is_data_center_gpu() -> bool:
+    if "Data Center GPU Max" in torch.xpu.get_device_name():
+        return True
+    else:
+        return False
 
 
 def cache_module(model_list):

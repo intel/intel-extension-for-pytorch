@@ -2,8 +2,10 @@ from test_llm_common_utils import TestIpexLLMOptimizeBase
 from test_llm_common_utils import (
     curpath,
     common_params,
+    is_data_center_gpu,
 )
 import transformers
+import pytest
 from torch.testing._internal.common_utils import (
     instantiate_parametrized_tests,
     run_tests,
@@ -20,6 +22,8 @@ class TestBloomOptimize(TestIpexLLMOptimizeBase):
     @parametrize("input_tokens_length", common_params["input_tokens_length"])
     @parametrize("max_new_tokens", common_params["max_new_tokens"])
     def test_bloom_model_generate(self, **params):
+        if not is_data_center_gpu():
+            pytest.skip("Skipping this test on platforms except data centor GPU.")
         self.run_generate_test(**params)
 
 
