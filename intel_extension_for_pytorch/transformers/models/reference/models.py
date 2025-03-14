@@ -5926,10 +5926,10 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
         if self.scoring_func == "softmax":
             scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
         elif self.scoring_func == "sigmoid":
-            if self.topk_method == "noaux_tc":
-                scores = logits
-            else:
-                scores = logits.sigmoid()
+            # if self.topk_method == "noaux_tc":
+            #     scores = logits
+            # else:
+            scores = logits.sigmoid()
         else:
             raise NotImplementedError(
                 f"insupportable scoring function for MoE gating: {self.scoring_func}"
@@ -5952,16 +5952,16 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
                 self.top_k,
             )
         elif self.topk_method == "noaux_tc":
-            # topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
-            #     hidden_states,
-            #     scores,
-            #     torch.tensor(self.routed_scaling_factor),
-            #     self.n_group,
-            #     self.topk_group,
-            #     self.n_routed_experts,
-            #     self.top_k,
-            #     torch.tensor(self.e_score_correction_bias, dtype=torch.float32),
-            # )
+            topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
+                hidden_states,
+                scores,
+                torch.tensor(self.routed_scaling_factor),
+                self.n_group,
+                self.topk_group,
+                self.n_routed_experts,
+                self.top_k,
+                torch.tensor(self.e_score_correction_bias, dtype=torch.float32),
+            )
             # # breakpoint()
             # n_group = 8 topk_group 4, n_routed_experts: 256, num_experts_per_tok = topk: 8,
             # scores_for_choice = scores.view(hidden_states.size(0), -1) + self.e_score_correction_bias.unsqueeze(0)
@@ -5993,7 +5993,7 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
             # topk_weight = topk_weight / denominator
             # topk_idx = torch.empty(hidden_states.size(0), self.top_k).to(torch.int)
             # topk_weight = torch.empty(hidden_states.size(0), self.top_k).to(hidden_states.dtype)
-            topk_idx, topk_weight = torch.ops.torch_ipex.grouped_topk(hidden_states, scores, self.top_k, True, self.n_group, self.topk_group,  self.e_score_correction_bias, self.routed_scaling_factor_r1)
+            # topk_idx, topk_weight = torch.ops.torch_ipex.grouped_topk(hidden_states, scores, self.top_k, True, self.n_group, self.topk_group,  self.e_score_correction_bias, self.routed_scaling_factor_r1)
 
         # norm gate to sum 1
         if self.top_k > 1 and self.norm_topk_prob and not self.topk_method == "noaux_tc":
@@ -6001,8 +6001,8 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
             topk_weight = topk_weight / denominator
         elif self.topk_method == "greedy":
             topk_weight = topk_weight * self.routed_scaling_factor
-        # if self.topk_method == "noaux_tc":
-        #     topk_weight = topk_weight * self.routed_scaling_factor
+        if self.topk_method == "noaux_tc":
+            topk_weight = topk_weight * self.routed_scaling_factor
 
         aux_loss = None
         return topk_idx, topk_weight, aux_loss
