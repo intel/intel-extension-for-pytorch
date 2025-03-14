@@ -85,3 +85,13 @@ Tensor bmm(const Tensor& self, const Tensor& mat2) {
 }
 } // namespace AtenIpexTypeNestedTensorXPU
 } // namespace at
+
+namespace at {
+namespace native {
+
+Tensor bmm_nested_xpu(const Tensor& self, const Tensor& mat2) {
+  return at::AtenIpexTypeNestedTensorXPU::bmm(self, mat2);
+}
+
+} // namespace native
+} // namespace at

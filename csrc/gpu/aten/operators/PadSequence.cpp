@@ -256,7 +256,14 @@ void parallel_pad(
 }
 } // namespace impl
 
-Tensor pad_sequence(
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+//	pad_sequence_xpu(c10::ArrayRef<at::Tensor>, bool, double,
+// std::basic_string_view<char, std::char_traits<char> >
+Tensor pad_sequence_xpu(
     TensorList sequences,
     bool batch_first,
     double padding_value,
@@ -310,7 +317,8 @@ Tensor pad_sequence(
       });
 
   if (sequences.size() > 1 && allSameType && !isBlockfmt && all32BitIndexable &&
-      allContiguous && out.dim() <= impl::PAD_ARRAY_MAX_INPUT_DIMS &&
+      allContiguous &&
+      out.dim() <= AtenIpexTypeXPU::impl::PAD_ARRAY_MAX_INPUT_DIMS &&
       batch_first) {
     int nDims = out.dim();
     IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
@@ -320,7 +328,8 @@ Tensor pad_sequence(
         out.scalar_type(),
         "pad_dpcpp",
         [&]() {
-          impl::parallel_pad<scalar_t>(out, sequences, nDims, batch_first);
+          AtenIpexTypeXPU::impl::parallel_pad<scalar_t>(
+              out, sequences, nDims, batch_first);
         });
   } else {
     for (const auto i : c10::irange(sequences_size)) {
@@ -337,5 +346,5 @@ Tensor pad_sequence(
   }
   return out;
 }
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

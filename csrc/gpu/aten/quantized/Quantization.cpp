@@ -226,3 +226,36 @@ Tensor _empty_per_channel_affine_quantized(
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
+
+namespace at {
+namespace native {
+
+Tensor quantize_per_tensor_xpu(
+    const Tensor& self,
+    double scale,
+    int64_t zero_point,
+    ScalarType dtype) {
+  return at::AtenIpexTypeXPU::quantize_per_tensor(
+      self, scale, zero_point, dtype);
+}
+
+Tensor quantize_per_channel_xpu(
+    const Tensor& self,
+    const Tensor& scales,
+    const Tensor& zero_points,
+    int64_t axis,
+    ScalarType dtype) {
+  return at::AtenIpexTypeXPU::quantize_per_channel(
+      self, scales, zero_points, axis, dtype);
+}
+
+Tensor quantize_per_tensor_dynamic_xpu(
+    const Tensor& self,
+    ScalarType dtype,
+    bool reduce_range = false) {
+  return at::AtenIpexTypeXPU::quantize_per_tensor_dynamic(
+      self, dtype, reduce_range);
+}
+
+} // namespace native
+} // namespace at

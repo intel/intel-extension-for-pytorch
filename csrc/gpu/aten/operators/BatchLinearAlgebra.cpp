@@ -3,10 +3,11 @@
 #include <ATen/native/LinearAlgebraUtils.h>
 #include <ATen/native/Resize.h>
 #include <ATen/ops/_linalg_check_errors.h>
-
 #include <runtime/Utils.h>
 #include <tensor/TensorMeta.h>
 #include <utils/oneMKLUtils.h>
+#include <xpu/ATen/ops/_linalg_det_native.h>
+#include <xpu/ATen/ops/_linalg_slogdet_native.h>
 
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
@@ -370,6 +371,73 @@ std::tuple<Tensor&, Tensor&> linalg_eig_out(
   return std::tuple<Tensor&, Tensor&>(values, vectors);
 }
 
+// As P is a permutation matrix
+// det(P) = 1 if it's an even permutation and det(P) = -1 if it's an odd
+// permutation
+Tensor lu_det_P(const Tensor& pivots) {
+  return (at::arange(1, pivots.size(-1) + 1, pivots.options()) != pivots)
+      .sum(-1, /*keepdim=*/false, /*dtype=*/at::kLong)
+      .fmod_(2)
+      // take 0 to 1 and 1 to -1
+      .mul_(-2)
+      .add_(1);
+}
+
+Tensor& linalg_lu_solve_out(
+    const Tensor& LU,
+    const Tensor& pivots,
+    const Tensor& B,
+    bool left,
+    bool adjoint,
+    Tensor& result) {
+  // Trivial case
+  if (result.numel() == 0) {
+    return result;
+  }
+
+  // Solve A^H X = B^H. Then we return X^H
+  if (!left) {
+    adjoint = !adjoint;
+    result.transpose_(-2, -1);
+  }
+
+  // Copy B (or B^H) into result
+  if (!result.is_same(B)) {
+    result.copy_(left ? B : B.mH());
+  }
+
+  // Make LU / pivots F-contiguous
+  auto pivots_ = pivots.expect_contiguous();
+  auto LU_ = at::native::borrow_else_clone(
+      LU.mT().is_contiguous(), LU, LU, /*row_major=*/false);
+
+  const auto trans = !adjoint ? TransposeType::NoTranspose
+      : LU.is_complex()       ? TransposeType::ConjTranspose
+                              : TransposeType::Transpose;
+  std::vector<int32_t> infos_vec(native::batchCount(LU), 0);
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      LU_->scalar_type(), "lu_solve_dpcpp", [&] {
+        impl::apply_lu_solve_dpcpp_<scalar_t>(
+            result, *LU_, *pivots_, infos_vec, trans);
+      });
+
+  // Conj-transpose back in-place
+  if (!left) {
+    result.transpose_(-2, -1);
+    if (result.is_complex()) {
+      result._set_conj(!result.is_conj());
+    }
+  }
+  return result;
+}
+
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+
 Tensor _linalg_eigvals(const Tensor& input) {
   ScalarType complex_dtype = toComplexType(input.scalar_type());
   Tensor values = at::empty({0}, input.options().dtype(complex_dtype));
@@ -377,7 +445,7 @@ Tensor _linalg_eigvals(const Tensor& input) {
   return values;
 }
 
-Tensor& linalg_eigvals_out(const Tensor& input, Tensor& values) {
+Tensor& linalg_eigvals_out_xpu(const Tensor& input, Tensor& values) {
   native::squareCheckInputs(input, "linalg.eigvals");
 
   // unlike NumPy for real-valued inputs the output is always complex-valued
@@ -438,39 +506,28 @@ Tensor& linalg_eigvals_out(const Tensor& input, Tensor& values) {
   return values;
 }
 
-// As P is a permutation matrix
-// det(P) = 1 if it's an even permutation and det(P) = -1 if it's an odd
-// permutation
-Tensor lu_det_P(const Tensor& pivots) {
-  return (at::arange(1, pivots.size(-1) + 1, pivots.options()) != pivots)
-      .sum(-1, /*keepdim=*/false, /*dtype=*/at::kLong)
-      .fmod_(2)
-      // take 0 to 1 and 1 to -1
-      .mul_(-2)
-      .add_(1);
-}
-
-std::tuple<Tensor&, Tensor&, Tensor&> _linalg_det_out(
-    const Tensor& A,
-    Tensor& det,
-    Tensor& LU,
-    Tensor& pivots) {
+TORCH_IMPL_FUNC(_linalg_det_out_xpu)
+(const Tensor& A, const Tensor& det, const Tensor& LU, const Tensor& pivots) {
   auto shape = A.sizes();
   auto ndim = shape.size();
 
   // det
-  auto det_new = set_contiguous(det, shape.slice(0, ndim - 2), A.options());
+  auto det_new = AtenIpexTypeXPU::set_contiguous(
+      const_cast<Tensor&>(det), shape.slice(0, ndim - 2), A.options());
   Tensor det_use = C10_UNLIKELY(det_new.has_value()) ? det_new.value() : det;
 
   // LU
   auto LU_strides =
       at::native::batched_matrix_contiguous_strides(shape, /*f-contig*=*/true);
-  auto LU_new = set_strided(LU, shape, LU_strides, A.options());
+  auto LU_new = AtenIpexTypeXPU::set_strided(
+      const_cast<Tensor&>(LU), shape, LU_strides, A.options());
   Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
 
   // pivots
-  set_contiguous_no_create(
-      pivots, shape.slice(0, ndim - 1), A.options().dtype(kInt));
+  AtenIpexTypeXPU::set_contiguous_no_create(
+      const_cast<Tensor&>(pivots),
+      shape.slice(0, ndim - 1),
+      A.options().dtype(kInt));
 
   // info is an aux tensor
   auto info = at::empty({0}, A.options().dtype(kInt));
@@ -487,21 +544,20 @@ std::tuple<Tensor&, Tensor&, Tensor&> _linalg_det_out(
   // det = det_P * prod(diag(LU))
   at::mul_out(
       const_cast<Tensor&>(det_use),
-      lu_det_P(pivots),
+      AtenIpexTypeXPU::lu_det_P(pivots),
       at::prod(LU_use.diagonal(0, -2, -1), /*dim=*/-1));
   if (det_new.has_value())
     det.copy_(det_use);
   if (LU_new.has_value())
     LU.copy_(LU_use);
-  return std::tuple<Tensor&, Tensor&, Tensor&>(det, LU, pivots);
 }
 
-std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
-    const Tensor& A,
-    Tensor& sign,
-    Tensor& logabsdet,
-    Tensor& LU,
-    Tensor& pivots) {
+TORCH_IMPL_FUNC(_linalg_slogdet_out_xpu)
+(const Tensor& A,
+ const Tensor& sign,
+ const Tensor& logabsdet,
+ const Tensor& LU,
+ const Tensor& pivots) {
   at::native::squareCheckInputs(A, "linalg.slogdet");
   at::native::checkFloatingOrComplex(
       A, "linalg.slogdet", /*low_precision*/ false);
@@ -511,13 +567,14 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
   auto shape_outputs = shape.slice(0, ndim - 2);
 
   // sign
-  auto sign_new = set_contiguous(sign, shape_outputs, A.options());
+  auto sign_new = AtenIpexTypeXPU::set_contiguous(
+      const_cast<Tensor&>(sign), shape_outputs, A.options());
   Tensor sign_use =
       C10_UNLIKELY(sign_new.has_value()) ? sign_new.value() : sign;
 
   // logabsdet
-  auto logabsdet_new = set_contiguous(
-      logabsdet,
+  auto logabsdet_new = AtenIpexTypeXPU::set_contiguous(
+      const_cast<Tensor&>(logabsdet),
       shape_outputs,
       A.options().dtype(toRealValueType(A.scalar_type())));
   Tensor logabsdet_use = C10_UNLIKELY(logabsdet_new.has_value())
@@ -528,12 +585,15 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
   auto LU_strides = at::native::batched_matrix_contiguous_strides(
       shape,
       /*f-contig*=*/true);
-  auto LU_new = set_strided(LU, shape, LU_strides, A.options());
+  auto LU_new = AtenIpexTypeXPU::set_strided(
+      const_cast<Tensor&>(LU), shape, LU_strides, A.options());
   Tensor LU_use = C10_UNLIKELY(LU_new.has_value()) ? LU_new.value() : LU;
 
   // pivots
-  set_contiguous_no_create(
-      pivots, shape.slice(0, ndim - 1), A.options().dtype(kInt));
+  AtenIpexTypeXPU::set_contiguous_no_create(
+      const_cast<Tensor&>(pivots),
+      shape.slice(0, ndim - 1),
+      A.options().dtype(kInt));
 
   // info is an aux tensor
   auto info = at::empty({0}, A.options().dtype(kInt));
@@ -550,7 +610,9 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
   auto diag_U = LU_use.diagonal(0, -2, -1);
   // sign
   at::mul_out(
-      const_cast<Tensor&>(sign_use), diag_U.sgn().prod(-1), lu_det_P(pivots));
+      const_cast<Tensor&>(sign_use),
+      diag_U.sgn().prod(-1),
+      AtenIpexTypeXPU::lu_det_P(pivots));
 
   // logabsdet
   at::sum_out(const_cast<Tensor&>(logabsdet_use), diag_U.abs().log_(), -1);
@@ -561,61 +623,9 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_slogdet_out(
     logabsdet.copy_(logabsdet_use);
   if (LU_new.has_value())
     LU.copy_(LU_use);
-
-  return std::tuple<Tensor&, Tensor&, Tensor&, Tensor&>(
-      sign, logabsdet, LU, pivots);
 }
 
-Tensor& linalg_lu_solve_out(
-    const Tensor& LU,
-    const Tensor& pivots,
-    const Tensor& B,
-    bool left,
-    bool adjoint,
-    Tensor& result) {
-  // Trivial case
-  if (result.numel() == 0) {
-    return result;
-  }
-
-  // Solve A^H X = B^H. Then we return X^H
-  if (!left) {
-    adjoint = !adjoint;
-    result.transpose_(-2, -1);
-  }
-
-  // Copy B (or B^H) into result
-  if (!result.is_same(B)) {
-    result.copy_(left ? B : B.mH());
-  }
-
-  // Make LU / pivots F-contiguous
-  auto pivots_ = pivots.expect_contiguous();
-  auto LU_ = at::native::borrow_else_clone(
-      LU.mT().is_contiguous(), LU, LU, /*row_major=*/false);
-
-  const auto trans = !adjoint ? TransposeType::NoTranspose
-      : LU.is_complex()       ? TransposeType::ConjTranspose
-                              : TransposeType::Transpose;
-  std::vector<int32_t> infos_vec(native::batchCount(LU), 0);
-
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      LU_->scalar_type(), "lu_solve_dpcpp", [&] {
-        impl::apply_lu_solve_dpcpp_<scalar_t>(
-            result, *LU_, *pivots_, infos_vec, trans);
-      });
-
-  // Conj-transpose back in-place
-  if (!left) {
-    result.transpose_(-2, -1);
-    if (result.is_complex()) {
-      result._set_conj(!result.is_conj());
-    }
-  }
-  return result;
-}
-
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at
 
 #ifdef USE_OVERRIDE_OP

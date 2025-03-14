@@ -626,15 +626,24 @@ Tensor& _int_mm_out_xpu(
   return result;
 }
 
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+
 Tensor _int_mm_xpu(const Tensor& self, const Tensor& mat2) {
   Tensor result =
       at::empty({self.size(0), mat2.size(1)}, self.options().dtype(at::kInt));
-  return _int_mm_out_xpu(self, mat2, result);
+  return AtenIpexTypeXPU::_int_mm_out_xpu(self, mat2, result);
 }
 
-Tensor _int_mm(const Tensor& self, const Tensor& mat2) {
-  return _int_mm_xpu(self, mat2);
+Tensor& _int_mm_out_xpu(
+    const Tensor& self,
+    const Tensor& mat2,
+    Tensor& result) {
+  return AtenIpexTypeXPU::_int_mm_out_xpu(self, mat2, result);
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

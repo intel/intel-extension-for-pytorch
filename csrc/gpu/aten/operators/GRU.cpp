@@ -901,3 +901,30 @@ std::tuple<Tensor, Tensor> gru(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace at {
+namespace native {
+std::tuple<Tensor, Tensor> gru_xpu(
+    const Tensor& input_,
+    const Tensor& hx_,
+    TensorList params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
+  return at::AtenIpexTypeXPU::gru(
+      input_,
+      hx_,
+      params,
+      has_biases,
+      num_layers,
+      dropout,
+      train,
+      bidirectional,
+      batch_first);
+}
+
+} // namespace native
+} // namespace at

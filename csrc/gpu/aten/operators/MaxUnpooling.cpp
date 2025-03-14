@@ -3,12 +3,13 @@
 #include <ATen/NativeFunctions.h>
 #include <core/Memory.h>
 #include <core/MemoryFormat.h>
+#include <ops/max_unpool2d_native.h>
+#include <ops/max_unpool3d_native.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
-
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
@@ -600,47 +601,54 @@ Tensor& max_unpooling3d_forward_template(
 }
 } // namespace impl
 
-Tensor& max_unpool2d_out(
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+
+Tensor& max_unpooling2d_forward_out_dpcpp(
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size,
     Tensor& out) {
-  impl::max_unpooling2d_forward_template(out, self, indices, output_size);
+  AtenIpexTypeXPU::impl::max_unpooling2d_forward_template(
+      out, self, indices, output_size);
   return out;
 }
 
-Tensor max_unpool2d(
+Tensor max_unpooling2d_forward_dpcpp(
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size) {
   auto out = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::max_unpool2d_out(self, indices, output_size, out);
+  max_unpooling2d_forward_out_dpcpp(self, indices, output_size, out);
   return out;
 }
 
-Tensor& max_unpool3d_out(
+Tensor& max_unpooling3d_forward_out_dpcpp(
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size,
     IntArrayRef stride,
     IntArrayRef padding,
     Tensor& out) {
-  impl::max_unpooling3d_forward_template(
+  AtenIpexTypeXPU::impl::max_unpooling3d_forward_template(
       out, self, indices, output_size, stride, padding);
   return out;
 }
 
-Tensor max_unpool3d(
+Tensor max_unpooling3d_forward_dpcpp(
     const Tensor& self,
     const Tensor& indices,
     IntArrayRef output_size,
     IntArrayRef stride,
     IntArrayRef padding) {
   auto out = at::empty({0}, self.options());
-  at::AtenIpexTypeXPU::max_unpool3d_out(
+  max_unpooling3d_forward_out_dpcpp(
       self, indices, output_size, stride, padding, out);
   return out;
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

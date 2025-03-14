@@ -11,6 +11,20 @@
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include <ATen/Context.h>
+#include <runtime/Utils.h>
+#include <tensor/TensorMeta.h>
+#include <utils/oneMKLUtils.h>
+
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+#include "utils/CustomOperatorRegistration.h"
+
+#include "Resize.h"
+
+#include <torch/custom_class.h>
+#include "comm/ParamUtils.h"
+
 #include <vector>
 
 using namespace dnnl;
@@ -355,3 +369,27 @@ Tensor _adaptive_avg_pool2d(const Tensor& self, IntArrayRef output_size) {
 
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at
+
+namespace {
+at::Tensor wrapper_QuantizedXPU___adaptive_avg_pool2d(
+    const at::Tensor& self,
+    c10::SymIntArrayRef output_size) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      self,
+      "wrapper_QuantizedXPU___adaptive_avg_pool2d",
+      "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+  return at::AtenIpexTypeQuantizedXPU::_adaptive_avg_pool2d(
+      self, C10_AS_INTARRAYREF_SLOW(output_size));
+}
+
+// TORCH_LIBRARY_IMPL(aten, QuantizedXPU, m) {
+IPEX_TORCH_LIBRARY_IMPL(aten, QuantizedXPU, m) {
+  m.impl(
+      "_adaptive_avg_pool2d",
+      TORCH_FN(wrapper_QuantizedXPU___adaptive_avg_pool2d));
+}
+} // anonymous namespace

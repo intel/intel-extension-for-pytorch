@@ -911,7 +911,12 @@ void max_pool3d_with_indices_backward_out_template(
 
 } // namespace impl
 
-std::tuple<Tensor&, Tensor&> max_pool3d_with_indices_out(
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+std::tuple<Tensor&, Tensor&> max_pool3d_with_indices_out_dpcpp(
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef stride,
@@ -920,12 +925,12 @@ std::tuple<Tensor&, Tensor&> max_pool3d_with_indices_out(
     bool ceil_mode,
     Tensor& out,
     Tensor& indices) {
-  impl::max_pool3d_with_indices_out_template(
+  AtenIpexTypeXPU::impl::max_pool3d_with_indices_out_template(
       out, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
   return std::tuple<Tensor&, Tensor&>(out, indices);
 }
 
-std::tuple<Tensor, Tensor> max_pool3d_with_indices(
+std::tuple<Tensor, Tensor> max_pool3d_with_indices_dpcpp(
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef stride,
@@ -934,11 +939,11 @@ std::tuple<Tensor, Tensor> max_pool3d_with_indices(
     bool ceil_mode) {
   Tensor output = at::empty({0}, self.options());
   Tensor indices = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeXPU::max_pool3d_with_indices_out(
+  return max_pool3d_with_indices_out_dpcpp(
       self, kernel_size, stride, padding, dilation, ceil_mode, output, indices);
 }
 
-Tensor& max_pool3d_with_indices_backward_out(
+Tensor& max_pool3d_with_indices_backward_out_dpcpp(
     const Tensor& grad_output_,
     const Tensor& self_,
     IntArrayRef kernel_size,
@@ -966,7 +971,7 @@ Tensor& max_pool3d_with_indices_backward_out(
     indices = contiguous_if_needed(indices_, smf);
     grad_input.resize_as_(self, smf);
   }
-  impl::max_pool3d_with_indices_backward_out_template(
+  AtenIpexTypeXPU::impl::max_pool3d_with_indices_backward_out_template(
       grad_input,
       grad_output,
       self,
@@ -979,7 +984,7 @@ Tensor& max_pool3d_with_indices_backward_out(
   return grad_input;
 }
 
-Tensor max_pool3d_with_indices_backward(
+Tensor max_pool3d_with_indices_backward_dpcpp(
     const Tensor& grad_output_,
     const Tensor& self_,
     IntArrayRef kernel_size,
@@ -1006,7 +1011,7 @@ Tensor max_pool3d_with_indices_backward(
     indices = contiguous_if_needed(indices_, smf);
     grad_input = at::empty_like(self, smf);
   }
-  impl::max_pool3d_with_indices_backward_out_template(
+  AtenIpexTypeXPU::impl::max_pool3d_with_indices_backward_out_template(
       grad_input,
       grad_output,
       self,
@@ -1019,5 +1024,5 @@ Tensor max_pool3d_with_indices_backward(
   return grad_input;
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

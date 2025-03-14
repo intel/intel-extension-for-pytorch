@@ -445,28 +445,6 @@ Tensor multilabel_margin_loss(
       out, self, target, reduction);
 }
 
-std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out(
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction,
-    Tensor& output,
-    Tensor& is_target) {
-  multilabel_margin_loss_forward_out_xpu_template(
-      self, target, reduction, output, is_target);
-  return std::tuple<Tensor&, Tensor&>(output, is_target);
-}
-
-std::tuple<Tensor, Tensor> multilabel_margin_loss_forward(
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor is_target = at::empty({0}, self.options());
-  multilabel_margin_loss_forward_out_xpu_template(
-      self, target, reduction, output, is_target);
-  return std::make_tuple(output, is_target);
-}
-
 void multilabel_margin_loss_backward_xpu_out_template(
     const Tensor& grad_output,
     const Tensor& input,
@@ -546,29 +524,57 @@ void multilabel_margin_loss_backward_xpu_out_template(
   }
 }
 
-Tensor& multilabel_margin_loss_backward_out(
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+
+std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out_xpu(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction,
+    Tensor& output,
+    Tensor& is_target) {
+  AtenIpexTypeXPU::multilabel_margin_loss_forward_out_xpu_template(
+      self, target, reduction, output, is_target);
+  return std::tuple<Tensor&, Tensor&>(output, is_target);
+}
+
+std::tuple<Tensor, Tensor> multilabel_margin_loss_forward_xpu(
+    const Tensor& self,
+    const Tensor& target,
+    int64_t reduction) {
+  Tensor output = at::empty({0}, self.options());
+  Tensor is_target = at::empty({0}, self.options());
+  AtenIpexTypeXPU::multilabel_margin_loss_forward_out_xpu_template(
+      self, target, reduction, output, is_target);
+  return std::make_tuple(output, is_target);
+}
+
+Tensor& multilabel_margin_loss_backward_out_xpu(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
     int64_t reduction,
     const Tensor& is_target,
     Tensor& grad_input) {
-  multilabel_margin_loss_backward_xpu_out_template(
+  AtenIpexTypeXPU::multilabel_margin_loss_backward_xpu_out_template(
       grad_input, self, target, reduction, is_target, grad_input);
   return grad_input;
 }
 
-Tensor multilabel_margin_loss_backward(
+Tensor multilabel_margin_loss_backward_xpu(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
     int64_t reduction,
     const Tensor& is_target) {
   Tensor grad_input = at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  multilabel_margin_loss_backward_xpu_out_template(
+  AtenIpexTypeXPU::multilabel_margin_loss_backward_xpu_out_template(
       grad_output, self, target, reduction, is_target, grad_input);
   return grad_input;
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

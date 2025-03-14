@@ -15,7 +15,7 @@ using namespace torch_ipex::xpu::dpcpp;
 using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
-namespace AtenIpexTypeXPU {
+namespace native {
 
 template <typename scalar_t, typename underlying_t>
 struct _make_per_tensor_quantized_tensor_functor {
@@ -24,7 +24,7 @@ struct _make_per_tensor_quantized_tensor_functor {
   }
 };
 
-Tensor _make_per_tensor_quantized_tensor(
+Tensor make_per_tensor_quantized_tensor_xpu(
     const Tensor& self,
     double scale,
     int64_t zero_point) {
@@ -54,7 +54,7 @@ struct _make_per_channel_quantized_tensor_functor {
   }
 };
 
-Tensor _make_per_channel_quantized_tensor(
+Tensor make_per_channel_quantized_tensor_xpu(
     const Tensor& self,
     const Tensor& scales,
     const Tensor& zero_points,
@@ -79,7 +79,7 @@ Tensor _make_per_channel_quantized_tensor(
   return dst;
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 
 namespace AtenIpexTypeQuantizedXPU {
 

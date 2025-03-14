@@ -121,49 +121,6 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
 #endif
 }
 
-std::tuple<Tensor, Tensor, Tensor, Tensor>
-_scaled_dot_product_efficient_attention_backward(
-    const Tensor& grad_out,
-    const Tensor& query,
-    const Tensor& key,
-    const Tensor& value,
-    const Tensor& attn_bias,
-    const Tensor& out,
-    const Tensor& logsumexp,
-    const Tensor& philox_seed,
-    const Tensor& philox_offset,
-    double dropout_p,
-    std::array<bool, 4> grad_input_mask,
-    bool causal,
-    c10::optional<double> scale) {
-  if (!grad_out.defined()) {
-    return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
-  }
-
-  // This is needed because SaveVarible automatically converts
-  // c10::optional to undefined tensor
-  c10::optional<Tensor> kernel_bias;
-  if (attn_bias.defined()) {
-    kernel_bias = attn_bias;
-  }
-
-  return _efficient_attention_backward_impl(
-      grad_out,
-      query,
-      key,
-      value,
-      kernel_bias,
-      out,
-      logsumexp,
-      causal,
-      dropout_p,
-      c10::nullopt,
-      philox_seed,
-      philox_offset,
-      grad_input_mask[3],
-      scale);
-}
-
 std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
     const Tensor& grad_out,
     const Tensor& query,
@@ -265,6 +222,55 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> xetla_sdp_backward(
 }
 
 } // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace at {
+namespace native {
+
+std::tuple<Tensor, Tensor, Tensor, Tensor>
+_scaled_dot_product_efficient_attention_backward_xpu(
+    const Tensor& grad_out,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const Tensor& attn_bias,
+    const Tensor& out,
+    const Tensor& logsumexp,
+    const Tensor& philox_seed,
+    const Tensor& philox_offset,
+    double dropout_p,
+    std::array<bool, 4> grad_input_mask,
+    bool causal,
+    c10::optional<double> scale) {
+  if (!grad_out.defined()) {
+    return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
+  }
+
+  // This is needed because SaveVarible automatically converts
+  // c10::optional to undefined tensor
+  c10::optional<Tensor> kernel_bias;
+  if (attn_bias.defined()) {
+    kernel_bias = attn_bias;
+  }
+
+  return at::AtenIpexTypeXPU::_efficient_attention_backward_impl(
+      grad_out,
+      query,
+      key,
+      value,
+      kernel_bias,
+      out,
+      logsumexp,
+      causal,
+      dropout_p,
+      c10::nullopt,
+      philox_seed,
+      philox_offset,
+      grad_input_mask[3],
+      scale);
+}
+
+} // namespace native
 } // namespace at
 
 namespace {

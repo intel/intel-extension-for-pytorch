@@ -317,9 +317,9 @@ int64_t padded_tensor_numel(const Tensor& sizes) {
 } // namespace at
 
 namespace at {
-namespace AtenIpexTypeXPU {
+namespace native {
 
-Tensor _nested_from_padded(
+Tensor _nested_from_padded_xpu(
     const Tensor& padded,
     const Tensor& sizes,
     bool do_transform_0213) {
@@ -408,5 +408,5 @@ Tensor _nested_from_padded(
   }
 }
 
-} // namespace AtenIpexTypeXPU
+} // namespace native
 } // namespace at

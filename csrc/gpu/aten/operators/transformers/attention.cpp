@@ -464,61 +464,6 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
   }
 }
 
-std::tuple<Tensor, Tensor, Tensor, Tensor>
-_scaled_dot_product_efficient_attention(
-    const Tensor& query,
-    const Tensor& key,
-    const Tensor& value,
-    const c10::optional<at::Tensor>& attn_bias,
-    bool compute_log_sumexp,
-    double dropout_p,
-    bool is_causal,
-    c10::optional<double> scale) {
-  int64_t B = query.size(0);
-  int64_t num_heads = query.size(1);
-  int64_t M = query.size(-2);
-  int64_t N = key.size(-2);
-
-  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
-      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
-  std::pair<uint64_t, uint64_t> philox_state;
-  {
-    // See Note [Acquire lock when using random generators]
-    std::lock_guard<std::mutex> lock(gen->mutex_);
-    philox_state = gen->philox_engine_inputs(B * num_heads * M * N);
-  }
-  PhiloxState rng_engine_inputs(
-      std::get<0>(philox_state), std::get<1>(philox_state));
-  auto [seed, offset] = philox_unpack(rng_engine_inputs);
-  Tensor seed_t = at::scalar_tensor(
-      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
-  Tensor offset_t = at::scalar_tensor(
-      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
-
-  auto softmax_lse = at::empty(
-      {query.size(0), query.size(1), query.size(2)},
-      query.options().dtype(at::kFloat));
-
-  auto out = _scaled_dot_product_efficient_attention_impl(
-      query,
-      key,
-      value,
-      attn_bias,
-      c10::nullopt,
-      seed_t,
-      offset_t,
-      softmax_lse,
-      is_causal,
-      compute_log_sumexp,
-      dropout_p,
-      scale);
-  return std::make_tuple(
-      std::move(out),
-      std::move(softmax_lse),
-      std::move(seed_t),
-      std::move(offset_t));
-}
-
 std::tuple<Tensor, Tensor, Tensor> ipex_sdp_dropout_forward(
     const Tensor& query,
     const Tensor& key,
@@ -2168,3 +2113,84 @@ REGISTER_XPU_DISPATCH(
     &at::AtenIpexTypeXPU::_fused_sdp_choice);
 
 } // namespace at::native
+
+namespace at {
+namespace native {
+std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_xpu(
+    const Tensor& query_,
+    const Tensor& key,
+    const Tensor& value,
+    const std::optional<Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    const std::optional<Tensor>& dropout_mask,
+    std::optional<double> scale,
+    bool enable_gqa) {
+  return at::AtenIpexTypeXPU::_scaled_dot_product_attention_math(
+      query_,
+      key,
+      value,
+      attn_mask_,
+      dropout_p,
+      is_causal,
+      dropout_mask,
+      scale,
+      enable_gqa);
+}
+
+std::tuple<Tensor, Tensor, Tensor, Tensor>
+_scaled_dot_product_efficient_attention_xpu(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_bias,
+    bool compute_log_sumexp,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  int64_t B = query.size(0);
+  int64_t num_heads = query.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
+  std::pair<uint64_t, uint64_t> philox_state;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    philox_state = gen->philox_engine_inputs(B * num_heads * M * N);
+  }
+  at::AtenIpexTypeXPU::PhiloxState rng_engine_inputs(
+      std::get<0>(philox_state), std::get<1>(philox_state));
+  auto [seed, offset] = philox_unpack(rng_engine_inputs);
+  Tensor seed_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+  Tensor offset_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+
+  auto softmax_lse = at::empty(
+      {query.size(0), query.size(1), query.size(2)},
+      query.options().dtype(at::kFloat));
+
+  auto out = at::AtenIpexTypeXPU::_scaled_dot_product_efficient_attention_impl(
+      query,
+      key,
+      value,
+      attn_bias,
+      c10::nullopt,
+      seed_t,
+      offset_t,
+      softmax_lse,
+      is_causal,
+      compute_log_sumexp,
+      dropout_p,
+      scale);
+  return std::make_tuple(
+      std::move(out),
+      std::move(softmax_lse),
+      std::move(seed_t),
+      std::move(offset_t));
+}
+} // namespace native
+} // namespace at

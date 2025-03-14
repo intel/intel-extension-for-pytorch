@@ -1,6 +1,6 @@
 #include "Context.h"
-#include <QuantizedXPUNativeFunctions.h>
 #include <oneDNN/oneDNN.h>
+#include <operators/QuantizedXPUNativeFunctions.h>
 #include <operators/comm/Scalar.h>
 
 using namespace torch_ipex::xpu::oneDNN;

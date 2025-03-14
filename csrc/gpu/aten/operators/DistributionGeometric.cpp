@@ -55,3 +55,29 @@ Tensor& geometric_(Tensor& self, double p, c10::optional<Generator> gen_) {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace at {
+namespace native {
+Tensor geometric_xpu(
+    const at::Tensor& self,
+    double p,
+    ::std::optional<at::Generator> generator = ::std::nullopt) {
+  return at::native::geometric(self, p, generator);
+}
+Tensor& geometric_xpu_(
+    Tensor& self,
+    double p,
+    ::std::optional<at::Generator> generator = ::std::nullopt) {
+  return at::AtenIpexTypeXPU::geometric_(self, p, generator);
+}
+
+Tensor& geometric_out_xpu(
+    const Tensor& self,
+    double p,
+    c10::optional<Generator> generator,
+    at::Tensor& out) {
+  return at::native::geometric_out(self, p, generator, out);
+}
+
+} // namespace native
+} // namespace at
