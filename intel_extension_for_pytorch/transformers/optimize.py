@@ -214,7 +214,8 @@ def model_convert_reference(_model):
         JambaForCausalLM_forward,
         DeepseekV2ForCausalLM_forward,
         DeepseekV2Model_forward,
-        Deepseek_MoEGate_forward,
+        # Deepseek_MoEGate_forward,
+        _IPEXDeepSeekV3MoEGate,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -1099,11 +1100,18 @@ def model_convert_reference(_model):
     ]:
         convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
         convert_function(_model.model, "forward", DeepseekV2Model_forward)
-        convert_functions(
+        # convert_functions(
+        #     _model,
+        #     type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
+        #     "forward",
+        #     Deepseek_MoEGate_forward,
+        # )
+        convert_class(
             _model,
             type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
-            "forward",
-            Deepseek_MoEGate_forward,
+            _IPEXDeepSeekV3MoEGate,
+            _model.config,
+            distributed=distributed,
         )
         convert_class(
             _model,
