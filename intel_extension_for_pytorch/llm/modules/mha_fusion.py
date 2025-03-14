@@ -325,6 +325,8 @@ class VarlenAttention(nn.Module):
         softmax_scale (float): scaling factor applied is prior to softmax.
         is_causal (bool): whether to apply causal attention masking, default is True.
         softcap (float): the positive softcap value to apply on the attention weights, default is -1.
+        window_size_left (int) : left size of sliding window, default is -1.
+        window_size_right (int) : right size of sliding window, default is -1.
 
     Examples:
         >>> # module init:
@@ -371,6 +373,8 @@ class VarlenAttention(nn.Module):
         is_causal: bool,
         return_softmax: bool,
         gen_: torch.Generator,
+        window_size_left: int = -1,
+        window_size_right: int = -1,
         softcap: float = -1,
     ):
         return cls.runtime_ops.get_module_from_device(
@@ -390,6 +394,8 @@ class VarlenAttention(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            window_size_left,
+            window_size_right,
             softcap,
         )
 
@@ -793,6 +799,8 @@ class PagedAttention:
         is_cusal: bool,
         block_tables: torch.Tensor,
         alibi_slopes: torch.Tensor,
+        window_size_left: int = -1,
+        window_size_right: int = -1,
         kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
@@ -813,6 +821,8 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
+            window_size_left,
+            window_size_right,
             kv_cache_dtype,
             k_scale,
             v_scale,

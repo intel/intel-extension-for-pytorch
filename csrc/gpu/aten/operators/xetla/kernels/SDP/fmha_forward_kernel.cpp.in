@@ -22,6 +22,7 @@ This is an implementation of the Flash Attention algorithm
 #cmakedefine01 IMPL_KISTRAINING
 #cmakedefine01 IMPL_KISDROPOUT
 #cmakedefine01 IMPL_KISVARLEN
+#cmakedefine01 IMPL_KISLOCAL
 // clang-format on
 
 namespace gpu::xetla {
@@ -45,12 +46,13 @@ template <
     bool kSeqLast,
     bool kIsTraining,
     bool kIsDropout,
-    bool kVarlen>
+    bool kVarlen,
+    bool kIsLocal>
 cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
 #ifdef SDP_DBG
   printf(
       "B, N, Nkv, F, T, H: %u, %u, %u, %u, %u, %u, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d,"
-      "IsDropout: %d, IsVarlen: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
+      "IsDropout: %d, IsVarlen: %d, IsLocal: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
       args.num_batches,
       args.num_heads,
       args.num_kv_heads,
@@ -62,7 +64,8 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
       kIsCausal,
       kIsTraining,
       kIsDropout,
-      kIsVarlen,
+      kVarlen,
+      kIsLocal,
       (unsigned long long)args.alibi,
       args.alibi_padded_block_size,
       args.attn_mask_padded_block_size,
@@ -86,7 +89,8 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
         kSeqLast,
         kIsTraining,
         kIsDropout,
-        kVarlen>;
+        kVarlen,
+        kIsLocal>;
 
     sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
         args.num_batches * args.num_heads, args.num_queries);
@@ -117,7 +121,8 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
       IMPL_KSEQLAST,                         \
       IMPL_KISTRAINING,                      \
       IMPL_KISDROPOUT,                       \
-      IMPL_KISVARLEN>(const dispatch_fmha_forward_args_t<IMPL_T>& args)
+      IMPL_KISVARLEN,                        \
+      IMPL_KISLOCAL>(const dispatch_fmha_forward_args_t<IMPL_T>& args)
 
 #if (IMPL_KISTRAINING && IMPL_KISDROPOUT && defined(GPU_ARCH_XeHpc))
 INSTANTIATE_POLICY(fmha_policy_128x128x64);

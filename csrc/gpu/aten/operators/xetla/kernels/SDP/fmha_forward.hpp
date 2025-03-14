@@ -24,7 +24,8 @@ template <
     bool kSeqLast,
     bool kIsTraining,
     bool kIsDropout,
-    bool kVarlen>
+    bool kVarlen,
+    bool kIsLocal>
 class fmha_forward_t {
  public:
   using accum_t = float;
@@ -70,6 +71,10 @@ class fmha_forward_t {
     accum_t dp_scale;
     uint32_t uAT;
     uint32_t uMT;
+
+    // sliding window size
+    int32_t w_left, w_right;
+
     uint64_t seed;
     uint64_t offset;
     bool is_bias_add;
@@ -109,6 +114,8 @@ class fmha_forward_t {
         accum_t dropout_prob,
         uint32_t alibi_padded_block_size,
         uint32_t attn_mask_padded_block_size,
+        int32_t window_size_left,
+        int32_t window_size_right,
         uint64_t seed_t,
         uint64_t offset_t,
         accum_t softcap = -1.,
@@ -145,6 +152,8 @@ class fmha_forward_t {
           dp_scale(1.f / (1.f - dropout_prob)),
           uAT(alibi_padded_block_size),
           uMT(attn_mask_padded_block_size),
+          w_left(window_size_left),
+          w_right(window_size_right),
           seed(seed_t),
           offset(offset_t),
           is_bias_add(bias_strideF == 0),
@@ -278,6 +287,10 @@ class fmha_forward_t {
     int32_t kv_offset_y;
     int32_t kv_offset_x;
 
+    // local attention
+    uint32_t local_left;
+    uint32_t local_right;
+
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
@@ -339,6 +352,26 @@ class fmha_forward_t {
 
         mem_desc_Oi.init(
             args.O_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
+
+        // for local attention
+        if constexpr (kIsLocal) {
+          if constexpr (kIsCausal) {
+            args.w_right = 0;
+          }
+          int32_t startF = item.get_group(1) * kBr;
+          uint32_t real_T =
+              args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+          uint32_t real_F =
+              args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
+          uint32_t seq_diff = real_T - real_F;
+          local_left = args.w_left == -1
+              ? int(seq_diff)
+              : std::max(int(seq_diff), int(seq_diff + startF - args.w_left));
+          local_right = args.w_right == -1
+              ? real_T - 1
+              : std::min(
+                    seq_diff + startF + kBr + args.w_right - 1, real_T - 1);
+        }
       } else { // 2d mem: [BxF, NxH]
         int32_t ptr_offset_y =
             (batch_id * args.q_strideB + head_id * args.q_strideN) /
@@ -670,19 +703,22 @@ class fmha_forward_t {
     using tile_mask = tile_mask_t<matAccSij_t>;
 
     uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
-    uint32_t real_T;
+    uint32_t real_T = args.uT;
     if constexpr (kVarlen) {
-      int32_t batch_id = item.get_group(0) / args.uN;
-      real_T = args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
-    } else {
-      real_T = args.uT;
+      real_T =
+          args.cu_seqlen_k[ctx.batch_id + 1] - args.cu_seqlen_k[ctx.batch_id];
     }
     uint32_t remainT = std::max(int(real_T) - int(sg_startT), 0);
+    if constexpr (kIsLocal) {
+      uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
+      tile_mask::local_mask(
+          matAccSij, sg_startF, sg_startT, args.w_left, args.w_right);
+    }
     if (remainT < kSgBc) {
       tile_mask::padding_mask(matAccSij, remainT);
     }
 
-    if constexpr (kIsCausal) {
+    if constexpr (kIsCausal && !kIsLocal) {
       uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
       if (sg_startT + kSgBc > sg_startF) {
         tile_mask::causal_mask(matAccSij, sg_startT, sg_startF);
@@ -1010,8 +1046,9 @@ class fmha_forward_t {
     uint32_t batch_id = ctx.batch_id; // get batch idx
     // Early exit when current thread access data exceed actual seqlen in varlen
     // fwd
+    int32_t actual_seqlen_q = args.uF;
     if constexpr (kVarlen) {
-      int32_t actual_seqlen_q =
+      actual_seqlen_q =
           args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
       int32_t seqlen_q = item.get_group(1) * kBr;
 
@@ -1026,14 +1063,12 @@ class fmha_forward_t {
 
     uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
-    int32_t actual_seqlen = 0;
+    int32_t actual_seqlen_k = 0;
     int32_t seqlen_diff = 0;
     if constexpr (kVarlen) {
-      actual_seqlen =
+      actual_seqlen_k =
           args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
-      int32_t seqlen_q =
-          args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
-      seqlen_diff = actual_seqlen - seqlen_q;
+      seqlen_diff = actual_seqlen_k - actual_seqlen_q;
     }
 
     // iterate through the keys
@@ -1041,8 +1076,16 @@ class fmha_forward_t {
       // Early leave for varlen_fwd if we found current seqlen exceed the actual
       // seqlen.
       if constexpr (kVarlen) {
-        if (startT >= actual_seqlen) {
+        if (startT >= actual_seqlen_k) {
           break;
+        }
+        if constexpr (kIsLocal) {
+          if (startT + kBc <= ctx.local_left) {
+            continue;
+          }
+          if (startT > ctx.local_right) {
+            break;
+          }
         }
       }
       if constexpr (kIsCausal) {

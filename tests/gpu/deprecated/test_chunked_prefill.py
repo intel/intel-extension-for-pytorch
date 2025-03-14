@@ -9,6 +9,8 @@ from torch.testing._internal.common_utils import (
     run_tests,
 )
 import pytest
+from einops import rearrange
+import torch.nn.functional as F
 
 FLOAT32_BYTES = torch.finfo(torch.float).bits // 8
 # This will change depending on the compute capability.
@@ -47,6 +49,41 @@ class TestChunkedPrefill(TestCase):
         out = torch.einsum("hqk,khd->qhd", attn_weights, value)
         return out
 
+
+    def construct_local_mask(
+        self,
+        seqlen_q,
+        seqlen_k,
+        window_size=(-1, -1),  # -1 means infinite window size
+        query_padding_mask=None,
+        key_padding_mask=None,
+        device=None,
+    ):
+        row_idx = rearrange(
+            torch.arange(seqlen_q, device=device, dtype=torch.long), "s -> s 1"
+        )
+        col_idx = torch.arange(seqlen_k, device=device, dtype=torch.long)
+        sk = (
+            seqlen_k
+            if key_padding_mask is None
+            else rearrange(key_padding_mask.sum(-1), "b -> b 1 1 1")
+        )
+        sq = (
+            seqlen_q
+            if query_padding_mask is None
+            else rearrange(query_padding_mask.sum(-1), "b -> b 1 1 1")
+        )
+        if window_size[0] < 0:
+            return col_idx > row_idx + sk - sq + window_size[1]
+        else:
+            sk = torch.full_like(col_idx, seqlen_k) if key_padding_mask is None else sk
+            right = sk if window_size[1] < 0 else torch.minimum(row_idx + sk - sq + window_size[1], sk)
+            return torch.logical_or(
+                col_idx > right,
+                col_idx < row_idx + sk - sq - window_size[0],
+            )
+
+
     def ref_chunked_prefill(
         self,
         output: torch.Tensor,
@@ -62,6 +99,7 @@ class TestChunkedPrefill(TestCase):
         scale: float,
         alibi_slopes: Optional[torch.Tensor],
         causal: bool = True,
+        window_size: Tuple[int, int] = [-1, -1],
         softcap: float = -1.0,
     ) -> None:
         query = query.to("xpu")
@@ -149,10 +187,23 @@ class TestChunkedPrefill(TestCase):
         pad_q = pad_q.permute(0, 2, 1, 3)
         pad_k = pad_k.permute(0, 2, 1, 3)
         pad_v = pad_v.permute(0, 2, 1, 3)
-        attn_mask = torch.empty([num_batch, 1, 1, max_seqlen_k], device="xpu").fill_(
-            float("-inf")
-        )
-        attn_mask[:, :, :, :max_seqlen_k].masked_fill_(k_mask[:, None, None, :], 0)
+        attn_mask = torch.empty([num_batch, 1, max_seqlen_q, max_seqlen_k], device="xpu").fill_(
+        float("-inf")
+    )
+        qk_mask = q_mask.unsqueeze(2) * k_mask.unsqueeze(1)
+        if window_size != (-1, -1):
+            for i in range(num_batch):
+                local_mask = self.construct_local_mask(
+                    seqlen_q[i][0],
+                    seqlen_k[i][0],
+                    window_size,
+                    None,
+                    None,
+                    query.device
+                )
+                local_mask = F.pad(local_mask, pad=(0, qk_mask[i].size(1) - local_mask.size(1), 0, qk_mask[i].size(0) - local_mask.size(0)))
+                qk_mask[i] = qk_mask[i].logical_and(local_mask==False)
+        attn_mask[:, :, :max_seqlen_q, :max_seqlen_k].masked_fill_(qk_mask[:, None, :, :], 0)
         # [b, h, f, t]
         attn_weights = torch.einsum("bhqd,bhkd->bhqk", pad_q, pad_k)
         attn_weights *= scale
@@ -231,6 +282,7 @@ class TestChunkedPrefill(TestCase):
         use_alibi,
         is_causal,
         version,
+        window_size,
         dtype,
         softcap,
     ) -> None:
@@ -309,6 +361,7 @@ class TestChunkedPrefill(TestCase):
             scale,
             alibi_slopes,
             is_causal,
+            window_size,
             softcap,
         )
 
@@ -325,6 +378,8 @@ class TestChunkedPrefill(TestCase):
             is_causal,
             block_tables_xpu,
             alibi_slopes_xpu,
+            window_size_left=window_size[0],
+            window_size_right=window_size[1],
             softcap=softcap,
         )
 
@@ -452,6 +507,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("block_size", [16, 32, 64, 128])
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False, True])
+    @parametrize("window_size", [(-1, -1), (8, 2), (8, 1024), (1024, 8)])
     @parametrize("dtype", [torch.float16])
     @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
@@ -467,6 +523,7 @@ class TestChunkedPrefill(TestCase):
         block_size,
         use_alibi,
         is_causal,
+        window_size,
         dtype,
         softcap,
     ):
@@ -479,6 +536,7 @@ class TestChunkedPrefill(TestCase):
             use_alibi,
             is_causal,
             "chunked_prefill",
+            window_size,
             dtype,
             softcap,
         )
@@ -494,6 +552,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False])
     @parametrize("dtype", [torch.float16])
+    @parametrize("window_size", [(-1, -1), (2, 2), (2, 1024), (1024, 2)])
     @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
@@ -520,6 +579,7 @@ class TestChunkedPrefill(TestCase):
             use_alibi,
             is_causal,
             "flash_decoding",
+            window_size,
             dtype,
             softcap,
         )

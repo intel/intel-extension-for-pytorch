@@ -139,6 +139,114 @@ struct tile_mask_t {
       }
     }
   }
+
+  // -------------------- // local_mask // ---------------------- //
+
+  inline static void local_mask(
+      mat_t& src,
+      uint32_t start_y,
+      uint32_t start_x,
+      int32_t w_left,
+      int32_t w_right) {
+#pragma unroll
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
+      int blk_start_y = start_y + i * block_size_y;
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; j++) {
+        auto src_sub = src.reg
+                           .xetla_select<block_elems, 1>(
+                               (i * num_block_x + j) * block_elems)
+                           .xetla_format<accum_t, block_size_y, block_size_x>();
+        int real_x = start_x + j * block_size_x;
+        int end_x = real_x + block_size_x - 1;
+#pragma unroll
+        for (uint32_t k = 0; k < block_size_y; k++) {
+          int real_y = blk_start_y + k;
+          if (w_right >= 0) {
+            int local_right = real_y + w_right;
+            if (local_right < real_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(1, 1) <=
+                  block_size_x;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+              continue;
+            } else if (local_right < end_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(real_x, 1) >
+                  local_right;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            }
+          }
+
+          if (w_left >= 0) {
+            int local_left = real_y - w_left;
+            if (local_left > end_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(1, 1) <=
+                  block_size_x;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            } else if (local_left > real_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(real_x, 1) <
+                  local_left;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            }
+          }
+        }
+      }
+    }
+
+    if constexpr ((tile_size_y % block_size_y) != 0) {
+      constexpr uint32_t tail_start_y =
+          tile_size_y / block_size_y * block_size_y;
+      constexpr uint32_t tail_size_y = tile_size_y % block_size_y;
+      constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        auto src_sub =
+            src.reg
+                .xetla_select<tail_block_elems, 1>(
+                    tail_start_y * tile_size_x + j * tail_block_elems)
+                .xetla_format<accum_t, tail_size_y, block_size_x>();
+        int real_x = start_x + j * block_size_x;
+        int end_x = real_x + block_size_x - 1;
+#pragma unroll
+        for (int k = 0; k < tail_size_y; k++) {
+          int real_y = start_y + tail_start_y + k;
+          if (w_right >= 0) {
+            int local_right = real_y + w_right;
+            if (local_right < real_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(1, 1) <=
+                  block_size_x;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+              continue;
+            } else if (local_right < end_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(real_x, 1) >
+                  local_right;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            }
+          }
+
+          if (w_left >= 0) {
+            int local_left = real_y - w_left;
+            if (local_left > end_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(1, 1) <=
+                  block_size_x;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            } else if (local_left > real_x) {
+              xetla_mask<block_size_x> mask =
+                  xetla_vector_gen<uint32_t, block_size_x>(real_x, 1) <
+                  local_left;
+              src_sub.row(k).xetla_merge(kNegInfinity, mask);
+            }
+          }
+        }
+      }
+    }
+  }
 };
 
 // ==================== // group_row_reduce_t // ================== //

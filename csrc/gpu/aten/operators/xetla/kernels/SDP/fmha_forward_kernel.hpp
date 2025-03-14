@@ -44,6 +44,8 @@ struct dispatch_fmha_forward_args_t {
   uint32_t bias_strideF;
   uint32_t alibi_padded_block_size;
   uint32_t attn_mask_padded_block_size;
+  int32_t window_size_left;
+  int32_t window_size_right;
   uint64_t seed_t;
   uint64_t offset_t;
   int32_t* block_tables;
@@ -79,6 +81,8 @@ struct dispatch_fmha_forward_args_t {
         bias_strideF(args.bias_strideF),
         alibi_padded_block_size(args.alibi_padded_block_size),
         attn_mask_padded_block_size(args.attn_mask_padded_block_size),
+        window_size_left(args.window_size_left),
+        window_size_right(args.window_size_right),
         seed_t(args.seed_t),
         offset_t(args.offset_t),
         block_tables(args.block_tables),
@@ -158,6 +162,8 @@ struct FmhaForwardKernelFunctor {
           (accum_t)args.dropout_prob,
           args.alibi_padded_block_size,
           args.attn_mask_padded_block_size,
+          args.window_size_left,
+          args.window_size_right,
           args.seed_t,
           args.offset_t,
           -1,
@@ -185,7 +191,8 @@ template <
     bool kSeqLast,
     bool kIsTraining,
     bool kIsDropout,
-    bool kIsVarlen>
+    bool kIsVarlen,
+    bool kIsLocal>
 cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args);
 
 } // namespace fmha

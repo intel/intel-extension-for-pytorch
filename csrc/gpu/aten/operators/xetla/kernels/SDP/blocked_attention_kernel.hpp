@@ -75,7 +75,10 @@ class blocked_attention_kernel {
     uint32_t head_size;
     uint32_t max_blocks_per_seq;
     uint32_t max_num_partitions;
+    int32_t w_left;
+    int32_t w_right;
     bool is_causal;
+    bool is_local;
     float softcap;
 
     inline arguments_t(
@@ -101,7 +104,10 @@ class blocked_attention_kernel {
         uint32_t head_size,
         uint32_t max_blocks_per_seq,
         uint32_t max_num_partitions,
+        int32_t window_size_left,
+        int32_t window_size_right,
         bool is_causal,
+        bool is_local,
         float softcap)
         : out(out),
           max_logits(max_logits),
@@ -124,7 +130,10 @@ class blocked_attention_kernel {
           head_size(head_size),
           max_blocks_per_seq(max_blocks_per_seq),
           max_num_partitions(max_num_partitions),
+          w_left(window_size_left),
+          w_right(window_size_right),
           is_causal(is_causal),
+          is_local(is_local),
           softcap(softcap) {
       // atoms = atoms_; // reinterpret_cast<AttentionAtom*>(atoms_);
       head_groups = num_heads / num_kv_heads;
@@ -216,6 +225,10 @@ class blocked_attention_kernel {
       loop_count = DIVIDE_ROUND_UP(args.head_size, head_size_stride);
 
       nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
+
+      if (args.is_local && args.is_causal) {
+        args.w_right = 0;
+      }
     }
   };
 
@@ -343,6 +356,17 @@ class blocked_attention_kernel {
     uint32_t context_q_end = context_q_start + block_size_y > seqlen_k
         ? seqlen_k
         : context_q_start + block_size_y;
+    uint32_t local_left, local_right;
+    if (args.is_local) {
+      local_left = args.w_left == -1
+          ? int(seqlen_diff)
+          : std::max(int(seqlen_diff), int(context_q_start - args.w_left));
+      local_right = args.w_right == -1
+          ? seqlen_k - 1
+          : std::min(
+                context_q_start + block_size_y + args.w_right - 1,
+                seqlen_k - 1);
+    }
 
     // iterate over context blocks
     for (int bid = ctx.sg_id_x, row_i = 0; bid < ctx.max_blocks_per_wg;
@@ -356,6 +380,15 @@ class blocked_attention_kernel {
       }
       const int context_k_start = bid * block_size +
           ctx.partition_id * ctx.max_blocks_per_wg * block_size;
+
+      if (args.is_local) {
+        if (context_k_start + block_size <= local_left) {
+          continue;
+        }
+        if (context_k_start > local_right) {
+          break;
+        }
+      }
 
       if (args.is_causal && context_k_start >= context_q_end) {
         break;
@@ -419,11 +452,21 @@ class blocked_attention_kernel {
       using tile_mask = fmha::tile_mask_t<score_acc_tile_t>;
       uint32_t remained_len = std::max(int(ctx.seq_k_end) - int(cu_seqlen), 0);
 
+      if (args.is_local) {
+        tile_mask::local_mask(
+            score_sub,
+            context_q_start,
+            context_k_start,
+            args.w_left,
+            args.w_right);
+      }
+
       if (remained_len < block_size) {
         tile_mask::padding_mask(score_sub, remained_len);
       }
       // TODO: handle remained_len before the loop and reverse bid loop
-      if (args.is_causal && context_k_start + block_size > context_q_start) {
+      if (!args.is_local && args.is_causal &&
+          context_k_start + block_size > context_q_start) {
         tile_mask::causal_mask(score_sub, context_k_start, context_q_start);
       }
 
@@ -453,14 +496,20 @@ class blocked_attention_kernel {
     xetla_vector<accum_t, block_size_y> group_max = wg_row_max(mat_score);
     xetla_mask<block_size_y> mask_inf = group_max == neg_infinity;
     xetla_vector<accum_t, block_size_y> group_max_minus = group_max;
-    group_max_minus.xetla_merge(0.0f, mask_inf);
 
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive();
 
+    group_max_minus.xetla_merge(0.0f, mask_inf);
     subgroup::tile_broadcast_op<subgroup::tile_minus, score_tile_t>(
         mat_score, group_max_minus);
-    mat_score.reg = xetla_exp<accum_t>(mat_score.reg);
+    // mat_score.reg = xetla_exp<accum_t>(mat_score.reg);
+
+    score_tile_t mat_zeros(0);
+    constexpr int elems = score_tile_t::tile_desc::tile_elems;
+    xetla_mask<elems> mask = mat_score.reg < -65400.f;
+    (mat_score.reg)
+        .xetla_merge(mat_zeros.reg, xetla_exp<accum_t>(mat_score.reg), mask);
 
     if constexpr (wg_size > 1)
       ctx.nbarrier.wait();
@@ -470,6 +519,9 @@ class blocked_attention_kernel {
 
     subgroup::tile_broadcast_op<subgroup::tile_div, score_tile_t>(
         mat_score, group_sum + std::numeric_limits<accum_t>::min());
+
+    if constexpr (wg_size > 1)
+      ctx.nbarrier.arrive_wait();
     // #endif
     // sycl::ext::oneapi::experimental::printf("num partitions: %d\n",
     // ctx.num_partitions); int num_pars = ctx.num_partitions; if the kv is too

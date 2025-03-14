@@ -34,7 +34,8 @@ template <
     bool kSeqLast = false,
     bool kIsTraining = false,
     bool kIsDropout = false,
-    bool kIsVarlen = false>
+    bool kIsVarlen = false,
+    bool kIsLocal = false>
 class fmha_forward_kernel_policy {
   template <typename fmha_policy, typename... Args>
   static cgfs_t policy(Args&&... args) {
@@ -60,7 +61,8 @@ class fmha_forward_kernel_policy {
         kSeqLast,
         kIsTraining,
         kIsDropout,
-        kIsVarlen>(std::forward<Args>(args)...);
+        kIsVarlen,
+        kIsLocal>(std::forward<Args>(args)...);
   }
 
  public:
@@ -136,7 +138,7 @@ class fmha_forward_kernel_policy {
       constexpr bool igpu_wo_dropout =
           arch_tag == gpu_arch::XeLpg && !kIsDropout;
       constexpr bool v2_available = igpu_wo_dropout && !kUseAlibi &&
-          !kIsCausal && !kIsTraining && !kIsDropout && !kIsVarlen;
+          !kIsCausal && !kIsTraining && !kIsDropout && !kIsVarlen && !kIsLocal;
       // roughly policy should match (num_queries)x(num_keys)x(head_size)
       if (args.head_size <= HEAD_SIZE_LIMIT_0) {
         if (v2_available && args.num_queries == NUM_QUERIES_GREEDY &&
@@ -243,7 +245,8 @@ cgfs_t _fmha_forward_kernel(
         args.seq_last,
         args.is_training,
         args.is_dropout,
-        args.is_varlen);
+        args.is_varlen,
+        args.is_local);
   } else if constexpr (arch_tag != gpu_arch::XeLpg) {
     return dispatch_fmha_forward<bf16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<bf16>(args),
@@ -253,7 +256,9 @@ cgfs_t _fmha_forward_kernel(
         args.seq_last,
         args.is_training,
         args.is_dropout,
-        args.is_varlen);
+        args.is_varlen,
+        args.is_local);
+    return {};
   } else {
     printf("bfloat16 is not supported on the XeLpg platform\n");
     return {};

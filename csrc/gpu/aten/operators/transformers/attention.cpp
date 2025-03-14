@@ -139,11 +139,14 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        attn_mask.has_value() ? attn_mask->stride(2) : -1,
        /* ablibi padded size */ 0,
        attn_mask_padded_block_size,
+       /* window size left */ -1,
+       /* window size right */ -1,
        is_causal,
        false,
        is_training,
        use_dropout,
        false, // use varlen
+       false, // is_local
        seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
        offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
                             : -1});
@@ -1012,6 +1015,8 @@ Tensor varlen_fwd(
     const double p_dropout,
     const double softmax_scale,
     const bool zero_tensors,
+    int64_t window_size_left,
+    int64_t window_size_right,
     bool is_causal,
     const bool return_softmax,
     c10::optional<at::Generator> gen_,
@@ -1046,6 +1051,15 @@ Tensor varlen_fwd(
   TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
   TORCH_CHECK(cu_seqlens_q.is_contiguous(), "cu_seqlens_q must be contiguous");
   TORCH_CHECK(cu_seqlens_k.is_contiguous(), "cu_seqlens_k must be contiguous");
+
+  if (window_size_left >= max_seqlen_k) {
+    window_size_left = -1;
+  }
+  if (window_size_right >= max_seqlen_k) {
+    window_size_right = -1;
+  }
+
+  bool is_local = (window_size_left != -1) | (window_size_right != -1);
 
   int batch_size = cu_seqlens_q.numel() - 1;
   int num_heads_q = query.size(1);
@@ -1148,11 +1162,14 @@ Tensor varlen_fwd(
        /* bias_strideF */ -1,
        alibi_padded_block_size,
        /* attn_mask_padding_block_size */ 0,
+       window_size_left,
+       window_size_right,
        is_causal,
        /* seq_last */ false,
        /* is_training */ false,
        /* use dropout */ p_dropout > 0.0 ? true : false,
        /* use varlen */ true,
+       /* is local */ is_local,
        (uint64_t)*seed_t.data_ptr<int64_t>(),
        (uint64_t)*offset_t.data_ptr<int64_t>(),
        softcap});
@@ -1288,11 +1305,14 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
        alibi_padded_block_size,
        attn_mask_padded_block_size,
+       -1, // window_size_left
+       -1, // window_size_right
        is_causal,
        seq_last,
        false, // is_training
        false, // use_dropout
        false, // use_varlen
+       false, // is_local
        (int)0,
        (int)0});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
@@ -1677,6 +1697,8 @@ Tensor chunked_prefill(
     const double p_dropout,
     const double softmax_scale,
     const bool zero_tensors,
+    int64_t window_size_left,
+    int64_t window_size_right,
     bool is_causal,
     const bool return_softmax,
     c10::optional<at::Generator> gen_,
@@ -1733,6 +1755,15 @@ Tensor chunked_prefill(
   Tensor out = out_;
   TORCH_CHECK(out.is_xpu(), "Output tensor must on XPU");
   TORCH_CHECK(out.is_contiguous(), "Output tensor must be contiguous");
+
+  if (window_size_left >= max_seqlen_k) {
+    window_size_left = -1;
+  }
+  if (window_size_right >= max_seqlen_k) {
+    window_size_right = -1;
+  }
+
+  bool is_local = (window_size_left != -1) | (window_size_right != -1);
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
   char str__[100];
@@ -1826,11 +1857,14 @@ Tensor chunked_prefill(
          -1,
          alibi_padded_block_size,
          0,
+         window_size_left,
+         window_size_right,
          is_causal,
          false, // seqlast
          false, // is_training
          false, // use_dropout
          true, // use_varlen
+         is_local, // is_local
          (uint64_t)0,
          (uint64_t)0,
          softcap,
@@ -1879,7 +1913,10 @@ Tensor chunked_prefill(
            head_dim,
            num_max_seq_block,
            block_size,
+           window_size_left,
+           window_size_right,
            is_causal,
+           is_local,
            softcap});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     } else {
@@ -1909,7 +1946,10 @@ Tensor chunked_prefill(
            head_dim,
            num_max_seq_block,
            block_size,
+           window_size_left,
+           window_size_right,
            is_causal,
+           is_local,
            softcap});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     }

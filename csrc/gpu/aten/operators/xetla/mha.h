@@ -43,11 +43,14 @@ struct fmha_forward_kernel_args_t {
   uint32_t bias_strideF;
   uint32_t alibi_padded_block_size;
   uint32_t attn_mask_padded_block_size;
+  int32_t window_size_left;
+  int32_t window_size_right;
   bool is_causal;
   bool seq_last;
   bool is_training;
   bool is_dropout;
   bool is_varlen;
+  bool is_local;
   uint64_t seed_t;
   uint64_t offset_t;
   float softcap = -1.;
@@ -100,7 +103,10 @@ struct chunked_prefill_fwd_kernel_args_t {
   int32_t head_size;
   int32_t max_blocks_per_seq;
   int32_t block_size;
+  int32_t window_size_left;
+  int32_t window_size_right;
   bool is_causal;
+  bool is_local;
   float softcap = -1.;
 };
 

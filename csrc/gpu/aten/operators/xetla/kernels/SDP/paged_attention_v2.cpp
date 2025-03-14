@@ -152,7 +152,10 @@ cgfs_t launch_split_kv_kernels(chunked_prefill_fwd_kernel_args_t fwd_args) {
               fwd_args.head_size,
               fwd_args.max_blocks_per_seq,
               num_splits,
+              fwd_args.window_size_left,
+              fwd_args.window_size_right,
               fwd_args.is_causal,
+              fwd_args.is_local,
               fwd_args.softcap);
 
           kernel_fn(item, args);

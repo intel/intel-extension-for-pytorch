@@ -274,6 +274,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         is_causal,
         return_softmax,
         gen_,
+        window_size_left,
+        window_size_right,
         softcap=-1.0,
     ):
         _IPEXVarlenScaledDotProductXPU.apply_function_flash_varlen(
@@ -292,8 +294,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
             softmax_scale,
             zero_tensors,
             is_causal,
-            -1,
-            -1,
+            window_size_left,
+            window_size_right,
             return_softmax,
             gen_,
             softcap,
@@ -324,9 +326,6 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         gen_,
         softcap=-1,
     ):
-        assert (
-            window_size_left == -1 and window_size_right == -1
-        ), "IPEX only support window_size_left and window_size_right as -1"
         assert seqused_k is None, "IPEX only support seqused_k as None yet"
         assert block_tables_ is None, "IPEX only support block_tables_ as None yet"
         if torch.xpu.has_2d_block_array():
@@ -355,6 +354,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
                 p_dropout,
                 softmax_scale,
                 zero_tensors,
+                window_size_left,
+                window_size_right,
                 is_causal,
                 return_softmax,
                 gen_,
@@ -554,6 +555,8 @@ class _IPEXPagedAttentionXPU:
         is_causal,
         block_table,
         alibi_slopes=None,
+        window_size_left=-1,
+        window_size_right=-1,
         kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
@@ -591,6 +594,8 @@ class _IPEXPagedAttentionXPU:
             0.0,
             scale,
             False,
+            window_size_left,
+            window_size_right,
             is_causal,
             False,
             None,

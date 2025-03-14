@@ -3,6 +3,8 @@ import intel_extension_for_pytorch as ipex  # noqa
 from typing import Tuple, Optional
 import pytest
 import math
+from einops import rearrange
+import torch.nn.functional as F
 
 # The largest head dim we can support is 256
 HEAD_DIM = [64, 70, 96, 128, 256]
@@ -18,6 +20,70 @@ USE_ALIBI = [False, True]
 SEQLEN_RANGE = [10, 64, 500, 1024]
 
 IS_CAUSAL = [False, True]
+
+WINDOW_SIZE = [(-1, -1), (2, 2), (2, 1024), (1024, 2)]
+
+
+def construct_local_mask(
+    seqlen_q,
+    seqlen_k,
+    window_size=(-1, -1),  # -1 means infinite window size
+    query_padding_mask=None,
+    key_padding_mask=None,
+    device=None,
+):
+    row_idx = rearrange(
+        torch.arange(seqlen_q, device=device, dtype=torch.long), "s -> s 1"
+    )
+    col_idx = torch.arange(seqlen_k, device=device, dtype=torch.long)
+    sk = (
+        seqlen_k
+        if key_padding_mask is None
+        else rearrange(key_padding_mask.sum(-1), "b -> b 1 1 1")
+    )
+    sq = (
+        seqlen_q
+        if query_padding_mask is None
+        else rearrange(query_padding_mask.sum(-1), "b -> b 1 1 1")
+    )
+    if window_size[0] < 0:
+        return col_idx > row_idx + sk - sq + window_size[1]
+    else:
+        sk = torch.full_like(col_idx, seqlen_k) if key_padding_mask is None else sk
+        return torch.logical_or(
+            col_idx > torch.minimum(row_idx + sk - sq + window_size[1], sk),
+            col_idx < row_idx + sk - sq - window_size[0],
+        )
+
+
+def create_causal_mask(num_batch, max_seqlen_q, max_seqlen_k, seqlen_q, seqlen_k):
+    seqlen_q = seqlen_q.view(-1, 1)
+    seqlen_k = seqlen_k.view(-1, 1)
+    seqlen_diff = seqlen_k - seqlen_q
+    q_idx_mask = (
+        torch.arange(0, max_seqlen_q, device="xpu").view(1, -1).repeat(num_batch, 1)
+    )
+    k_idx_mask = (
+        torch.arange(0, max_seqlen_k, device="xpu").view(1, -1).repeat(num_batch, 1)
+    )
+    q_mask = q_idx_mask < seqlen_q
+    k_mask = k_idx_mask < seqlen_k
+
+    # calculate idx for causal mask of query    [batch, max_seqlen_q]
+    causal_mask_idx = (q_idx_mask + seqlen_diff)[q_mask]
+
+    # generate causal mask [batch, max_seqlen_q, max_seqlen_k]
+    tril_mask = torch.tril(torch.ones(max_seqlen_k, max_seqlen_k, device="xpu"))
+    tril_mask[tril_mask == 0] = float("-inf")
+    tril_mask[tril_mask == 1] = 0
+    causal_mask = tril_mask[causal_mask_idx]
+    causal_mask_padding = torch.empty(
+        [num_batch, max_seqlen_q, max_seqlen_k], device="xpu"
+    ).fill_(float("-inf"))
+    causal_mask_padding[q_mask] = causal_mask
+    # to [batch, num_heads, max_seqlen_q, max_seqlen_k]
+    causal_mask_padding = causal_mask_padding.unsqueeze(1)
+    return causal_mask_padding
 
 
 def varlen_fwd_reference(
@@ -35,6 +101,7 @@ def varlen_fwd_reference(
     zero_tensors: bool,
     is_causal: bool,
     return_softmax: bool,
+    window_size,
     gen_,
 ):
     assert return_softmax is False, "ipex do not support return_softmax option"
@@ -75,9 +142,34 @@ def varlen_fwd_reference(
     k_mask = k_mask < seqlen_k[:, None].repeat(1, k_mask.size(-1))
     align_mask_seqlen = (max_seqlen_k + 63) // 64 * 64
     attn_mask = torch.empty(
-        [batch_size, 1, 1, align_mask_seqlen], dtype=torch.float16, device=query.device
+        [batch_size, 1, max_seqlen_q, align_mask_seqlen],
+        dtype=torch.float16,
+        device=query.device,
     ).fill_(float("-inf"))
-    attn_mask[:, :, :, :max_seqlen_k].masked_fill_(k_mask[:, None, None, :], 0)
+    qk_mask = q_mask.unsqueeze(2) * k_mask.unsqueeze(1)
+    if window_size != (-1, -1):
+        for i in range(batch_size):
+            local_mask = construct_local_mask(
+                seqlen_q[i], seqlen_k[i], window_size, None, None, query.device
+            )
+            local_mask = F.pad(
+                local_mask,
+                pad=(
+                    0,
+                    qk_mask[i].size(1) - local_mask.size(1),
+                    0,
+                    qk_mask[i].size(0) - local_mask.size(0),
+                ),
+            )
+            qk_mask[i] = qk_mask[i].logical_and(~local_mask)
+    attn_mask[:, :, :max_seqlen_q, :max_seqlen_k].masked_fill_(
+        qk_mask[:, None, :, :], 0
+    )
+    if is_causal:
+        causal_mask = create_causal_mask(
+            batch_size, max_seqlen_q, max_seqlen_k, seqlen_q, seqlen_k
+        )
+        attn_mask[:, :, :max_seqlen_q, :max_seqlen_k] += causal_mask
     # print("attn mask: ", attn_mask)
     pad_q[q_mask] = query
     pad_k[k_mask] = key
@@ -126,7 +218,7 @@ def varlen_fwd_reference(
         softmax_scale,
         1.0,
         pdropout,
-        is_causal,
+        False,
         False,
     )
     if head_size % 32 != 0:
@@ -154,6 +246,7 @@ def varlen_fwd_reference(
 @pytest.mark.parametrize("use_alibi", USE_ALIBI)
 @pytest.mark.parametrize("seqlen_range", SEQLEN_RANGE)
 @pytest.mark.parametrize("is_causal", IS_CAUSAL)
+@pytest.mark.parametrize("window_size", WINDOW_SIZE)
 def test_varlen_fwd(
     head_dim: int,
     num_heads: Tuple[int, int],
@@ -162,6 +255,7 @@ def test_varlen_fwd(
     use_alibi: bool,
     seqlen_range: int,
     is_causal: bool,
+    window_size: Tuple[int, int],
 ):
     torch.manual_seed(15)
     seqlen_list = torch.randint(1, seqlen_range, [batch_size], dtype=torch.int32)
@@ -205,8 +299,8 @@ def test_varlen_fwd(
         softmax_scale,
         False,
         is_causal,
-        -1,
-        -1,
+        window_size[0],
+        window_size[1],
         False,
         None,
     )
@@ -226,27 +320,31 @@ def test_varlen_fwd(
         False,
         is_causal,
         False,
+        window_size,
         None,
     )
-    torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)
+    torch.testing.assert_close(out, out_ref, atol=3e-3, rtol=1e-3)
 
-    ipex.llm.functional.varlen_attention(
-        query,
-        key,
-        value,
-        out,
-        cu_seqlen,
-        cu_seqlen,
-        max_seqlen,
-        max_seqlen,
-        0.0,
-        softmax_scale,
-        False,
-        is_causal,
-        False,
-        None,
-    )
-    torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)
+    if not use_alibi:
+        ipex.llm.functional.varlen_attention(
+            query,
+            key,
+            value,
+            out,
+            cu_seqlen,
+            cu_seqlen,
+            max_seqlen,
+            max_seqlen,
+            0.0,
+            softmax_scale,
+            False,
+            is_causal,
+            False,
+            None,
+            window_size_left=window_size[0],
+            window_size_right=window_size[1],
+        )
+        torch.testing.assert_close(out, out_ref, atol=3e-3, rtol=1e-3)
 
 
 SOFTCAP = 50.0

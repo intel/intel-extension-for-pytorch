@@ -249,6 +249,8 @@ def varlen_attention(
     is_causal: bool,
     return_softmax: bool,
     gen_: torch.Generator,
+    window_size_left: int = -1,
+    window_size_right: int = -1,
     softcap: float = -1.0,
 ):
     r"""
@@ -277,7 +279,8 @@ def varlen_attention(
         pdropout (float): dropout probability; if greater than 0.0, dropout is applied, default is 0.0.
         softmax_scale (float): scaling factor applied is prior to softmax.
         is_causal (bool): whether to apply causal attention masking, default is True.
-
+        window_size_left (int) : left size of sliding window, default is -1.
+        window_size_right (int) : right size of sliding window, default is -1.
     """
 
     return VarlenAttention.apply_function(
@@ -295,6 +298,8 @@ def varlen_attention(
         is_causal,
         return_softmax,
         gen_,
+        window_size_left,
+        window_size_right,
         softcap,
     )
 
@@ -346,6 +351,8 @@ def varlen_fwd(
         pdropout (float): dropout probability; if greater than 0.0, dropout is applied, default is 0.0.
         softmax_scale (float): scaling factor applied is prior to softmax.
         is_causal (bool): whether to apply causal attention masking, default is True.
+        window_size_left (int) : left size of sliding window, default is -1.
+        window_size_right (int) : right size of sliding window, default is -1.
 
     """
     return VarlenAttention.apply_function_flash_varlen(
