@@ -5916,7 +5916,8 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
         self.fp8_fake_scale = torch.tensor(0).to(module.weight.dtype)
         if self.topk_method == "noaux_tc":
             # self.e_score_correction_bias = torch.tensor(module.e_score_correction_bias.unsqueeze(0))
-            self.e_score_correction_bias = module.e_score_correction_bias
+            # self.e_score_correction_bias = module.e_score_correction_bias
+            self.e_score_correction_bias = torch.tensor(module.e_score_correction_bias, dtype=torch.float32)
     def forward(self, hidden_states):
         # compute gating score
         # hidden_states = hidden_states.unsqueeze(0)
@@ -5961,7 +5962,7 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
                 self.topk_group,
                 self.n_routed_experts,
                 self.top_k,
-                torch.tensor(self.e_score_correction_bias, dtype=torch.float32),
+                self.e_score_correction_bias,
             )
             # # breakpoint()
             # n_group = 8 topk_group 4, n_routed_experts: 256, num_experts_per_tok = topk: 8,
