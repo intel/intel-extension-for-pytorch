@@ -7,12 +7,10 @@
 #include <limits>
 #include "../../utils/isa_utils.h"
 #include "vec/vec.h"
-#include "tpp/utils.h"
+
 namespace torch_ipex {
 namespace cpu {
 namespace {
-// static int ENFORCE_BRGEMM = torch_ipex::tpp::env2int("ENFORCE_BRGEMM", 0);
-
 using namespace at::vec;
 template <
     typename scalar_t,
@@ -515,9 +513,8 @@ struct brgemm<scalar_t, scalar_t> {
       int K,
       int lda,
       int ldb,
-      int ldc,
-      int block_n_tuned = block_size_n()) {
-    int BLOCK_N = block_n_tuned;
+      int ldc) {
+    constexpr int BLOCK_N = block_size_n();
     at::native::cpublas::brgemm(
         M, N, K, lda, ldb, BLOCK_N, /* add_C */ false, A, B, Ctmp);
 
@@ -540,8 +537,7 @@ struct brgemm<at::BFloat16, at::Float8_e4m3fn> {
       int K,
       int lda,
       int ldb,
-      int ldc,
-      int block_n_tuned = block_size_n()) {
+      int ldc) {
     std::cout << "### brgemm fp8" << std::endl;
   }
 };
@@ -570,10 +566,9 @@ void tinygemm_kernel(
     int lda,
     int ldb,
     int ldc,
-    bool brg,
-    int block_n_tuned = block_size_n()) {
+    bool brg) {
   if (brg) {
-    brgemm<scalar_t, packed_t>::apply(A, B, C, Ctmp, M, N, K, lda, ldb, ldc, block_n_tuned);
+    brgemm<scalar_t, packed_t>::apply(A, B, C, Ctmp, M, N, K, lda, ldb, ldc);
     return;
   }
 
@@ -706,12 +701,10 @@ void bmm_kernel_impl(
     int mat1_strideM,
     int out_strideB,
     int out_strideM,
-    float scale = 0.f,
-    const bool enforce_brgemm = false,
-    int block_n_tuned = block_size_n()) {
+    float scale = 0.f) {
   // std::cout << "### bmm_kernel_impl" << std::endl;
   constexpr int BLOCK_M = block_size_m();
-  int BLOCK_N = block_n_tuned;
+  constexpr int BLOCK_N = block_size_n();
   const int MB = div_up(M, BLOCK_M);
   const int NB = div_up(N, BLOCK_N);
 
@@ -720,7 +713,7 @@ void bmm_kernel_impl(
   int mat2_strideN = K;
 
   // use avx512-bf16 when a) M is small; b) dtype is bfloat16, otherwise use amx
-  const bool use_brgemm = enforce_brgemm ? true : (M > 4) || (!std::is_same_v<scalar_t, at::BFloat16>);
+  const bool use_brgemm = (M > 4) || (!std::is_same_v<scalar_t, at::BFloat16>);
 
   // parallel on [B, MB, NB]
   at::parallel_for(0, B * MB * NB, 0, [&](int begin, int end) {
@@ -750,8 +743,7 @@ void bmm_kernel_impl(
           /* lda */ mat1_strideM,
           /* ldb */ nb_size,
           /* ldc */ out_strideM,
-          /* brg */ use_brgemm,
-          block_n_tuned);
+          /* brg */ use_brgemm);
 
       // move to the next index
       data_index_step(bs, B, mb, MB, nb, NB);
@@ -825,7 +817,7 @@ inline void check_scalar_types(
   }
 }
 
-at::Tensor convert_weight_packed(at::Tensor& weight, bool use_tuned_block_n) {
+at::Tensor convert_weight_packed(at::Tensor& weight) {
   // weight : [E, OC, IC]
   //     w1 : [E, 2N,  K]
   //     w2 : [E,  K,  N]
@@ -840,7 +832,7 @@ at::Tensor convert_weight_packed(at::Tensor& weight, bool use_tuned_block_n) {
   TORCH_CHECK(OC % TILE_N == 0, "invalid weight out features ", OC);
   TORCH_CHECK(IC % TILE_K == 0, "invalid weight input features ", IC);
 
-  int BLOCK_N = use_tuned_block_n ? 16: block_size_n();
+  constexpr int BLOCK_N = block_size_n();
 
   // use phony sizes here [E, OC, IC], for each [E], [OC, IC] -> [IC / 2, OC, 2]
   auto packed_weight = at::empty({E, OC, IC}, weight.options());
@@ -881,10 +873,7 @@ at::Tensor bmm(
     at::Tensor& mat1,
     at::Tensor& mat2,
     bool is_vnni,
-    const c10::optional<at::Tensor>& scale,
-    const bool enforce_brgemm = false,
-    const bool enforce_not_fp8 = false,
-    int block_n_tuned = block_size_n()) {
+    const c10::optional<at::Tensor>& scale) {
   RECORD_FUNCTION("ipex::bmm", c10::ArrayRef<c10::IValue>({}));
 
   auto packed_w = is_vnni ? mat2 : convert_weight_packed(mat2);
@@ -903,7 +892,7 @@ at::Tensor bmm(
   int N = mat2.size(1);
   int K = mat1.size(2);
 
-  const bool use_fp8_w8a16 = enforce_not_fp8 ? false : scale.has_value();
+  const bool use_fp8_w8a16 = scale.has_value();
 
   int mat1_strideB = mat1.stride(0);
   int mat1_strideM = mat1.stride(1);
@@ -939,9 +928,7 @@ at::Tensor bmm(
         mat1_strideM,
         out_strideB,
         out_strideM,
-        scale_val,
-        enforce_brgemm,
-        block_n_tuned);
+        scale_val);
   });
   return out;
 }

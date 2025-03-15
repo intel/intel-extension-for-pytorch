@@ -2974,7 +2974,7 @@ deepseekv2_mla_kernel_impl(
   auto bmm_out = q.narrow(-1, 0, kv_lora_rank).transpose_(0, 1);
   auto q_tmp = query.reshape({-1, q_head_num, q_head_dim});
   auto mat1 = q_tmp.narrow(2, 0, qk_nope_head_dim).transpose_(0, 1);
-  torch_ipex::cpu::bmm_kernel_stub(kCPU, bmm_out, mat1, w_kc, true, w_scale, false, false, block_size_n());
+  torch_ipex::cpu::bmm_kernel_stub(kCPU, bmm_out, mat1, w_kc, true, w_scale);
   if (query.scalar_type() == at::kFloat) {
     q = get_query<float>(
         q, q_tmp, qk_nope_head_dim, qk_rope_head_dim, kv_lora_rank);
@@ -3001,64 +3001,52 @@ deepseekv2_mla_kernel_impl(
 
   auto b_ptr = beam_idx.data_ptr<long>();
   auto max_cache_size = beam_idx.size(0);
+  auto new_beam_idx = at::empty({beam_batch, offset + q.size(1) + 1}, at::kInt);
+  auto new_b_ptr = new_beam_idx.data_ptr<int>();
+  auto new_b_stride0 = new_beam_idx.stride(0);
   auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
   auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
   auto beam_size = 1;
   if (prompt_bs != 0) {
     beam_size = beam_batch / prompt_bs;
   }
-  if (beam_size > 1) {
-    auto new_beam_idx = at::empty({beam_batch, offset + 1}, at::kInt);
-    auto new_b_ptr = new_beam_idx.data_ptr<int>();
-    auto new_b_stride0 = new_beam_idx.stride(0);
-  // according to last decoded token to get the target beam for the past
-  #pragma omp parallel for
-    for (int i = 0; i < kv_bs; i++) {
-      new_b_ptr[i * new_b_stride0 + offset] = i + offset * beam_batch;
-      new_b_ptr[i * new_b_stride0 + offset - 1] =
-          b_ptr[(offset - 1) * kv_bs + i] + (offset - 1) * beam_batch;
-      for (int j = offset - 2; j >= prompt_len; j--) {
-        new_b_ptr[i * new_b_stride0 + j] =
-            b_ptr
-                [j * kv_bs + new_b_ptr[i * new_b_stride0 + j + 1] -
-                (j + 1) * beam_batch] +
-            j * beam_batch;
-      }
+// according to last decoded token to get the target beam for the past
+#pragma omp parallel for
+  for (int i = 0; i < kv_bs; i++) {
+    new_b_ptr[i * new_b_stride0 + offset] = i + offset * beam_batch;
+    new_b_ptr[i * new_b_stride0 + offset - 1] =
+        b_ptr[(offset - 1) * kv_bs + i] + (offset - 1) * beam_batch;
+    for (int j = offset - 2; j >= prompt_len; j--) {
+      new_b_ptr[i * new_b_stride0 + j] =
+          b_ptr
+              [j * kv_bs + new_b_ptr[i * new_b_stride0 + j + 1] -
+               (j + 1) * beam_batch] +
+          j * beam_batch;
     }
-  #pragma omp parallel for collapse(2)
-    for (int i = 0; i < kv_bs; i++) {
-      for (int j = prompt_len - 1; j >= 0; j--) {
-        new_b_ptr[i * new_b_stride0 + j] =
-            b_ptr[j * kv_bs + i - i % beam_size] + j * beam_batch;
-      }
-    }
-    torch_ipex::cpu::decode_attention_kernel_stub(
-        kCPU,
-        q,
-        attn_outs,
-        kv_cache,
-        new_beam_idx,
-        attn_weights,
-        1 / scale_attn,
-        0,
-        offset);
-  } else {
-    torch_ipex::cpu::decode_attention_opt_kernel_stub(
-        kCPU,
-        q,
-        attn_outs,
-        kv_cache,
-        attn_weights,
-        1 / scale_attn,
-        0,
-        offset);
   }
+#pragma omp parallel for collapse(2)
+  for (int i = 0; i < kv_bs; i++) {
+    for (int j = prompt_len - 1; j >= 0; j--) {
+      new_b_ptr[i * new_b_stride0 + j] =
+          b_ptr[j * kv_bs + i - i % beam_size] + j * beam_batch;
+    }
+  }
+  torch_ipex::cpu::decode_attention_kernel_stub(
+      kCPU,
+      q,
+      attn_outs,
+      kv_cache,
+      new_beam_idx,
+      attn_weights,
+      1 / scale_attn,
+      0,
+      offset);
   attn_outs.transpose_(0, 1);
   attn_output = at::empty(
       {attn_outs.size(0), attn_outs.size(1), w_vc.size(1)},
       attn_outs.options());
   torch_ipex::cpu::bmm_kernel_stub(
-      kCPU, attn_output, attn_outs, w_vc, true, w_scale, false, false, block_size_n());
+      kCPU, attn_output, attn_outs, w_vc, true, w_scale);
   attn_output.transpose_(0, 1).unsqueeze_(2);
 
   return std::make_tuple(attn_output, attn_weights, kv_cache, beam_idx);

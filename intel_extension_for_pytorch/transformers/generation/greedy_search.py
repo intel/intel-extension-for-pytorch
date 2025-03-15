@@ -18,29 +18,7 @@ from transformers.generation.utils import (
 GreedySearchOutput = Union[
     GreedySearchEncoderDecoderOutput, GreedySearchDecoderOnlyOutput
 ]
-iter_prof_print = 0
-import os
-def get_int_from_env(env_keys, default):
-    """Returns the first positive env value found in the `env_keys` list or the default."""
-    for e in env_keys:
-        val = int(os.environ.get(e, -1))
-        if val >= 0:
-            return val
-    return default
-local_rank = get_int_from_env(["LOCAL_RANK", "MPI_LOCALRANKID"], "0")
-enable_profile = get_int_from_env(["enable_profile"], "0")
 
-def print_rank0(*msg):
-    if local_rank != 0:
-        return
-    print(*msg)
-
-def trace_handler(prof):
-    print_rank0(prof.key_averages().table(
-        sort_by="self_cpu_time_total", row_limit=-1))
-    # if local_rank == 0:
-    #     global iter_prof_print
-    #     prof.export_chrome_trace("my_trace_rank" + str(local_rank) + "-step" + str(prof.step_num) + "token:"+str(iter_prof_print)+".json")
 
 def _greedy_search(
     self,
@@ -139,7 +117,7 @@ def _greedy_search(
     unfinished_sequences = torch.ones(
         input_ids.shape[0], dtype=torch.long, device=input_ids.device
     )
-    iter_prof = 0
+
     this_peer_finished = False  # used by synced_gpus only
     while True:
         tic = time.time()
@@ -489,27 +467,7 @@ def _greedy_search(
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
-                    if enable_profile == 1:
-                        if iter_prof == 0 or iter_prof == 512:
-                            global iter_prof_print
-                            iter_prof_print = iter_prof
-                            with torch.profiler.profile(
-                                    activities=[
-                                        torch.profiler.ProfilerActivity.CPU],
-                                    schedule=torch.profiler.schedule(
-                                        wait=0,
-                                        warmup=0,
-                                        active=1),
-                                    on_trace_ready=trace_handler
-                                    ) as prof:
-                                    # for i in range(2):
-                                    outputs = self.trace_graph(**model_inputs)
-                                    prof.step()
-                        else:
-                            outputs = self.trace_graph(**model_inputs)
-                        iter_prof = iter_prof + 1
-                    else:
-                        outputs = self.trace_graph(**model_inputs)
+                    outputs = self.trace_graph(**model_inputs)
             else:
                 outputs = self(
                     **model_inputs,
