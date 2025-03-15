@@ -2974,7 +2974,7 @@ deepseekv2_mla_kernel_impl(
   auto bmm_out = q.narrow(-1, 0, kv_lora_rank).transpose_(0, 1);
   auto q_tmp = query.reshape({-1, q_head_num, q_head_dim});
   auto mat1 = q_tmp.narrow(2, 0, qk_nope_head_dim).transpose_(0, 1);
-  torch_ipex::cpu::bmm_kernel_stub(kCPU, bmm_out, mat1, w_kc, true, w_scale);
+  torch_ipex::cpu::bmm_kernel_stub(kCPU, bmm_out, mat1, w_kc, true, w_scale, false, false, block_size_n());
   if (query.scalar_type() == at::kFloat) {
     q = get_query<float>(
         q, q_tmp, qk_nope_head_dim, qk_rope_head_dim, kv_lora_rank);
@@ -3046,7 +3046,7 @@ deepseekv2_mla_kernel_impl(
       {attn_outs.size(0), attn_outs.size(1), w_vc.size(1)},
       attn_outs.options());
   torch_ipex::cpu::bmm_kernel_stub(
-      kCPU, attn_output, attn_outs, w_vc, true, w_scale);
+      kCPU, attn_output, attn_outs, w_vc, true, w_scale, false, false, block_size_n());
   attn_output.transpose_(0, 1).unsqueeze_(2);
 
   return std::make_tuple(attn_output, attn_weights, kv_cache, beam_idx);
