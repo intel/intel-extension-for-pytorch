@@ -130,6 +130,10 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
         self.n_dim = self.module.weight.shape[0]
         self.bias = self.module.bias
         self.weight = self.module.weight.transpose(-1, -2).contiguous()
+        if self.module.weight is not None:
+            self.module.weight = None
+        if self.module.bias is not None:
+            self.module.bias = None
         if dist.is_initialized():
             self.mp_group = self.module.mp_group
             self.rank = self.module.rank

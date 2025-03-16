@@ -50,14 +50,15 @@ try:
             for i in range(len(cache.key_cache)):
                 start_head = self.tp_idx * self.num_key_value_heads
                 end_head = (self.tp_idx + 1) * self.num_key_value_heads
-                self.key_cache.append(
-                    cache.key_cache[i][:, start_head:end_head, :, :].contiguous()
-                )
+                self.key_cache.append(cache.key_cache[i][:, start_head:end_head, :, :])
                 self.value_cache.append(
-                    cache.value_cache[i][:, start_head:end_head, :, :].contiguous()
+                    cache.value_cache[i][:, start_head:end_head, :, :]
                 )
 
-            # [b, n, f, h] -> [f, b, n, h]
+            # convert the memory format of kv cache to the one specified by cache_format
+            # for FBNH or BFNH format, need to release the original kv cache memory hold by
+            # the persistent StaticCache in transformers, by letting it share the memory with IPEXStaticCache
+            # and keep shape as [b, n, f, h]
             if cache_format == CacheFormat.FBNH:
                 # keep the memory format as [f, b, n, h]
                 for i in range(len(cache.key_cache)):
@@ -73,6 +74,7 @@ try:
                         .reshape([seqlen, bs, self.num_key_value_heads, self.head_dim])
                         .contiguous()
                     )
+                    self._release_original_cache(cache, cache_format, i)
             elif cache_format == CacheFormat.BFNH:
                 # keep the memory format as [b, f, n, h]
                 for i in range(len(cache.key_cache)):
@@ -80,12 +82,43 @@ try:
                     self.value_cache[i] = (
                         self.value_cache[i].transpose(1, 2).contiguous()
                     )
+                    self._release_original_cache(cache, cache_format, i)
             elif cache_format == CacheFormat.BNFH:
                 for i in range(len(cache.key_cache)):
                     self.key_cache[i] = self.key_cache[i]
                     self.value_cache[i] = self.value_cache[i]
             else:
                 raise ValueError(f"Unsupported cache format: {cache_format}")
+
+        def _release_original_cache(self, cache, cache_format, layer_idx):
+            # when running with tp, each rank holds part of the kv cache
+            # then the original kv cache managed by StaticCache cannot share memory
+            # with tensors distributed on different ranks
+            if self.tp_size > 1:
+                return
+            permute_order = (0, 1, 2, 3)
+            if cache_format == CacheFormat.FBNH:
+                permute_order = (1, 2, 0, 3)
+            elif cache_format == CacheFormat.BFNH:
+                permute_order = (0, 2, 1, 3)
+            # key_cache and value_cache always appear in pairs
+            if getattr(cache, f"key_cache_{layer_idx}", None) is not None:
+                setattr(
+                    cache,
+                    f"key_cache_{layer_idx}",
+                    self.key_cache[layer_idx].permute(*permute_order),
+                )
+                setattr(
+                    cache,
+                    f"value_cache_{layer_idx}",
+                    self.value_cache[layer_idx].permute(*permute_order),
+                )
+            cache.key_cache[layer_idx] = self.key_cache[layer_idx].permute(
+                *permute_order
+            )
+            cache.value_cache[layer_idx] = self.value_cache[layer_idx].permute(
+                *permute_order
+            )
 
         def update(
             self,

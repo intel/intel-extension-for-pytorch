@@ -24,9 +24,9 @@ class TestTorchMethod(TestCase):
         weight = torch.rand(output_dim, input_dim, dtype=dtype, device=dpcpp_device)
         weight.copy_(layer.weight)
 
-        IPEXLmHead = IPEXLmHeadLinearAllreduceWithPadding(layer)
-
         result = torch.nn.functional.linear(input_ori, weight, layer.bias)
+
+        IPEXLmHead = IPEXLmHeadLinearAllreduceWithPadding(layer)
 
         result_IPEX = IPEXLmHead(input_IPEX)
 
