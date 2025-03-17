@@ -1,4 +1,3 @@
-
 import os
 import sys
 test_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
@@ -347,7 +346,7 @@ $1: f32[2] = torch._ops.prims.sin.default($0)""")
     def test_clone_complex(self):
         with torch._dispatch.python.enable_python_dispatcher():
             x = torch.randn(4, dtype=torch.complex64, device='meta').conj()
-            out = x + 1
+            x + 1
 
     def test_check_deprecation_warning(self):
         with self.assertWarnsRegex(FutureWarning, 'will be removed in the future'):
@@ -415,7 +414,7 @@ class TestRefs(TestCase):
         # enables prim decomps
         with torch._dispatch.python.enable_python_dispatcher():
             x = torch.ones(4)
-            y = x.to(device="meta")
+            x.to(device="meta")
 
     def test_inferred_tags(self):
         self.assertEqual(torch.ops.prims.normal.default.tags, (torch.Tag.nondeterministic_seeded, torch.Tag.pt2_compliant_tag))

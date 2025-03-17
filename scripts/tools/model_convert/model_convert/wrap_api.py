@@ -72,7 +72,10 @@ class WrapAPI:
         @wraps(api)
         def new_api(*args, **kwargs):
             api_schema = api.__module__ + '.' + api.__name__
-            assert False, "Error: the api " + api_schema + " is not supported by xpu"
+            if api_schema.find("is_tf32_supported") != -1:
+                return False
+            else:
+                assert False, "Error: the api " + api_schema + " is not supported by xpu"
 
         return new_api
 
