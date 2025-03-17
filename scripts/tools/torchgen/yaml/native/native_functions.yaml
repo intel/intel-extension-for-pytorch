@@ -173,6 +173,7 @@
     NestedTensorXPU: bmm_nested_xpu
   tags: core
 
+# Temporarily reserved, and will be removed after merging https://github.com/intel/torch-xpu-ops/pull/1341
 - func: _nested_from_padded(Tensor padded, Tensor cpu_nested_shape_example, bool fuse_transform_0213=False) -> Tensor
   device_check: NoCheck
   dispatch:
