@@ -1832,7 +1832,7 @@ void decode_attention_grouped_opt_kernel_impl(
   // TODO: tune BLOCK_N 256/512
   constexpr int BLOCK_N = 512;
   // block length for heads
-  constexpr int BLOCK_H = 16;
+  constexpr int BLOCK_H = 6;
   // strides
   const int stride_q0 = num_heads * head_size;
   const int stride_q1 = head_size;
