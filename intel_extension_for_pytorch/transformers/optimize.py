@@ -2400,11 +2400,15 @@ def optimize(
 
             elif use_low_precision_checkpoint:  # weight only quantization
                 # for non-quantized layers
-                from ..nn.utils._weight_prepack import (
-                    weight_prepack_with_ipex,
-                )
+                from ..frontend import optimize as ipex_optimize
 
-                _model = weight_prepack_with_ipex(_model, None, {})[0]
+                _model = _model.to(dtype)
+                _model = ipex_optimize(
+                    _model,
+                    dtype=dtype,
+                    inplace=True,
+                    auto_kernel_selection=(dtype == torch.float),
+                )
             else:
                 # Note that low precision checkpoint is already handled at the beginning.
                 # If checkpoint is not provided, model is quantized here

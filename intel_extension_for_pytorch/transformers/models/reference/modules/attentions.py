@@ -2667,15 +2667,27 @@ class _IPEXAttentionRef(nn.Module):
         elif hasattr(module, "all_head_size"):
             self.hidden_size = module.all_head_size
         elif hasattr(module, "q_proj"):
-            if hasattr(module.q_proj, "weight"):
+            if hasattr(module.q_proj, "out_features"):
+                self.hidden_size = module.q_proj.out_features
+            elif hasattr(module.q_proj, "linear") and hasattr(
+                module.q_proj.linear, "out_features"
+            ):
+                self.hidden_size = module.q_proj.linear.out_features
+            elif hasattr(module.q_proj, "weight"):
                 self.hidden_size = module.q_proj.weight.shape[0]
             else:
                 self.hidden_size = module.q_proj.linear.weight.shape[0]
         elif hasattr(module, "o_proj"):
-            if hasattr(module.o_proj, "weight"):
-                self.hidden_size = module.o_proj.weight.shape[0]
+            if hasattr(module.o_proj, "in_features"):
+                self.hidden_size = module.q_proj.in_features
+            elif hasattr(module.o_proj, "linear") and hasattr(
+                module.o_proj.linear, "in_features"
+            ):
+                self.hidden_size = module.q_proj.linear.in_features
+            elif hasattr(module.o_proj, "weight"):
+                self.hidden_size = module.o_proj.weight.shape[1]
             else:
-                self.hidden_size = module.o_proj.linear.weight.shape[0]
+                self.hidden_size = module.o_proj.linear.weight.shape[1]
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):

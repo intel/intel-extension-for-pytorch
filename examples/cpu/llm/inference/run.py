@@ -383,7 +383,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.audio is not None:
                 infer_cmd.extend(["--audio", str(args.audio)])
 
-            print("LLM RUNTIME INFO: running model geneartion...")
+            print("LLM RUNTIME INFO: running model generation...")
             result = subprocess.run(infer_cmd)
             if result.returncode != 0:
                 print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
@@ -564,7 +564,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.config_file is not None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
 
-            print("LLM RUNTIME INFO: running model geneartion...")
+            print("LLM RUNTIME INFO: running model generation...")
             result = subprocess.run(infer_cmd)
             if result.returncode != 0:
                 print("LLM RUNTIME ERROR: Running generation task failed. Quit.")
@@ -700,7 +700,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         if args.cache_weight_for_large_batch:
             infer_cmd.extend(["--cache-weight-for-large-batch"])
 
-        print("LLM RUNTIME INFO: running model geneartion with deepspeed (autotp)...")
+        print("LLM RUNTIME INFO: running model generation with deepspeed (autotp)...")
         result = subprocess.run(infer_cmd)
         if result.returncode != 0:
             print("LLM RUNTIME ERROR: Running generation task failed. Quit.")

@@ -224,7 +224,6 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Met
 # Assuming the pre-sharded Llama model is generated at "saved_results/llama_local_shard/" folder.
 # run_accuracy_with_deepspeed.py script is under "distributed" directory.
 cd distributed
-unset KMP_AFFINITY
 
 # Distributed inference in FP32
 deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype float32 --ipex --tasks lambada_openai
@@ -431,11 +430,7 @@ If your INT4 checkpoints are not from HuggingFace or INC, please make sure the d
 
 ### 2.2.2 Run generation in distributed way
 
-#### 2.2.2.1 Prepare:
-
-```bash
-unset KMP_AFFINITY
-```
+#### 2.2.2.1 Prologue:
 
 In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight sizes more even for better memory usage when running with DeepSpeed.
 
@@ -660,7 +655,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Met
 
 ### 3.2.2 Run in distributed way
 
-#### 3.2.2.1 Prepare:
+#### 3.2.2.1 Prologue:
 
 We provided a `run_accuracy_with_deepspeed.py` script for testing accuracy
 for the models benchmarked in distributed way via `deepspeed`.
@@ -676,7 +671,6 @@ the path of the folder of the sharded model instead of original model ID.
 ```bash
 # Run distributed accuracy with 2 ranks of one node
 cd ./distributed
-unset KMP_AFFINITY
 ```
 
 #### 3.2.2.2 FP32:
