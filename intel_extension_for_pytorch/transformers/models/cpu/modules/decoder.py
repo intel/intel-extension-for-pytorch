@@ -191,7 +191,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 "DeepseekV3ForCausalLM",
             ]:
                 if hasattr(self.mlp, "experts"):
-                    if self.deepseek_lowbit_load:
+                    if hasattr(self, "deepseek_lowbit_load") and self.deepseek_lowbit_load:
                         w13_qweight_list = []
                         w13_scale_list = []
                         w13_zp_list = []
@@ -313,7 +313,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     ]
                                 ).detach()
                                 self.w13_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed(w13_weight)
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(w13_weight)
                                 )
                                 for idx in range(len(self.mlp.experts)):
                                     del self.mlp.experts[idx].w13_weight
@@ -323,7 +323,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                         for idx in range(len(self.mlp.experts))
                                     ]
                                 ).detach()
-                                self.w2_weight = torch.ops.torch_ipex.convert_weight_packed(
+                                self.w2_weight = torch.ops.torch_ipex.convert_weight_packed_bf16(
                                     w2_weight
                                 )
                                 for idx in range(len(self.mlp.experts)):
