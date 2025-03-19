@@ -242,7 +242,6 @@ def _build_installation_dependency():
     install_requires.append("psutil")
     install_requires.append("numpy")
     install_requires.append("packaging")
-    install_requires.append("pydantic")
     install_requires.append("ruamel.yaml")
     if _check_env_flag("ENABLE_ONEAPI_INTEGRATION", default="OFF"):
         for key, value in _get_basekit_rt().items():
