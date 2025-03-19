@@ -273,6 +273,7 @@ static DimVector _sort_dims(
 #ifdef USE_ONEMKL
 class dft_config_t {
  public:
+  using config_cfg_val_t = std::unordered_map<config_param, config_value>;
   using config_int64_t = std::unordered_map<config_param, int64_t>;
   using config_float_t = std::unordered_map<config_param, float>;
   using config_double_t = std::unordered_map<config_param, double>;
@@ -292,18 +293,20 @@ class dft_config_t {
     bwd_strides_ = bwd_strides;
   }
 
-  template <typename T>
-  void set_value(config_param key, T value) {
-    if (std::is_same<DFTI_CONFIG_VALUE, T>::value ||
-        std::is_same<int64_t, T>::value) {
-      val_int64_.insert({key, value});
-    } else if (std::is_same<T, float>::value) {
-      val_float_.insert({key, value});
-    } else if (std::is_same<T, double>::value) {
-      val_double_.insert({key, value});
-    } else {
-      TORCH_CHECK(0, "Unsupported value type in FFT config!");
-    }
+  void set_value(config_param key, config_value value) {
+    val_cfg_val_.insert({key, value});
+  }
+
+  void set_value(config_param key, int64_t value) {
+    val_int64_.insert({key, value});
+  }
+
+  void set_value(config_param key, float value) {
+    val_float_.insert({key, value});
+  }
+
+  void set_value(config_param key, double value) {
+    val_double_.insert({key, value});
   }
 
   template <precision prec, domain dom>
@@ -313,6 +316,7 @@ class dft_config_t {
     desc.set_value(value.first, value.second); \
   }
 
+    COMMIT_VAL(val_cfg_val_);
     COMMIT_VAL(val_int64_);
     COMMIT_VAL(val_float_);
     COMMIT_VAL(val_double_);
@@ -332,6 +336,7 @@ class dft_config_t {
     torch_ipex::xpu::dpcpp::to_bytes(bytes, value.second); \
   }
 
+    MAP_TO_BYTES(val_cfg_val_);
     MAP_TO_BYTES(val_int64_);
     MAP_TO_BYTES(val_float_);
     MAP_TO_BYTES(val_double_);
@@ -341,6 +346,7 @@ class dft_config_t {
   }
 
  private:
+  config_cfg_val_t val_cfg_val_;
   config_int64_t val_int64_;
   config_float_t val_float_;
   config_double_t val_double_;
@@ -480,7 +486,7 @@ void _mkl_dft(
       checked_signal_sizes.begin() + 1, checked_signal_sizes.end());
 
   std::shared_ptr<dft_config_t> desc_config(new dft_config_t);
-  desc_config->set_value(config_param::PLACEMENT, DFTI_NOT_INPLACE);
+  desc_config->set_value(config_param::PLACEMENT, config_value::NOT_INPLACE);
   desc_config->set_value(config_param::NUMBER_OF_TRANSFORMS, batch);
 
   auto istrides = input.strides();
@@ -513,7 +519,7 @@ void _mkl_dft(
 
   if (!complex_input || !complex_output) {
     desc_config->set_value(
-        config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
+        config_param::CONJUGATE_EVEN_STORAGE, config_value::COMPLEX_COMPLEX);
   }
 
   lru_key_t key;
