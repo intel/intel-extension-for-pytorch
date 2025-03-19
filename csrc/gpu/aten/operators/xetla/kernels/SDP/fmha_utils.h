@@ -247,6 +247,61 @@ struct tile_mask_t {
       }
     }
   }
+
+  // -------------------- // alibi_mask // ---------------------- //
+
+  inline static void alibi_mask(
+      mat_t& src,
+      float alibi_slopes,
+      uint32_t start_x,
+      uint32_t start_y) {
+#pragma unroll
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
+      uint32_t blk_start_y = start_y + i * block_size_y;
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        uint32_t blk_start_x = start_x + j * block_size_x;
+        xetla_vector<float, block_size_x> blk_seq_x =
+            xetla_vector_gen<float, block_size_x>(blk_start_x, 1);
+        auto src_sub = src.reg
+                           .xetla_select<block_elems, 1>(
+                               (i * num_block_x + j) * block_elems)
+                           .xetla_format<accum_t, block_size_y, block_size_x>();
+#pragma unroll
+        for (int k = 0; k < block_size_y; k++) {
+          src_sub.row(k) += (blk_seq_x * alibi_slopes);
+          xetla_mask<block_size_x> mask = blk_seq_x > blk_start_y + k;
+          src_sub.row(k).xetla_merge(kNegInfinity, mask);
+        }
+      }
+    }
+
+    if constexpr ((tile_size_y % block_size_y) != 0) {
+      constexpr uint32_t tail_start_y =
+          tile_size_y / block_size_y * block_size_y;
+      constexpr uint32_t tail_size_y = tile_size_y % block_size_y;
+      constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
+
+      uint32_t blk_start_y = start_y + tail_start_y;
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        uint32_t blk_start_x = start_x + j * block_size_x;
+        xetla_vector<float, block_size_x> blk_seq_x =
+            xetla_vector_gen<float, block_size_x>(blk_start_x, 1);
+        auto src_sub =
+            src.reg
+                .xetla_select<tail_block_elems, 1>(
+                    tail_start_y * tile_size_x + j * tail_block_elems)
+                .xetla_format<accum_t, tail_size_y, block_size_x>();
+#pragma unroll
+        for (int k = 0; k < tail_size_y; k++) {
+          src_sub.row(k) += (blk_seq_x * alibi_slopes);
+          xetla_mask<block_size_x> mask = blk_seq_x > blk_start_y + k;
+          src_sub.row(k).xetla_merge(kNegInfinity, mask);
+        }
+      }
+    }
+  }
 };
 
 // ==================== // group_row_reduce_t // ================== //

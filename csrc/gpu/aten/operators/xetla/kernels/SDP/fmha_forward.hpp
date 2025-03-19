@@ -39,7 +39,8 @@ class fmha_forward_t {
     scalar_t* K_ptr; // [B, T, N, H] - key   | [num_blocks, block_size,
                      // num_kv_heads, head_size]
     scalar_t* V_ptr; // [B, T, N, H] - value
-    scalar_t* A_ptr = nullptr; // [B, N, 1, T] - Alibi
+    scalar_t* A_ptr =
+        nullptr; // [B, N, 1, T] - Alibi | [B, N] or [N] - alibi_slopes(float)
     scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
     // Output tensor
@@ -500,15 +501,6 @@ class fmha_forward_t {
             args.A_ptr, {end_x, end_y, args.uAT}, {start_x, start_y});
       }
 
-      // B, N or N
-      if constexpr (kUseAlibi && kVarlen) {
-        // assume uAt in varlen equals N or 0
-        int32_t start_x = batch_id * args.uAT + head_id;
-        uint32_t end_x = start_x + 1;
-        end_x = end_x >= args.uN ? end_x : args.uN;
-        mem_desc_Ai.init(args.A_ptr, {end_x, 1, 1}, {start_x, 0});
-      }
-
       if constexpr (kUseBias && !kIsCausal) {
         int32_t start_x = startT;
         uint32_t end_x = start_x + kBc;
@@ -593,7 +585,7 @@ class fmha_forward_t {
       matAccSij.reg *= args.softcap;
     }
 
-    // + beta * alibi
+    // + alibi
     if constexpr (kUseAlibi && !kVarlen) {
       using alibi_op_t = bias_add_op_t<scalar_t, arch_tag>;
       using alibi_args_t = typename alibi_op_t::arguments_t;
@@ -601,16 +593,6 @@ class fmha_forward_t {
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
       int32_t tile_offset_y = 0;
       ctx.mem_desc_Ai.update_coord(tile_offset_x, tile_offset_y);
-
-      alibi_op_t alibi_op;
-      alibi_args_t alibi_args(ctx.mem_desc_Ai.base, ctx.mem_desc_Ai.shape);
-      alibi_op(matAccSij, ctx.mem_desc_Ai.coord, alibi_args);
-    }
-
-    if constexpr (kUseAlibi && kVarlen) {
-      using alibi_op_t =
-          bias_add_op_t<scalar_t, arch_tag, add_type::single_element>;
-      using alibi_args_t = typename alibi_op_t::arguments_t;
 
       alibi_op_t alibi_op;
       alibi_args_t alibi_args(ctx.mem_desc_Ai.base, ctx.mem_desc_Ai.shape);
@@ -703,6 +685,13 @@ class fmha_forward_t {
     using tile_mask = tile_mask_t<matAccSij_t>;
 
     uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
+    // alibi_slopes: B, N or N
+    if constexpr (kUseAlibi && kVarlen) {
+      float _alibi_slopes = reinterpret_cast<float*>(
+          args.A_ptr)[ctx.batch_id * args.uAT + ctx.head_id];
+      uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
+      tile_mask::alibi_mask(matAccSij, _alibi_slopes, sg_startT, sg_startF);
+    }
     uint32_t real_T = args.uT;
     if constexpr (kVarlen) {
       real_T =

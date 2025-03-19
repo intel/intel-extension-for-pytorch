@@ -318,6 +318,8 @@ class VarlenAttention(nn.Module):
             current query_tokens among total sequence length.
         seqlen_k (torch.Tensor): shape [batch_size + 1], points the
             current key_tokens among total sequence length.
+        alibi_slopes (torch.Tensor): shape [num_head] | [batch_size, num_head],
+            for attention head by adding a bias term
         max_seqlen_q (int): max/total sequence length of query.
         max_seqlen_k (int): max/total sequence length of key.
         pdropout (float): dropout probability; if greater than 0.0,
@@ -336,13 +338,15 @@ class VarlenAttention(nn.Module):
         >>> key = torch.randn(32, 16, 256)
         >>> value = torch.randn(32, 16, 256)
         >>> out = torch.emply_like(query)
-        >>> seqlen_q = torch.tensor(1)
-        >>> seqlen_k = torch.tensor(1)
-        >>> max_seqlen_q = 1
-        >>> max_seqlen_k  = 1
+        >>> seqlen_q = torch.tensor(2)
+        >>> seqlen_k = torch.tensor(2)
+        >>> alibi_slopes = torch.randn(1, 16)
+        >>> max_seqlen_q = 2
+        >>> max_seqlen_k  = 2
         >>> pdropout = 0.0
         >>> softmax_scale  = 0.5
-        >>> varlenAttention_module(query, key, value, out, seqlen_q, seqlen_k, max_seqlen_q, max_seqlen_k, pdropout, softmax_scale)
+        >>> varlenAttention_module(
+                query, key, value, out, seqlen_q, seqlen_k, alibi_slopes, max_seqlen_q, max_seqlen_k, pdropout, softmax_scale)
 
     [Direct function call] This module also provides a `.apply_function`
     function call to apply VarlenAttention without initializing the module.
@@ -365,6 +369,7 @@ class VarlenAttention(nn.Module):
         out: torch.Tensor,
         seqlen_q: torch.Tensor,
         seqlen_k: torch.Tensor,
+        alibi_slopes: torch.Tensor,
         max_seqlen_q: int,
         max_seqlen_k: int,
         pdropout: float,
@@ -386,6 +391,7 @@ class VarlenAttention(nn.Module):
             out,
             seqlen_q,
             seqlen_k,
+            alibi_slopes,
             max_seqlen_q,
             max_seqlen_k,
             pdropout,
