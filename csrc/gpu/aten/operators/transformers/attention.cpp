@@ -22,6 +22,9 @@
 #include "sdp_utils.h"
 #include "utils/CustomOperatorRegistration.h"
 
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+
 using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -2243,4 +2246,68 @@ _scaled_dot_product_efficient_attention_xpu(
       std::move(offset_t));
 }
 } // namespace native
+} // namespace at
+
+namespace at {
+namespace {
+::std::tuple<at::Tensor, at::Tensor>
+wrapper_AutogradXPU___scaled_dot_product_attention_math(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const c10::optional<at::Tensor>& attn_mask,
+    double dropout_p,
+    bool is_causal,
+    const c10::optional<at::Tensor>& dropout_mask,
+    c10::optional<double> scale,
+    bool enable_gqa) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      query,
+      "wrapper_AutogradXPU___scaled_dot_product_attention_math",
+      "query");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      key,
+      "wrapper_AutogradXPU___scaled_dot_product_attention_math",
+      "key");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      value,
+      "wrapper_AutogradXPU___scaled_dot_product_attention_math",
+      "value");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      attn_mask,
+      "wrapper_AutogradXPU___scaled_dot_product_attention_math",
+      "attn_mask");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      dropout_mask,
+      "wrapper_AutogradXPU___scaled_dot_product_attention_math",
+      "dropout_mask");
+  const OptionalDeviceGuard device_guard(device_of(query));
+  auto _query = AtenIpexTypeXPU::to_plain_if_needed(query);
+  auto _key = AtenIpexTypeXPU::to_plain_if_needed(key);
+  auto _value = AtenIpexTypeXPU::to_plain_if_needed(value);
+  return at::AtenIpexTypeXPU::_scaled_dot_product_attention_math(
+      _query,
+      _key,
+      _value,
+      attn_mask,
+      dropout_p,
+      is_causal,
+      dropout_mask,
+      scale,
+      enable_gqa);
+}
+} // namespace
+
+TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
+  m.impl(
+      "_scaled_dot_product_attention_math",
+      TORCH_FN(wrapper_AutogradXPU___scaled_dot_product_attention_math));
+};
 } // namespace at
