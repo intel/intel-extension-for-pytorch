@@ -143,7 +143,7 @@ def varlen_fwd_reference(
     align_mask_seqlen = (max_seqlen_k + 63) // 64 * 64
     attn_mask = torch.empty(
         [batch_size, 1, max_seqlen_q, align_mask_seqlen],
-        dtype=torch.float16,
+        dtype=query.dtype,
         device=query.device,
     ).fill_(float("-inf"))
     qk_mask = q_mask.unsqueeze(2) * k_mask.unsqueeze(1)
@@ -165,6 +165,18 @@ def varlen_fwd_reference(
     attn_mask[:, :, :max_seqlen_q, :max_seqlen_k].masked_fill_(
         qk_mask[:, None, :, :], 0
     )
+    if alibi is not None:
+        col_indices = torch.arange(align_mask_seqlen).to("xpu").to(torch.float32)
+        distances = col_indices.unsqueeze(0).expand(max_seqlen_q, align_mask_seqlen)
+        upper_triangular_mask = torch.triu(
+            torch.ones(max_seqlen_q, align_mask_seqlen, device="xpu"), diagonal=1
+        ).bool()
+        distances = distances.masked_fill(upper_triangular_mask, float("-inf"))
+        is_causal = False  # bias with causal can only be [B, 1, 1, T]
+        bias = alibi.unsqueeze(2).unsqueeze(3) * distances
+        attn_mask = torch.where(
+            torch.isinf(attn_mask) | torch.isinf(bias), -float("inf"), attn_mask + bias
+        ).to(torch.float16)
     if is_causal:
         causal_mask = create_causal_mask(
             batch_size, max_seqlen_q, max_seqlen_k, seqlen_q, seqlen_k
@@ -174,21 +186,6 @@ def varlen_fwd_reference(
     pad_q[q_mask] = query
     pad_k[k_mask] = key
     pad_v[k_mask] = value
-    block_alibi = None
-    if alibi is not None:
-        block_alibi = torch.empty(
-            [batch_size, num_head, 1, align_mask_seqlen],
-            device="xpu",
-            dtype=query.dtype,
-        )
-        if alibi.dim() == 1:
-            block_alibi[:, :, :, :max_seqlen_k] = alibi.view([1, num_head, 1, 1])
-        elif alibi.dim() == 2:
-            block_alibi[:, :, :, :max_seqlen_k] = alibi.view(
-                [batch_size, num_head, 1, 1]
-            )
-        else:
-            raise RuntimeError
 
     if num_head_k < num_head:
         assert num_head % num_head_k == 0, "num_head_k should be divisible by num_head."
@@ -212,7 +209,7 @@ def varlen_fwd_reference(
         pad_q,
         pad_k,
         pad_v,
-        block_alibi,
+        None,
         attn_mask,
         None,
         softmax_scale,
@@ -278,8 +275,13 @@ def test_varlen_fwd(
     alibi_slopes = None
     softmax_scale = 1 / math.sqrt(head_dim)
     if use_alibi:
-        alibi_slopes = torch.randn(
-            [batch_size, num_heads_query], dtype=dtype, device="xpu"
+        alibi_slopes = torch.tensor(
+            [2 ** (-1 - i) for i in range(num_heads_query)],
+            dtype=torch.float,
+            device="xpu",
+        )
+        alibi_slopes = (
+            alibi_slopes.unsqueeze(0).expand(batch_size, num_heads_query).contiguous()
         )
     out_ref = query.clone()
     out = query.clone()
@@ -292,7 +294,7 @@ def test_varlen_fwd(
         cu_seqlen,
         None,
         None,
-        alibi_slopes if use_alibi else None,
+        alibi_slopes,
         max_seqlen,
         max_seqlen,
         0.0,
@@ -325,26 +327,26 @@ def test_varlen_fwd(
     )
     torch.testing.assert_close(out, out_ref, atol=3e-3, rtol=1e-3)
 
-    if not use_alibi:
-        ipex.llm.functional.varlen_attention(
-            query,
-            key,
-            value,
-            out,
-            cu_seqlen,
-            cu_seqlen,
-            max_seqlen,
-            max_seqlen,
-            0.0,
-            softmax_scale,
-            False,
-            is_causal,
-            False,
-            None,
-            window_size_left=window_size[0],
-            window_size_right=window_size[1],
-        )
-        torch.testing.assert_close(out, out_ref, atol=3e-3, rtol=1e-3)
+    ipex.llm.functional.varlen_attention(
+        query,
+        key,
+        value,
+        out,
+        cu_seqlen,
+        cu_seqlen,
+        alibi_slopes,
+        max_seqlen,
+        max_seqlen,
+        0.0,
+        softmax_scale,
+        False,
+        is_causal,
+        False,
+        None,
+        window_size_left=window_size[0],
+        window_size_right=window_size[1],
+    )
+    torch.testing.assert_close(out, out_ref, atol=3e-3, rtol=1e-3)
 
 
 SOFTCAP = 50.0
@@ -390,6 +392,7 @@ def test_varlen_attention_softcap(
         out,
         cu_seqlen,
         cu_seqlen,
+        None,
         max_seqlen,
         max_seqlen,
         0.0,

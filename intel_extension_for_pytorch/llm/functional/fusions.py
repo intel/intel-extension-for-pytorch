@@ -241,6 +241,7 @@ def varlen_attention(
     out: torch.Tensor,
     seqlen_q: torch.Tensor,
     seqlen_k: torch.Tensor,
+    alibi_slopes: torch.Tensor,
     max_seqlen_q: int,
     max_seqlen_k: int,
     pdropout: float,
@@ -274,6 +275,8 @@ def varlen_attention(
             points the current query_tokens among total sequence length.
         seqlen_k (torch.Tensor): shape [batch_size + 1],
             points the current key_tokens among total sequence length.
+        alibi_slopes (torch.Tensor): shape [num_head] | [batch_size, num_head],
+            for attention head by adding a bias term
         max_seqlen_q (int): max/total sequence length of query.
         max_seqlen_k (int): max/total sequence length of key.
         pdropout (float): dropout probability; if greater than 0.0, dropout is applied, default is 0.0.
@@ -290,6 +293,7 @@ def varlen_attention(
         out,
         seqlen_q,
         seqlen_k,
+        alibi_slopes,
         max_seqlen_q,
         max_seqlen_k,
         pdropout,

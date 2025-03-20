@@ -1042,6 +1042,9 @@ Tensor varlen_fwd(
   TORCH_CHECK(query.is_xpu(), "query must on XPU");
   TORCH_CHECK(key.is_xpu(), "key must on XPU");
   TORCH_CHECK(value.is_xpu(), "value must on XPU");
+  if (alibi_slopes_.has_value()) {
+    TORCH_CHECK(alibi_slopes_->is_xpu(), "alibi_slopes_ must on XPU");
+  }
   TORCH_CHECK(cu_seqlens_q.is_xpu(), "cu_seqlens_q must on XPU");
   TORCH_CHECK(cu_seqlens_k.is_xpu(), "cu_seqlens_k must on XPU");
 
@@ -1049,6 +1052,10 @@ Tensor varlen_fwd(
   TORCH_CHECK(query.is_contiguous(), "query must be contiguous");
   TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
   TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
+  if (alibi_slopes_.has_value()) {
+    TORCH_CHECK(
+        alibi_slopes_->is_contiguous(), "alibi_slopes_ must be contiguous");
+  }
   TORCH_CHECK(cu_seqlens_q.is_contiguous(), "cu_seqlens_q must be contiguous");
   TORCH_CHECK(cu_seqlens_k.is_contiguous(), "cu_seqlens_k must be contiguous");
 
@@ -1083,10 +1090,13 @@ Tensor varlen_fwd(
       num_keys);
   RECORD_FUNCTION(str__, {});
 
-  // check alibi padded
+  // check alibi_slopes
   uint32_t alibi_padded_block_size = 0;
   if (alibi_slopes_.has_value()) {
     int ndim = alibi_slopes_->ndimension();
+    TORCH_CHECK(
+        alibi_slopes_->scalar_type() == at::kFloat,
+        "XeTLA VarlenAttention: The datatype of alibi_slopes should be float");
     TORCH_CHECK(
         ndim == 1 || ndim == 2,
         "XeTLA VarlenAttention: only support 1 dim or 2 dim alibi tensor!");
@@ -1094,7 +1104,7 @@ Tensor varlen_fwd(
     if (ndim == 1) {
       TORCH_CHECK(
           last_dim == num_heads_q,
-          "XeTLA VarlenAttention: The shape of alibi tensor should equal to [batch_size]");
+          "XeTLA VarlenAttention: The shape of alibi tensor should equal to [num_head]");
       alibi_padded_block_size = 0;
     }
     if (ndim == 2) {
