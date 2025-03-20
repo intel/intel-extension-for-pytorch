@@ -415,12 +415,12 @@ void fused_experts_kernel_impl(
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * N + nb0;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * N + nb1;
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
 
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
             Dequantize<
@@ -492,8 +492,8 @@ void fused_experts_kernel_impl(
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * N + nb0;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           // 2.a gemm: C = A @ B
             Dequantize_and_compute(
                     qB0 ,
@@ -508,8 +508,8 @@ void fused_experts_kernel_impl(
                     get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * N + nb1;
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
             Dequantize_and_compute(
                     qB1 ,
                     m_size,
