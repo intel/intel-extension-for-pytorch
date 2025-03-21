@@ -2120,6 +2120,7 @@ def ipex_disable_attn_mask_prepare(model):
             transformers.models.gptj.modeling_gptj.GPTJForCausalLM: "GPTJModel",
             transformers.models.opt.modeling_opt.OPTForCausalLM: "OPTModel",
             transformers.models.glm.modeling_glm.GlmForCausalLM: "GlmModel",
+            transformers.models.mistral.modeling_mistral.MistralForCausalLM: "MistralModel",
         }
         model_list.update(model_list_new)
 
@@ -2139,3 +2140,18 @@ def ipex_disable_attn_mask_prepare(model):
         model_spec._update_causal_mask = (
             lambda self, attention_mask, *args: attention_mask
         )
+
+
+# RoPE is an additional operation inside the model level in Transformers4.48.
+# Set it to None and handle the RoPE operation within the IPEX decoderlayer flow instead.
+def ipex_disable_rotary_emb(model):
+    if hasattr(model, "rotary_emb"):
+        model.rotary_emb = IPEXRotaryEmbedding()
+
+
+class IPEXRotaryEmbedding(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, position_ids):
+        return None
