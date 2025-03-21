@@ -183,10 +183,22 @@ def get_build_type():
 
 
 def get_build_aot():
-    if _get_build_target() in ["develop", "python", "bdist_wheel"]:
-        return ",".join(arch for arch in torch.xpu.get_arch_list())
-    else:
-        return os.environ.get("TORCH_XPU_ARCH_LIST", "")
+    build_target = _get_build_target()
+    aot_env = os.environ.get("TORCH_XPU_ARCH_LIST", "")
+
+    # 1. If TORCH_XPU_ARCH_LIST is not set, we will use the arch list from torch-xpu-ops.
+    # 2. If TORCH_XPU_ARCH_LIST is set to "", following torch-xpu-ops behavior, we will use the list from torch-xpu-ops.
+    if not aot_env:
+        return (
+            ",".join(torch.xpu.get_arch_list())
+            if build_target in ["develop", "python", "bdist_wheel"]
+            else ""
+        )
+    # 3. If TORCH_XPU_ARCH_LIST is set to "none", following torch-xpu-ops behavior, we will not use AOT.
+    if aot_env == "none":
+        return ""
+    # 4. If TORCH_XPU_ARCH_LIST is set to a specific arch list, we will use it.
+    return aot_env
 
 
 def create_if_not_exist(path_dir):
