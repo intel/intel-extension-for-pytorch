@@ -332,6 +332,9 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
                 "IPEXAttention dose not support this modelType {} !".format(dtype)
             )
 
+        self.attn.position_embed = self.ipex_config.rotary_embedding_class(
+            self.ipex_config, torch.float16
+        )
         self.mlp = self.build_mlp_from_config("ChatGLM")
         # self.attn.post_qkv = partial(chatglm_post_qkv, self.attn)
         # self.attn.prepare_sdp_input = partial(chatglm_prepare_sdp_input, self.attn)

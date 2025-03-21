@@ -512,7 +512,11 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
 
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
-        self.dim = int(config.embedding_dim / config.num_attention_head)
+        self.dim = int(
+            config.embedding_dim
+            / config.num_attention_head
+            * config.partial_rotary_factor
+        )
         LlamaRotaryEmbedding.max_position_embedding = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device
@@ -820,6 +824,46 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
 class Phi3RotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
+
+    def apply_rotary_pos_emb(self, q, k, sin, cos, position_ids=None, unsqueeze_dim=1):
+        if q.shape == k.shape:
+            cos = cos.expand(q.shape)
+            sin = sin.expand(q.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half_qk(q, k, sin, cos, q, k)
+        else:
+            # TODO Optimize space?
+            rotary_dim = cos.shape[-1]
+            q_rot, q_pass = q[..., :rotary_dim], q[..., rotary_dim:]
+            k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
+
+            q_embed = torch.cat(
+                [(q_rot * cos) + (self.rotate_half(q_rot) * sin), q_pass], dim=-1
+            )
+            k_embed = torch.cat(
+                [(k_rot * cos) + (self.rotate_half(k_rot) * sin), k_pass], dim=-1
+            )
+            return q_embed, k_embed
+
+    def forward(
+        self,
+        query,
+        key,
+        position_ids,
+        layer_id,
+        beam_size,
+        kv_seq_len,
+        cache_format=CacheFormat.BFNH,
+    ):
+        sin, cos = self.get_sin_cos(
+            position_ids, layer_id, beam_size, kv_seq_len, cache_format
+        )
+        if query.shape == key.shape:
+            self.apply_rotary_pos_emb(query, key, sin, cos)
+        else:
+            q_embed, k_embed = self.apply_rotary_pos_emb(query, key, sin, cos)
+            query.copy_(q_embed)
+            key.copy_(k_embed)
+        return query, key
 
 
 class Phi3SmallRotaryEmbedding(LlamaRotaryEmbedding):

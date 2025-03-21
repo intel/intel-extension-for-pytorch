@@ -137,6 +137,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                     transpose_attn_fused_qkv_params, self.attn
                 )
 
+        self.attn.position_embed = self.ipex_config.rotary_embedding_class(
+            self.ipex_config, torch.float16
+        )
         self.mlp = (
             FalconMLP(config)
             if not self.new_decoder_architecture

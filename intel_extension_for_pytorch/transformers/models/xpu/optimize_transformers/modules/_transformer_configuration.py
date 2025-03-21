@@ -36,9 +36,9 @@ class IPEXTransformerConfig:
     rope_scaling: Optional[Dict[str, Union[float, List[float], int]]] = None
     rotary_pct: float = 1.0
     rotary_dim: int = 64
+    partial_rotary_factor: Optional[float] = 1.0
     rotary_half: bool = False
     rotate_every_two: bool = True
-    rope_scaling = None
     use_causal_mask: bool = False
     activation_function: str = None
     ipex_act: SupportedActivation = SupportedActivation.gelu

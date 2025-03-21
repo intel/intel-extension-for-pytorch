@@ -266,6 +266,20 @@ Run_benchmark_Llava1.5-7b(){
 	mv trace.json ${dir}
 }
 
+## Phi4-mini
+Run_benchmark_Phi4-mini() {
+    model=microsoft/Phi-4-mini-instruct
+    sub_model_name=phi4-mini
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --use-static-cache --dtype float16 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --use-static-cache --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
 
 main() {
 
@@ -289,6 +303,7 @@ main() {
     Run_benchmark_glm4-9b-chat-hf
     Run_benchmark_Mistral-7B
     Run_benchmark_Llava1.5-7b
+    Run_benchmark_Phi4-mini
 }
 
 main

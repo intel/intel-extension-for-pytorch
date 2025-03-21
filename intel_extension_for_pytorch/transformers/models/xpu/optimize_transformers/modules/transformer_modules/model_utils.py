@@ -232,7 +232,7 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
     if dtype == "fp16":
         embed_dim = self.embed_dim
         num_head = self.num_attn_head
-        num_kv_head = self.num_kv_head
+        num_kv_head = self.num_kv_heads
         head_dim = self.head_dim
         group = num_head // num_kv_head + 2
         query_weight_size = head_dim * num_head
@@ -269,9 +269,6 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
         self.out_proj.weight = out_proj.weight
         self.out_proj.bias = out_proj.bias
 
-        self.position_embed = self.config.rotary_embedding_class(
-            self.config, self.qkv_proj.weight.dtype
-        )
     elif dtype == "int4":
         self.qkv_proj_quant.set_weights_bias(qkv_proj.qweight, qkv_proj.bias)
         self.qkv_proj_quant.set_scales_zps_gidx(qkv_proj.scales, qkv_proj.qzeros)
@@ -290,7 +287,6 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
         out_proj.bias = None
         out_proj.scales = None
         out_proj.qzeros = None
-        self.position_embed = self.config.rotary_embedding_class(self.config, dtype)
 
 
 # Use SDPA if XETLA support is available and head_dim is smaller than 128,

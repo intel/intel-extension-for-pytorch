@@ -28,6 +28,7 @@ from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.model_utils import (
     load_attn_fused_qkv_params,
     transpose_attn_fused_qkv_params,
+    chatglm_load_attn_params_grouped,
 )
 
 
@@ -106,6 +107,11 @@ class NewIPEXPhi3DecoderLayer(IPEXTransformerBlock):
             positional_embedding_base=self.config.rope_theta,
             original_max_position_embeddings=self.config.original_max_position_embeddings,
             rope_scaling=self.config.rope_scaling,
+            partial_rotary_factor=(
+                self.config.partial_rotary_factor
+                if hasattr(self.config, "partial_rotary_factor")
+                else 1.0
+            ),
             use_causal_mask=False,
             activation_function=activation_function,
             ipex_act=ipex_activation,
@@ -141,10 +147,23 @@ class NewIPEXPhi3DecoderLayer(IPEXTransformerBlock):
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
-        self.attn.load_parameter = partial(load_attn_fused_qkv_params, self.attn)
-        self.attn.transpose_parameter = partial(
-            transpose_attn_fused_qkv_params, self.attn
+        grouped = (
+            self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head
         )
+        if grouped:
+            self.attn.load_parameter = partial(
+                chatglm_load_attn_params_grouped, self.attn
+            )
+            self.attn.transpose_parameter = partial(
+                transpose_attn_fused_qkv_params,
+                self.attn,
+                grouped=grouped,
+            )
+        else:
+            self.attn.load_parameter = partial(load_attn_fused_qkv_params, self.attn)
+            self.attn.transpose_parameter = partial(
+                transpose_attn_fused_qkv_params, self.attn
+            )
         super().port_all_parameters_to_new_module()
         if self.ipex_config.transpose:
             self.transpose_parameter()

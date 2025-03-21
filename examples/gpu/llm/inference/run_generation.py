@@ -37,6 +37,7 @@ MODEL_CLASSES = {
     "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "llava": (LlavaForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
+    "phi-4": (AutoModelForCausalLM, AutoTokenizer),
 }
 
 # Set console encoding to UTF-8
