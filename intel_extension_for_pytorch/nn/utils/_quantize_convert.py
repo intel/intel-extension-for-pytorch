@@ -447,6 +447,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             use_optimum_format=False,
             quant_method=quant_method,
         )
+
         if g_idx is not None and quant_method == QuantMethod.GPTQ_GEMM:
             shuffler = GPTQShuffle(bits=4, blocksize=group_size)
             qweight_new, g_idx_new = shuffler(qweight, g_idx)
@@ -455,12 +456,21 @@ class WeightOnlyQuantizedLinear(nn.Module):
             qweight_new = None
             g_idx_new = None
             del qweight_new, g_idx_new
+
         cls_inst.set_weights_bias(qweight, bias)
         cls_inst.set_scales_zps_gidx(scales, zero_points, g_idx, quant_method)
+
         if quant_method == QuantMethod.AWQ_GEMM:
-            cls_inst.qweight.data, cls_inst.qzeros.data = fast_awq_to_gptq(
+            qweight_new, qzeros_new = fast_awq_to_gptq(
                 cls_inst.qweight, cls_inst.qzeros
             )
+            if qweight_new.shape != cls_inst.qweight.data.shape:
+                cls_inst.qweight.data = cls_inst.qweight.data.view_as(qweight_new)
+            if qzeros_new.shape != cls_inst.qzeros.data.shape:
+                cls_inst.qzeros.data = cls_inst.qzeros.data.view_as(qzeros_new)
+            cls_inst.qweight.data.copy_(qweight_new)
+            cls_inst.qzeros.data.copy_(qzeros_new)
+
         if not cls_inst.weight_transposed:
             if xpu_gemm_use_xetla():
                 # Transpose the weight/scale/zp to xetla format
