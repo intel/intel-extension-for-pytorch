@@ -12,6 +12,8 @@
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include "xetla/GRU.h"
 
 using namespace dnnl;
@@ -927,4 +929,44 @@ std::tuple<Tensor, Tensor> gru_xpu(
 }
 
 } // namespace native
+
+namespace {
+::std::tuple<at::Tensor, at::Tensor> wrapper_AutogradXPU_input_gru(
+    const at::Tensor& input,
+    const at::Tensor& hx,
+    at::TensorList params,
+    bool has_biases,
+    int64_t num_layers,
+    double dropout,
+    bool train,
+    bool bidirectional,
+    bool batch_first) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, input, "wrapper_AutogradXPU_input_gru", "input");
+  c10::impl::check_and_update_common_device(
+      common_device, hx, "wrapper_AutogradXPU_input_gru", "hx");
+  c10::impl::check_and_update_common_device(
+      common_device, params, "wrapper_AutogradXPU_input_gru", "params");
+  const OptionalDeviceGuard device_guard(device_of(input));
+  auto _input = AtenIpexTypeXPU::to_plain_if_needed(input);
+  auto _hx = AtenIpexTypeXPU::to_plain_if_needed(hx);
+  auto params_vec = AtenIpexTypeXPU::to_plain_if_needed(params);
+  auto _params = at::TensorList(params_vec);
+  return at::AtenIpexTypeXPU::gru(
+      _input,
+      _hx,
+      _params,
+      has_biases,
+      num_layers,
+      dropout,
+      train,
+      bidirectional,
+      batch_first);
+}
+} // anonymous namespace
+TORCH_LIBRARY_IMPL(aten, AutogradXPU, m) {
+  m.impl("gru.input", TORCH_FN(wrapper_AutogradXPU_input_gru));
+}
 } // namespace at
