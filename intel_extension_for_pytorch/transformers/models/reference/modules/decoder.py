@@ -1829,71 +1829,129 @@ def JambaMambaDecoderLayer_forward(
 
 def moe_infer(self, x, topk_ids, topk_weight):
     if self.use_fused_moe or self.use_fused_moe_woq:
-        final_out = torch.ops.torch_ipex.fused_experts(
-            x,
-            self.w13_weight,
-            self.w2_weight,
-            topk_weight.to(torch.float),
-            topk_ids.to(torch.int),
-            False,  # inplace
-            True,  # is_vnni
-            self.distributed,  # is distributed
-            self.use_fused_moe_woq,  # is_woq
-            self.w13_scale,
-            self.w13_zp,
-            self.w2_scale,
-            self.w2_zp,
-        )
+        if self.unify_experts:
+            pad_weights = torch.ones(x.size(0), 1)
+            pad_ids = torch.full((x.size(0), 1),self.unify_shared_expert_id-1).to(torch.int)
+            topk_weight = torch.cat((topk_weight.to(torch.float), pad_weights), -1).to(torch.float)
+            topk_ids = torch.cat((topk_ids.to(torch.int), pad_ids), -1).to(torch.int)
+            final_out = torch.ops.torch_ipex.fused_experts(
+                x,
+                self.w13_weight,
+                self.w2_weight,
+                topk_weight,
+                topk_ids,
+                False,  # inplace
+                True,  # is_vnni
+                self.distributed,  # is distributed
+                self.use_fused_moe_woq,  # is_woq
+                self.w13_scale,
+                self.w13_zp,
+                self.w2_scale,
+                self.w2_zp,
+            )
+        else:
+            final_out = torch.ops.torch_ipex.fused_experts(
+                x,
+                self.w13_weight,
+                self.w2_weight,
+                topk_weight.to(torch.float),
+                topk_ids.to(torch.int),
+                False,  # inplace
+                True,  # is_vnni
+                self.distributed,  # is distributed
+                self.use_fused_moe_woq,  # is_woq
+                self.w13_scale,
+                self.w13_zp,
+                self.w2_scale,
+                self.w2_zp,
+            )
     else:
         if self.moe_linear_type in [0, 1]:
             final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
                 x,
-                topk_ids,
+                topk_ids.to(torch.int64),
                 self.gate_weights,
                 self.up_weights,
                 self.down_weights,
                 self.moe_linear_type == 0,
-                topk_weight,
+                topk_weight.to(x.dtype),
                 self.distributed,
             )
         elif self.moe_linear_type == 2:
             final_out = torch.ops.torch_ipex.deepseek_moe(
                 x,
-                topk_ids,
+                topk_ids.to(torch.int64),
                 self.gate_weights,
                 self.gate_ctx,
                 self.up_weights,
                 self.up_ctx,
                 self.down_weights,
                 self.down_ctx,
-                topk_weight,
+                topk_weight.to(x.dtype),
                 self.distributed,
             )
         elif self.moe_linear_type == 3:
             final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
                 x,
-                topk_ids,
+                topk_ids.to(torch.int64),
                 self.gate_weights,
                 self.gate_ctx,
                 self.up_weights,
                 self.up_ctx,
                 self.down_weights,
                 self.down_ctx,
-                topk_weight,
+                topk_weight.to(x.dtype),
                 self.distributed,
             )
         else:
             final_out = torch.ops.torch_ipex.deepseek_moe_woq(
                 x,
-                topk_ids,
+                topk_ids.to(torch.int64),
                 self.gate_ctx,
                 self.up_ctx,
                 self.down_ctx,
-                topk_weight,
+                topk_weight.to(x.dtype),
                 self.distributed,
             )
     return final_out
 
+def moe_infer_shared(self, identity, hidden_states, residual):
+    # input shape:
+    # identity/hidden_states/residual [BS, seqlen, dims]
+    if self.use_fused_moe or self.use_fused_moe_woq:
+        orig_shape = hidden_states.shape
+        identity = identity.view(-1, hidden_states.shape[-1])
+        # identity [BS*seqlen, dims]
+        identity = torch.ops.torch_ipex.fused_mlp(
+            identity,
+            self.w13_shared_weight,
+            self.w2_shared_weight,
+            # torch.ones(identity.size(0), 1),
+            # torch.zeros(identity.size(0), 1).to(torch.int),
+            False,  # inplace
+            True,  # is_vnni
+            self.distributed,  # is distributed
+            self.use_fused_moe_woq,  # is_woq
+            self.w13_shared_scale,
+            self.w13_shared_zp,
+            self.w2_shared_scale,
+            self.w2_shared_zp,
+        ).view(
+            *orig_shape
+        )
+        hidden_states = hidden_states + identity
+        hidden_states = residual + hidden_states
+    else:
+        identity = self.shared_linear_silu_mul(identity)
+        if not self.distributed:
+            hidden_states = self.shared_linear_add_add(
+                identity, hidden_states, residual
+            )
+        else:
+            identity = self.mlp.shared_experts.down_proj(identity)
+            hidden_states = hidden_states + identity
+            hidden_states = residual + hidden_states
+    return hidden_states
 
 def DeepseekV2DecoderLayer_forward(
     self,
@@ -1935,21 +1993,15 @@ def DeepseekV2DecoderLayer_forward(
         if len(moegate_outputs) == 3:
             topk_idx, topk_weight, aux_loss = moegate_outputs
         else:
-            tok_idx, topk_weight = moegate_outputs
+            topk_idx, topk_weight = moegate_outputs
             aux_loss = None
         hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
             *orig_shape
         )
-        if hasattr(self.mlp, "shared_experts"):
-            identity = self.shared_linear_silu_mul(identity)
-            if not self.distributed:
-                hidden_states = self.shared_linear_add_add(
-                    identity, hidden_states, residual
-                )
-            else:
-                identity = self.mlp.shared_experts.down_proj(identity)
-                hidden_states = hidden_states + identity
-                hidden_states = residual + hidden_states
+        if not self.unify_experts and hasattr(self.mlp, "shared_experts"):
+            hidden_states = moe_infer_shared(self, identity, hidden_states, residual)
+        else:
+            hidden_states = residual + hidden_states
     else:  # DeepseekV2MLP
         hidden_states = self.mlp_linear_silu_mul(hidden_states)
         if not self.distributed:
@@ -2264,9 +2316,29 @@ class _IPEXDecoderLayerRef(nn.Module):
             if not self.distributed and hasattr(module.self_attn, "o_proj"):
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
+
+            self.deepseek_lowbit_load = False
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
                 if config.n_shared_experts is not None:
+                  if (self.use_fused_moe or self.use_fused_moe_woq):
+                    if (
+                        hasattr(module.mlp.shared_experts.gate_proj, "_op_context")
+                        and module.mlp.shared_experts.gate_proj._op_context is not None
+                    ):
+                        self.deepseek_lowbit_load = True
+                    else:
+                        shared_weights_list = [
+                            module.mlp.shared_experts.gate_proj.weight,
+                            module.mlp.shared_experts.up_proj.weight,
+                        ]
+                        concat_shared_weight = torch.concat(shared_weights_list, 0)
+                        self.mlp.shared_experts.w13_shared_weight = concat_shared_weight
+                        self.mlp.shared_experts.w2_shared_weight = module.mlp.shared_experts.down_proj.weight
+                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
+                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                        del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
+                  else:
                     if not self.distributed and hasattr(
                         module.mlp.shared_experts, "down_proj"
                     ):

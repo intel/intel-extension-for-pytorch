@@ -190,6 +190,187 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 "DeepseekV2ForCausalLM",
                 "DeepseekV3ForCausalLM",
             ]:
+                self.unify_experts = False
+                if hasattr(self.mlp, "shared_experts"):
+                    if config.n_shared_experts == 1:
+                        self.unify_experts = True
+                        self.unify_shared_expert_id = config.n_routed_experts + 1
+                        print("[INFO] using unify_experts for shared MOE...")
+                    if hasattr(self, "deepseek_lowbit_load") and self.deepseek_lowbit_load:
+                        w13_shared_qweight_list = []
+                        w13_shared_scale_list = []
+                        w13_shared_zp_list = []
+                        w2_shared_qweight_list = []
+                        w2_shared_scale_list = []
+                        w2_shared_zp_list = []
+                        group_size = -1
+                        dtype = torch.bfloat16
+                        from intel_extension_for_pytorch.quantization._quantize_utils import (
+                            dequantize_per_channel,
+                            dequantize_per_block
+                        )
+                        shared_moe_gate_proj = module.mlp.shared_experts.gate_proj._op_context.to_public(
+                            module.mlp.shared_experts.gate_proj._op_context.get_weight()
+                        )
+                        if module.mlp.shared_experts.gate_proj._group_size > 1:
+                            shared_moe_gate_proj = dequantize_per_block(
+                                shared_moe_gate_proj,
+                                module.mlp.shared_experts.gate_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.gate_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.gate_proj.dtype,
+                                module.mlp.shared_experts.gate_proj._group_size,
+                            )
+                        else:
+                            shared_moe_gate_proj = dequantize_per_channel(
+                                shared_moe_gate_proj,
+                                module.mlp.shared_experts.gate_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.gate_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.gate_proj.dtype,
+                            )
+                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
+                        shared_moe_gate_proj = shared_moe_gate_proj.bfloat16()
+
+                        shared_moe_up_proj = module.mlp.shared_experts.up_proj._op_context.to_public(
+                            module.mlp.shared_experts.up_proj._op_context.get_weight()
+                        )
+                        if module.mlp.shared_experts.up_proj._group_size > 1:
+                            shared_moe_up_proj = dequantize_per_block(
+                                shared_moe_up_proj,
+                                module.mlp.shared_experts.up_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.up_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.up_proj.dtype,
+                                module.mlp.shared_experts.up_proj._group_size,
+                            )
+                        else:
+                            shared_moe_up_proj = dequantize_per_channel(
+                                shared_moe_up_proj,
+                                module.mlp.shared_experts.up_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.up_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.up_proj.dtype,
+                            )
+                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                        shared_moe_up_proj = shared_moe_up_proj.bfloat16()
+                        shared_weights_list = [
+                            shared_moe_gate_proj,
+                            shared_moe_up_proj,
+                        ]
+                        concat_shared_weight = torch.concat(shared_weights_list, 0)
+                        w13_shared_qweight, w13_shared_scale, w13_shared_zp = woq_quant_and_pack(
+                            concat_shared_weight, group_size
+                        )
+                        w13_shared_qweight_list.append(w13_shared_qweight)
+                        w13_shared_scale_list.append(w13_shared_scale)
+                        w13_shared_zp_list.append(w13_shared_zp)
+
+                        shared_moe_down_proj = module.mlp.shared_experts.down_proj._op_context.to_public(
+                            module.mlp.shared_experts.down_proj._op_context.get_weight()
+                        )
+                        if module.mlp.shared_experts.down_proj._group_size > 1:
+                            shared_moe_down_proj = dequantize_per_block(
+                                shared_moe_down_proj,
+                                module.mlp.shared_experts.down_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.down_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.down_proj.dtype,
+                                module.mlp.shared_experts.down_proj._group_size,
+                            )
+                        else:
+                            shared_moe_down_proj = dequantize_per_channel(
+                                shared_moe_down_proj,
+                                module.mlp.shared_experts.down_proj._op_context.get_scales(),
+                                module.mlp.shared_experts.down_proj._op_context.get_zero_points(),
+                                module.mlp.shared_experts.down_proj.dtype,
+                            )
+                        del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
+                        shared_moe_down_proj = shared_moe_down_proj.bfloat16()
+                        w2_shared_qweight, w2_shared_scale, w2_shared_zp = woq_quant_and_pack(
+                            shared_moe_down_proj, group_size
+                        )
+                        w2_shared_qweight_list.append(w2_shared_qweight)
+                        w2_shared_scale_list.append(w2_shared_scale)
+                        w2_shared_zp_list.append(w2_shared_zp)
+
+                        self.w13_shared_weight = torch.stack(w13_shared_qweight_list).detach()
+                        self.w13_shared_scale = (
+                            torch.stack(w13_shared_scale_list).detach().to(dtype)
+                        )
+                        self.w13_shared_zp = (
+                            torch.stack(w13_shared_zp_list).detach().to(dtype)
+                        )
+                        self.w2_shared_weight = torch.stack(w2_shared_qweight_list).detach()
+                        self.w2_shared_scale = (
+                            torch.stack(w2_shared_scale_list).detach().to(dtype)
+                        )
+                        self.w2_shared_zp = torch.stack(w2_shared_zp_list).detach().to(dtype)
+
+                        print("[INFO] Using fused shared MOE WOQ INT8 lowbit weights path...")
+                    else:
+                        if (
+                            self.use_fused_moe or self.use_fused_moe_woq
+                        ) and self.mlp.shared_experts.w13_shared_weight.device.type != "meta":
+                            dtype = self.mlp.shared_experts.w13_shared_weight.dtype
+                            if not self.use_fused_moe_woq:
+                                w13_shared_weight = torch.stack(
+                                    [
+                                        self.mlp.shared_experts.w13_shared_weight
+                                    ]
+                                ).detach()
+                                self.w13_shared_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(w13_shared_weight)
+                                )
+                                del self.mlp.shared_experts.w13_shared_weight
+                                w2_shared_weight = torch.stack(
+                                    [
+                                        self.mlp.shared_experts.w2_shared_weight
+                                    ]
+                                ).detach()
+                                self.w2_shared_weight = torch.ops.torch_ipex.convert_weight_packed_bf16(
+                                    w2_shared_weight
+                                )
+                                del self.mlp.shared_experts.w2_shared_weight
+                                # dummy scale/zps
+                                self.w13_shared_scale = torch.tensor(0).to(dtype)
+                                self.w13_shared_zp = torch.tensor(0).to(dtype)
+                                self.w2_shared_scale = torch.tensor(0).to(dtype)
+                                self.w2_shared_zp = torch.tensor(0).to(dtype)
+                                print("[INFO] Using fused shared MOE bf16 path...")
+                            else:
+                                w13_shared_qweight_list = []
+                                w13_shared_scale_list = []
+                                w13_shared_zp_list = []
+                                w2_shared_qweight_list = []
+                                w2_shared_scale_list = []
+                                w2_shared_zp_list = []
+                                group_size = -1
+                                w13_shared_qweight, w13_shared_scale, w13_shared_zp = woq_quant_and_pack(
+                                    self.mlp.shared_experts.w13_shared_weight, group_size
+                                )
+                                del self.mlp.shared_experts.w13_shared_weight
+                                w13_shared_qweight_list.append(w13_shared_qweight)
+                                w13_shared_scale_list.append(w13_shared_scale)
+                                w13_shared_zp_list.append(w13_shared_zp)
+                                w2_shared_qweight, w2_shared_scale, w2_shared_zp = woq_quant_and_pack(
+                                    self.mlp.shared_experts.w2_shared_weight, group_size
+                                )
+                                del self.mlp.shared_experts.w2_shared_weight
+
+                                w2_shared_qweight_list.append(w2_shared_qweight)
+                                w2_shared_scale_list.append(w2_shared_scale)
+                                w2_shared_zp_list.append(w2_shared_zp)
+                                self.w13_shared_weight = torch.stack(w13_shared_qweight_list).detach()
+                                self.w13_shared_scale = (
+                                    torch.stack(w13_shared_scale_list).detach().to(dtype)
+                                )
+                                self.w13_shared_zp = (
+                                    torch.stack(w13_shared_zp_list).detach().to(dtype)
+                                )
+                                self.w2_shared_weight = torch.stack(w2_shared_qweight_list).detach()
+                                self.w2_shared_scale = (
+                                    torch.stack(w2_shared_scale_list).detach().to(dtype)
+                                )
+                                self.w2_shared_zp = torch.stack(w2_shared_zp_list).detach().to(dtype)
+
+                                print("[INFO] Using fused shared MOE WOQ INT8 path...")
+
                 if hasattr(self.mlp, "experts"):
                     if hasattr(self, "deepseek_lowbit_load") and self.deepseek_lowbit_load:
                         w13_qweight_list = []
@@ -257,7 +438,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             w13_qweight_list.append(w13_qweight)
                             w13_scale_list.append(w13_scale)
                             w13_zp_list.append(w13_zp)
-                            
+
 
                             moe_down_proj = module.mlp.experts[idx].down_proj._op_context.to_public(
                                 module.mlp.experts[idx].down_proj._op_context.get_weight()
@@ -285,7 +466,19 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             w2_qweight_list.append(w2_qweight)
                             w2_scale_list.append(w2_scale)
                             w2_zp_list.append(w2_zp)
-
+                        if self.unify_experts:
+                            w13_qweight_list.append(self.w13_shared_weight[0])
+                            del self.w13_shared_weight
+                            w13_scale_list.append(self.w13_shared_scale[0])
+                            del self.w13_shared_scale
+                            w13_zp_list.append(self.w13_shared_zp[0])
+                            del self.w13_shared_zp
+                            w2_qweight_list.append(self.w2_shared_weight[0])
+                            del self.w2_shared_weight
+                            w2_scale_list.append(self.w2_shared_scale[0])
+                            del self.w2_shared_scale
+                            w2_zp_list.append(self.w2_shared_zp[0])
+                            del self.w2_shared_zp
                         self.w13_weight = torch.stack(w13_qweight_list).detach()
                         self.w13_scale = (
                             torch.stack(w13_scale_list).detach().to(dtype)
@@ -306,6 +499,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         ) and self.mlp.experts[0].w13_weight.device.type != "meta":
                             dtype = self.mlp.experts[0].w13_weight.dtype
                             if not self.use_fused_moe_woq:
+                                self.unify_experts = False
                                 w13_weight = torch.stack(
                                     [
                                         self.mlp.experts[idx].w13_weight
@@ -329,6 +523,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 for idx in range(len(self.mlp.experts)):
                                     del self.mlp.experts[idx].w2_weight
                                 # dummy scale/zps
+                                
                                 self.w13_scale = torch.tensor(0).to(dtype)
                                 self.w13_zp = torch.tensor(0).to(dtype)
                                 self.w2_scale = torch.tensor(0).to(dtype)
@@ -358,6 +553,19 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     w2_qweight_list.append(w2_qweight)
                                     w2_scale_list.append(w2_scale)
                                     w2_zp_list.append(w2_zp)
+                                if self.unify_experts:
+                                    w13_qweight_list.append(self.w13_shared_weight[0])
+                                    del self.w13_shared_weight
+                                    w13_scale_list.append(self.w13_shared_scale[0])
+                                    del self.w13_shared_scale
+                                    w13_zp_list.append(self.w13_shared_zp[0])
+                                    del self.w13_shared_zp
+                                    w2_qweight_list.append(self.w2_shared_weight[0])
+                                    del self.w2_shared_weight
+                                    w2_scale_list.append(self.w2_shared_scale[0])
+                                    del self.w2_shared_scale
+                                    w2_zp_list.append(self.w2_shared_zp[0])
+                                    del self.w2_shared_zp
                                 self.w13_weight = torch.stack(w13_qweight_list).detach()
                                 self.w13_scale = (
                                     torch.stack(w13_scale_list).detach().to(dtype)

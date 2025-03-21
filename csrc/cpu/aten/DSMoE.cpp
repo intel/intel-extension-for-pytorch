@@ -9,7 +9,7 @@ namespace torch_ipex {
 namespace cpu {
 
 IPEX_DEFINE_DISPATCH(fused_experts_impl_stub);
-
+IPEX_DEFINE_DISPATCH(fused_mlp_impl_stub);
 at::Tensor fused_experts(
     at::Tensor& hidden_states,
     at::Tensor& w1,
@@ -41,6 +41,35 @@ at::Tensor fused_experts(
       w1_zp,
       w2_scale,
       w2_zp);
+}
+
+at::Tensor fused_mlp(
+  at::Tensor& hidden_states,
+  at::Tensor& w1,
+  at::Tensor& w2,
+  bool inplace,
+  bool is_vnni,
+  bool is_distributed,
+  bool is_woq,
+  at::Tensor w1_scale,
+  at::Tensor w1_zp,
+  at::Tensor w2_scale,
+  at::Tensor w2_zp) {
+RECORD_FUNCTION("ipex::fused_mlp", c10::ArrayRef<c10::IValue>({}));
+
+return fused_mlp_impl_stub(
+    kCPU,
+    hidden_states,
+    w1,
+    w2,
+    inplace,
+    is_vnni,
+    is_distributed,
+    is_woq,
+    w1_scale,
+    w1_zp,
+    w2_scale,
+    w2_zp);
 }
 constexpr int block_size_m() {
   return 1 * TILE_M;
@@ -414,6 +443,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
        bool is_distributed, bool is_woq, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
   m.impl(
       "fused_experts", c10::DispatchKey::CPU, torch_ipex::cpu::fused_experts);
+  m.def(
+        "fused_mlp(Tensor hidden_states, Tensor w1, Tensor w2, bool inplace, bool is_vnni, \
+         bool is_distributed, bool is_woq, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
+  m.impl(
+        "fused_mlp", c10::DispatchKey::CPU, torch_ipex::cpu::fused_mlp);
   m.def(
         "grouped_topk(Tensor hidden_states, Tensor gating_output, \
         int topk, bool renormalize, int num_expert_group, int topk_group, Tensor e_score_correction_bias, Tensor routed_scaling_factor)  -> (Tensor, Tensor)");
