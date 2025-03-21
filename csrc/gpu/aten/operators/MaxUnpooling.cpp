@@ -337,6 +337,7 @@ Tensor& max_unpooling2d_forward_template(
     const Tensor& self_,
     const Tensor& indices_,
     IntArrayRef output_size) {
+  at::globalContext().alertNotDeterministic("max_unpooling2d_forward_out");
   TORCH_CHECK(output.is_contiguous(), "output must be contiguous");
   TORCH_CHECK(
       indices_.scalar_type() == at::ScalarType::Long,
@@ -496,6 +497,7 @@ Tensor& max_unpooling3d_forward_template(
     IntArrayRef output_size,
     IntArrayRef stride,
     IntArrayRef padding) {
+  at::globalContext().alertNotDeterministic("max_unpooling3d_forward_out");
   TORCH_CHECK(output.is_contiguous(), "output must be contiguous");
   max_unpooling3d_shape_check(
       self_, Tensor(), indices_, output_size, stride, padding);
