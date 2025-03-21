@@ -17,6 +17,7 @@ from .modules.Functions import (
     ipex_build_bloom_alibi_tensor,
     ipex_static_cache,
     ipex_disable_attn_mask_prepare,
+    ipex_disable_rotary_emb,
 )
 from .modules.utils import is_int4
 from typing import List
@@ -112,6 +113,7 @@ def default_override_function_list() -> List:
         ipex_static_cache,
         ipex_prepare_inputs_for_generation,
         ipex_disable_attn_mask_prepare,
+        ipex_disable_rotary_emb,
     ]
     return default_fn_list
 
