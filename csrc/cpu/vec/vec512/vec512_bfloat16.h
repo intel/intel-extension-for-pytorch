@@ -436,7 +436,6 @@ inline float toFloat(T val) {
   return ret;
 }
 
-
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex
