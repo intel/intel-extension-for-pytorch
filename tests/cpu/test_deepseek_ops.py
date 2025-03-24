@@ -2,6 +2,7 @@ import unittest
 import torch
 import torch.nn.functional as F
 from common_utils import TestCase
+import torch.nn as nn
 
 
 def woq_quant_and_pack(weight, group_size):
@@ -221,6 +222,179 @@ def ipex_default_woq_moe(a, w1_list, w3_list, w2_list, score, topk, renormalize)
         False,
     )
     return final_out
+
+
+class DeepseekV2RMSNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, hidden_states):
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * hidden_states.to(input_dtype)
+
+
+class MLA(torch.nn.Module):
+    def __init__(self, dtype=torch.bfloat16):
+        super(MLA, self).__init__()
+        self.hidden_size = 5120
+        self.q_lora_rank = 1536
+        self.num_heads = 128
+        self.qk_nope_head_dim = 128
+        self.qk_rope_head_dim = 64
+        self.kv_lora_rank = 512
+        self.q_head_dim = self.qk_nope_head_dim + self.qk_rope_head_dim
+        self.v_head_dim = 128
+        self.q_a_proj = nn.Linear(self.hidden_size, self.q_lora_rank, bias=False)
+        self.q_b_proj = nn.Linear(
+            self.q_lora_rank, self.num_heads * self.q_head_dim, bias=False
+        )
+        self.q_a_layernorm = DeepseekV2RMSNorm(self.q_lora_rank)
+        self.kv_a_layernorm = DeepseekV2RMSNorm(self.kv_lora_rank)
+        self.kv_a_proj_with_mqa = nn.Linear(
+            self.hidden_size,
+            self.kv_lora_rank + self.qk_rope_head_dim,
+            bias=False,
+        )
+        self.kv_b_proj = nn.Linear(
+            self.kv_lora_rank,
+            self.num_heads
+            * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim),
+            bias=False,
+        )
+        self.softmax_scale = self.q_head_dim ** (-0.5) * 0.707
+        kv_b_proj_weight = self.kv_b_proj.weight.detach().to(dtype)
+        self.kv_b_proj_weight = kv_b_proj_weight.transpose(0, 1).contiguous()
+        w_kc, w_vc = kv_b_proj_weight.unflatten(
+            0, (-1, self.qk_nope_head_dim + self.v_head_dim)
+        ).split([self.qk_nope_head_dim, self.v_head_dim], dim=1)
+        self.w_kc = torch.ops.torch_ipex.convert_weight_packed(
+            w_kc.transpose(-1, -2).contiguous(), False
+        )
+        self.w_vc = torch.ops.torch_ipex.convert_weight_packed(w_vc.contiguous(), False)
+        if hasattr(self.kv_b_proj, "weight_scale") and self.w_scale is None:
+            self.w_scale = self.kv_b_proj.weight_scale
+        self.text_max_length = 2048
+
+    def forward(self, hidden_states, attention_mask, past_key_value, ipex=False):
+        if ipex:
+            bsz, q_len, _ = hidden_states.size()
+            if self.q_lora_rank is None:
+                q = self.q_proj(hidden_states)
+            else:
+                q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+            compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+            compressed_kv, k_pe = torch.split(
+                compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
+            )
+            kv = self.kv_a_layernorm(compressed_kv)
+            k_pe = k_pe.view(bsz, q_len, 1, self.qk_rope_head_dim)
+            kv_seq_len = (
+                past_key_value[0].shape[2] + q_len
+                if past_key_value is not None
+                else q_len
+            )
+            query_states = q.view(bsz, q_len, self.num_heads, self.q_head_dim)
+            if past_key_value is None:
+                past_key_value = (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous().to(kv.dtype),
+                    torch.zeros(
+                        1, int(query_states.size(0)), dtype=torch.long
+                    ).contiguous(),
+                )
+            kv_cache = past_key_value[1].contiguous()
+            beam_idx = past_key_value[-1].contiguous()
+            seq_info = torch.tensor(
+                past_key_value[0].size(-2), dtype=torch.long
+            ).contiguous()
+            (
+                attn_output,
+                attn_weights,
+                kv_cache,
+                beam_idx,
+            ) = torch.ops.torch_ipex.deepseekv2_mla(
+                query_states,
+                kv,
+                k_pe,
+                kv_cache,
+                self.kv_b_proj_weight,
+                self.w_kc,
+                self.w_vc,
+                beam_idx,
+                seq_info,
+                1 / self.softmax_scale,
+                self.text_max_length,
+                self.v_head_dim,
+                None,
+                attention_mask,
+                self.w_scale if hasattr(self, "w_scale") else None,
+                False,
+            )
+
+            past_key_value = (
+                torch.empty(
+                    1, kv_seq_len, kv_seq_len, 1, dtype=torch.long
+                ).contiguous(),
+                kv_cache,
+                beam_idx,
+            )
+        else:
+            bsz, q_len, _ = hidden_states.size()
+
+            q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+            q = q.view(bsz, q_len, self.num_heads, self.q_head_dim).transpose(1, 2)
+            q_nope, q_pe = torch.split(
+                q, [self.qk_nope_head_dim, self.qk_rope_head_dim], dim=-1
+            )
+
+            compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+            compressed_kv, k_pe = torch.split(
+                compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
+            )
+            k_pe = k_pe.view(bsz, q_len, 1, self.qk_rope_head_dim).transpose(1, 2)
+            kv = (
+                self.kv_b_proj(self.kv_a_layernorm(compressed_kv))
+                .view(
+                    bsz, q_len, self.num_heads, self.qk_nope_head_dim + self.v_head_dim
+                )
+                .transpose(1, 2)
+            )
+
+            k_nope, value_states = torch.split(
+                kv, [self.qk_nope_head_dim, self.v_head_dim], dim=-1
+            )
+            query_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
+            query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
+            query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
+
+            key_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
+            key_states[:, :, :, : self.qk_nope_head_dim] = k_nope
+            key_states[:, :, :, self.qk_nope_head_dim :] = k_pe
+            if past_key_value is not None:
+                past_key, past_value = past_key_value
+                key_states = torch.cat([past_key, key_states], dim=2)
+                value_states = torch.cat([past_value, value_states], dim=2)
+
+            attn_weights = (
+                torch.matmul(query_states, key_states.transpose(2, 3))
+                * self.softmax_scale
+            )
+
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+
+            # upcast attention to fp32
+            attn_weights = nn.functional.softmax(
+                attn_weights, dim=-1, dtype=torch.float32
+            ).to(query_states.dtype)
+            attn_output = torch.matmul(attn_weights, value_states)
+            past_key_value = (key_states, value_states)
+        return attn_output, past_key_value
 
 
 class DeepSeekTester(TestCase):
@@ -464,6 +638,57 @@ class DeepSeekTester(TestCase):
             run_single_test(bs, 32, 4, 3, 2, torch.bfloat16)
             run_single_test(bs, 64, 1, 6, 1, torch.bfloat16)
             run_single_test(bs, 256, 8, 4, 8, torch.bfloat16)
+
+    # testing MLA
+    def test_mla(self):
+        dtype = torch.bfloat16
+        mla = MLA().to(dtype)
+        for batch_size in [1, 2, 4, 8, 16]:
+            first_seq_len = 128
+            hidden_size = 5120
+            # first token decode
+            input_t = torch.rand(batch_size, first_seq_len, hidden_size, dtype=dtype)
+            past_key_value = None
+            attention_mask = torch.zeros(
+                batch_size, 1, first_seq_len, first_seq_len, dtype=dtype
+            )
+            casual_mask = torch.full(
+                (first_seq_len, first_seq_len), -1e6, dtype=input_t.dtype
+            )
+            casual_mask = casual_mask.triu(1)
+            casual_mask = casual_mask.unsqueeze(0).unsqueeze(0)
+            attention_mask = (
+                attention_mask + casual_mask
+            )  # combine the attention mask and causal mask
+            with torch.inference_mode(), torch.no_grad(), torch.autocast(
+                device_type="cpu",
+                enabled=True,
+                dtype=torch.bfloat16,
+            ):
+                output_ref, past_key_value_ref = mla(
+                    input_t, attention_mask, past_key_value, False
+                )
+                output_ipex, past_key_value_ipex = mla(
+                    input_t, attention_mask, past_key_value, True
+                )
+                self.assertEqual(output_ref, output_ipex, prec=0.05)
+            # UT for next token
+            input_t = torch.rand(batch_size, 1, hidden_size, dtype=dtype)
+            attention_mask = torch.zeros(
+                batch_size, 1, 1, first_seq_len + 1, dtype=dtype
+            )
+            with torch.inference_mode(), torch.no_grad(), torch.autocast(
+                device_type="cpu",
+                enabled=True,
+                dtype=torch.bfloat16,
+            ):
+                output_ref, past_key_value_ref = mla(
+                    input_t, attention_mask, past_key_value_ref, False
+                )
+                output_ipex, past_key_value_ipex = mla(
+                    input_t, attention_mask, past_key_value_ipex, True
+                )
+                self.assertEqual(output_ref, output_ipex, prec=0.05)
 
 
 if __name__ == "__main__":
