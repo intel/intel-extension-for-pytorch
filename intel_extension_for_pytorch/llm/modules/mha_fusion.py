@@ -797,3 +797,181 @@ class IndirectAccessKVCacheAttention(nn.Module):
             add_casual_mask,
             seq_info,
         )
+
+
+class MambaMixer:
+    r"""
+    This module provides four class methods to apply the custom operators for Mamba/Jamba models (https://arxiv.org/pdf/2312.00752).
+
+    [class method]: causal_conv1d_fn
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.causal_conv1d_fn(
+            x,
+            weight,
+            bias=None,
+            initial_states=None,
+            return_final_states=False,
+            final_states_out=None,
+            activation="silu")
+
+    Args:
+        x (torch.Tensor): x tensor, shape: [batch, dim, seqlen].
+        weight (torch.Tensor): weight tensor of conv1d, shape: [dim, width].
+        bias (torch.Tensor): bias tensor of conv1d, shape: [dim].
+        initial_states (torch.Tensor): initial states tensor, shape: [batch, dim, width - 1].
+        return_final_states (bool): whether to return the final states.
+        final_states_out (torch.Tensor): buffer to store the final states, shape: [batch, dim, width - 1].
+        activation (str): activation function to be used, default is "silu".
+
+    [class method]: causal_conv1d_update
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.causal_conv1d_update(
+            x,
+            conv_state,
+            weight,
+            bias=None,
+            activation=None,
+            cache_seqlens=None)
+
+    Args:
+        x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, dim, seqlen].
+        conv_state (torch.Tensor): convolution state tensor, shape: [batch, dim, state_len], where state_len >= width - 1.
+        weight (torch.Tensor): weight tensor of conv1d, shape: [dim, width].
+        bias (torch.Tensor): bias tensor of conv1d, shape: [dim].
+        activation (str): activation function to be used.
+        cache_seqlens (torch.Tensor): shape: [batch]. dtype: torch.int32.
+            If not None, the conv_state is treated as a circular buffer.
+            The conv_state will be updated by copying x to the conv_state starting at the index
+            @cache_seqlens % state_len.
+
+    [class method]: selective_state_update
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.selective_state_update(
+            state,
+            x,
+            dt,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            dt_bias=None,
+            dt_softplus=False)
+
+    Args:
+        state (torch.Tensor): state tensor, shape: [batch, dim, dstate] or [batch, nheads, dim, dstate].
+        x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, nheads, dim].
+        dt (torch.Tensor): delta time tensor, shape: [batch, dim] or [batch, nheads, dim].
+        A (torch.Tensor): A tensor, shape: [dim, dstate] or [nheads, dim, dstate].
+        B (torch.Tensor): B tensor, shape: [batch, dstate] or [batch, ngroups, dstate].
+        C (torch.Tensor): C tensor, shape: [batch, dstate] or [batch, ngroups, dstate].
+        D (torch.Tensor): D tensor, shape: [dim] or [nheads, dim].
+        z (torch.Tensor): z tensor, shape: [batch, dim] or [nheads, dim].
+        dt_bias (torch.Tensor): delta time bias tensor, shape: [dim] or [nheads, dim].
+        dt_softplus (bool): whether to apply softplus to delta time.
+
+    [class method]: selective_scan_fn
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.selective_scan_fn(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            delta_bias=None,
+            delta_softplus=False,
+            return_last_state=False)
+
+    Args:
+        u (torch.Tensor): u tensor, shape: [batch, dim, seqlen].
+        delta (torch.Tensor): delta tensor, shape: [batch, dim, seqlen].
+        A (torch.Tensor): A tensor, shape: [dim, dstate].
+        B (torch.Tensor): B tensor, shape: [dim, dstate] or [dim, dstate, seqlen] or [batch, ngroups, dstate, seqlen].
+        C (torch.Tensor): C tensor, shape: [dim, dstate] or [dim, dstate, seqlen] or [batch, ngroups, dstate, seqlen].
+        D (torch.Tensor): D tensor, shape: [dim].
+        z (torch.Tensor): z tensor, shape: [batch, dim, seqlen].
+        delta_bias (torch.Tensor): delta bias tensor, shape: [dim], dtype: fp32.
+        delta_softplus (bool): whether to apply softplus to delta.
+        return_last_state (bool): whether to return the last state.
+
+    """
+
+    runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
+
+    @classmethod
+    def causal_conv1d_fn(
+        cls,
+        x: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        initial_states: Optional[torch.Tensor] = None,
+        return_final_states: bool = False,
+        final_states_out: Optional[torch.Tensor] = None,
+        activation: Optional[str] = "silu",
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).causal_conv1d_fn(
+            x,
+            weight,
+            bias,
+            initial_states,
+            return_final_states,
+            final_states_out,
+            activation,
+        )
+
+    @classmethod
+    def causal_conv1d_update(
+        cls, x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).causal_conv1d_update(x, conv_state, weight, bias, activation, cache_seqlens)
+
+    @classmethod
+    def selective_state_update(
+        cls, state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).selective_state_update(state, x, dt, A, B, C, D, z, dt_bias, dt_softplus)
+
+    @classmethod
+    def selective_scan_fn(
+        cls,
+        u,
+        delta,
+        A,
+        B,
+        C,
+        D=None,
+        z=None,
+        delta_bias=None,
+        delta_softplus=False,
+        return_last_state=False,
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            u.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).selective_scan_fn(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D,
+            z,
+            delta_bias,
+            delta_softplus,
+            return_last_state,
+        )

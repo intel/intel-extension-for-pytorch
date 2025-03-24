@@ -17,4 +17,5 @@ from .mha_fusion import (
     IndirectAccessKVCacheAttention,
     PagedAttention,
     VarlenAttention,
+    MambaMixer,
 )

@@ -9,6 +9,19 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
     _disable_tpp,
 )
+import itertools
+import torch.nn.functional as F
+
+from typing import Optional
+
+try:
+    import einops  # noqa: F401
+
+    HAS_EINPOS = True
+except ImportError:
+    HAS_EINPOS = False
+
+skipIfNoEINPOS = unittest.skipIf(not HAS_EINPOS, "no einops")
 
 
 class Linear_gelu(torch.nn.Module):
@@ -560,6 +573,126 @@ class Deepseekv3MoE(torch.nn.Module):
         return final_hidden_states.view(num_tokens, hidden_dim)
 
 
+def causal_conv1d_ref(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+    initial_states: Optional[torch.Tensor] = None,
+    return_final_states: bool = False,
+    final_states_out: Optional[torch.Tensor] = None,
+    activation: Optional[str] = "silu",
+):
+    """
+    x: (batch, dim, seqlen)
+    weight: (dim, width)
+    bias: (dim,)
+    initial_states: (batch, dim, width - 1)
+    final_states_out: (batch, dim, width - 1)
+
+    out: (batch, dim, seqlen)
+    """
+    if activation not in [None, "silu", "swish"]:
+        raise NotImplementedError("activation must be None, silu, or swish")
+    dtype_in = x.dtype
+    x = x.to(weight.dtype)
+    seqlen = x.shape[-1]
+    dim, width = weight.shape
+    if initial_states is None:
+        out = F.conv1d(x, weight.unsqueeze(1), bias, padding=width - 1, groups=dim)
+    else:
+        x = torch.cat([initial_states, x], dim=-1)
+        out = F.conv1d(x, weight.unsqueeze(1), bias, padding=0, groups=dim)
+    out = out[..., :seqlen]
+    if return_final_states:
+        final_states = F.pad(x, (width - 1 - x.shape[-1], 0)).to(
+            dtype_in
+        )  # (batch, dim, width - 1)
+        if final_states_out is not None:
+            final_states_out.copy_(final_states)
+        else:
+            final_states_out = final_states
+    out = (out if activation is None else F.silu(out)).to(dtype=dtype_in)
+    return (out, None) if not return_final_states else (out, final_states_out)
+
+
+def selective_scan_ref(
+    u,
+    delta,
+    A,
+    B,
+    C,
+    D=None,
+    z=None,
+    delta_bias=None,
+    delta_softplus=False,
+    return_last_state=False,
+    prev_state=None,
+    final_state_out=None,
+):
+    """
+    u: r(B D L)
+    delta: r(B D L)
+    A: c(D N) or r(D N)
+    B: c(D N) or r(B N L) or r(B N 2L) or r(B G N L) or (B G N L)
+    C: c(D N) or r(B N L) or r(B N 2L) or r(B G N L) or (B G N L)
+    D: r(D)
+    z: r(B D L)
+    delta_bias: r(D), fp32
+    prev_state: r(B D N), fp32
+
+    out: r(B D L)
+    last_state (optional): r(B D dstate) or c(B D dstate)
+    """
+    from einops import rearrange, repeat
+
+    dtype_in = u.dtype
+    u = u.float()
+    delta = delta.float()
+    if delta_bias is not None:
+        delta = delta + delta_bias[..., None].float()
+    if delta_softplus:
+        delta = F.softplus(delta)
+    batch, dim, dstate = u.shape[0], A.shape[0], A.shape[1]
+    is_variable_B = B.dim() >= 3
+    is_variable_C = C.dim() >= 3
+    B = B.float()
+    C = C.float()
+    x = A.new_zeros((batch, dim, dstate)) if prev_state is None else prev_state
+    ys = []
+    deltaA = torch.exp(torch.einsum("bdl,dn->bdln", delta, A))
+    if not is_variable_B:
+        deltaB_u = torch.einsum("bdl,dn,bdl->bdln", delta, B, u)
+    else:
+        if B.dim() == 3:
+            deltaB_u = torch.einsum("bdl,bnl,bdl->bdln", delta, B, u)
+        else:
+            B = repeat(B, "B G N L -> B (G H) N L", H=dim // B.shape[1])
+            deltaB_u = torch.einsum("bdl,bdnl,bdl->bdln", delta, B, u)
+    if is_variable_C and C.dim() == 4:
+        C = repeat(C, "B G N L -> B (G H) N L", H=dim // C.shape[1])
+    for i in range(u.shape[2]):
+        x = deltaA[:, :, i] * x + deltaB_u[:, :, i]
+        if not is_variable_C:
+            y = torch.einsum("bdn,dn->bd", x, C)
+        else:
+            if C.dim() == 3:
+                y = torch.einsum("bdn,bn->bd", x, C[:, :, i])
+            else:
+                y = torch.einsum("bdn,bdn->bd", x, C[:, :, :, i])
+        if i == u.shape[2] - 1:
+            if final_state_out is None:
+                final_state_out = x
+            else:
+                final_state_out.copy_(x)
+        ys.append(y)
+    y = torch.stack(ys, dim=2)  # (batch dim L)
+    out = y if D is None else y + u * rearrange(D, "d -> d 1")
+    if z is not None:
+        out = out * F.silu(z)
+    out = out.to(dtype=dtype_in)
+    return out if not return_last_state else (out, final_state_out)
+
+
 class TestLLMModules(TestCase):
     def test_linearfusion_args0(self):
         x1 = torch.rand(1, 4, 4096)
@@ -728,6 +861,7 @@ class TestLLMModules(TestCase):
         assert ipex.llm.modules.RotaryEmbedding is not None
         assert ipex.llm.modules.RotaryEmbedding.apply_function is not None
         assert ipex.llm.modules.PagedAttention is not None
+        assert ipex.llm.modules.MambaMixer is not None
         assert ipex.llm.modules.IndirectAccessKVCacheAttention is not None
         assert (
             ipex.llm.modules.IndirectAccessKVCacheAttention.apply_function is not None
@@ -873,6 +1007,423 @@ class TestLLMModules(TestCase):
                             x_, use_ipex_api=True, use_ipex_prepack=prepack
                         )
                         self.assertEqual(ref_out, ipex_out)
+
+    def test_causal_conv1d_update(self):
+        def causal_conv1d_update_ref(
+            x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+        ):
+            """
+            x: (batch, dim) or (batch, dim, seqlen)
+            conv_state: (batch, dim, state_len), where state_len >= width - 1
+            weight: (dim, width)
+            bias: (dim,)
+            cache_seqlens: (batch,), dtype int32.
+                If not None, the conv_state is treated as a circular buffer.
+                The conv_state will be updated by copying x to the
+                conv_state starting at the index
+                @cache_seqlens % state_len before performing the convolution.
+
+            out: (batch, dim) or (batch, dim, seqlen)
+            """
+            if activation not in [None, "silu", "swish"]:
+                raise NotImplementedError("activation must be None, silu, or swish")
+            dtype_in = x.dtype
+            unsqueeze = x.dim() == 2
+            if unsqueeze:
+                x = x.unsqueeze(-1)
+            batch, dim, seqlen = x.shape
+            width = weight.shape[1]
+            state_len = conv_state.shape[-1]
+            assert conv_state.shape == (batch, dim, state_len)
+            assert weight.shape == (dim, width)
+            if cache_seqlens is None:
+                x_new = torch.cat([conv_state, x], dim=-1).to(
+                    weight.dtype
+                )  # (batch, dim, state_len + seqlen)
+                conv_state.copy_(x_new[:, :, -state_len:])
+            else:
+                width_idx = torch.arange(
+                    -(width - 1), 0, dtype=torch.long, device=x.device
+                ).unsqueeze(0) + cache_seqlens.unsqueeze(1)
+                width_idx = (
+                    torch.remainder(width_idx, state_len)
+                    .unsqueeze(1)
+                    .expand(-1, dim, -1)
+                )
+                x_new = torch.cat([conv_state.gather(2, width_idx), x], dim=-1).to(
+                    weight.dtype
+                )
+                copy_idx = torch.arange(
+                    seqlen, dtype=torch.long, device=x.device
+                ).unsqueeze(0) + cache_seqlens.unsqueeze(1)
+                copy_idx = (
+                    torch.remainder(copy_idx, state_len)
+                    .unsqueeze(1)
+                    .expand(-1, dim, -1)
+                )
+                conv_state.scatter_(2, copy_idx, x)
+            out = F.conv1d(x_new, weight.unsqueeze(1), bias, padding=0, groups=dim)[
+                :, :, -seqlen:
+            ]
+            if unsqueeze:
+                out = out.squeeze(-1)
+            return (out if activation is None else F.silu(out)).to(dtype=dtype_in)
+
+        def causal_conv1d_update_ipex(
+            x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+        ):
+            return ipex.llm.modules.MambaMixer.causal_conv1d_update(
+                x, conv_state, weight, bias, activation, cache_seqlens
+            )
+
+        batch = 2
+        seqlens = [1, 2, 3]
+        width = 4
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        has_bias_list = [True, False]
+        dims = [2048, 2048 + 16, 4096]
+        silu_activation = [True, False]
+        state_lens = [width - 1, width, width + 1]
+        has_cache_seqlens_list = [True, False]
+        for (
+            dtype,
+            has_bias,
+            dim,
+            activation,
+            state_len,
+            seqlen,
+            has_cache_seqlens,
+        ) in itertools.product(
+            dtypes,
+            has_bias_list,
+            dims,
+            silu_activation,
+            state_lens,
+            seqlens,
+            has_cache_seqlens_list,
+        ):
+            x = torch.rand(batch, dim, seqlen).to(dtype)
+            x_ref = x.clone()
+            conv_state = torch.rand(batch, dim, state_len).to(dtype)
+            weight = torch.rand(dim, width).to(dtype)
+            bias = torch.rand(dim).to(dtype) if has_bias else None
+            conv_state_ref = conv_state.clone()
+            act = None if not activation else "silu"
+            cache_seqlens = (
+                torch.randint(0, 1024, (batch,), dtype=torch.int32)
+                if has_cache_seqlens
+                else None
+            )
+
+            out_ref = causal_conv1d_update_ref(
+                x_ref,
+                conv_state_ref,
+                weight,
+                bias,
+                activation=act,
+                cache_seqlens=cache_seqlens,
+            )
+            out_ipex = causal_conv1d_update_ipex(
+                x, conv_state, weight, bias, activation=act, cache_seqlens=cache_seqlens
+            )
+            rtol, atol = (3e-4, 1e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 1e-2, 5e-2
+            self.assertTrue(torch.allclose(out_ref, out_ipex, rtol=rtol, atol=atol))
+            self.assertEqual(conv_state_ref, conv_state)
+
+    def test_causal_conv1d_fn(self):
+        def causal_conv1d_ipex(
+            x: torch.Tensor,
+            weight: torch.Tensor,
+            bias: Optional[torch.Tensor] = None,
+            initial_states: Optional[torch.Tensor] = None,
+            return_final_states: bool = False,
+            final_states_out: Optional[torch.Tensor] = None,
+            activation: Optional[str] = "silu",
+        ):
+            return ipex.llm.modules.MambaMixer.causal_conv1d_fn(
+                x,
+                weight,
+                bias,
+                initial_states,
+                return_final_states,
+                final_states_out,
+                activation,
+            )
+
+        batch = 1
+        seqlens = [1, 8, 16, 32, 64, 128, 256, 512, 784, 1024, 1025, 2048, 4096]
+        width = 4
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        has_bias_list = [True]
+        dims = [64]
+        silu_activation = [True]
+        has_initial_state_list = [True, False]
+        for (
+            dtype,
+            has_bias,
+            dim,
+            activation,
+            seqlen,
+            has_initial_state,
+        ) in itertools.product(
+            dtypes,
+            has_bias_list,
+            dims,
+            silu_activation,
+            seqlens,
+            has_initial_state_list,
+        ):
+            x = torch.rand(batch, dim, seqlen).to(dtype)
+            x_ref = x.clone()
+            weight = torch.rand(dim, width).to(dtype)
+            bias = torch.rand(dim).to(dtype) if has_bias else None
+            if has_initial_state:
+                initial_states = torch.randn(batch, dim, width - 1, dtype=dtype)
+            else:
+                initial_states = None
+            x_ref = x.clone()
+            weight_ref = weight.clone()
+            bias_ref = bias.clone() if bias is not None else None
+            initial_states_ref = (
+                initial_states.clone() if initial_states is not None else None
+            )
+            act = None if not activation else "silu"
+
+            out_ref, final_states_ref = causal_conv1d_ref(
+                x_ref,
+                weight_ref,
+                bias_ref,
+                initial_states=initial_states_ref,
+                return_final_states=True,
+                activation=act,
+            )
+            out_ipex, final_states_ipex = causal_conv1d_ipex(
+                x,
+                weight,
+                bias,
+                initial_states=initial_states,
+                return_final_states=True,
+                activation=act,
+            )
+            rtol, atol = (3e-4, 1e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 1e-2, 5e-2
+            self.assertEqual(out_ref, out_ipex, rtol=rtol, atol=atol)
+            self.assertEqual(final_states_ref, final_states_ipex, rtol=rtol, atol=atol)
+
+    @skipIfNoEINPOS
+    def test_selective_state_update(self):
+        from einops import rearrange, repeat
+
+        def selective_state_update_ref(
+            state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+        ):
+            """
+            Argument:
+                state: (batch, dim, dstate) or (batch, nheads, dim, dstate)
+                x: (batch, dim) or (batch, nheads, dim)
+                dt: (batch, dim) or (batch, nheads, dim)
+                A: (dim, dstate) or (nheads, dim, dstate)
+                B: (batch, dstate) or (batch, ngroups, dstate)
+                C: (batch, dstate) or (batch, ngroups, dstate)
+                D: (dim,) or (nheads, dim)
+                z: (batch, dim) or (batch, nheads, dim)
+                dt_bias: (dim,) or (nheads, dim)
+            Return:
+                out: (batch, dim) or (batch, nheads, dim)
+            """
+            has_heads = state.dim() > 3
+            if state.dim() == 3:
+                state = state.unsqueeze(1)
+            if x.dim() == 2:
+                x = x.unsqueeze(1)
+            if dt.dim() == 2:
+                dt = dt.unsqueeze(1)
+            if A.dim() == 2:
+                A = A.unsqueeze(0)
+            if B.dim() == 2:
+                B = B.unsqueeze(1)
+            if C.dim() == 2:
+                C = C.unsqueeze(1)
+            if D is not None and D.dim() == 1:
+                D = D.unsqueeze(0)
+            if z is not None and z.dim() == 2:
+                z = z.unsqueeze(1)
+            if dt_bias is not None and dt_bias.dim() == 1:
+                dt_bias = dt_bias.unsqueeze(0)
+            batch, nheads, dim, dstate = state.shape
+            assert x.shape == (batch, nheads, dim)
+            assert dt.shape == x.shape
+            assert A.shape == (nheads, dim, dstate)
+            ngroups = B.shape[1]
+            assert nheads % ngroups == 0, "nheads must be divisible by ngroups"
+            assert B.shape == (batch, ngroups, dstate)
+            assert C.shape == B.shape
+            if D is not None:
+                assert D.shape == (nheads, dim)
+            if z is not None:
+                assert z.shape == x.shape
+            if dt_bias is not None:
+                assert dt_bias.shape == (nheads, dim)
+                dt = dt + dt_bias
+            dt = F.softplus(dt) if dt_softplus else dt
+            dA = torch.exp(
+                rearrange(dt, "b h d -> b h d 1") * A
+            )  # (batch, nheads, dim, dstate)
+            B = repeat(
+                B, "b g n -> b (g h) n", h=nheads // ngroups
+            )  # (batch, nheads, dstate)
+            C = repeat(
+                C, "b g n -> b (g h) n", h=nheads // ngroups
+            )  # (batch, nheads, dstate)
+            dB = rearrange(dt, "b h d -> b h d 1") * rearrange(
+                B, "b h n -> b h 1 n"
+            )  # (batch, nheads, dim, dstate)
+            state.copy_(
+                state * dA + dB * rearrange(x, "b h d -> b h d 1")
+            )  # (batch, dim, dstate
+            out = torch.einsum("bhdn,bhn->bhd", state.to(C.dtype), C)
+            if D is not None:
+                out += (x * D).to(out.dtype)
+            out = (out if z is None else out * F.silu(z)).to(x.dtype)
+            if not has_heads:
+                out = out.squeeze(1)
+            return out
+
+        def selective_state_update_ipex(
+            state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+        ):
+            return ipex.llm.modules.MambaMixer.selective_state_update(
+                state,
+                x,
+                dt,
+                A,
+                B,
+                C,
+                D,
+                z,
+                dt_bias,
+                dt_softplus,
+            )
+
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        has_z_list = [True, False]
+        dstate_list = [16, 32, 64]
+        dims = [2048, 2048 + 16, 4096]
+        batch = 1
+        for dtype, has_z, dstate, dim in itertools.product(
+            dtypes, has_z_list, dstate_list, dims
+        ):
+            state = torch.randn(batch, dim, dstate, dtype=dtype)
+            x = torch.randn(batch, dim, dtype=dtype)
+            dt = torch.randn(batch, dim, dtype=dtype)
+            dt_bias = torch.rand(dim) - 4.0
+            A = -torch.rand(dim, dstate) - 1.0
+            B = torch.randn(batch, dstate)
+            C = torch.randn(batch, dstate)
+            D = torch.randn(dim)
+            z = torch.randn_like(x) if has_z else None
+            state_ref = state.detach().clone()
+            out_ref = selective_state_update_ref(
+                state_ref, x, dt, A, B, C, D=D, z=z, dt_bias=dt_bias, dt_softplus=True
+            )
+            out_ipex = selective_state_update_ipex(
+                state, x, dt, A, B, C, D=D, z=z, dt_bias=dt_bias, dt_softplus=True
+            )
+            rtol, atol = (3e-4, 1e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 1e-2, 5e-2
+            self.assertEqual(out_ref, out_ipex, rtol=rtol, atol=atol)
+            self.assertEqual(state_ref, state, rtol=rtol, atol=atol)
+
+    @skipIfNoEINPOS
+    def test_selective_scan(self):
+        def selective_scan_ipex(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            delta_bias=None,
+            delta_softplus=False,
+            return_last_state=False,
+        ):
+            return ipex.llm.modules.MambaMixer.selective_scan_fn(
+                u, delta, A, B, C, D, z, delta_bias, delta_softplus, return_last_state
+            )
+
+        dtypes = [torch.float, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        seqlens = [128, 256, 512, 1024, 2048, 4096]
+        varBC_groups = [1, 2]
+        batch_size = 1
+        dim = 4
+        dstate = 8
+        for dtype, seqlen, BC_group in itertools.product(dtypes, seqlens, varBC_groups):
+            rtol, atol = (6e-4, 2e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 3e-2, 5e-2
+            rtolw, atolw = (1e-3, 1e-3)
+            rtolw = max(rtolw, rtol)
+            atolw = max(atolw, atol)
+            A = -0.5 * torch.rand(dim, dstate, dtype=torch.float32)
+            A_ref = A.clone()
+            if BC_group == 1:
+                B_shape = [batch_size, dstate, seqlen]
+                C_shape = [batch_size, dstate, seqlen]
+            else:
+                B_shape = [batch_size, BC_group, dstate, seqlen]
+                C_shape = [batch_size, BC_group, dstate, seqlen]
+            B = torch.randn(B_shape, dtype=dtype)
+            B_ref = B.clone()
+            C = torch.randn(C_shape, dtype=dtype)
+            C_ref = C.clone()
+            D = torch.randn(dim, dtype=torch.float32)
+            D_ref = D.clone()
+            z = torch.randn(batch_size, dim, seqlen, dtype=dtype)
+            z_ref = z.clone()
+            delta_bias = 0.5 * torch.rand(dim, dtype=torch.float32)
+            u = torch.randn(batch_size, dim, seqlen, dtype=dtype)
+            u_ref = u.clone()
+            delta = 0.5 * torch.rand(batch_size, dim, seqlen, dtype=dtype)
+            delta_ref = delta.clone()
+            out_ref, state_ref = selective_scan_ref(
+                u_ref,
+                delta_ref,
+                A_ref,
+                B_ref,
+                C_ref,
+                D_ref,
+                z=z_ref,
+                delta_bias=delta_bias,
+                delta_softplus=True,
+                return_last_state=True,
+            )
+            out_ipex, state_ipex = selective_scan_ipex(
+                u,
+                delta,
+                A,
+                B,
+                C,
+                D,
+                z=z,
+                delta_bias=delta_bias,
+                delta_softplus=True,
+                return_last_state=True,
+            )
+            self.assertEqual(out_ref, out_ipex, rtol=rtol, atol=atol)
+            self.assertEqual(state_ref, state_ipex, rtol=rtolw, atol=atolw)
 
 
 if __name__ == "__main__":

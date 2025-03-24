@@ -560,6 +560,125 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         )
 
 
+class _IPEXMambaMixerCPU:
+    @classmethod
+    def causal_conv1d_fn(
+        cls,
+        x: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        initial_states: Optional[torch.Tensor] = None,
+        return_final_states: bool = False,
+        final_states_out: Optional[torch.Tensor] = None,
+        activation: Optional[str] = "silu",
+    ):
+        """
+        x: (batch, dim, seqlen)
+        weight: (dim, width)
+        bias: (dim,)
+        initial_states: (batch, dim, width - 1)
+        final_states_out: (batch, dim, width - 1)
+
+        out: (batch, dim, seqlen)
+        """
+        if activation not in [None, "silu", "swish"]:
+            raise NotImplementedError("activation must be None, silu, or swish")
+        out, final_states_out = torch.ops.torch_ipex.causal_conv1d_fn(
+            x, weight, bias, initial_states, final_states_out, activation == "silu"
+        )
+        return (out, None) if not return_final_states else (out, final_states_out)
+
+    @classmethod
+    def causal_conv1d_update(
+        cls, x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+    ):
+        """
+        x: (batch, dim) or (batch, dim, seqlen)
+        conv_state: (batch, dim, state_len), where state_len >= width - 1
+        weight: (dim, width)
+        bias: (dim,)
+        activation: None, "silu", or "swish"
+        cache_seqlens: (batch,), dtype int32.
+            If not None, the conv_state is treated as a circular buffer.
+            The conv_state will be updated by copying x to the
+            conv_state starting at the index
+            @cache_seqlens % state_len before performing the convolution.
+
+        out: (batch, dim) or (batch, dim, seqlen)
+        """
+        if activation not in [None, "silu", "swish"]:
+            raise NotImplementedError("activation must be None, silu, or swish")
+        out, conv_state_new = torch.ops.torch_ipex.causal_conv1d_update(
+            x, conv_state, weight, bias, activation == "silu", cache_seqlens
+        )
+        conv_state.copy_(conv_state_new)
+        return out
+
+    @classmethod
+    def selective_state_update(
+        cls, state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+    ):
+        """
+        Argument:
+            state: (batch, dim, dstate) or (batch, nheads, dim, dstate)
+            x: (batch, dim) or (batch, nheads, dim)
+            dt: (batch, dim) or (batch, nheads, dim)
+            A: (dim, dstate) or (nheads, dim, dstate) or (dstate, dim) or (nheads, dstate, dim)
+            B: (batch, dstate) or (batch, ngroups, dstate)
+            C: (batch, dstate) or (batch, ngroups, dstate)
+            D: (dim,) or (nheads, dim) or None
+            z: (batch, dim) or (batch, nheads, dim) or None
+            dt_bias: (dim,) or (nheads, dim) or None
+            dt_softplus: bool
+        Return:
+            out: (batch, dim) or (batch, nheads, dim)
+        """
+        return torch.ops.torch_ipex.selective_state_update(
+            state, x, dt, A, B, C, D, z, dt_bias, dt_softplus
+        )
+
+    @classmethod
+    def selective_scan_fn(
+        cls,
+        u,
+        delta,
+        A,
+        B,
+        C,
+        D=None,
+        z=None,
+        delta_bias=None,
+        delta_softplus=False,
+        return_last_state=False,
+    ):
+        """
+        u: (B D L) or (B L D)
+        delta: same shape as u
+        A: (D N) or (N D)
+        B: (B N L) or (B N 2L) or (B G N L)
+        C: (B N L) or (B N 2L) or (B G N L)
+        D: (D) or None
+        z: (B D L) or None
+        delta_bias: (D) or None, fp32
+
+        out: (B D L)
+        last_state (optional): (B D dstate)
+        """
+        out, ssm_state = torch.ops.torch_ipex.selective_scan_fn(
+            u,
+            delta.to(A.dtype),
+            A,
+            B,
+            C,
+            D,
+            z,
+            delta_bias,
+            delta_softplus,
+            return_last_state,
+        )
+        return out if not return_last_state else (out, ssm_state)
+
+
 def add_rms_norm_cpu(
     add: torch.Tensor,
     x: torch.Tensor,

@@ -57,6 +57,15 @@ std::tuple<at::Tensor, at::Tensor> causal_conv1d_update(
     const at::Tensor& conv_states,
     const at::Tensor& conv_weights,
     const c10::optional<at::Tensor>& conv_bias,
+    bool silu_activation,
+    const c10::optional<at::Tensor>& cache_seqlens);
+
+std::tuple<at::Tensor, at::Tensor> causal_conv1d_fn(
+    const at::Tensor& x,
+    const at::Tensor& conv_weights,
+    const c10::optional<at::Tensor>& conv_bias,
+    const c10::optional<at::Tensor>& initial_states,
+    const c10::optional<at::Tensor>& final_states_out,
     bool silu_activation);
 
 // IPEX customized convolution OP with n-D packed weight
@@ -108,9 +117,18 @@ using causal_conv1d_update_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     const at::Tensor& conv_states,
     const at::Tensor& conv_weights,
     const c10::optional<at::Tensor>& conv_bias,
+    bool silu_activation,
+    const c10::optional<at::Tensor>& cache_seqlens);
+using causal_conv1d_fn_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
+    const at::Tensor& x,
+    const at::Tensor& conv_weights,
+    const c10::optional<at::Tensor>& conv_bias,
+    const c10::optional<at::Tensor>& initial_states,
+    const c10::optional<at::Tensor>& final_states_out,
     bool silu_activation);
 IPEX_DECLARE_DISPATCH(
     causal_conv1d_update_kernel_fn,
     causal_conv1d_update_kernel_stub);
+IPEX_DECLARE_DISPATCH(causal_conv1d_fn_kernel_fn, causal_conv1d_fn_kernel_stub);
 } // namespace cpu
 } // namespace torch_ipex

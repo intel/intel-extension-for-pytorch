@@ -5706,39 +5706,39 @@ def JambaMambaMixer_forward(
     C = self.c_layernorm(C)
     orig_bias = self.dt_proj.bias
     if self.dt_proj.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
-        time_proj_bias = self.dt_proj._op_context.get_bias().data.to(B.dtype)
+        time_proj_bias = self.dt_proj._op_context.get_bias().data
     else:
         time_proj_bias = orig_bias
     self.dt_proj.bias = None
     discrete_time_step = self.dt_proj(time_step)
     self.dt_proj.bias = orig_bias
 
-    A = -torch.exp(self.A_log.to(dtype))  # [intermediate_size, ssm_state_size]
+    A = -torch.exp(self.A_log)  # [intermediate_size, ssm_state_size]
     # 3.c perform the recurrence y ← SSM(A, B, C)(x)
     if use_precomputed_states:
         discrete_time_step = discrete_time_step.transpose(1, 2)
         scan_outputs = torch.ops.torch_ipex.selective_state_update(
-            cache_params[0],
+            cache_params[0].to(dtype),
             hidden_states[..., 0],
             discrete_time_step[..., 0],
             A,
-            B[:, 0],
-            C[:, 0],
-            self.D.to(dtype),
+            B[:, 0].to(torch.float),
+            C[:, 0].to(torch.float),
+            self.D.to(torch.float),
             gate[..., 0],
-            time_proj_bias,
+            time_proj_bias.to(torch.float),
             dt_softplus=True,
         ).unsqueeze(-1)
     else:
         scan_outputs, ssm_state = torch.ops.torch_ipex.selective_scan_fn(
             hidden_states2,
-            discrete_time_step,
+            discrete_time_step.to(torch.float),
             A,
             B.transpose(1, 2).contiguous(),
             C.transpose(1, 2).contiguous(),
-            self.D.to(dtype),
+            self.D.to(torch.float),
             gate,
-            time_proj_bias,
+            time_proj_bias.to(torch.float),
             delta_softplus=True,
             return_last_state=True,
         )
