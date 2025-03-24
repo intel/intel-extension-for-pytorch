@@ -680,6 +680,19 @@ class HuggingFaceModel(BaseLM):
                     for i in range(self.config.num_hidden_layers)
                 ]
             )
+        if re.search("deepseek", self.config.architectures[0], re.IGNORECASE):
+            past_key_values = tuple(
+                [
+                    (
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                    )
+                    for i in range(num_hidden_layers)
+                ]
+            )
         return past_key_values
 
     def _model_call(
