@@ -12,7 +12,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
-#include <aten/operators/fp8/fp8_utils.h>
+#include <aten/operators/fp8/FP8Utils.h>
 #include <aten/quantized/QUtils.h>
 #include <aten/quantized/Quantizer.h>
 #include <core/MemoryFormat.h>
