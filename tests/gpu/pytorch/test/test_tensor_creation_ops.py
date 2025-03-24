@@ -3651,6 +3651,13 @@ class TestLikeTensorCreation(TestCase):
         self.assertEqual(torch.full_like(like, 1., dtype=torch.complex64).dtype,
                          torch.complex64)
 
+    @onlyNativeDeviceTypes
+    def test_large_tensor(self, device):
+        # Test that we can create tensors with a large number of elements
+        # (larger than 2^31) on XPU.
+        size = 2**30 + 1
+        torch.ones(size, dtype=torch.float32 ,device=device)
+
 # Tests for the `frombuffer` function (only work on CPU):
 #   Constructs tensors from Python objects that implement the buffer protocol,
 #   without copying data.
