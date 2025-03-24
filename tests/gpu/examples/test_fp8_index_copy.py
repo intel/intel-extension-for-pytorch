@@ -1,3 +1,14 @@
+################################################################################
+# Copyright (C) 2025 Intel Corporation
+# This software and the related documents are Intel copyrighted materials,
+# and your use of them is governed by the express license under which they
+# were provided to you ("License"). Unless the License provides otherwise,
+# you may not use, modify, copy, publish, distribute, disclose or transmit
+# this software or the related documents without Intel's prior written
+# permission. This software and the related documents are provided as is,
+# with no express or implied warranties, other than those that are expressly
+# stated in the License.
+################################################################################
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch as ipex  # noqa
@@ -20,7 +31,7 @@ class TestTorchMethod(TestCase):
         ).xpu()
         index = torch.LongTensor([0, 2, 1, 4, 3]).xpu()
 
-        fp8_dtype = ipex._isa_help.Float8Format.kFloat8_E4M3
+        fp8_dtype = ipex._C.Float8Format.kFloat8_E4M3
         b = torch.zeros((5, 5), dtype=dtype).xpu()
 
         a_scale, a_amax, a_scale_inv = (
@@ -30,12 +41,12 @@ class TestTorchMethod(TestCase):
         )
 
         fp8_meta = {}
-        fp8_meta["test"] = ipex._isa_help.FP8TensorMeta()
+        fp8_meta["test"] = ipex._C.FP8TensorMeta()
         fp8_meta["test"].scale = (torch.ones(1) * 2).xpu()
         fp8_meta["test"].scale_inv = torch.ones(1).xpu()
         fp8_meta["test"].amax_history = torch.ones([1, 4]).xpu()
 
-        fp8_tensor = ipex._isa_help.FP8FwdTensors.GEMM1_INPUT
+        fp8_tensor = ipex._C.FP8FwdTensors.GEMM1_INPUT
 
         # print("a = ", a)
         # print("index = ", index)

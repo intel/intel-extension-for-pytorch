@@ -1,3 +1,14 @@
+################################################################################
+# Copyright (C) 2025 Intel Corporation
+# This software and the related documents are Intel copyrighted materials,
+# and your use of them is governed by the express license under which they
+# were provided to you ("License"). Unless the License provides otherwise,
+# you may not use, modify, copy, publish, distribute, disclose or transmit
+# this software or the related documents without Intel's prior written
+# permission. This software and the related documents are provided as is,
+# with no express or implied warranties, other than those that are expressly
+# stated in the License.
+################################################################################
 from typing import Union, Optional, Tuple
 import math
 
@@ -8,7 +19,7 @@ from intel_extension_for_pytorch.quantization.fp8.util import (
     cast_if_needed,
     cast_to_fp8,
 )
-import intel_extension_for_pytorch._isa_help as ipex
+import intel_extension_for_pytorch._C as ipex
 from .base import Fp8BaseModule, prepare_backward
 from intel_extension_for_pytorch.quantization.fp8.fp8 import (
     get_fp8_dtype,
