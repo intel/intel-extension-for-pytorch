@@ -515,7 +515,8 @@ static inline void  dequant_n_grouped_and_compute(
   const at::BFloat16* act,
   float* out,
   long ldb,
-  long N_GROUP_SIZE) {
+  long N_GROUP_SIZE,
+  bool is_woq_sym) {
 #if defined(CPU_CAPABILITY_AVX512_BF16)
 using T = at::BFloat16;
 using VT = typename VecType<T>::type;
@@ -526,9 +527,13 @@ using VAT = typename VA::type;
 constexpr long COLS = VA::num_vec;
 auto load_qparam = [&](at::BFloat16* p) { return VA_l::load1d(p); };
 auto load_qint_as_fp = [&](uint8_t* p, auto vscales, auto vzps) {
-
-  return load_dequant_int8<32, false, float>::call(
+  if (!is_woq_sym){
+    return load_dequant_int8<32, false, float>::call(
+        p, vscales, vzps);
+  }else{
+    return load_dequant_int8<32, true, float>::call(
       p, vscales, vzps);
+  }
   
 };
 
@@ -551,10 +556,11 @@ constexpr int COLS_ = get_n_group_size(WOQ_N_BLOCK_SIZE) / 16 ; //N_GROUP_SIZE /
  };
  Unroll<ROWS_ * COLS_>{}(loadc);
  
-
   auto vscales = load_qparam(scales + n);
   VAT vzps;
-  vzps = load_qparam(zps + n);
+  if(!is_woq_sym){
+      vzps = load_qparam(zps + n);
+  }
   // convert to vnni: [K/2, N, 2]
   // torch::Tensor vbs_ = torch::empty(
   //   {1, N, 2}, c10::CppTypeToScalarType<at::BFloat16>::value);

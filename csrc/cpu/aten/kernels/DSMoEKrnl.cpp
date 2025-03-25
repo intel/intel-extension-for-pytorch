@@ -420,7 +420,8 @@ inline void silu_and_mul(
   const at::BFloat16* __restrict__ act,
   float* __restrict__ out,
   long ldb,
-  long N_GROUP_SIZE) {
+  long N_GROUP_SIZE,
+  bool is_woq_sym) {
     // std::cout<<"----0----:"<<out[0]<<std::endl;
   #if defined(CPU_CAPABILITY_AVX512_BF16)
   using T = at::BFloat16;
@@ -432,7 +433,7 @@ inline void silu_and_mul(
   // saving an "and" op
   VT lut;
   lut = V::set_0_to_15();
-  dequant_n_grouped_and_compute(qB, M, K, N, scales, zps, act, out, ldb, N_GROUP_SIZE);
+  dequant_n_grouped_and_compute(qB, M, K, N, scales, zps, act, out, ldb, N_GROUP_SIZE, is_woq_sym);
 
   #endif
   }
@@ -458,6 +459,7 @@ void fused_experts_kernel_impl(
     int topk,
     int num_tokens_post_pad,
     bool is_woq,
+    const bool is_woq_sym,
     scalar_t* w1_scale,
     scalar_t* w1_zp,
     scalar_t* w2_scale,
@@ -522,47 +524,85 @@ void fused_experts_kernel_impl(
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
 
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-                scalar_t, // target : bf16  gjn here dequant
-                Q_BLOCK_N,
-                get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                WOQ_DTYPE_INT8, // qw_type_
-                false, // sym_quant_w
-                false>:: // use_g_idx
-                call(
-                    qB0 + k_i * BLOCK_N,
-                    Q_BLOCK_K,
-                    n_size,
-                    w1_scale_0,
-                    w1_zp_0,
-                    dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                    0,
-                    nullptr); // g_idx_ptr
+            if(is_woq_sym){
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB0 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_0,
+                      w1_zp_0,
+                      dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+              scalar_t, // target : bf16  gjn here dequant
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              WOQ_DTYPE_INT8, // qw_type_
+              false, // sym_quant_w
+              false>:: // use_g_idx
+              call(
+                  qB0 + k_i * BLOCK_N,
+                  Q_BLOCK_K,
+                  n_size,
+                  w1_scale_0,
+                  w1_zp_0,
+                  dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                  0,
+                  nullptr); // g_idx_ptr
+            }
           }
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-                scalar_t, // target : bf16  gjn here dequant
-                Q_BLOCK_N,
-                get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                WOQ_DTYPE_INT8, // qw_type_
-                false, // sym_quant_w
-                false>:: // use_g_idx
-                call(
-                    qB1 + k_i * BLOCK_N,
-                    Q_BLOCK_K,
-                    n_size,
-                    w1_scale_1,
-                    w1_zp_1,
-                    dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                    0,
-                    nullptr); // g_idx_ptr
+            if(is_woq_sym){
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB1 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_1,
+                      w1_zp_1,
+                      dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB1 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_1,
+                      w1_zp_1,
+                      dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }
           }
         }
         const scalar_t* __restrict__ B0 = is_woq
@@ -599,7 +639,7 @@ void fused_experts_kernel_impl(
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           // 2.a gemm: C = A @ B
             Dequantize_and_compute(
                     qB0 ,
@@ -611,11 +651,12 @@ void fused_experts_kernel_impl(
                     A,
                     C0_f,
                     Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                    get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                    is_woq_sym);
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
             Dequantize_and_compute(
                     qB1 ,
                     m_size,
@@ -626,7 +667,8 @@ void fused_experts_kernel_impl(
                     A,
                     C1_f,
                     Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                    get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                    is_woq_sym);
 
         }else{
           const scalar_t* __restrict__ B0 = packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
@@ -703,25 +745,44 @@ void fused_experts_kernel_impl(
           {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
           uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = is_woq_sym? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           for (int k_i = 0; k_i < IC; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-            scalar_t, // dequant dtype
-            Q_BLOCK_N,
-            get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-            WOQ_DTYPE_INT8, // qw_type_
-            false, // sym_quant_w
-            false>:: // use_g_idx
-            call(
-              qB + k_i * BLOCK_N,
-                Q_BLOCK_K,
-                n_size,
-                w2_scale_,
-                w2_zp_,
-                dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                0,
-                nullptr); // g_idx_ptr
+            if(is_woq_sym){
+              Dequantize<
+              scalar_t, // dequant dtype
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              WOQ_DTYPE_INT8, // qw_type_
+              true, // sym_quant_w
+              false>:: // use_g_idx
+              call(
+                qB + k_i * BLOCK_N,
+                  Q_BLOCK_K,
+                  n_size,
+                  w2_scale_,
+                  w2_zp_,
+                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                  0,
+                  nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+              scalar_t, // dequant dtype
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              WOQ_DTYPE_INT8, // qw_type_
+              false, // sym_quant_w
+              false>:: // use_g_idx
+              call(
+                qB + k_i * BLOCK_N,
+                  Q_BLOCK_K,
+                  n_size,
+                  w2_scale_,
+                  w2_zp_,
+                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                  0,
+                  nullptr); // g_idx_ptr
+            }
           }
         }
         const scalar_t* __restrict__ B = is_woq
@@ -742,7 +803,7 @@ void fused_experts_kernel_impl(
         if (is_woq) { // Dequant loop
           uint8_t* qB =
               packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = is_woq_sym? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           // 2.a gemm: C = A @ B
           Dequantize_and_compute(
@@ -755,7 +816,8 @@ void fused_experts_kernel_impl(
                   A,
                   C_f,
                   Q_BLOCK_N,
-                  get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  is_woq_sym);
         }else{
           const scalar_t* __restrict__ B = packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
           torch_ipex::cpu::tinygemm_kernel<at::BFloat16, at::BFloat16>(
@@ -811,6 +873,7 @@ at::Tensor fused_experts_impl(
     bool is_vnni,
     bool is_distributed,
     bool is_woq,
+    bool is_woq_sym,
     at::Tensor w1_scale,
     at::Tensor w1_zp,
     at::Tensor w2_scale,
@@ -941,6 +1004,7 @@ at::Tensor fused_experts_impl(
       topk,
       num_tokens_post_pad,
       is_woq,
+      is_woq_sym,
       w1_scale.data_ptr<scalar_t>(),
       w1_zp.data_ptr<scalar_t>(),
       w2_scale.data_ptr<scalar_t>(),
@@ -974,6 +1038,7 @@ void fused_mlp_kernel_impl(
     int topk,
     int num_tokens_post_pad,
     bool is_woq,
+    const bool is_woq_sym,
     scalar_t* w1_scale,
     scalar_t* w1_zp,
     scalar_t* w2_scale,
@@ -1038,47 +1103,85 @@ void fused_mlp_kernel_impl(
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
 
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-                scalar_t, // target : bf16  gjn here dequant
-                Q_BLOCK_N,
-                get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                WOQ_DTYPE_INT8, // qw_type_
-                false, // sym_quant_w
-                false>:: // use_g_idx
-                call(
-                    qB0 + k_i * BLOCK_N,
-                    Q_BLOCK_K,
-                    n_size,
-                    w1_scale_0,
-                    w1_zp_0,
-                    dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                    0,
-                    nullptr); // g_idx_ptr
+            if(is_woq_sym){
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB0 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_0,
+                      w1_zp_0,
+                      dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB0 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_0,
+                      w1_zp_0,
+                      dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }
           }
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-                scalar_t, // target : bf16  gjn here dequant
-                Q_BLOCK_N,
-                get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                WOQ_DTYPE_INT8, // qw_type_
-                false, // sym_quant_w
-                false>:: // use_g_idx
-                call(
-                    qB1 + k_i * BLOCK_N,
-                    Q_BLOCK_K,
-                    n_size,
-                    w1_scale_1,
-                    w1_zp_1,
-                    dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                    0,
-                    nullptr); // g_idx_ptr
+            if(is_woq_sym){
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB1 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_1,
+                      w1_zp_1,
+                      dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB1 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_1,
+                      w1_zp_1,
+                      dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            }
           }
         }
         const scalar_t* __restrict__ B0 = is_woq
@@ -1115,7 +1218,7 @@ void fused_mlp_kernel_impl(
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
           // 2.a gemm: C = A @ B
             Dequantize_and_compute(
                     qB0 ,
@@ -1127,11 +1230,12 @@ void fused_mlp_kernel_impl(
                     A,
                     C0_f,
                     Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                    get_n_group_size(Q_BLOCK_N),
+                    is_woq_sym); // N_GROUP_SIZE
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = is_woq_sym? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
             Dequantize_and_compute(
                     qB1 ,
                     m_size,
@@ -1142,7 +1246,8 @@ void fused_mlp_kernel_impl(
                     A,
                     C1_f,
                     Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                    get_n_group_size(Q_BLOCK_N),
+                    is_woq_sym); // N_GROUP_SIZE
 
         }else{
           const scalar_t* __restrict__ B0 = packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
@@ -1219,25 +1324,44 @@ void fused_mlp_kernel_impl(
           {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
           uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = is_woq_sym? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           for (int k_i = 0; k_i < IC; k_i = k_i + Q_BLOCK_K) {
-            Dequantize<
-            scalar_t, // dequant dtype
-            Q_BLOCK_N,
-            get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-            WOQ_DTYPE_INT8, // qw_type_
-            false, // sym_quant_w
-            false>:: // use_g_idx
-            call(
-              qB + k_i * BLOCK_N,
-                Q_BLOCK_K,
-                n_size,
-                w2_scale_,
-                w2_zp_,
-                dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                0,
-                nullptr); // g_idx_ptr
+            if (is_woq_sym){
+              Dequantize<
+              scalar_t, // dequant dtype
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              WOQ_DTYPE_INT8, // qw_type_
+              true, // sym_quant_w
+              false>:: // use_g_idx
+              call(
+                qB + k_i * BLOCK_N,
+                  Q_BLOCK_K,
+                  n_size,
+                  w2_scale_,
+                  w2_zp_,
+                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                  0,
+                  nullptr); // g_idx_ptr
+            }else{
+              Dequantize<
+              scalar_t, // dequant dtype
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              WOQ_DTYPE_INT8, // qw_type_
+              false, // sym_quant_w
+              false>:: // use_g_idx
+              call(
+                qB + k_i * BLOCK_N,
+                  Q_BLOCK_K,
+                  n_size,
+                  w2_scale_,
+                  w2_zp_,
+                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                  0,
+                  nullptr); // g_idx_ptr
+            }
           }
         }
         const scalar_t* __restrict__ B = is_woq
@@ -1258,7 +1382,7 @@ void fused_mlp_kernel_impl(
         if (is_woq) { // Dequant loop
           uint8_t* qB =
               packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = is_woq_sym? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           // 2.a gemm: C = A @ B
           Dequantize_and_compute(
@@ -1271,7 +1395,8 @@ void fused_mlp_kernel_impl(
                   A,
                   C_f,
                   Q_BLOCK_N,
-                  get_n_group_size(Q_BLOCK_N)); // N_GROUP_SIZE
+                  get_n_group_size(Q_BLOCK_N),
+                  is_woq_sym); // N_GROUP_SIZE
         }else{
           const scalar_t* __restrict__ B = packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
           torch_ipex::cpu::tinygemm_kernel<at::BFloat16, at::BFloat16>(
@@ -1324,6 +1449,7 @@ at::Tensor fused_mlp_impl(
     bool is_vnni,
     bool is_distributed,
     bool is_woq,
+    bool is_woq_sym,
     at::Tensor w1_scale,
     at::Tensor w1_zp,
     at::Tensor w2_scale,
@@ -1447,6 +1573,7 @@ at::Tensor fused_mlp_impl(
       topk,
       num_tokens_post_pad,
       is_woq,
+      is_woq_sym,
       w1_scale.data_ptr<scalar_t>(),
       w1_zp.data_ptr<scalar_t>(),
       w2_scale.data_ptr<scalar_t>(),

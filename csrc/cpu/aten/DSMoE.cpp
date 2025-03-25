@@ -20,6 +20,7 @@ at::Tensor fused_experts(
     bool is_vnni,
     bool is_distributed,
     bool is_woq,
+    bool is_woq_sym,
     at::Tensor w1_scale,
     at::Tensor w1_zp,
     at::Tensor w2_scale,
@@ -37,6 +38,7 @@ at::Tensor fused_experts(
       is_vnni,
       is_distributed,
       is_woq,
+      is_woq_sym,
       w1_scale,
       w1_zp,
       w2_scale,
@@ -51,6 +53,7 @@ at::Tensor fused_mlp(
   bool is_vnni,
   bool is_distributed,
   bool is_woq,
+  bool is_woq_sym,
   at::Tensor w1_scale,
   at::Tensor w1_zp,
   at::Tensor w2_scale,
@@ -66,6 +69,7 @@ return fused_mlp_impl_stub(
     is_vnni,
     is_distributed,
     is_woq,
+    is_woq_sym,
     w1_scale,
     w1_zp,
     w2_scale,
@@ -440,12 +444,12 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "fused_experts(Tensor hidden_states, Tensor w1, Tensor w2, Tensor topk_weights, \
       Tensor topk_ids, bool inplace, bool is_vnni, \
-       bool is_distributed, bool is_woq, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
+       bool is_distributed, bool is_woq, bool is_woq_sym, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
   m.impl(
       "fused_experts", c10::DispatchKey::CPU, torch_ipex::cpu::fused_experts);
   m.def(
         "fused_mlp(Tensor hidden_states, Tensor w1, Tensor w2, bool inplace, bool is_vnni, \
-         bool is_distributed, bool is_woq, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
+         bool is_distributed, bool is_woq, bool is_woq_sym, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
   m.impl(
         "fused_mlp", c10::DispatchKey::CPU, torch_ipex::cpu::fused_mlp);
   m.def(

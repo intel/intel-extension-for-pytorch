@@ -1844,6 +1844,7 @@ def moe_infer(self, x, topk_ids, topk_weight):
                 True,  # is_vnni
                 self.distributed,  # is distributed
                 self.use_fused_moe_woq,  # is_woq
+                self.fuse_moe_woq_sym,
                 self.w13_scale,
                 self.w13_zp,
                 self.w2_scale,
@@ -1860,6 +1861,7 @@ def moe_infer(self, x, topk_ids, topk_weight):
                 True,  # is_vnni
                 self.distributed,  # is distributed
                 self.use_fused_moe_woq,  # is_woq
+                self.fuse_moe_woq_sym,
                 self.w13_scale,
                 self.w13_zp,
                 self.w2_scale,
@@ -1932,6 +1934,7 @@ def moe_infer_shared(self, identity, hidden_states, residual):
             True,  # is_vnni
             self.distributed,  # is distributed
             self.use_fused_moe_woq,  # is_woq
+            self.fuse_moe_woq_sym,
             self.w13_shared_scale,
             self.w13_shared_zp,
             self.w2_shared_scale,

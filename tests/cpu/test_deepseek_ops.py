@@ -4,8 +4,10 @@ import torch.nn.functional as F
 from common_utils import TestCase
 import torch.nn as nn
 
+torch.manual_seed(128)
 
-def woq_quant_and_pack(weight, group_size):
+
+def woq_quant_and_pack(weight, group_size, is_sym=False):
     from intel_extension_for_pytorch.quantization import (
         WoqWeightDtype,
         WoqLowpMode,
@@ -18,11 +20,11 @@ def woq_quant_and_pack(weight, group_size):
     assert group_size == -1, "current fused MOE WOQ only support group size = -1"
     if group_size == -1:
         qweight, scales, zero_points = quantize_per_channel(
-            weight, dtype, None, None, False
+            weight, dtype, None, None, is_sym
         )
     else:
         qweight, scales, zero_points = quantize_per_block(
-            weight, dtype, group_size, None, None, False
+            weight, dtype, group_size, None, None, is_sym
         )
 
     _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
@@ -60,12 +62,16 @@ def compare(a: torch.Tensor, b: torch.Tensor, debug=False):
     atol = rtol = pres[a.dtype]
 
     res = torch.allclose(a, b, rtol=rtol, atol=atol)
-    assert res, "[Failure] Acc allclose check is failing..."
+
     max_diff = (a - b).abs().max().item()
     max_index = torch.argmax((a - b).abs()).item()
     a_sum = a.sum().item()
     b_sum = b.sum().item()
 
+    if debug:
+        print(a)
+        print(b)
+        print(max_index, a.flatten()[max_index], b.flatten()[max_index])
     print(
         "Comparing: ",
         res,
@@ -73,6 +79,7 @@ def compare(a: torch.Tensor, b: torch.Tensor, debug=False):
             max_diff, a_sum, b_sum
         ),
     )
+    assert res, "[Failure] Acc allclose check is failing..."
 
 
 def grouped_topk_native(
@@ -189,7 +196,9 @@ def torch_naive_moe(a, w1, w2, score, topk, renormalize):
     ).sum(dim=1)
 
 
-def ipex_default_woq_moe(a, w1_list, w3_list, w2_list, score, topk, renormalize):
+def ipex_default_woq_moe(
+    a, w1_list, w3_list, w2_list, score, topk, renormalize, is_woq_sym=False
+):
     G = 1
     topk_group = 1
     E = score.size(-1)
@@ -205,9 +214,15 @@ def ipex_default_woq_moe(a, w1_list, w3_list, w2_list, score, topk, renormalize)
     down_ctx = []
     group_size = -1
     for expert_idx in range(E):
-        _, _, _, w1_op_context = woq_quant_and_pack(w1_list[expert_idx], group_size)
-        _, _, _, w3_op_context = woq_quant_and_pack(w3_list[expert_idx], group_size)
-        _, _, _, w2_op_context = woq_quant_and_pack(w2_list[expert_idx], group_size)
+        _, _, _, w1_op_context = woq_quant_and_pack(
+            w1_list[expert_idx], group_size, is_woq_sym
+        )
+        _, _, _, w3_op_context = woq_quant_and_pack(
+            w3_list[expert_idx], group_size, is_woq_sym
+        )
+        _, _, _, w2_op_context = woq_quant_and_pack(
+            w2_list[expert_idx], group_size, is_woq_sym
+        )
         gate_ctx.append(w1_op_context)
         up_ctx.append(w3_op_context)
         down_ctx.append(w2_op_context)
@@ -400,7 +415,9 @@ class MLA(torch.nn.Module):
 class DeepSeekTester(TestCase):
     # testing fusedMoE modules
     def test_fused_moe(self):
-        def fused_moe(a, w1, w2, score, topk, renormalize, is_woq=False):
+        def fused_moe(
+            a, w1, w2, score, topk, renormalize, is_woq=False, is_woq_sym=False
+        ):
             G = 1
             topk_group = 1
 
@@ -423,24 +440,31 @@ class DeepSeekTester(TestCase):
                 group_size = -1
                 for idx in range(E):
                     w13_qweight, w13_scale, w13_zp, _ = woq_quant_and_pack(
-                        w1[idx], group_size
+                        w1[idx], group_size, is_woq_sym
                     )
                     w13_qweight_list.append(w13_qweight)
                     w13_scale_list.append(w13_scale)
                     w13_zp_list.append(w13_zp)
                     w2_qweight, w2_scale, w2_zp, _ = woq_quant_and_pack(
-                        w2[idx], group_size
+                        w2[idx], group_size, is_woq_sym
                     )
-
                     w2_qweight_list.append(w2_qweight)
                     w2_scale_list.append(w2_scale)
                     w2_zp_list.append(w2_zp)
                 packed_w1 = torch.stack(w13_qweight_list).detach()
                 w13_scale = torch.stack(w13_scale_list).detach().to(dtype)
-                w13_zp = torch.stack(w13_zp_list).detach().to(dtype)
+                w13_zp = (
+                    torch.tensor(0).to(dtype)
+                    if is_woq_sym
+                    else torch.stack(w13_zp_list).detach().to(dtype)
+                )
                 packed_w2 = torch.stack(w2_qweight_list).detach()
                 w2_scale = torch.stack(w2_scale_list).detach().to(dtype)
-                w2_zp = torch.stack(w2_zp_list).detach().to(dtype)
+                w2_zp = (
+                    torch.tensor(0).to(dtype)
+                    if is_woq_sym
+                    else torch.stack(w2_zp_list).detach().to(dtype)
+                )
             else:
                 packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
                 packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
@@ -460,13 +484,16 @@ class DeepSeekTester(TestCase):
                 True,
                 False,
                 is_woq,
+                is_woq_sym,
                 w13_scale,
                 w13_zp,
                 w2_scale,
                 w2_zp,
             )
 
-        def run_single_test(m, n, k, e, topk, dtype, renormalize=False, is_woq=False):
+        def run_single_test(
+            m, n, k, e, topk, dtype, renormalize=False, is_woq=False, is_woq_sym=False
+        ):
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 10
             score = torch.randn((m, e), device="cpu", dtype=dtype)
             w13_list = []
@@ -486,29 +513,91 @@ class DeepSeekTester(TestCase):
             w2 = torch.stack(w2_list).detach().to(dtype)
             if is_woq:  # Using WOQ INT8: lowp=BF16, group size= -1
                 torch_output = ipex_default_woq_moe(
-                    a, w1_list, w3_list, w2_list, score, topk, renormalize
+                    a,
+                    w1_list,
+                    w3_list,
+                    w2_list,
+                    score,
+                    topk,
+                    renormalize,
+                    is_woq_sym=is_woq_sym,
                 )
             else:
                 torch_output = torch_naive_moe(a, w13, w2, score, topk, renormalize)
             fused_output = fused_moe(
-                a, w13, w2, score, topk, renormalize, is_woq=is_woq
+                a,
+                w13,
+                w2,
+                score,
+                topk,
+                renormalize,
+                is_woq=is_woq,
+                is_woq_sym=is_woq_sym,
             )
 
             compare(torch_output, fused_output)
 
         for is_woq in [True, False]:
-            run_single_test(
-                2, 2048, 2048, 4, 2, torch.bfloat16, renormalize=True, is_woq=is_woq
-            )
-            run_single_test(
-                2, 128, 7168, 4, 2, torch.bfloat16, renormalize=True, is_woq=is_woq
-            )
-            run_single_test(
-                2, 128, 2048, 4, 2, torch.bfloat16, renormalize=True, is_woq=is_woq
-            )
-            run_single_test(
-                2, 2048, 2048, 4, 2, torch.bfloat16, renormalize=True, is_woq=is_woq
-            )
+            if is_woq:
+                is_woq_sym = [True, False]
+            else:
+                is_woq_sym = [False]
+            for is_sym in is_woq_sym:
+                run_single_test(
+                    2,
+                    2048,
+                    2048,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    is_woq_sym=is_sym,
+                )
+                run_single_test(
+                    2,
+                    128,
+                    7168,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    is_woq_sym=is_sym,
+                )
+                run_single_test(
+                    2,
+                    128,
+                    2048,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    is_woq_sym=is_sym,
+                )
+                run_single_test(
+                    2,
+                    7168,
+                    128,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    is_woq_sym=is_sym,
+                )
+                run_single_test(
+                    2,
+                    2048,
+                    128,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    is_woq_sym=is_sym,
+                )
 
     # testing fusedMoE + shardMoE fusion modules
     def test_fuse_moe_with_shared_expert(self):
@@ -545,6 +634,7 @@ class DeepSeekTester(TestCase):
                 topk_ids,
                 inplace,
                 True,
+                False,
                 False,
                 False,
                 w13_scale,

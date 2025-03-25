@@ -52,6 +52,36 @@ def woq_quant_and_pack(weight, group_size):
         _op_context.get_zero_points(),
     )
 
+def woq_pack(plain_qweight, plain_scales, plain_zp=None, group_size=-1):
+    from intel_extension_for_pytorch.quantization import (
+        WoqWeightDtype,
+        WoqLowpMode,
+        WoqActQuantMode,
+    )
+
+    dtype = WoqWeightDtype.INT8
+    assert group_size == -1, "current fused MOE WOQ only support group size = -1"
+
+    _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
+        plain_qweight,
+        dtype,
+        [plain_qweight.shape[0], plain_qweight.shape[1]],
+        plain_scales,
+        plain_zp,
+        None,  # bias
+        None,  # g_idx
+        None,  # batch size
+        group_size,
+        WoqLowpMode.BF16,  # lowp-mode
+        WoqActQuantMode.NONE,  # act_quant_mode
+        False,  # cache_weight_for_large_batch
+    )
+    # pack_qweight: {N/block_n, K/block_k, block_k, block_n}
+    return (
+        _op_context.get_weight(),
+        _op_context.get_scales(),
+        _op_context.get_zero_points(),
+    )
 
 class _IPEXDecoderLayerCPU(nn.Module):
     def __init__(self, module, config, tpp=False, woq=False):
@@ -191,6 +221,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 "DeepseekV3ForCausalLM",
             ]:
                 self.unify_experts = False
+                self.fuse_moe_woq_sym = False
                 if hasattr(self.mlp, "shared_experts"):
                     if config.n_shared_experts == 1:
                         self.unify_experts = True
@@ -205,89 +236,46 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         w2_shared_zp_list = []
                         group_size = -1
                         dtype = torch.bfloat16
-                        from intel_extension_for_pytorch.quantization._quantize_utils import (
-                            dequantize_per_channel,
-                            dequantize_per_block
-                        )
-                        shared_moe_gate_proj = module.mlp.shared_experts.gate_proj._op_context.to_public(
+                        self.fuse_moe_woq_sym = True
+                        assert module.mlp.shared_experts.gate_proj._group_size == -1, "Block wise WOQ fusedMoE is not supported yet..."
+                        assert module.mlp.shared_experts.gate_proj._op_context.get_zero_points() is None, "Expecting WOQ fusedMoE with sym quant, no zp..."
+                        shared_moe_gate_proj_weight = module.mlp.shared_experts.gate_proj._op_context.to_public(
                             module.mlp.shared_experts.gate_proj._op_context.get_weight()
                         )
-                        if module.mlp.shared_experts.gate_proj._group_size > 1:
-                            shared_moe_gate_proj = dequantize_per_block(
-                                shared_moe_gate_proj,
-                                module.mlp.shared_experts.gate_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.gate_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.gate_proj.dtype,
-                                module.mlp.shared_experts.gate_proj._group_size,
-                            )
-                        else:
-                            shared_moe_gate_proj = dequantize_per_channel(
-                                shared_moe_gate_proj,
-                                module.mlp.shared_experts.gate_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.gate_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.gate_proj.dtype,
-                            )
-                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
-                        shared_moe_gate_proj = shared_moe_gate_proj.bfloat16()
+                        shared_moe_gate_proj_scale = module.mlp.shared_experts.gate_proj._op_context.get_scales()
 
-                        shared_moe_up_proj = module.mlp.shared_experts.up_proj._op_context.to_public(
+
+                        shared_moe_up_proj_weight = module.mlp.shared_experts.up_proj._op_context.to_public(
                             module.mlp.shared_experts.up_proj._op_context.get_weight()
                         )
-                        if module.mlp.shared_experts.up_proj._group_size > 1:
-                            shared_moe_up_proj = dequantize_per_block(
-                                shared_moe_up_proj,
-                                module.mlp.shared_experts.up_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.up_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.up_proj.dtype,
-                                module.mlp.shared_experts.up_proj._group_size,
-                            )
-                        else:
-                            shared_moe_up_proj = dequantize_per_channel(
-                                shared_moe_up_proj,
-                                module.mlp.shared_experts.up_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.up_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.up_proj.dtype,
-                            )
-                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
-                        shared_moe_up_proj = shared_moe_up_proj.bfloat16()
-                        shared_weights_list = [
-                            shared_moe_gate_proj,
-                            shared_moe_up_proj,
-                        ]
-                        concat_shared_weight = torch.concat(shared_weights_list, 0)
-                        w13_shared_qweight, w13_shared_scale, w13_shared_zp = woq_quant_and_pack(
-                            concat_shared_weight, group_size
-                        )
-                        w13_shared_qweight_list.append(w13_shared_qweight)
-                        w13_shared_scale_list.append(w13_shared_scale)
-                        w13_shared_zp_list.append(w13_shared_zp)
+                        shared_moe_up_proj_scale = module.mlp.shared_experts.up_proj._op_context.get_scales()
 
-                        shared_moe_down_proj = module.mlp.shared_experts.down_proj._op_context.to_public(
-                            module.mlp.shared_experts.down_proj._op_context.get_weight()
-                        )
-                        if module.mlp.shared_experts.down_proj._group_size > 1:
-                            shared_moe_down_proj = dequantize_per_block(
-                                shared_moe_down_proj,
-                                module.mlp.shared_experts.down_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.down_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.down_proj.dtype,
-                                module.mlp.shared_experts.down_proj._group_size,
-                            )
-                        else:
-                            shared_moe_down_proj = dequantize_per_channel(
-                                shared_moe_down_proj,
-                                module.mlp.shared_experts.down_proj._op_context.get_scales(),
-                                module.mlp.shared_experts.down_proj._op_context.get_zero_points(),
-                                module.mlp.shared_experts.down_proj.dtype,
-                            )
+                        shared_weights_list = [
+                            shared_moe_gate_proj_weight,
+                            shared_moe_up_proj_weight,
+                        ]
+                        shared_scale_list = [
+                            shared_moe_gate_proj_scale,
+                            shared_moe_up_proj_scale,
+                        ]
+
+                        concat_shared_weight = torch.concat(shared_weights_list, 0)
+                        concat_shared_scale = torch.concat(shared_scale_list, 0)
+
+                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
+                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                        pack_shared_weight, pack_shared_scale, _ = woq_pack(concat_shared_weight, concat_shared_scale)
+                        w13_shared_qweight_list.append(pack_shared_weight)
+                        w13_shared_scale_list.append(pack_shared_scale)
+                        w13_shared_zp_list.append(torch.tensor(0).to(dtype))
+
+                        shared_moe_down_proj = module.mlp.shared_experts.down_proj._op_context.get_weight()
+                        shared_moe_down_proj_scale = module.mlp.shared_experts.down_proj._op_context.get_scales()
+
+                        w2_shared_qweight_list.append(shared_moe_down_proj)
+                        w2_shared_scale_list.append(shared_moe_down_proj_scale)
+                        w2_shared_zp_list.append(torch.tensor(0).to(dtype))
                         del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
-                        shared_moe_down_proj = shared_moe_down_proj.bfloat16()
-                        w2_shared_qweight, w2_shared_scale, w2_shared_zp = woq_quant_and_pack(
-                            shared_moe_down_proj, group_size
-                        )
-                        w2_shared_qweight_list.append(w2_shared_qweight)
-                        w2_shared_scale_list.append(w2_shared_scale)
-                        w2_shared_zp_list.append(w2_shared_zp)
 
                         self.w13_shared_weight = torch.stack(w13_shared_qweight_list).detach()
                         self.w13_shared_scale = (
@@ -381,91 +369,45 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         w2_zp_list = []
                         group_size = -1
                         dtype = torch.bfloat16
-                        from intel_extension_for_pytorch.quantization._quantize_utils import (
-                            dequantize_per_channel,
-                            dequantize_per_block
-                        )
+
+                        assert module.mlp.experts[0].gate_proj._group_size == -1, "Block wise WOQ fusedMoE is not supported yet..."
+                        assert module.mlp.experts[0].gate_proj._op_context.get_zero_points() is None, "Expecting WOQ fusedMoE with sym quant, no zp..."
+                        self.fuse_moe_woq_sym = True
                         for idx in range(config.n_routed_experts):
-                            moe_gate_proj = module.mlp.experts[idx].gate_proj._op_context.to_public(
+                            moe_gate_proj_weight = module.mlp.experts[idx].gate_proj._op_context.to_public(
                                 module.mlp.experts[idx].gate_proj._op_context.get_weight()
                             )
-                            if module.mlp.experts[idx].gate_proj._group_size > 1:
-                                moe_gate_proj = dequantize_per_block(
-                                    moe_gate_proj,
-                                    module.mlp.experts[idx].gate_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].gate_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].gate_proj.dtype,
-                                    module.mlp.experts[idx].gate_proj._group_size,
-                                )
-                            else:
-                                moe_gate_proj = dequantize_per_channel(
-                                    moe_gate_proj,
-                                    module.mlp.experts[idx].gate_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].gate_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].gate_proj.dtype,
-                                )
-                            del self.__dict__["_modules"]["mlp"].experts[idx].gate_proj    
-                            moe_gate_proj = moe_gate_proj.bfloat16()
+                            moe_gate_proj_scale = module.mlp.experts[idx].gate_proj._op_context.get_scales()
 
-                            moe_up_proj = module.mlp.experts[idx].up_proj._op_context.to_public(
+                            moe_up_proj_weight = module.mlp.experts[idx].up_proj._op_context.to_public(
                                 module.mlp.experts[idx].up_proj._op_context.get_weight()
                             )
-                            if module.mlp.experts[idx].up_proj._group_size > 1:
-                                moe_up_proj = dequantize_per_block(
-                                    moe_gate_proj,
-                                    module.mlp.experts[idx].up_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].up_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].up_proj.dtype,
-                                    module.mlp.experts[idx].up_proj._group_size,
-                                )
-                            else:
-                                moe_up_proj = dequantize_per_channel(
-                                    moe_up_proj,
-                                    module.mlp.experts[idx].up_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].up_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].up_proj.dtype,
-                                )
-                            del self.__dict__["_modules"]["mlp"].experts[idx].up_proj
-                            moe_up_proj = moe_up_proj.bfloat16()
+                            moe_up_proj_scale = module.mlp.experts[idx].up_proj._op_context.get_scales()
+
                             weights_list = [
-                                moe_gate_proj,
-                                moe_up_proj,
+                                moe_gate_proj_weight,
+                                moe_up_proj_weight,
                             ]
+                            scale_list = [
+                                moe_gate_proj_scale,
+                                moe_up_proj_scale,
+                            ]
+
                             concat_weight = torch.concat(weights_list, 0)
-                            w13_qweight, w13_scale, w13_zp = woq_quant_and_pack(
-                                concat_weight, group_size
-                            )
-                            w13_qweight_list.append(w13_qweight)
-                            w13_scale_list.append(w13_scale)
-                            w13_zp_list.append(w13_zp)
+                            concat_scale = torch.concat(scale_list, 0)
+                            del self.__dict__["_modules"]["mlp"].experts[idx].gate_proj
+                            del self.__dict__["_modules"]["mlp"].experts[idx].up_proj
+                            pack_weight, pack_scale, _ = woq_pack(concat_weight, concat_scale)
+                            w13_qweight_list.append(pack_weight)
+                            w13_scale_list.append(pack_scale)
+                            w13_zp_list.append(torch.tensor(0).to(dtype))
 
-
-                            moe_down_proj = module.mlp.experts[idx].down_proj._op_context.to_public(
-                                module.mlp.experts[idx].down_proj._op_context.get_weight()
-                            )
-                            if module.mlp.experts[idx].down_proj._group_size > 1:
-                                moe_down_proj = dequantize_per_block(
-                                    moe_down_proj,
-                                    module.mlp.experts[idx].down_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].down_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].down_proj.dtype,
-                                    module.mlp.experts[idx].down_proj._group_size,
-                                )
-                            else:
-                                moe_down_proj = dequantize_per_channel(
-                                    moe_down_proj,
-                                    module.mlp.experts[idx].down_proj._op_context.get_scales(),
-                                    module.mlp.experts[idx].down_proj._op_context.get_zero_points(),
-                                    module.mlp.experts[idx].down_proj.dtype,
-                                )
+                            moe_down_proj_weight = module.mlp.experts[idx].down_proj._op_context.get_weight()
+                            moe_down_proj_scale = module.mlp.experts[idx].down_proj._op_context.get_scales()
+                            w2_qweight_list.append(moe_down_proj_weight)
+                            w2_scale_list.append(moe_down_proj_scale)
+                            w2_zp_list.append(torch.tensor(0).to(dtype))
                             del self.__dict__["_modules"]["mlp"].experts[idx].down_proj
-                            moe_down_proj = moe_down_proj.bfloat16()
-                            w2_qweight, w2_scale, w2_zp = woq_quant_and_pack(
-                                moe_down_proj, group_size
-                            )
-                            w2_qweight_list.append(w2_qweight)
-                            w2_scale_list.append(w2_scale)
-                            w2_zp_list.append(w2_zp)
                         if self.unify_experts:
                             w13_qweight_list.append(self.w13_shared_weight[0])
                             del self.w13_shared_weight
@@ -523,7 +465,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 for idx in range(len(self.mlp.experts)):
                                     del self.mlp.experts[idx].w2_weight
                                 # dummy scale/zps
-                                
+
                                 self.w13_scale = torch.tensor(0).to(dtype)
                                 self.w13_zp = torch.tensor(0).to(dtype)
                                 self.w2_scale = torch.tensor(0).to(dtype)
