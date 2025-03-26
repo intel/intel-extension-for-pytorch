@@ -7,16 +7,16 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0"
+    "version": "2.7.0+xpu",
+    "commit": "release/2.7"
   },
   "torchaudio": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0"
+    "version": "2.7.0+xpu",
+    "commit": "release/2.7"
   },
   "torchvision": {
-    "version": "0.21.0+xpu",
-    "commit": "v0.21.0"
+    "version": "0.22.0+xpu",
+    "commit": "release/0.22"
   },
   "torch-ccl": {
     "version": "2.6.0+xpu",
@@ -24,19 +24,22 @@
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "version": "2025.0"
+      "linux": "2025.0.4",
+      "windows": "2025.0.5"
     },
     "mkl-dpcpp": {
-      "version": "2025.0.1"
+      "linux": "2025.0.1",
+      "windows": "2025.0.1"
     },
     "oneccl-devel": {
-      "version": "2021.14.1"
+      "linux": "2021.14.1"
     },
     "impi-devel": {
-      "version": "2021.14.1"
+      "linux": "2021.14.1"
     },
     "intel-pti": {
-      "version": "0.10"
+      "linux": "0.10",
+      "windows": "0.10"
     }
   }
 }
