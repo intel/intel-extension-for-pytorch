@@ -842,7 +842,7 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-    elif _model.config.architectures[0] == "Qwen2ForCausalLM":
+    elif _model.config.architectures[0] in ["Qwen2ForCausalLM", "Qwen3ForCausalLM"]:
         convert_function(_model, "forward", Qwen2ForCausalLM_forward)
         convert_function(_model.model, "forward", QWen2Model_forward)
         convert_function(
@@ -852,14 +852,14 @@ def model_convert_reference(_model):
         )
         convert_class(
             _model,
-            transformers.models.qwen2.modeling_qwen2.Qwen2Attention,
+            type(_model.model.layers[0].self_attn),
             _IPEXAttentionRef,
             _model.config,
             distributed=distributed,
         )
         convert_class(
             _model,
-            transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer,
+            type(_model.model.layers[0]),
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
@@ -1810,6 +1810,8 @@ def model_convert_lowering(
                 supported_classes.append(
                     transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm
                 )
+            if _model.config.architectures[0] == "Qwen3ForCausalLM":
+                supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if hasattr(transformers.models, "mistral"):
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
@@ -2111,7 +2113,7 @@ def optimize(
 
     Well supported model family with full functionalities:
     Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
-    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper, Maira2, Jamba, DeepSeekV2.
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Qwen3, Whisper. Maira2, Jamba, DeepSeekV2.
 
     For the model that is not in the scope of supported model family above, will try to
     apply default ipex.optimize transparently to get benifits (not include quantizations,
@@ -2195,6 +2197,7 @@ def optimize(
                 "MptForCausalLM",
                 "StableLmForCausalLM",
                 "QWenLMHeadModel",
+                "Qwen3ForCausalLM",
                 "Qwen2ForCausalLM",
                 "GitForCausalLM",
                 "LlavaLlamaForCausalLM",

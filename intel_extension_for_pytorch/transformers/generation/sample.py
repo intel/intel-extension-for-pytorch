@@ -187,6 +187,7 @@ def _sample(
             "MptForCausalLM",
             "StableLmForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3ForCausalLM",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",

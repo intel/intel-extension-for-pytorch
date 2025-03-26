@@ -160,6 +160,7 @@ def _greedy_search(
             "MptForCausalLM",
             "StableLmForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3ForCausalLM",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",

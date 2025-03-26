@@ -2102,6 +2102,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "Qwen2ForCausalLM",
+            "Qwen3ForCausalLM",
         ]:
             self.is_cross_decoder = False
             if (
@@ -2506,7 +2507,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                     output_attentions,
                     use_cache,
                 )
-        elif self.model_backbone == "Qwen2ForCausalLM":
+        elif self.model_backbone in ["Qwen2ForCausalLM", "Qwen3ForCausalLM"]:
             return Qwen2DecoderLayer_forward(
                 self,
                 hidden_states,

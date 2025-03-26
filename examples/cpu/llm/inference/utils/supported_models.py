@@ -41,6 +41,7 @@ MODEL_CLASSES = {
     "deepseek-v3": (AutoModelForCausalLM, AutoTokenizer),
     "deepseekv2": (AutoModelForCausalLM, AutoTokenizer),
     "deepseekv3": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen3": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

@@ -58,6 +58,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3ForCausalLM",
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
             "Maira2ForConditionalGeneration",
