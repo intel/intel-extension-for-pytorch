@@ -8,7 +8,7 @@ set(Options_cmake_included true)
 include(CMakeDependentOption)
 # General options:
 
-option(BUILD_WITH_CPU "Build CPU backend implementation" OFF)
+option(BUILD_WITH_CPU "Build CPU backend implementation" ON)
 option(BUILD_WITH_XPU "Build XPU backend implementation" OFF)
 option(BUILD_CFG_HABANA "Build config for Habana" OFF)
 option(BUILD_NO_CLANGFORMAT "Build without force clang-format" OFF)
