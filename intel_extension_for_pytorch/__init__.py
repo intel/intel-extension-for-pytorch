@@ -126,6 +126,10 @@ from .utils._logger import logger, WarningType
 if has_xpu():
     from . import xpu
 
+    # set UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS to 1 to enable allocate memory more than 4GB
+    # will delete this line after the issue is fixed in compiler
+    os.environ["UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS"] = "1"
+
 if has_cpu():
     from . import cpu
     from . import quantization
