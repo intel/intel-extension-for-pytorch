@@ -1759,6 +1759,7 @@ def _QWen2Attention_forward(
 
     return attn_output, attn_weights, past_key_value
 
+
 def _QWenAttention_forward(
     self,
     hidden_states: Optional[Tuple[torch.FloatTensor]],
@@ -3240,7 +3241,7 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif self.model_backbone == "Qwen3ForCausalLM":
+        elif self.model_backbone in ["Qwen3ForCausalLM", "Qwen3MoeForCausalLM"]:
             return _QWen3Attention_forward(
                 self,
                 hidden_states,

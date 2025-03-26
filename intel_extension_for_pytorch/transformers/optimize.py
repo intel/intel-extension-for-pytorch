@@ -194,6 +194,8 @@ def model_convert_reference(_model):
         QWenModel_forward,
         QWen2Model_forward,
         Qwen2ForCausalLM_forward,
+        Qwen3MoeModel_forward,
+        Qwen3MoeForCausalLM_forward,
         GitForCausalLM_forward,
         GitEncoder_forward,
         GitVisionEncoder_forward,
@@ -845,6 +847,28 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] in ["Qwen2ForCausalLM", "Qwen3ForCausalLM"]:
         convert_function(_model, "forward", Qwen2ForCausalLM_forward)
         convert_function(_model.model, "forward", QWen2Model_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "Qwen3MoeForCausalLM":
+        convert_function(_model, "forward", Qwen3MoeForCausalLM_forward)
+        convert_function(_model.model, "forward", Qwen3MoeModel_forward)
         convert_function(
             _model,
             "prepare_inputs_for_generation",
@@ -1795,6 +1819,8 @@ def model_convert_lowering(
                 "YuanForCausalLM",
                 "Phi3ForCausalLM",
                 "Phi4MMForCausalLM",
+                "Qwen3ForCausalLM",
+                "Qwen3MoeForCausalLM",
             ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -1810,8 +1836,6 @@ def model_convert_lowering(
                 supported_classes.append(
                     transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm
                 )
-            if _model.config.architectures[0] == "Qwen3ForCausalLM":
-                supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if hasattr(transformers.models, "mistral"):
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
@@ -2197,6 +2221,7 @@ def optimize(
                 "MptForCausalLM",
                 "StableLmForCausalLM",
                 "QWenLMHeadModel",
+                "Qwen3MoeForCausalLM",
                 "Qwen3ForCausalLM",
                 "Qwen2ForCausalLM",
                 "GitForCausalLM",

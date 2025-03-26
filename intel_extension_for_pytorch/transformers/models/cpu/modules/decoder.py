@@ -58,6 +58,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3MoeForCausalLM",
             "Qwen3ForCausalLM",
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
@@ -149,6 +150,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if self.model_backbone in [
                 "DeepseekV2ForCausalLM",
                 "DeepseekV3ForCausalLM",
+                "Qwen3MoeForCausalLM",
             ]:
                 if hasattr(self.mlp, "experts"):
                     # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
@@ -177,7 +179,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
                     self.gate_ctx = []
                     self.up_ctx = []
                     self.down_ctx = []
-                    offset = self.mlp.ep_rank * self.mlp.experts_per_rank
+                    offset = (
+                        0
+                        if self.model_backbone == "Qwen3MoeForCausalLM"
+                        else self.mlp.ep_rank * self.mlp.experts_per_rank
+                    )
                     for expert_idx in range(len(self.mlp.experts)):
                         expert_layer = self.mlp.experts[expert_idx + offset]
                         if self.moe_linear_type in [0, 1]:

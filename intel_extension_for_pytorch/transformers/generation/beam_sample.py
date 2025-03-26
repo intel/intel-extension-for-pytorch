@@ -168,6 +168,7 @@ def _beam_sample(
             "MptForCausalLM",
             "StableLmForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3MoeForCausalLM",
             "Qwen3ForCausalLM",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",

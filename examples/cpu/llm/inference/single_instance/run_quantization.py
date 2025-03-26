@@ -39,6 +39,7 @@ from llm.inference.utils.model_class.mixtral import MixtralConfig
 from llm.inference.utils.model_class.mpt import MPTConfig
 from llm.inference.utils.model_class.stablelm import StableLMConfig
 from llm.inference.utils.model_class.qwen3 import Qwen3Config
+from llm.inference.utils.model_class.qwen3moe import Qwen3moeConfig
 from llm.inference.utils.model_class.qwen import QwenConfig
 from llm.inference.utils.model_class.qwen2 import Qwen2Config
 from llm.inference.utils.model_class.git import GitConfig
@@ -376,6 +377,8 @@ elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
     model = MixtralConfig(args.model_id)
 elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
     model = StableLMConfig(args.model_id)
+elif re.search("qwen3moe", config.architectures[0], re.IGNORECASE):
+    model = Qwen3moeConfig(args.model_id)
 elif re.search("qwen3", config.architectures[0], re.IGNORECASE):
     model = Qwen3Config(args.model_id)
 elif re.search("qwen", config.architectures[0], re.IGNORECASE):

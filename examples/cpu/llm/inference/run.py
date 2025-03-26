@@ -597,6 +597,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
                 "qwen3": ("/qwen3_local_shard"),
+                "qwen3moe": ("/qwen3moe_local_shard"),
                 "qwen": ("/qwen_local_shard"),
                 "git": ("/git_local_shard"),
                 "yuan": ("/yuan_local_shard"),
