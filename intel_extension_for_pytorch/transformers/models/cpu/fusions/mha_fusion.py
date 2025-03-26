@@ -362,6 +362,20 @@ class _IPEXPagedAttentionCPU:
         )
 
     @classmethod
+    def reshape_and_cache_flash(
+        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+    ):
+        torch.ops.torch_ipex.reshape_and_cache(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
+            k_scale,
+            v_scale,
+        )
+
+    @classmethod
     def single_query_cached_kv_attention(
         cls,
         output,
