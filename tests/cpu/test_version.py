@@ -1,0 +1,5 @@
+import intel_extension_for_pytorch
+
+intel_extension_for_pytorch._C._get_mkl_version()
+intel_extension_for_pytorch._C._get_ideep_version()
+intel_extension_for_pytorch._C._get_libxsmm_version()

@@ -100,7 +100,7 @@ class TestDynDisp(unittest.TestCase):
             command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as p:
             out = p.stdout.readlines()
-            onednn_isa_level = str(out[int(len(out)/2)], "utf-8").strip()
+            onednn_isa_level = str(out[-1], "utf-8").strip()
             self.assertTrue(onednn_isa_level == "AVX2")
 
     @unittest.skipIf(
@@ -114,7 +114,7 @@ class TestDynDisp(unittest.TestCase):
             command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as p:
             out = p.stdout.readlines()
-            cur_ipex_isa_1 = str(out[int(len(out)/2)], "utf-8").strip()
+            cur_ipex_isa_1 = str(out[-1], "utf-8").strip()
             self.assertTrue(cur_ipex_isa == cur_ipex_isa_1)
 
 

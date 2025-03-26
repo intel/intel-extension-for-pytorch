@@ -96,7 +96,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.46.2"
+    validated_version = "4.48.0"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -209,6 +209,13 @@ def model_convert_reference(_model):
         PhiForCausalLM_forward,
         PhiModel_forward,
         Phi3Model_forward,
+        PhiOModel_forward,
+        PhiOForCausalLM_forward,
+        PhiOImageEmbedding_forward,
+        PhiOAudioEmbedding_forward,
+        SiglipVisionTransformer_forward,
+        LoraLinear_forward,
+        ConformerEncoder_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
@@ -231,6 +238,8 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_llava,
         prepare_inputs_for_generation_opt_mpt,
         prepare_inputs_for_generation_t5,
+        prepare_inputs_for_generation_phi3,
+        prepare_inputs_for_generation_phio,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -845,7 +854,7 @@ def model_convert_reference(_model):
         )
         convert_class(
             _model,
-            transformers.models.qwen2.modeling_qwen2.Qwen2SdpaAttention,
+            transformers.models.qwen2.modeling_qwen2.Qwen2Attention,
             _IPEXAttentionRef,
             _model.config,
             distributed=distributed,
@@ -1004,6 +1013,102 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_phi3,
+        )
+    elif _model.config.architectures[0] == "Phi4MMForCausalLM":
+        import peft
+
+        convert_functions(
+            _model, peft.tuners.lora.layer.Linear, "forward", LoraLinear_forward
+        )
+        convert_function(_model, "forward", PhiOForCausalLM_forward)
+        convert_function(_model.model, "forward", PhiOModel_forward)
+        convert_function(
+            _model.model.embed_tokens_extend.image_embed.img_processor,
+            "forward",
+            SiglipVisionTransformer_forward,
+        )
+        convert_function(
+            _model.model.embed_tokens_extend.audio_embed.encoder,
+            "forward",
+            ConformerEncoder_forward,
+        )
+        convert_function(
+            _model.model.embed_tokens_extend.image_embed,
+            "forward",
+            PhiOImageEmbedding_forward,
+        )
+        convert_function(
+            _model.model.embed_tokens_extend.audio_embed,
+            "forward",
+            PhiOAudioEmbedding_forward,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.image_embed.img_processor.encoder.layers[
+                    0
+                ]
+            ),
+            _IPEXEncoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.image_embed.img_processor.encoder.layers[
+                    0
+                ].self_attn
+            ),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.audio_embed.encoder.encoders[
+                    0
+                ]._checkpoint_wrapped_module
+            ),
+            _IPEXEncoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.embed_tokens_extend.audio_embed.encoder.encoders[
+                    0
+                ]._checkpoint_wrapped_module.self_attn
+            ),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_phio,
         )
     elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
         convert_function(_model, "detect_language", detect_language)
@@ -1480,6 +1585,62 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs["cross_attention_mask"] = cross_attention_mask
         else:
             sample_inputs = sample_inputs + (cross_attention_mask,)
+    if _model.config.architectures[0] == "Phi4MMForCausalLM":
+        input_mode = (
+            _model.config.input_mode if hasattr(_model.config, "input_mode") else 0
+        )
+        batch_size = (
+            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
+        )
+        audio_batch_size = (
+            _model.config.audio_batch_size
+            if hasattr(_model.config, "audio_batch_size")
+            else batch_size
+        )
+        if return_dict:
+            sample_inputs["input_mode"] = torch.tensor([input_mode])
+            sample_inputs["image_sizes"] = (
+                torch.tensor([[896, 1344]]).repeat(batch_size, 1)
+                if input_mode in [1, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["image_attention_mask"] = (
+                torch.ones(1, 7, 32, 32).repeat(batch_size, 1, 1, 1)
+                if input_mode in [1, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["input_image_embeds"] = (
+                torch.rand(1, 7, 3, 448, 448).repeat(batch_size, 1, 1, 1, 1)
+                if input_mode in [1, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["input_audio_embeds"] = (
+                torch.rand(1, 498, 80).repeat(audio_batch_size, 1, 1)
+                if input_mode in [2, 3]
+                else torch.tensor([])
+            )
+            sample_inputs["audio_embed_sizes"] = (
+                torch.tensor([63]).repeat(audio_batch_size)
+                if input_mode in [2, 3]
+                else torch.tensor([])
+            )
+        else:
+            sample_inputs = sample_inputs + (
+                torch.tensor([input_mode]),
+                (
+                    torch.rand(1, 7, 3, 448, 448)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.tensor([[896, 1344]])
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                torch.ones(1, 7, 32, 32) if input_mode in [1, 3] else torch.tensor([]),
+                torch.rand(1, 498, 80) if input_mode in [2, 3] else torch.tensor([]),
+                torch.tensor([63]) if input_mode in [2, 3] else torch.tensor([]),
+            )
     return sample_inputs
 
 
@@ -1636,6 +1797,7 @@ def model_convert_lowering(
                 "BaichuanForCausalLM",
                 "YuanForCausalLM",
                 "Phi3ForCausalLM",
+                "Phi4MMForCausalLM",
             ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -1763,7 +1925,68 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
-
+                elif _model.config.architectures[0] == "Phi4MMForCausalLM":
+                    batch_size = (
+                        _model.config.batch_size
+                        if hasattr(_model.config, "batch_size")
+                        else 1
+                    )
+                    input_mode = (
+                        _model.config.input_mode
+                        if hasattr(_model.config, "input_mode")
+                        else 0
+                    )
+                    audio_batch_size = (
+                        _model.config.audio_batch_size
+                        if hasattr(_model.config, "audio_batch_size")
+                        else batch_size
+                    )
+                    if _model.config.input_mode == 1:
+                        input_ids = (
+                            torch.ones(1851 * batch_size).to(torch.long).unsqueeze(0)
+                        )
+                        input_ids[:, : 1841 * batch_size] = 200010
+                        sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
+                    elif _model.config.input_mode == 2:
+                        input_ids = (
+                            torch.ones(96 * audio_batch_size)
+                            .to(torch.long)
+                            .unsqueeze(0)
+                        )
+                        input_ids[:, : 63 * audio_batch_size] = 200011
+                    elif _model.config.input_mode == 3:
+                        input_ids = (
+                            torch.ones(1907 * batch_size).to(torch.long).unsqueeze(0)
+                        )
+                        input_ids[:, : 1841 * batch_size] = 200010
+                        input_ids[
+                            :,
+                            1841 * batch_size : 1841 * batch_size
+                            + 63 * audio_batch_size,
+                        ] = 200011
+                        sample_inputs["image_attention_mask"][:, 3, :, -1] = 0
+                    if _model.config.input_mode > 0:
+                        attention_mask = torch.ones_like(input_ids)
+                        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+                        sample_inputs["input_ids"] = input_ids
+                        sample_inputs["attention_mask"] = attention_mask
+                        sample_inputs["position_ids"] = position_ids
+                        trace_model_first = torch.jit.trace(
+                            _model,
+                            example_kwarg_inputs=sample_inputs,
+                            strict=False,
+                            check_trace=False,
+                        )
+                        trace_model_first = torch.jit.freeze(trace_model_first)
+                        _model = _set_optimized_model_for_generation(
+                            _model,
+                            optimized_model=trace_model,
+                            first_token_optimized_model=trace_model_first,
+                        )
+                    else:
+                        _model = _set_optimized_model_for_generation(
+                            _model, optimized_model=trace_model
+                        )
                 elif _model.config.architectures[0] == "YuanForCausalLM":
                     sample_inputs.pop("past_key_values", None)
                     batch_size = (
@@ -1973,6 +2196,7 @@ def check_cpu_llm_support(model):
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "Phi4MMForCausalLM",
             "WhisperForConditionalGeneration",
             "Maira2ForConditionalGeneration",
             "JambaForCausalLM",
@@ -2259,6 +2483,7 @@ def optimize(
 
         is_quantization = False
         is_woq = False
+        use_low_precision_checkpoint = False
         if device == "cpu":
             # profiling mode is disabled in ChatGLM (https://huggingface.co/THUDM/chatglm3-6b/blob/main/modeling_chatglm.py#L33-L34)
             # Enable profiling mode to apply jit optimizations
@@ -2308,6 +2533,7 @@ def optimize(
                 _model = _convert_woq_with_low_precision_checkpoint(
                     _model, quantization_config, state_dict, quant_config
                 )
+                use_low_precision_checkpoint = True
 
         xpu_woq = False
         if device == "xpu" and low_precision_checkpoint is not None:
@@ -2422,11 +2648,20 @@ def optimize(
                         "ipex.optimize_transformers is prepared for the calibration of the static quantization"
                     )
 
-            else:  # weight only quantization
-                # Note that GPTQ is already handled at the beginning.
-                # Here we only deal with linear layers that have not beed quantized so far.
-                # It's a choice of the user or algorithm.
-                # Those layers will also be converted here.
+            elif use_low_precision_checkpoint:  # weight only quantization
+                # for non-quantized layers
+                from ..frontend import optimize as ipex_optimize
+
+                _model = _model.to(dtype)
+                _model = ipex_optimize(
+                    _model,
+                    dtype=dtype,
+                    inplace=True,
+                    auto_kernel_selection=(dtype == torch.float),
+                )
+            else:
+                # Note that low precision checkpoint is already handled at the beginning.
+                # If checkpoint is not provided, model is quantized here
                 _model = ipex_quantization_flow(
                     _model,
                     dtype,

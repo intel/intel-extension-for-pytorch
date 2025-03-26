@@ -15,6 +15,7 @@ from test_ao_jit_llga_utils import (
     JitLlgaTestCase,
     LLGA_FUSION_GROUP,
     llga_fp32_bf16_test_env,
+    skipIfNoVNNI,
 )
 from torch.testing._internal.jit_utils import freeze_rng_state
 
@@ -108,6 +109,7 @@ class TestIpexOps(JitLlgaTestCase):
                 "at::dequantize"
             ).check("aten::adaptive_avg_pool2d").run(graph)
 
+    @skipIfNoVNNI
     def test_flatten_int8(self):
         class M(nn.Module):
             def __init__(self):
@@ -380,16 +382,23 @@ class TestIpexOps(JitLlgaTestCase):
                 super(M, self).__init__()
                 self.f = ipex.nn.functional.interaction
 
-            def forward(self, x1, x2, x3):
-                x = self.f(x1.relu(), x2.relu(), x3.relu())
+            def forward(self, *args):
+                relu_args = [arg.relu() for arg in args]
+                x = self.f(*relu_args)
                 return x
 
-        m = M()
-        inputs = []
-        for i in range(0, 3):
-            inputs.append(torch.randn([128, 128]) * 0.1)
-        graph = self.checkQuantizeTrace(m, inputs, atol=1e-2, qconfig=static_qconfig[1])
-        self.assertGraphContainsExactly(graph, "ipex::qinteraction", 1)
+        feature_nums = [3, 27]
+        lens = [128, 224]
+        for fnum in feature_nums:
+            for len in lens:
+                m = M()
+                inputs = []
+                for _ in range(0, fnum):
+                    inputs.append(torch.randn([len, len]) * 0.1)
+                graph = self.checkQuantizeTrace(
+                    m, inputs, atol=1e-2, qconfig=static_qconfig[1]
+                )
+                self.assertGraphContainsExactly(graph, "ipex::qinteraction", 1)
 
     # Besides its primary objective, this UT also implicitly tests if mayRevertDtypeAttributeInsertion
     # in csrc/jit/codegen/onednn/prepare_binary.cpp works well.
@@ -419,6 +428,7 @@ class TestIpexOps(JitLlgaTestCase):
         self.assertEqual(ori_out, out)
         self.assertGraphContainsExactly(graph, "quantized::add", 1)
 
+    @skipIfNoVNNI
     def test_lstm(self):
         class M(nn.Module):
             def __init__(
@@ -535,6 +545,7 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(model, [seq, hid, mask])
         self.assertGraphContainsExactly(graph, "aten::lstm", 1)
 
+    @skipIfNoVNNI
     def test_linear_lstm(self):
         class M(nn.Module):
             def __init__(self):
@@ -556,6 +567,7 @@ class TestIpexOps(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, "ipex::quantized_lstm", 1)
         self.assertGraphContainsExactly(graph, "aten::lstm", 0)
 
+    @skipIfNoVNNI
     def test_conv2d_with_padding(self):
         class M(nn.Module):
             def __init__(self, padding_mode):
@@ -569,6 +581,29 @@ class TestIpexOps(JitLlgaTestCase):
                 return x
 
         x = torch.rand(1, 3, 14, 14)
+        patterns = [
+            ["aten::dequantize", "aten::_convolution"],
+        ]
+        for padding_mode in ["circular", "replicate", "reflect"]:
+            m = M(padding_mode=padding_mode).eval()
+            graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.checkPatterns(graph, patterns)
+
+    @skipIfNoVNNI
+    def test_conv3d_with_padding(self):
+        class M(nn.Module):
+            def __init__(self, padding_mode):
+                super(M, self).__init__()
+                self.conv = nn.Conv3d(
+                    3, 3, 2, padding=1, bias=True, padding_mode=padding_mode
+                )
+
+            def forward(self, x):
+                x = self.conv(x)
+                return x
+
+        x = torch.rand(3, 3, 4, 2, 10)
         patterns = [
             ["aten::dequantize", "aten::_convolution"],
         ]
@@ -977,6 +1012,7 @@ class TestDynamicQuantization(JitLlgaTestCase):
 
 
 class TestDictInput(JitLlgaTestCase):
+    @skipIfNoVNNI
     def test_only_dict_input(self):
         class SubModule(nn.Module):
             def __init__(self):

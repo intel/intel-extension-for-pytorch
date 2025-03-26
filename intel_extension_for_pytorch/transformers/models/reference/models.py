@@ -10,17 +10,20 @@ from transformers.modeling_outputs import (
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
     BaseModelOutput,
+    BaseModelOutputWithPooling,
 )
 import numpy as np
 from ....utils._logger import logger, WarningType
 import transformers
 import inspect
 import math
+from enum import Enum
 
 try:
     from transformers.generation.configuration_utils import GenerationConfig
     from transformers.modeling_attn_mask_utils import (
         _prepare_4d_causal_attention_mask,
+        _prepare_4d_attention_mask,
     )
 
     from transformers.modeling_outputs import (
@@ -4811,6 +4814,7 @@ def PhiForCausalLM_forward(
     use_cache: Optional[bool] = None,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
+    num_logits_to_keep: int = 0,
     return_dict: Optional[bool] = None,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
     output_attentions = (
@@ -5079,32 +5083,24 @@ def Phi3Model_forward(
     if inputs_embeds is None:
         inputs_embeds = self.embed_tokens(input_ids)
 
-    if self._attn_implementation == "flash_attention_2":
-        # 2d mask is passed through the layers
-        attention_mask = (
-            attention_mask
-            if (attention_mask is not None and 0 in attention_mask)
-            else None
-        )
-    else:
-        if self.config.sliding_window is not None:
-            # 4d mask is passed through the layers
-            if attention_mask is not None and len(attention_mask.shape) == 2:
-                attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
-                    attention_mask,
-                    inputs_embeds,
-                    torch.tensor(past_key_values_length).contiguous(),
-                    torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
-                    self.config.sliding_window,
-                )
-        else:
-            # 4d mask is passed through the layers
-            attention_mask = _prepare_4d_causal_attention_mask(
+    if self.config.sliding_window is not None:
+        # 4d mask is passed through the layers
+        if attention_mask is not None and len(attention_mask.shape) == 2:
+            attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
                 attention_mask,
-                (batch_size, seq_length),
                 inputs_embeds,
-                past_key_values_length,
+                torch.tensor(past_key_values_length).contiguous(),
+                torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+                self.config.sliding_window,
             )
+    else:
+        # 4d mask is passed through the layers
+        attention_mask = _prepare_4d_causal_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
 
     hidden_states = inputs_embeds
 
@@ -6109,6 +6105,914 @@ def DeepseekV2ForCausalLM_forward(
     return (loss,) + output if loss is not None else output
 
 
+class InputMode(Enum):
+    LANGUAGE = 0
+    VISION = 1
+    SPEECH = 2
+    VISION_SPEECH = 3
+
+
+def PhiOForCausalLM_forward(
+    self,
+    input_ids: torch.LongTensor = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    input_mode=None,
+    input_image_embeds: Optional[torch.FloatTensor] = None,
+    image_sizes: Optional[torch.LongTensor] = None,
+    image_attention_mask=None,
+    input_audio_embeds: Optional[torch.FloatTensor] = None,
+    audio_embed_sizes=None,
+    audio_attention_mask=None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    labels: Optional[torch.LongTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    cache_position: Optional[torch.LongTensor] = None,
+    num_logits_to_keep: int = 0,
+):
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    if isinstance(input_mode, torch.Tensor):
+        assert len(input_mode) == 1
+        input_mode = input_mode[0].item()
+    input_mode = InputMode(input_mode)
+
+    if input_mode in [InputMode.VISION_SPEECH, InputMode.VISION]:
+        self.set_lora_adapter("vision")
+        audio_projection_mode = "vision"
+    elif input_mode == InputMode.SPEECH:
+        self.set_lora_adapter("speech")
+        audio_projection_mode = "speech"
+    elif input_mode == InputMode.LANGUAGE:
+        self.unset_lora_adapter()
+        audio_projection_mode = "speech"
+    else:
+        raise ValueError(f"Invalid input_mode: {input_mode}")
+
+    # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+    outputs = self.model(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_values=past_key_values,
+        inputs_embeds=inputs_embeds,
+        input_image_embeds=input_image_embeds,
+        image_sizes=image_sizes,
+        image_attention_mask=image_attention_mask,
+        input_audio_embeds=input_audio_embeds,
+        audio_embed_sizes=audio_embed_sizes,
+        audio_attention_mask=audio_attention_mask,
+        audio_projection_mode=audio_projection_mode,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
+    logits = self.lm_head(hidden_states)
+
+    loss = None
+    if labels is not None:
+        loss = self.loss_function(logits, labels, self.vocab_size)
+
+    output = (logits,) + outputs[1:]
+    return (loss,) + output if loss is not None else output
+
+
+def ConformerEncoder_forward(self, xs_pad, masks):
+    xs_pad = self.encoder_embedding(xs_pad)
+    input_tensor, pos_k, pos_v, hs_mask, masks = self.forward_embeddings(xs_pad, masks)
+
+    unfolded = False
+    ori_bz, seq_len, D = input_tensor.shape
+    max_seq_len = 500  # maxium position for absolute positional encoding
+    if seq_len > max_seq_len:
+        # audio sequence is longer than max_seq_len, unfold it into chunks of max_seq_len
+        unfolded = True
+        # the unfold op will drop residual frames, pad it to the multiple of max_seq_len
+        if seq_len % max_seq_len > 0:
+            chunk_pad_size = max_seq_len - (seq_len % max_seq_len)
+        else:
+            chunk_pad_size = 0
+        if chunk_pad_size > 0:
+            input_tensor_pad = F.pad(
+                input_tensor, (0, 0, 0, chunk_pad_size), "constant", 0
+            )
+            input_tensor = input_tensor_pad.to(input_tensor.device)
+
+        input_tensor = unfold_tensor(input_tensor, max_seq_len)
+        if masks is not None:
+            # revise hs_mask here because the previous calculated hs_mask did not consider extra pad
+            subsampled_pad_mask = masks.squeeze(1)  # [bz, subsampled_unmask_seq_len]
+            extra_padded_subsamlped_pad_mask = F.pad(
+                subsampled_pad_mask, (0, chunk_pad_size), "constant", False
+            )  # extra padding to the pad mask
+            extra_padded_subsamlped_pad_mask = (
+                extra_padded_subsamlped_pad_mask.unsqueeze(-1).float()
+            )
+            masks_unfold = unfold_tensor(
+                extra_padded_subsamlped_pad_mask, max_seq_len
+            )  # unfold the pad mask like we did to the input tensor
+            masks_unfold = masks_unfold.squeeze(
+                -1
+            ).bool()  # unfold op does not support bool tensor
+        else:
+            masks_unfold = None
+        hs_mask = self.calculate_hs_mask(
+            input_tensor, input_tensor.device, masks_unfold
+        )  # calculate hs_mask based on the unfolded pad mask
+    layer_emb = None
+
+    relative_attention_bias = self.init_relative_attention_bias(input_tensor)
+
+    _simplified_path = (
+        self.extra_layer_output_idx == -1 and relative_attention_bias is None
+    )
+
+    if _simplified_path:
+        input_tensor, *_ = self.encoders(
+            input_tensor, pos_k=pos_k, pos_v=pos_v, mask=hs_mask
+        )
+    else:
+        for i, layer in enumerate(self.encoders):
+            input_tensor, _, _, _ = layer._checkpoint_wrapped_module(
+                input_tensor,
+                pos_k=pos_k,
+                pos_v=pos_v,
+                mask=hs_mask,
+                relative_attention_bias=relative_attention_bias,
+            )
+
+            if i == self.extra_layer_output_idx:
+                layer_emb = input_tensor
+    if unfolded:
+        embed_dim = input_tensor.shape[-1]
+        input_tensor = input_tensor.reshape(ori_bz, -1, embed_dim)
+        # if we ever padded before unfolding, we need to remove the padding
+        if chunk_pad_size > 0:
+            input_tensor = input_tensor[:, :-chunk_pad_size, :]
+    return input_tensor, masks  # , layer_emb
+
+
+_IMAGE_SPECIAL_TOKEN_ID = (
+    200010  # '<|endoftext10|>', or we can better name it (in `tokenizer_config.json`)
+)
+_AUDIO_SPECIAL_TOKEN_ID = 200011  # '<|endoftext11|>'
+
+
+def PhiOImageEmbedding_forward(
+    self,
+    input_ids: torch.LongTensor,
+    input_embeds: torch.FloatTensor,
+    image_sizes=None,
+    **kwargs,
+) -> torch.FloatTensor:
+    if isinstance(input_ids, tuple):
+        # # pipeline parallel
+        input_ids, input_embeds = input_ids
+
+    img_embeds = input_embeds
+    if image_sizes is None and "image_sizes" in kwargs:
+        image_sizes = kwargs["image_sizes"]
+    img_sizes = image_sizes
+
+    if self.img_features is not None:
+        img_embeds = self.img_features.clone()
+        self.img_features = None
+
+    if self.img_sizes is not None:
+        img_sizes = self.img_sizes
+
+    if img_embeds is not None:
+        # convert to bf16
+        img_embeds = img_embeds.to(torch.bfloat16)
+
+    if self.image_attention_mask is not None:
+        image_attention_mask = self.image_attention_mask.clone()
+        self.image_attention_mask = None
+    elif "image_attention_mask" in kwargs:
+        image_attention_mask = kwargs["image_attention_mask"]
+    else:
+        image_attention_mask = None
+    input_shape = input_ids.size()
+    input_ids = input_ids.view(-1, input_shape[-1])
+
+    with torch.no_grad():
+        positions = torch.nonzero(input_ids == _IMAGE_SPECIAL_TOKEN_ID, as_tuple=False)
+        positions_tuple = torch.nonzero(
+            input_ids == _IMAGE_SPECIAL_TOKEN_ID, as_tuple=True
+        )
+
+    # logger.info(f'position size: {positions.size()} ...')
+    fake_image_forward = False
+    select = False
+    hd_transform = False
+    if isinstance(self.img_projection, torch.nn.Sequential):
+        if self.img_projection[0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = self.img_projection[0]._op_context.get_bias().dtype
+        else:
+            target_dtype = self.img_projection[0].bias.dtype
+    else:  # It's a single nn.Linear layer
+        if self.img_projection.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
+            target_dtype = self.img_projection._op_context.get_bias().dtype
+        else:
+            target_dtype = self.img_projection.bias.dtype
+
+    num_img_tokens = self.num_img_tokens
+    if len(positions.tolist()) > 0:
+        if self.use_hd_transform and img_sizes is not None and len(img_sizes):
+            hd_transform = True
+            assert (
+                img_embeds.ndim == 5
+            ), f"(branch 1) img_embeds size: {img_embeds.size()}, expect 5D tensor for hd transform"
+            # img_embeds: (num_images, max_num_crops, 3, H, W)
+            # img_sizes: (num_images, 2).view(1, -1)
+
+            bs = img_embeds.shape[0]
+            # Nx(HW)xC
+            if image_attention_mask is not None and len(image_attention_mask) > 0:
+                img_features = self.get_img_features(
+                    img_embeds.flatten(0, 1),
+                    attention_mask=image_attention_mask.type(torch.BoolTensor).flatten(
+                        0, 1
+                    ),
+                )
+            else:
+                img_features = self.get_img_features(img_embeds.flatten(0, 1))
+
+            base_feat_height_target = self.base_feat_height_target
+            base_resolution = self.crop_size
+            base_feat_height_reduction = self.base_feat_height_reduction
+
+            base_feat_height = base_feat_width = int(np.sqrt(img_features.shape[1]))
+
+            assert (
+                base_feat_height == base_feat_height_target
+                and base_feat_width == base_feat_height_target
+            ), f"base_feat_height: {base_feat_height}, base_feat_width: {base_feat_width},\
+                         expect {base_feat_height_target} features for hd transform"
+
+            # bs x max_num_crops x (24x24) x C
+            img_features = img_features.view(
+                bs, -1, base_feat_height * base_feat_width, self.image_dim_out
+            )
+            C = self.image_dim_out
+            H = base_feat_height
+
+            output_imgs = []
+            output_len = []
+            # training is tensor, inference is list
+            if isinstance(img_sizes, torch.Tensor):
+                img_sizes = img_sizes.view(-1, 2)
+            for _bs in range(bs):
+                h, w = img_sizes[_bs]
+                h = h // base_resolution
+                w = w // base_resolution
+                B_ = h * w
+
+                # 1 x (24x24) x 1024
+                global_img_feature = img_features[_bs, :1]
+
+                # 1 x 12 x 12 x 4096
+                glb_img = (
+                    global_img_feature.reshape(1, H, H, C)
+                    .reshape(
+                        1,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        C,
+                    )
+                    .contiguous()
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        1,
+                        H // base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                    .contiguous()
+                )
+                temp_glb_GN = self.sub_GN.repeat(
+                    1, H // base_feat_height_reduction, 1, 1
+                )
+
+                # 1 x 156 x 4096
+                glb_img = torch.cat([glb_img, temp_glb_GN], dim=2).reshape(
+                    1, -1, base_feat_height_reduction * base_feat_height_reduction * C
+                )
+
+                # (max_num_crops-1) x (12x12) x C
+                sub_img = img_features[_bs, 1:]
+                # 16x574x1024
+                # get rid of padding sub_img
+                sub_img = sub_img[:B_]
+
+                # (num_crops, 12, 2, 12, 2, 1024) -> (num_crops, 12, 12, 2, 2, 1024) -> (num_crops, 12*12, 4*1024)
+                sub_img = (
+                    sub_img.reshape(B_, H, H, C)
+                    .reshape(
+                        B_,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        H // base_feat_height_reduction,
+                        base_feat_height_reduction,
+                        C,
+                    )
+                    .contiguous()
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        B_,
+                        -1,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                    .contiguous()
+                )
+                sub_img = (
+                    sub_img.reshape(
+                        1,
+                        h,
+                        w,
+                        base_feat_height // base_feat_height_reduction,
+                        base_feat_width // base_feat_height_reduction,
+                        -1,
+                    )
+                    .permute(0, 1, 3, 2, 4, 5)
+                    .reshape(
+                        1,
+                        h * base_feat_height // base_feat_height_reduction,
+                        w * base_feat_width // base_feat_height_reduction,
+                        base_feat_height_reduction * base_feat_height_reduction * C,
+                    )
+                )
+
+                if image_attention_mask is not None and len(image_attention_mask) > 0:
+                    reshaped_image_attention_mask = (
+                        image_attention_mask[_bs, 1 : B_ + 1, 0::2, 0::2]
+                        .reshape(
+                            1,
+                            h,
+                            w,
+                            base_feat_height // base_feat_height_reduction,
+                            base_feat_width // base_feat_height_reduction,
+                        )
+                        .permute(0, 1, 3, 2, 4)
+                        .reshape(
+                            1,
+                            h * base_feat_height // base_feat_height_reduction,
+                            w * base_feat_width // base_feat_height_reduction,
+                        )
+                    )
+                    useful_height = int(
+                        reshaped_image_attention_mask[0, :, 0].sum().item()
+                    )
+                    useful_width = int(
+                        reshaped_image_attention_mask[0, 0, :].sum().item()
+                    )
+                    sub_img = sub_img[:, :useful_height, :useful_width]
+                    temp_sub_GN = self.sub_GN.repeat(1, useful_height, 1, 1)
+                    temp_len = (
+                        int(
+                            image_attention_mask[_bs, : B_ + 1, 0::2, 0::2].sum().item()
+                        )
+                        + (useful_height + 1)
+                        + base_feat_height // base_feat_height_reduction
+                    )
+                else:
+                    temp_sub_GN = self.sub_GN.repeat(
+                        1, h * base_feat_height // base_feat_height_reduction, 1, 1
+                    )
+                    temp_len = int(
+                        (h * w + 1) * self.num_img_tokens
+                        + 1
+                        + (h + 1) * base_feat_height // base_feat_height_reduction
+                    )
+
+                sub_img = torch.cat([sub_img, temp_sub_GN], dim=2).reshape(
+                    1, -1, base_feat_height_reduction * base_feat_height_reduction * C
+                )
+                # (1, num_img_tokens, 1024*4)
+
+                # glb + sub
+                if self.hd_transform_order == "glb_sub":
+                    output_imgs.append(
+                        torch.cat([glb_img, self.glb_GN, sub_img], dim=1)
+                    )
+                elif self.hd_transform_order == "sub_glb":
+                    output_imgs.append(
+                        torch.cat([sub_img, self.glb_GN, glb_img], dim=1)
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"hd_transform_order = {self.hd_transform_order}, not implemented"
+                    )
+
+                # temp_len = int((h*w+1)*144 + 1 + (h+1)*12)
+                assert (
+                    temp_len == output_imgs[-1].shape[1]
+                ), f"temp_len: {temp_len}, output_imgs[-1].shape[1]: {output_imgs[-1].shape[1]}"
+                output_len.append(temp_len)
+
+            num_img_tokens = output_len
+            img_set_tensor = []
+            for _output_img in output_imgs:
+                img_feature_proj = self.img_projection(_output_img.to(target_dtype))
+                img_set_tensor.append(img_feature_proj)
+
+        else:
+            raise NotImplementedError
+        select = True
+    else:
+        # # create a fake image tensor
+        # # TODO: need define image size for different vision model
+        if self.training:
+            img_embeds = torch.zeros(
+                1,
+                3,
+                self.crop_size,
+                self.crop_size,
+                dtype=torch.bfloat16,
+                device=input_ids.device,
+            )
+
+            tt = self.get_img_features(img_embeds).to(target_dtype).reshape(-1, 1024)
+            if self.use_hd_transform:
+                img_set_tensor = self.img_projection(
+                    tt.reshape(
+                        -1, self.image_dim_out * self.base_feat_height_reduction**2
+                    )
+                    * self.glb_GN[0]
+                    * self.sub_GN[0, 0]
+                )
+            else:
+                img_set_tensor = self.img_projection(tt)  # adapted visual features.
+            fake_image_forward = True
+
+    # we use the token embedding layer from the huggingface model, this is REQUIRED to make sure we are using the loaded weights.
+    hidden_states = kwargs["wte"](input_ids)
+
+    if select:
+        if hd_transform:
+            # img_set_tensor: a list of tensors, each tensor has shape (1, N_tokens, C)
+            assert all(
+                [_img_set_tensor.shape[0] == 1 for _img_set_tensor in img_set_tensor]
+            ), "img_set_tensor should have shape (1, N_tokens, C)"
+            # Shape: (merged_N_tokens, C)
+            merged_img_set_tensor = torch.cat(img_set_tensor, dim=1).squeeze(0)
+            merged_img_set_tensor = merged_img_set_tensor.to(hidden_states.dtype).to(
+                hidden_states.device
+            )
+            # Temporarily disable autocast to avoid issue on bf16 tensors
+            # Ref: https://github.com/pytorch/pytorch/issues/132715
+            with torch.autocast(device_type=hidden_states.device.type, enabled=False):
+                new_hidden_states = hidden_states.index_put(
+                    indices=positions_tuple,
+                    values=merged_img_set_tensor,
+                    accumulate=False,
+                )
+            hidden_states = new_hidden_states
+        else:
+            raise NotImplementedError
+
+    if fake_image_forward and self.training:
+        hidden_states = (
+            hidden_states
+            + (
+                0 * img_set_tensor[0].to(hidden_states.dtype).to(hidden_states.device)
+            ).sum()
+        )
+
+    if self.drop is not None:
+        hidden_states = self.drop(hidden_states)
+
+    return hidden_states
+
+
+def SiglipVisionTransformer_forward(
+    self,
+    pixel_values,
+    patch_attention_mask: Optional[torch.BoolTensor] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+):
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    batch_size = pixel_values.size(0)
+    if patch_attention_mask is None:
+        patch_attention_mask = torch.ones(
+            size=(
+                batch_size,
+                pixel_values.size(2) // self.config.patch_size,
+                pixel_values.size(3) // self.config.patch_size,
+            ),
+            dtype=torch.bool,
+            device=pixel_values.device,
+        )
+
+    hidden_states = self.embeddings(
+        pixel_values=pixel_values, patch_attention_mask=patch_attention_mask
+    )
+
+    patch_attention_mask = patch_attention_mask.view(batch_size, -1)
+    # The call to `_upad_input` in `_flash_attention_forward` is expensive
+    # So when the `patch_attention_mask` is full of 1s (i.e. attending to the whole sequence),
+    # avoiding passing the attention_mask, which is equivalent to attending to the full sequence
+    if not torch.any(~patch_attention_mask):
+        attention_mask = None
+    else:
+        attention_mask = _prepare_4d_attention_mask(
+            patch_attention_mask, hidden_states.dtype
+        )
+
+    encoder_outputs = self.encoder(
+        inputs_embeds=hidden_states,
+        attention_mask=attention_mask,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    last_hidden_state = encoder_outputs[0]
+    last_hidden_state = self.post_layernorm(last_hidden_state)
+
+    pooled_output = self.head(
+        hidden_state=last_hidden_state,
+        attention_mask=patch_attention_mask,
+    )
+
+    if not return_dict:
+        return (last_hidden_state, pooled_output) + encoder_outputs[1:]
+
+    return BaseModelOutputWithPooling(
+        last_hidden_state=last_hidden_state,
+        pooler_output=pooled_output,
+        hidden_states=encoder_outputs.hidden_states,
+        attentions=encoder_outputs.attentions,
+    )
+
+
+def PhiOAudioEmbedding_forward(
+    self,
+    input_ids: torch.LongTensor,
+    input_embeds: torch.FloatTensor,
+    audio_embed_sizes=None,
+    audio_attention_mask=None,
+    audio_projection_mode="speech",
+    **kwargs,
+) -> torch.FloatTensor:
+    """
+    arguments:
+        input_ids: input text ids (B, U)
+        input_embeds: audio features (B, T, D)  B: num audios in a sequence
+    """
+    if self.input_embeds is not None:
+        input_embeds = self.input_embeds.clone()
+    if self.audio_embed_sizes is not None:
+        audio_embed_sizes = self.audio_embed_sizes.clone()
+
+    input_shape = input_ids.size()
+    input_ids = input_ids.view(-1, input_shape[-1])
+    MAX_INPUT_ID = int(1e9)
+
+    with torch.no_grad():
+        positions = torch.nonzero(input_ids == _AUDIO_SPECIAL_TOKEN_ID, as_tuple=False)
+        positions_tuple = torch.nonzero(
+            input_ids == _AUDIO_SPECIAL_TOKEN_ID, as_tuple=True
+        )
+
+    if isinstance(self.audio_projection, torch.nn.Sequential):
+        if self.audio_projection[0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = self.audio_projection[0]._op_context.get_bias().dtype
+        else:
+            target_dtype = self.audio_projection[0].bias.dtype
+    elif isinstance(self.audio_projection, torch.nn.ModuleDict):
+        if self.audio_projection[audio_projection_mode][0].weight.dtype in [
+            torch.qint8,
+            torch.int8,
+            torch.uint8,
+        ]:
+            target_dtype = (
+                self.audio_projection[audio_projection_mode][0]
+                ._op_context.get_bias()
+                .dtype
+            )
+        else:
+            target_dtype = self.audio_projection[audio_projection_mode][0].bias.dtype
+    else:  # It's a single nn.Linear layer
+        if self.audio_projection.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
+            target_dtype = self.audio_projection._op_context.get_bias().dtype
+        else:
+            target_dtype = self.audio_projection.bias.dtype
+
+    if input_embeds is not None:
+        input_embeds = input_embeds.to(target_dtype)
+
+    if len(positions.tolist()) > 0:
+        audio_set_tensor = self.get_audio_features(
+            input_embeds, audio_attention_mask, audio_projection_mode
+        )
+    else:
+        # # create an audio tensor
+        # To do: not sure if this is required for text only input
+        if self.training:
+            audio_embeds = torch.zeros(1, 500, self.audio_dim_in).to(target_dtype)
+            audio_attention_mask = audio_embeds.new_ones(audio_embeds.size()[:2]).long()
+            audio_set_tensor = self.get_audio_features(
+                audio_embeds, audio_attention_mask, audio_projection_mode
+            )
+
+    hidden_states = kwargs["wte"](input_ids)
+
+    if len(positions.tolist()) > 0:
+
+        assert audio_embed_sizes.sum().item() == len(
+            positions
+        ), f"please ensure the encoder outputs have the same length as defined in input_ids! \n \
+         audio_embed_sizes.sum().item(): {audio_embed_sizes.sum().item()} \n \
+         len(positions): {len(positions)} \n audio_embed_sizes: {audio_embed_sizes} \n \
+         positions: {positions} \n input_ids.shape \n {input_ids.shape}"
+
+        merged_audio_set_tensor = torch.cat(
+            [
+                audio_set_tensor[i, : audio_embed_sizes[i], :]
+                for i in range(len(audio_embed_sizes))
+            ],
+            dim=0,
+        )
+        merged_audio_set_tensor = merged_audio_set_tensor.to(hidden_states.dtype).to(
+            hidden_states.device
+        )
+        # Temporarily disable autocast to avoid issue on bf16 tensors
+        # Ref: https://github.com/pytorch/pytorch/issues/132715
+        with torch.autocast(device_type=hidden_states.device.type, enabled=False):
+            new_hidden_states = hidden_states.index_put(
+                indices=positions_tuple,
+                values=merged_audio_set_tensor,
+                accumulate=False,
+            )
+        hidden_states = new_hidden_states
+    else:
+        if self.training:
+            hidden_states = (
+                hidden_states
+                + (
+                    0
+                    * audio_set_tensor[:, 0]
+                    .to(hidden_states.dtype)
+                    .to(hidden_states.device)
+                ).sum()
+            )
+
+    if self.drop is not None:
+        hidden_states = self.drop(hidden_states)
+
+    return hidden_states
+
+
+def PhiOModel_forward(
+    self,
+    input_ids: torch.LongTensor = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    input_image_embeds: Optional[torch.FloatTensor] = None,
+    image_sizes: Optional[torch.LongTensor] = None,
+    image_attention_mask=None,
+    input_audio_embeds: Optional[torch.FloatTensor] = None,
+    audio_embed_sizes=None,
+    audio_attention_mask=None,
+    audio_projection_mode=None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+):
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    if (input_ids is None) ^ (inputs_embeds is not None):
+        raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+
+    if self.gradient_checkpointing and self.training:
+        if use_cache:
+            logger.warning_once(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+            )
+            use_cache = False
+
+    if inputs_embeds is None:
+        inputs_embeds = self.embed_tokens_extend(
+            input_ids=input_ids,
+            input_embeds=inputs_embeds,
+            input_image_embeds=input_image_embeds,
+            input_audio_embeds=input_audio_embeds,
+            image_sizes=image_sizes,
+            image_attention_mask=image_attention_mask,
+            audio_embed_sizes=audio_embed_sizes,
+            audio_attention_mask=audio_attention_mask,
+            audio_projection_mode=audio_projection_mode,
+            wte=self.embed_tokens,
+        )
+
+    past_key_values_length = 0
+    if past_key_values is not None:
+        past_key_values_length = past_key_values[0][0].shape[2]
+
+    if position_ids is None:
+        device = input_ids.device if input_ids is not None else inputs_embeds.device
+        batch_size, seq_length = inputs_embeds.shape[:2]
+        position_ids = torch.arange(
+            past_key_values_length,
+            seq_length + past_key_values_length,
+            dtype=torch.long,
+            device=device,
+        )
+        position_ids = position_ids.unsqueeze(0).repeat(batch_size, 1)
+
+    if attention_mask is not None and len(attention_mask.shape) == 2:
+        causal_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+            attention_mask,
+            inputs_embeds,
+            torch.tensor(past_key_values_length).contiguous(),
+            torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+            self.config.max_position_embeddings,
+        )
+    elif hasattr(self, "_prepare_decoder_attention_mask"):
+        causal_mask = self._prepare_decoder_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
+    else:
+        # 4d mask is passed through the layers
+        causal_mask = _prepare_4d_causal_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
+
+    hidden_states = inputs_embeds
+
+    # decoder layers
+    all_hidden_states = () if output_hidden_states else None
+    all_self_attns = () if output_attentions else None
+    next_decoder_cache = () if use_cache else None
+
+    for idx, decoder_layer in enumerate(self.layers):
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        past_key_value = past_key_values[idx] if past_key_values is not None else None
+        if self.gradient_checkpointing and self.training:
+            layer_outputs = self._gradient_checkpointing_func(
+                decoder_layer.__call__,
+                hidden_states,
+                causal_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+                cache_position,
+            )
+        else:
+            layer_outputs = decoder_layer(
+                hidden_states,
+                attention_mask=causal_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
+            )
+
+        hidden_states = layer_outputs[0]
+
+        if use_cache:
+            next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+
+        if output_attentions:
+            all_self_attns += (layer_outputs[1],)
+
+    hidden_states = self.norm(hidden_states)
+
+    # add hidden states from the last decoder layer
+    if output_hidden_states:
+        all_hidden_states += (hidden_states,)
+
+    next_cache = next_decoder_cache if use_cache else None
+
+    return tuple(
+        v
+        for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+        if v is not None
+    )
+
+
+def LoraLinear_forward(
+    self, x: torch.Tensor, *args: Any, **kwargs: Any
+) -> torch.Tensor:
+    self._check_forward_args(x, *args, **kwargs)
+    adapter_names = kwargs.pop("adapter_names", None)
+
+    if self.disable_adapters:
+        if self.merged:
+            self.unmerge()
+        result = self.base_layer(x, *args, **kwargs)
+    elif adapter_names is not None:
+        result = self._mixed_batch_forward(
+            x, *args, adapter_names=adapter_names, **kwargs
+        )
+    elif self.merged:
+        result = self.base_layer(x, *args, **kwargs)
+    else:
+        result = self.base_layer(x, *args, **kwargs)
+        torch_result_dtype = result.dtype
+        for active_adapter in self.active_adapters:
+            if active_adapter not in self.lora_A.keys():
+                continue
+            lora_A = self.lora_A[active_adapter]
+            lora_B = self.lora_B[active_adapter]
+            dropout = self.lora_dropout[active_adapter]
+            scaling = self.scaling[active_adapter]
+            # x = x.to(lora_A.weight.dtype)
+
+            if not self.use_dora[active_adapter]:
+                result = result + lora_B(lora_A(dropout(x))) * scaling
+            else:
+                x = dropout(x)
+                result = result + self._apply_dora(
+                    x, lora_A, lora_B, scaling, active_adapter
+                )
+
+        result = result.to(torch_result_dtype)
+
+    return result
+
+
 def detect_language(
     self,
     input_features: Optional[torch.FloatTensor] = None,
@@ -6172,6 +7076,7 @@ def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):
         encoder_hidden_states = None
         encoder_attentions = None
         image_features = None
+        past_key_values = None
         if "labels" in kwargs and kwargs["labels"]:
             loss = outputs[idx]
             idx += 1
@@ -7175,5 +8080,150 @@ def prepare_inputs_for_generation_jamba(
             "num_logits_to_keep": self.config.num_logits_to_keep,
             "cache_position": cache_position,
         }
+    )
+    return model_inputs
+
+
+def prepare_inputs_for_generation_phi3(
+    self,
+    input_ids,
+    past_key_values=None,
+    attention_mask=None,
+    inputs_embeds=None,
+    cache_position=None,
+    position_ids=None,
+    use_cache=True,
+    num_logits_to_keep=None,
+    **kwargs,
+):
+    if past_key_values is not None:
+        cache_length = past_length = past_key_values[0][0].shape[2]
+        max_cache_length = None
+
+        # Keep only the unprocessed tokens:
+        # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
+        # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
+        # input)
+        if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+            input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+        # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
+        # input_ids based on the past_length.
+        elif past_length < input_ids.shape[1]:
+            input_ids = input_ids[:, past_length:]
+        # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
+
+        # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
+        if (
+            max_cache_length is not None
+            and attention_mask is not None
+            and cache_length + input_ids.shape[1] > max_cache_length
+        ):
+            attention_mask = attention_mask[:, -max_cache_length:]
+
+    position_ids = kwargs.get("position_ids", None)
+    if attention_mask is not None and position_ids is None:
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_key_values:
+            position_ids = position_ids[:, -input_ids.shape[1] :]
+
+    # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+    if inputs_embeds is not None and past_key_values is None:
+        model_inputs = {"inputs_embeds": inputs_embeds}
+    else:
+        model_inputs = {"input_ids": input_ids}
+
+    model_inputs.update(
+        {
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": kwargs.get("use_cache"),
+            "attention_mask": attention_mask,
+        }
+    )
+    return model_inputs
+
+
+def prepare_inputs_for_generation_phio(
+    self,
+    input_ids,
+    past_key_values=None,
+    attention_mask=None,
+    inputs_embeds=None,
+    input_image_embeds=None,
+    image_sizes=None,
+    image_attention_mask=None,
+    input_audio_embeds=None,
+    audio_embed_sizes=None,
+    audio_attention_mask=None,
+    input_mode=None,
+    cache_position=None,
+    position_ids=None,
+    use_cache=True,
+    num_logits_to_keep=None,
+    **kwargs,
+):
+    if past_key_values is not None:
+        cache_length = past_length = past_key_values[0][0].shape[2]
+        max_cache_length = None
+
+        # Keep only the unprocessed tokens:
+        # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
+        # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
+        # input)
+        if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+            input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+        # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
+        # input_ids based on the past_length.
+        elif past_length < input_ids.shape[1]:
+            input_ids = input_ids[:, past_length:]
+        # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
+
+        # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
+        if (
+            max_cache_length is not None
+            and attention_mask is not None
+            and cache_length + input_ids.shape[1] > max_cache_length
+        ):
+            attention_mask = attention_mask[:, -max_cache_length:]
+
+    position_ids = kwargs.get("position_ids", None)
+    if attention_mask is not None and position_ids is None:
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_key_values:
+            position_ids = position_ids[:, -input_ids.shape[1] :]
+
+    # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+    if inputs_embeds is not None and past_key_values is None:
+        model_inputs = {"inputs_embeds": inputs_embeds}
+    else:
+        model_inputs = {"input_ids": input_ids}
+
+    model_inputs.update(
+        {
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": kwargs.get("use_cache"),
+            "attention_mask": attention_mask,
+        }
+    )
+    model_inputs["input_mode"] = input_mode
+    model_inputs["input_image_embeds"] = (
+        input_image_embeds if input_image_embeds is not None else torch.empty([])
+    )
+    model_inputs["image_sizes"] = (
+        image_sizes if image_sizes is not None else torch.empty([])
+    )
+    model_inputs["image_attention_mask"] = (
+        image_attention_mask if image_attention_mask is not None else torch.empty([])
+    )
+    model_inputs["input_audio_embeds"] = (
+        input_audio_embeds if input_audio_embeds is not None else torch.empty([])
+    )
+    model_inputs["audio_embed_sizes"] = (
+        audio_embed_sizes if audio_embed_sizes is not None else torch.empty([])
     )
     return model_inputs

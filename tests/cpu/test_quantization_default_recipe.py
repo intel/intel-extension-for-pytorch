@@ -30,6 +30,7 @@ from intel_extension_for_pytorch.quantization import (
     WoqActQuantMode,
 )
 from intel_extension_for_pytorch.nn.modules.weight_only_quantization import (
+    WeightOnlyQuantizedLinear,
     Int4WeightFormat,
 )
 import os
@@ -133,8 +134,8 @@ class TestDefaultRecipe(JitLlgaTestCase):
                 ]
             ],
         ]
-        for quantized_modules, pattern in zip(quantized_modules, patterns):
-            m = M(quantized_modules).eval()
+        for quantized_module, pattern in zip(quantized_modules, patterns):
+            m = M(quantized_module).eval()
 
             x = torch.rand(1, 2, 14, 14)
 
@@ -788,10 +789,7 @@ class WeightOnlyQuantizationTester(TestCase):
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
-                woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
-                )
-                assert isinstance(woq_model.linear, woq_linear_class)
+                assert isinstance(woq_model.linear, WeightOnlyQuantizedLinear)
                 assert (
                     woq_model.linear.weight is not None
                     and woq_model.linear.weight.dtype == torch.int8
@@ -886,10 +884,7 @@ class WeightOnlyQuantizationTester(TestCase):
                     device_type="cpu", enabled=True, dtype=torch.bfloat16
                 ):
                     woq_model = convert(prepared_model)
-                    woq_linear_class = (
-                        ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
-                    )
-                    assert isinstance(woq_model.linear, woq_linear_class)
+                    assert isinstance(woq_model.linear, WeightOnlyQuantizedLinear)
 
                     woq_model = torch.jit.trace(woq_model, data)
                     woq_model = torch.jit.freeze(woq_model)
@@ -1034,10 +1029,7 @@ class WeightOnlyQuantizationTester(TestCase):
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
-                woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
-                )
-                assert isinstance(woq_model.linear, woq_linear_class)
+                assert isinstance(woq_model.linear, WeightOnlyQuantizedLinear)
                 assert (
                     woq_model.linear.weight is not None
                     and woq_model.linear.weight.dtype == torch.uint8
@@ -1091,10 +1083,7 @@ class WeightOnlyQuantizationTester(TestCase):
             prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
             with torch.no_grad():
                 woq_model = convert(prepared_model)
-                woq_linear_class = (
-                    ipex.nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
-                )
-                assert isinstance(woq_model.linear, woq_linear_class)
+                assert isinstance(woq_model.linear, WeightOnlyQuantizedLinear)
                 assert (
                     woq_model.linear.weight is not None
                     and woq_model.linear.weight.dtype == torch.uint8
@@ -1768,9 +1757,10 @@ class WeightOnlyQuantizationTester(TestCase):
                 )
                 woq_m = copy.deepcopy(m)
                 woq_m.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                woq_m.linear = WeightOnlyQuantizedLinear.from_float_and_qweight(
                     woq_m.linear,
                     packed_weight,
+                    WoqWeightDtype.INT4,
                     scales,
                     packed_zeros,
                     b,
@@ -1869,9 +1859,10 @@ class WeightOnlyQuantizationTester(TestCase):
                 # path with g_idx
                 woq_m = copy.deepcopy(m)
                 woq_m.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                woq_m.linear = WeightOnlyQuantizedLinear.from_float_and_qweight(
                     woq_m.linear,
                     packed_weight,
+                    WoqWeightDtype.INT4,
                     scales,
                     packed_zeros,
                     b,
@@ -1888,9 +1879,10 @@ class WeightOnlyQuantizationTester(TestCase):
                 # reference: without g_idx
                 woq_m_2 = copy.deepcopy(m)
                 woq_m_2.linear.qconfig = qconfig_mapping.global_qconfig
-                woq_m_2.linear = ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                woq_m_2.linear = WeightOnlyQuantizedLinear.from_float_and_qweight(
                     woq_m_2.linear,
                     packed_weight,
+                    WoqWeightDtype.INT4,
                     scales,
                     packed_zeros,
                     b,
@@ -1971,9 +1963,10 @@ class WeightOnlyQuantizationTester(TestCase):
             ].contiguous()
             g_idx_0 = g_idx[: g_idx.shape[0] // 2]
             woq_m_0.linear = (
-                ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_qweight(
                     woq_m_0.linear,
                     packed_weight_0,
+                    WoqWeightDtype.INT4,
                     scales,
                     packed_zeros,
                     None,  # bias
@@ -1987,16 +1980,15 @@ class WeightOnlyQuantizationTester(TestCase):
                 :, packed_weight.shape[1] // 2 :
             ].contiguous()
             g_idx_1 = g_idx[g_idx.shape[0] // 2 :]
-            woq_m_1.linear = (
-                ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
-                    woq_m_1.linear,
-                    packed_weight_1,
-                    scales,
-                    packed_zeros,
-                    None,  # bias
-                    group_size=group_size,
-                    g_idx=g_idx_1,
-                )
+            woq_m_1.linear = WeightOnlyQuantizedLinear.from_float_and_qweight(
+                woq_m_1.linear,
+                packed_weight_1,
+                WoqWeightDtype.INT4,
+                scales,
+                packed_zeros,
+                None,  # bias
+                group_size=group_size,
+                g_idx=g_idx_1,
             )
             x_0 = x[:, : x.shape[1] // 2].contiguous()
             y_0 = woq_m_0(x_0.to(dtype))
@@ -2387,6 +2379,7 @@ class WeightOnlyQuantizationTester(TestCase):
         shape_list = [
             [4, 1024, 1024],
             [1024, 512, 512],
+            [4, 256, 272],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]
@@ -2654,6 +2647,72 @@ class WeightOnlyQuantizationTester(TestCase):
             packed_weight_ref = op_context_ref.get_weight()
 
             torch.testing.assert_close(packed_weight, packed_weight_ref)
+
+    def test_fp8_weight(self):
+        class Mod(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(feature, has_bias):
+            M, K, N = feature[0], feature[1], feature[2]
+            model = Mod(K, N, has_bias)
+            m = model.eval()
+            data = torch.rand(M, K).bfloat16() * 0.1
+            weight = model.linear.weight
+            group_size = 128
+            fp8_max = 448.0
+            grouped_shape = (N, K // group_size, group_size)
+            weight_grouped = weight.view(grouped_shape)
+            w_scales = weight_grouped.abs().max(-1)[0] / fp8_max
+            w_zero_points = None
+            w_fp8 = weight_grouped / w_scales.unsqueeze(-1)
+            w_fp8 = w_fp8.view(N, K).to(torch.float8_e4m3fn)
+            w_dq_bf16 = w_fp8.view(grouped_shape).float() * w_scales.unsqueeze(-1)
+            compute_dtype = torch.bfloat16 if M <= 4 else torch.half
+            w_dq_bf16 = w_dq_bf16.view(N, K).to(compute_dtype)
+
+            if has_bias:
+                bias = model.linear.bias
+                output1 = torch.matmul(data.to(compute_dtype), w_dq_bf16.T) + bias
+            else:
+                output1 = torch.matmul(data.to(compute_dtype), w_dq_bf16.T).float()
+
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=WoqWeightDtype.FP8,
+                lowp_mode=WoqLowpMode.BF16,
+            )
+            with torch.no_grad():
+                woq_m = copy.deepcopy(m)
+                m.linear.qconfig = qconfig.global_qconfig
+                woq_m.linear = WeightOnlyQuantizedLinear.from_float_and_qweight(
+                    m.linear,
+                    w_fp8,
+                    WoqWeightDtype.FP8,
+                    w_scales,
+                    w_zero_points,
+                    m.linear.bias,
+                    group_size,
+                )
+                assert (
+                    woq_m.linear.weight is not None
+                    and woq_m.linear.weight.dtype == torch.float8_e4m3fn
+                )
+
+                output2 = woq_m(data).float()
+                torch.testing.assert_close(output1, output2, atol=1e-3, rtol=1e-3)
+
+        shape_list = [
+            [4, 1024, 1024],
+            [1024, 1024, 1024],
+        ]
+        use_bias_list = [True, False]
+        cases = itertools.product(shape_list, use_bias_list)
+        for shape, use_bias in cases:
+            test(shape, use_bias)
 
 
 class QuantizedOpTester(TestCase):

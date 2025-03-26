@@ -10,6 +10,10 @@ IPEX_DEFINE_DISPATCH(mixtral_moe_woq_kernel_stub);
 IPEX_DEFINE_DISPATCH(deepseek_moe_woq_kernel_stub);
 IPEX_DEFINE_DISPATCH(mixtral_moe_kernel_stub);
 IPEX_DEFINE_DISPATCH(deepseek_moegate_kernel_stub);
+IPEX_DEFINE_DISPATCH(convert_e4m3_to_bf16_intrinsic_stub);
+IPEX_DEFINE_DISPATCH(convert_e4m3_to_fp32_intrinsic_stub);
+IPEX_DEFINE_DISPATCH(convert_e4m3_to_fp16_intrinsic_stub);
+IPEX_DEFINE_DISPATCH(convert_e5m2_to_fp16_intrinsic_stub);
 
 at::Tensor mixtral_moe_tpp(
     const at::Tensor& hidden_states,
@@ -313,6 +317,64 @@ std::tuple<at::Tensor, at::Tensor> deepseek_moegate(
       top_k,
       e_score_cbias);
 }
+
+at::Tensor convert_e4m3_to_bf16(
+    const at::Tensor& src,
+    const at::Tensor& dst,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+  RECORD_FUNCTION("ipex::convert_e4m3_to_bf16", c10::ArrayRef<c10::IValue>({}));
+
+  auto src_ptr = src.data_ptr<at::Float8_e4m3fn>();
+  auto dst_ptr = dst.data_ptr<at::BFloat16>();
+  convert_e4m3_to_bf16_intrinsic_stub(
+      kCPU, src_ptr, dst_ptr, len, with_denorm, with_lut);
+  return dst;
+}
+
+at::Tensor convert_e4m3_to_fp32(
+    const at::Tensor& src,
+    const at::Tensor& dst,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+  RECORD_FUNCTION("ipex::convert_e4m3_to_fp32", c10::ArrayRef<c10::IValue>({}));
+
+  auto src_ptr = src.data_ptr<at::Float8_e4m3fn>();
+  auto dst_ptr = dst.data_ptr<float>();
+  convert_e4m3_to_fp32_intrinsic_stub(
+      kCPU, src_ptr, dst_ptr, len, with_denorm, with_lut);
+  return dst;
+}
+
+at::Tensor convert_e4m3_to_fp16(
+    const at::Tensor& src,
+    const at::Tensor& dst,
+    int64_t len,
+    bool with_denorm = true,
+    bool with_lut = true) {
+  RECORD_FUNCTION("ipex::convert_e4m3_to_fp16", c10::ArrayRef<c10::IValue>({}));
+
+  auto src_ptr = src.data_ptr<at::Float8_e4m3fn>();
+  auto dst_ptr = dst.data_ptr<at::Half>();
+  convert_e4m3_to_fp16_intrinsic_stub(
+      kCPU, src_ptr, dst_ptr, len, with_denorm, with_lut);
+  return dst;
+}
+
+at::Tensor convert_e5m2_to_fp16(
+    const at::Tensor& src,
+    const at::Tensor& dst,
+    int64_t len) {
+  RECORD_FUNCTION("ipex::convert_e5m2_to_fp16", c10::ArrayRef<c10::IValue>({}));
+
+  auto src_ptr = src.data_ptr<at::Float8_e5m2>();
+  auto dst_ptr = dst.data_ptr<at::Half>();
+  convert_e5m2_to_fp16_intrinsic_stub(kCPU, src_ptr, dst_ptr, len);
+  return dst;
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -381,5 +443,28 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "deepseek_moegate",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::deepseek_moegate);
+  m.def(
+      "convert_e4m3_to_bf16(Tensor src, Tensor dst, int len, bool with_denorm, bool with_lut) -> Tensor");
+  m.impl(
+      "convert_e4m3_to_bf16",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convert_e4m3_to_bf16);
+  m.def(
+      "convert_e4m3_to_fp32(Tensor src, Tensor dst, int len, bool with_denorm, bool with_lut) -> Tensor");
+  m.impl(
+      "convert_e4m3_to_fp32",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convert_e4m3_to_fp32);
+  m.def(
+      "convert_e4m3_to_fp16(Tensor src, Tensor dst, int len, bool with_denorm, bool with_lut) -> Tensor");
+  m.impl(
+      "convert_e4m3_to_fp16",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convert_e4m3_to_fp16);
+  m.def("convert_e5m2_to_fp16(Tensor src, Tensor dst, int len) -> Tensor");
+  m.impl(
+      "convert_e5m2_to_fp16",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::convert_e5m2_to_fp16);
 }
 } // namespace

@@ -6,6 +6,7 @@
 #define WOQ_DTYPE_INT8 1
 #define WOQ_DTYPE_INT4 2
 #define WOQ_DTYPE_NF4 3
+#define WOQ_DTYPE_FP8 4
 
 #define UNQUANT_A -1
 #define QUANT_A_PER_TENSOR 0

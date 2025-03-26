@@ -1143,7 +1143,7 @@ class TestCase(expecttest.TestCase):
                         "No expect file exists; to accept the current output, run:\n"
                         "python {} {} --accept"
                     ).format(munged_id, subname_output, s, __main__.__file__, munged_id)
-                )
+                ) from e
 
         # a hack for JIT tests
         if IS_WINDOWS:
@@ -1315,10 +1315,10 @@ def download_file(url, binary=True):
         with open(path, "wb" if binary else "w") as f:
             f.write(data)
         return path
-    except error.URLError:
+    except error.URLError as e:
         msg = "could not download test file '{}'".format(url)
         warnings.warn(msg, RuntimeWarning)
-        raise unittest.SkipTest(msg)
+        raise unittest.SkipTest(msg) from e
 
 
 def find_free_port():
