@@ -11,10 +11,11 @@ import torch
 from torch.utils.data import Dataset
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from transformers import Trainer, BitsAndBytesConfig, deepspeed
+from transformers import Trainer, BitsAndBytesConfig
 from transformers.trainer_pt_utils import LabelSmoother
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from accelerate.utils import DistributedType
+import deepspeed
 
 import accelerate
 from packaging.version import parse
