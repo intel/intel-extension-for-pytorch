@@ -408,14 +408,6 @@ bool Settings::is_onemkl_enabled() const {
 #endif
 }
 
-bool Settings::is_channels_last_1d_enabled() const {
-#if defined(USE_CHANNELS_LAST_1D)
-  return true;
-#else
-  return false;
-#endif
-}
-
 bool Settings::is_xetla_enabled() const {
 #if defined(USE_XETLA)
   return true;

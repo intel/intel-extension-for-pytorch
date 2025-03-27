@@ -103,17 +103,8 @@ Tensor empty_opaque_tensor(
 
   auto memory_format =
       optional_memory_format.value_or(MemoryFormat::Contiguous);
-  if (memory_format == CHANNELSLAST1D_DPCPP) {
-    TORCH_CHECK(
-        meta.get_dims().size() == 3,
-        "required rank 3 tensor to use channels_last_1d format");
-    tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
-        meta.get_dims(),
-        torch_ipex::xpu::dpcpp::get_channels_last_strides_1d_dpcpp(
-            meta.get_dims()));
-  } else {
-    tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
-  }
+
+  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
 
   auto ctx = (DPCPPTensorContext*)tensor.unsafeGetTensorImpl()
                  ->storage()
@@ -152,17 +143,8 @@ Tensor empty_opaque_qtensor(
 
   auto memory_format =
       optional_memory_format.value_or(MemoryFormat::Contiguous);
-  if (memory_format == CHANNELSLAST1D_DPCPP) {
-    TORCH_CHECK(
-        meta.get_dims().size() == 3,
-        "required rank 3 tensor to use channels_last_1d format");
-    tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
-        meta.get_dims(),
-        torch_ipex::xpu::dpcpp::get_channels_last_strides_1d_dpcpp(
-            meta.get_dims()));
-  } else {
-    tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
-  }
+
+  tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
 
   auto ctx = (DPCPPTensorContext*)tensor.unsafeGetTensorImpl()
                  ->storage()

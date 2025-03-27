@@ -120,8 +120,7 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
       dst = empty_opaque_tensor(dst_md, src.options(), dst_fmt);
     } else {
       dst = using_channels_last_for_onednn_op(src)
-          ? torch_ipex::xpu::dpcpp::empty_like_dpcpp(
-                src, src.options(), src_cl_mfmt)
+          ? at::empty_like(src, src.options(), src_cl_mfmt)
           : at::empty_like(src);
     }
   }

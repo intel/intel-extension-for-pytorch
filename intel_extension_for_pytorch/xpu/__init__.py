@@ -20,7 +20,6 @@ from .amp import *
 from .utils import *
 from .deterministics import *
 from .memory import *
-from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
 from ..utils.utils import has_xpu
 from .deepspeed import *
 from .bitsandbytes import *

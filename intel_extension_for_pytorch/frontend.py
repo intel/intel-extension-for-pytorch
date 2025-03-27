@@ -12,7 +12,7 @@ from .optim._optimizer_utils import (
     IPEX_FUSED_OPTIMIZER_LIST_CPU,
     IPEX_FUSED_OPTIMIZER_LIST_XPU,
 )
-from .utils.channels_last_1d import to_channels_last_1d
+
 from .cpu.utils.linear_bn_folding import linear_bn_fuse
 from .cpu.graph_capture import GraphCapture
 from .nn.utils._lstm_convert import _LSTM, replace_lstm_with_ipex_lstm
@@ -612,7 +612,7 @@ def optimize(
 def _convert_convNd_deconvNd_weight_memory_format(module):
     # inspired from https://github.com/pytorch/pytorch/blob/master/torch/nn/utils/memory_format.py
     if isinstance(module, (torch.nn.Conv1d, torch.nn.ConvTranspose1d)):
-        weight_data = to_channels_last_1d(module.weight.detach().clone())
+        weight_data = module.weight.detach().clone()
         module.weight.data = weight_data.resize_(weight_data.size())
     elif isinstance(module, (torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
         weight_data = (
