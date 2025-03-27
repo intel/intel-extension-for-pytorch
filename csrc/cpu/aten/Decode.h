@@ -45,7 +45,9 @@ using decode_attention_opt_kernel_fn = at::Tensor (*)(
     const double logit_cap,
     int64_t offset);
 IPEX_DECLARE_DISPATCH(decode_attention_kernel_fn, decode_attention_kernel_stub);
-IPEX_DECLARE_DISPATCH(decode_attention_opt_kernel_fn, decode_attention_opt_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    decode_attention_opt_kernel_fn,
+    decode_attention_opt_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

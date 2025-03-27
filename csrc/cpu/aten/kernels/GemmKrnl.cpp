@@ -6,8 +6,8 @@
 #include <torch/csrc/autograd/function.h>
 #include <limits>
 #include "../../utils/isa_utils.h"
-#include "vec/vec.h"
 #include "tpp/utils.h"
+#include "vec/vec.h"
 namespace torch_ipex {
 namespace cpu {
 namespace {
@@ -16,7 +16,8 @@ namespace {
 using namespace at::vec;
 template <
     typename scalar_t,
-    typename std::enable_if_t<c10::is_reduced_floating_point_v<scalar_t>, int> = 0>
+    typename std::enable_if_t<c10::is_reduced_floating_point_v<scalar_t>, int> =
+        0>
 inline Vectorized<scalar_t> convert_from_float_ext(
     const Vectorized<float>& a,
     const Vectorized<float>& b) {
@@ -573,7 +574,8 @@ void tinygemm_kernel(
     bool brg,
     int block_n_tuned = block_size_n()) {
   if (brg) {
-    brgemm<scalar_t, packed_t>::apply(A, B, C, Ctmp, M, N, K, lda, ldb, ldc, block_n_tuned);
+    brgemm<scalar_t, packed_t>::apply(
+        A, B, C, Ctmp, M, N, K, lda, ldb, ldc, block_n_tuned);
     return;
   }
 
@@ -720,7 +722,9 @@ void bmm_kernel_impl(
   int mat2_strideN = K;
 
   // use avx512-bf16 when a) M is small; b) dtype is bfloat16, otherwise use amx
-  const bool use_brgemm = enforce_brgemm ? true : (M > 4) || (!std::is_same_v<scalar_t, at::BFloat16>);
+  const bool use_brgemm = enforce_brgemm
+      ? true
+      : (M > 4) || (!std::is_same_v<scalar_t, at::BFloat16>);
 
   // parallel on [B, MB, NB]
   at::parallel_for(0, B * MB * NB, 0, [&](int begin, int end) {
@@ -840,7 +844,7 @@ at::Tensor convert_weight_packed(at::Tensor& weight, bool use_tuned_block_n) {
   TORCH_CHECK(OC % TILE_N == 0, "invalid weight out features ", OC);
   TORCH_CHECK(IC % TILE_K == 0, "invalid weight input features ", IC);
 
-  int BLOCK_N = use_tuned_block_n ? 16: block_size_n();
+  int BLOCK_N = use_tuned_block_n ? 16 : block_size_n();
 
   // use phony sizes here [E, OC, IC], for each [E], [OC, IC] -> [IC / 2, OC, 2]
   auto packed_weight = at::empty({E, OC, IC}, weight.options());

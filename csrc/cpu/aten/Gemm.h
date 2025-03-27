@@ -31,7 +31,9 @@ at::Tensor bmm_forward_cpu(
     bool is_vnni,
     const c10::optional<at::Tensor>& scale);
 
-at::Tensor convert_weight_packed(at::Tensor& weight, bool use_tuned_block_n=false);
+at::Tensor convert_weight_packed(
+    at::Tensor& weight,
+    bool use_tuned_block_n = false);
 } // namespace
 
 using bmm_kernel_fn = at::Tensor (*)(
@@ -42,8 +44,9 @@ using bmm_kernel_fn = at::Tensor (*)(
     const c10::optional<at::Tensor>& scale,
     const bool enforce_brgemm,
     const bool enforce_not_fp8,
-    int block_n );
-using convert_weight_packed_kernel_fn = at::Tensor (*)(at::Tensor& weight, bool use_tuned_block_n);
+    int block_n);
+using convert_weight_packed_kernel_fn =
+    at::Tensor (*)(at::Tensor& weight, bool use_tuned_block_n);
 IPEX_DECLARE_DISPATCH(bmm_kernel_fn, bmm_kernel_stub);
 IPEX_DECLARE_DISPATCH(
     convert_weight_packed_kernel_fn,

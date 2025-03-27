@@ -1828,8 +1828,12 @@ def moe_infer(self, x, topk_ids, topk_weight):
     if self.use_fused_moe or self.use_fused_moe_woq:
         if self.unify_experts:
             pad_weights = torch.ones(x.size(0), 1)
-            pad_ids = torch.full((x.size(0), 1),self.unify_shared_expert_id-1).to(torch.int)
-            topk_weight = torch.cat((topk_weight.to(torch.float), pad_weights), -1).to(torch.float)
+            pad_ids = torch.full((x.size(0), 1), self.unify_shared_expert_id - 1).to(
+                torch.int
+            )
+            topk_weight = torch.cat((topk_weight.to(torch.float), pad_weights), -1).to(
+                torch.float
+            )
             topk_ids = torch.cat((topk_ids.to(torch.int), pad_ids), -1).to(torch.int)
             final_out = torch.ops.torch_ipex.fused_experts(
                 x,
@@ -1922,6 +1926,7 @@ def moe_infer(self, x, topk_ids, topk_weight):
             )
     return final_out
 
+
 def moe_infer_shared(self, identity, hidden_states, residual):
     # input shape:
     # identity/hidden_states/residual [BS, seqlen, dims]
@@ -1948,9 +1953,7 @@ def moe_infer_shared(self, identity, hidden_states, residual):
             self.w2_shared_scale,
             self.w2_shared_zp,
             self.w2_shared_compensation,
-        ).view(
-            *orig_shape
-        )
+        ).view(*orig_shape)
         hidden_states = hidden_states + identity
         hidden_states = residual + hidden_states
     else:
@@ -1964,6 +1967,7 @@ def moe_infer_shared(self, identity, hidden_states, residual):
             hidden_states = hidden_states + identity
             hidden_states = residual + hidden_states
     return hidden_states
+
 
 def DeepseekV2DecoderLayer_forward(
     self,
@@ -2333,41 +2337,54 @@ class _IPEXDecoderLayerRef(nn.Module):
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
                 if config.n_shared_experts is not None:
-                  if (self.use_fused_moe or self.use_fused_moe_woq):
-                    if (
-                        hasattr(module.mlp.shared_experts.gate_proj, "_op_context")
-                        and module.mlp.shared_experts.gate_proj._op_context is not None
-                    ):
-                        self.deepseek_lowbit_load = True
+                    if self.use_fused_moe or self.use_fused_moe_woq:
+                        if (
+                            hasattr(module.mlp.shared_experts.gate_proj, "_op_context")
+                            and module.mlp.shared_experts.gate_proj._op_context
+                            is not None
+                        ):
+                            self.deepseek_lowbit_load = True
+                        else:
+                            shared_weights_list = [
+                                module.mlp.shared_experts.gate_proj.weight,
+                                module.mlp.shared_experts.up_proj.weight,
+                            ]
+                            concat_shared_weight = torch.concat(shared_weights_list, 0)
+                            self.mlp.shared_experts.w13_shared_weight = (
+                                concat_shared_weight
+                            )
+                            self.mlp.shared_experts.w2_shared_weight = (
+                                module.mlp.shared_experts.down_proj.weight
+                            )
+                            del self.__dict__["_modules"][
+                                "mlp"
+                            ].shared_experts.gate_proj
+                            del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                            del self.__dict__["_modules"][
+                                "mlp"
+                            ].shared_experts.down_proj
                     else:
-                        shared_weights_list = [
-                            module.mlp.shared_experts.gate_proj.weight,
-                            module.mlp.shared_experts.up_proj.weight,
-                        ]
-                        concat_shared_weight = torch.concat(shared_weights_list, 0)
-                        self.mlp.shared_experts.w13_shared_weight = concat_shared_weight
-                        self.mlp.shared_experts.w2_shared_weight = module.mlp.shared_experts.down_proj.weight
-                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
-                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
-                        del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
-                  else:
-                    if not self.distributed and hasattr(
-                        module.mlp.shared_experts, "down_proj"
-                    ):
-                        self.shared_linear_add_add = _IPEXlinearAddAddRef(
-                            module.mlp.shared_experts.down_proj
-                        )
-                        del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
+                        if not self.distributed and hasattr(
+                            module.mlp.shared_experts, "down_proj"
+                        ):
+                            self.shared_linear_add_add = _IPEXlinearAddAddRef(
+                                module.mlp.shared_experts.down_proj
+                            )
+                            del self.__dict__["_modules"][
+                                "mlp"
+                            ].shared_experts.down_proj
 
-                    if hasattr(module.mlp.shared_experts, "gate_proj") and hasattr(
-                        module.mlp.shared_experts, "up_proj"
-                    ):
-                        self.shared_linear_silu_mul = _IPEXlinearSiluMulRef(
-                            module.mlp.shared_experts.gate_proj,
-                            module.mlp.shared_experts.up_proj,
-                        )
-                        del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
-                        del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+                        if hasattr(module.mlp.shared_experts, "gate_proj") and hasattr(
+                            module.mlp.shared_experts, "up_proj"
+                        ):
+                            self.shared_linear_silu_mul = _IPEXlinearSiluMulRef(
+                                module.mlp.shared_experts.gate_proj,
+                                module.mlp.shared_experts.up_proj,
+                            )
+                            del self.__dict__["_modules"][
+                                "mlp"
+                            ].shared_experts.gate_proj
+                            del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
 
                 if (
                     self.use_fused_moe or self.use_fused_moe_woq

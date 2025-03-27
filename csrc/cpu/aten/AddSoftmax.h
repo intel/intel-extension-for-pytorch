@@ -22,8 +22,8 @@ at::Tensor div_add_softmax_kernel_impl(
 
 using div_add_softmax_kernel_fn =
     at::Tensor (*)(at::Tensor&, const at::Tensor&, const float&);
-using add_softmax_inplace_kernel_fn =
-    at::Tensor& (*)(at::Tensor&, const at::Tensor&);
+using add_softmax_inplace_kernel_fn = at::Tensor& (*)(at::Tensor&,
+                                                      const at::Tensor&);
 IPEX_DECLARE_DISPATCH(div_add_softmax_kernel_fn, div_add_softmax_kernel_stub);
 IPEX_DECLARE_DISPATCH(
     add_softmax_inplace_kernel_fn,

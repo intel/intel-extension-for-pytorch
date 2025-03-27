@@ -40,7 +40,11 @@ def woq_quant_and_pack(weight, group_size, dtype, lowp_mode, sym_quant):
         False,  # cache_weight_for_large_batch
     )
     # qweight: {N/block_n, K/block_k, block_k, block_n}
-    if dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8 and _op_context.get_weight().dim() == 4:
+    if (
+        dtype == WoqWeightDtype.INT8
+        and lowp_mode == WoqLowpMode.INT8
+        and _op_context.get_weight().dim() == 4
+    ):
         n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
         weight_view = qweight.view([n_blocks, block_n, k_blocks, block_k])
         compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
@@ -200,8 +204,17 @@ def torch_naive_moe(a, w1, w2, score, topk, renormalize):
 
 
 def ipex_default_woq_moe(
-    a, w1_list, w3_list, w2_list, score, topk, renormalize,
-    group_size=-1, weight_dtype=WoqWeightDtype.INT8, lowp_mode=WoqLowpMode.BF16, sym_quant_weight=False
+    a,
+    w1_list,
+    w3_list,
+    w2_list,
+    score,
+    topk,
+    renormalize,
+    group_size=-1,
+    weight_dtype=WoqWeightDtype.INT8,
+    lowp_mode=WoqLowpMode.BF16,
+    sym_quant_weight=False,
 ):
     G = 1
     topk_group = 1
@@ -505,7 +518,15 @@ class DeepSeekTester(TestCase):
             )
 
         def run_single_test(
-            m, n, k, e, topk, dtype, renormalize=False, is_woq=False, sym_quant_weight=False
+            m,
+            n,
+            k,
+            e,
+            topk,
+            dtype,
+            renormalize=False,
+            is_woq=False,
+            sym_quant_weight=False,
         ):
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 10
             score = torch.randn((m, e), device="cpu", dtype=dtype)
@@ -619,9 +640,7 @@ class DeepSeekTester(TestCase):
         lowp_mode = WoqLowpMode.INT8
         sym_quant_weight = True
 
-        def fused_moe(
-            a, w1, w2, score, topk, renormalize
-        ):
+        def fused_moe(a, w1, w2, score, topk, renormalize):
             G = 1
             topk_group = 1
 
@@ -635,7 +654,7 @@ class DeepSeekTester(TestCase):
             E = w1.size(0)
             w13_qweight_list = []
             w13_scale_list = []
-            w13_comp_list =[]
+            w13_comp_list = []
             w2_qweight_list = []
             w2_scale_list = []
             w2_comp_list = []
@@ -683,9 +702,7 @@ class DeepSeekTester(TestCase):
                 w2_comp,
             )
 
-        def run_single_test(
-            m, n, k, e, topk, dtype, renormalize=False
-        ):
+        def run_single_test(m, n, k, e, topk, dtype, renormalize=False):
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 20
             score = torch.randn((m, e), device="cpu", dtype=dtype)
             w13_list = []

@@ -2911,7 +2911,9 @@ class _IPEXAttentionRef(nn.Module):
             self.w_kc = torch.ops.torch_ipex.convert_weight_packed(
                 w_kc.transpose(-1, -2).contiguous(), False
             )
-            self.w_vc = torch.ops.torch_ipex.convert_weight_packed(w_vc.contiguous(), False)
+            self.w_vc = torch.ops.torch_ipex.convert_weight_packed(
+                w_vc.contiguous(), False
+            )
             if hasattr(self.kv_b_proj, "weight_scale") and self.w_scale is None:
                 self.w_scale = self.kv_b_proj.weight_scale
 

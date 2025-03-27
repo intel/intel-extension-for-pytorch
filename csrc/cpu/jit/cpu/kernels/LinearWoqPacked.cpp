@@ -98,7 +98,9 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
         for (size_t i = 0; i < num_row; ++i) {
           for (size_t j = 0; j < num_col; ++j) {
             zp_fp32_ptr[i * num_col + j] =
-                (float)((zp_int32_ptr[i * num_col_zp + j / 8] >> ((j % 8) * 4)) & 0xf);
+                (float)((zp_int32_ptr[i * num_col_zp + j / 8] >>
+                         ((j % 8) * 4)) &
+                        0xf);
           }
         }
       } else if (zero_points.numel() == scales_fp32.numel()) {

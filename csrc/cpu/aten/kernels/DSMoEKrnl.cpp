@@ -1,14 +1,13 @@
 #include <ATen/native/CPUBlas.h>
-#include <aten/utils/common.h>
-#include <aten/utils/vec.h>
-#include <aten/utils/amx.h>
-#include <aten/utils/woq.h>
-#include <aten/utils/gemm.h>
 #include <aten/DSMoE.h>
+#include <aten/utils/amx.h>
+#include <aten/utils/common.h>
+#include <aten/utils/gemm.h>
+#include <aten/utils/vec.h>
+#include <aten/utils/woq.h>
 #include <cassert>
-#include "vec/vec.h"
 #include "aten/utils/woq_dynamic_quant.h"
-
+#include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -68,8 +67,9 @@ inline void copy_stub(
   }
 }
 
-template <typename scalar_t,
-          typename std::enable_if_t<!std::is_same_v<scalar_t, float>>* = nullptr>
+template <
+    typename scalar_t,
+    typename std::enable_if_t<!std::is_same_v<scalar_t, float>>* = nullptr>
 inline void copy_stub(
     scalar_t* __restrict__ out,
     const float* __restrict__ input,
@@ -108,7 +108,7 @@ inline void copy_mul_stub(
     out_vec.store(out + d);
   }
   for (; d < size; ++d) {
-    out[d] = static_cast<scalar_t>(input[d]*weight);
+    out[d] = static_cast<scalar_t>(input[d] * weight);
   }
 }
 template <typename scalar_t>
@@ -132,7 +132,7 @@ inline void copy_mul_stub(
     out_vec.store(out + d);
   }
   for (; d < size; ++d) {
-    out[d] = static_cast<scalar_t>(input_[d]*weight);
+    out[d] = static_cast<scalar_t>(input_[d] * weight);
   }
 }
 // acc from [topk, K] to [K]
@@ -387,10 +387,10 @@ inline void silu_and_mul(
     const scalar_t* __restrict__ input1, // y: y0, y1
     int m_size,
     int N) {
-  float input0_[m_size*N];
-  cvt_bf16_to_fp32(input0_, input0, m_size*N);
-  float input1_[m_size*N];
-  cvt_bf16_to_fp32(input1_, input1, m_size*N);
+  float input0_[m_size * N];
+  cvt_bf16_to_fp32(input0_, input0, m_size * N);
+  float input1_[m_size * N];
+  cvt_bf16_to_fp32(input1_, input1, m_size * N);
   using bVec = at::vec::Vectorized<scalar_t>;
   using fVec = at::vec::Vectorized<float>;
   const fVec one = fVec(1.f);
@@ -417,20 +417,20 @@ inline void silu_and_mul(
   }
 }
 
- void Dequantize_and_compute(
-  uint8_t* qB,
-  long M,
-  long K,
-  long N,
-  at::BFloat16* scales,
-  at::BFloat16* zps,
-  const at::BFloat16* __restrict__ act,
-  float* __restrict__ out,
-  long ldb,
-  long N_GROUP_SIZE,
-  bool sym_quant_weight) {
-    // std::cout<<"----0----:"<<out[0]<<std::endl;
-  #if defined(CPU_CAPABILITY_AVX512_BF16)
+void Dequantize_and_compute(
+    uint8_t* qB,
+    long M,
+    long K,
+    long N,
+    at::BFloat16* scales,
+    at::BFloat16* zps,
+    const at::BFloat16* __restrict__ act,
+    float* __restrict__ out,
+    long ldb,
+    long N_GROUP_SIZE,
+    bool sym_quant_weight) {
+  // std::cout<<"----0----:"<<out[0]<<std::endl;
+#if defined(CPU_CAPABILITY_AVX512_BF16)
   using T = at::BFloat16;
   using VT = typename VecType<T>::type;
   using V = VecOps<VT>;
@@ -440,10 +440,11 @@ inline void silu_and_mul(
   // saving an "and" op
   VT lut;
   lut = V::set_0_to_15();
-  dequant_n_grouped_and_compute(qB, M, K, N, scales, zps, act, out, ldb, N_GROUP_SIZE, sym_quant_weight);
+  dequant_n_grouped_and_compute(
+      qB, M, K, N, scales, zps, act, out, ldb, N_GROUP_SIZE, sym_quant_weight);
 
-  #endif
-  }
+#endif
+}
 template <typename scalar_t>
 void fused_experts_kernel_impl(
     scalar_t* __restrict__ output,
@@ -503,8 +504,8 @@ void fused_experts_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     scalar_t* __restrict__ A = A_tmp + tid * BLOCK_M * K;
-    float*  C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
-    float*  C1_f = C0_f + BLOCK_M * BLOCK_N;
+    float* C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C1_f = C0_f + BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB;
       int nb = i % NB;
@@ -522,23 +523,27 @@ void fused_experts_kernel_impl(
         copy_stub(A + m * K, input + index * K, K);
       }
 
-      if(use_brgemm){
+      if (use_brgemm) {
         torch::Tensor dequant_packed_w1_0 = torch::empty(
-          {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         torch::Tensor dequant_packed_w1_1 = torch::empty(
-          {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb0 * BLOCK_N;
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb1 * BLOCK_N;
 
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            if(sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -555,27 +560,27 @@ void fused_experts_kernel_impl(
                       dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
                       0,
                       nullptr); // g_idx_ptr
-            }else{
+            } else {
               Dequantize<
-              scalar_t, // target : bf16  gjn here dequant
-              Q_BLOCK_N,
-              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-              WOQ_DTYPE_INT8, // qw_type_
-              false, // sym_quant_w
-              false>:: // use_g_idx
-              call(
-                  qB0 + k_i * BLOCK_N,
-                  Q_BLOCK_K,
-                  n_size,
-                  w1_scale_0,
-                  w1_zp_0,
-                  dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                  0,
-                  nullptr); // g_idx_ptr
+                  scalar_t, // target : bf16  gjn here dequant
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB0 + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w1_scale_0,
+                      w1_zp_0,
+                      dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
             }
           }
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            if(sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -592,7 +597,7 @@ void fused_experts_kernel_impl(
                       dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
                       0,
                       nullptr); // g_idx_ptr
-            }else{
+            } else {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -613,11 +618,11 @@ void fused_experts_kernel_impl(
           }
         }
         const scalar_t* __restrict__ B0 = is_woq
-        ? dequant_packed_w1_0.data_ptr<scalar_t>()
-        : packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
+            ? dequant_packed_w1_0.data_ptr<scalar_t>()
+            : packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
         const scalar_t* __restrict__ B1 = is_woq
-        ? dequant_packed_w1_1.data_ptr<scalar_t>()
-        : packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
+            ? dequant_packed_w1_1.data_ptr<scalar_t>()
+            : packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
         at::native::cpublas::brgemm(
             /* M     */ m_size,
             /* N     */ n_size,
@@ -641,70 +646,76 @@ void fused_experts_kernel_impl(
             /* A     */ A,
             /* B     */ B1,
             /* C     */ C1_f);
-      }else{
+      } else {
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb0 * BLOCK_N;
           // 2.a gemm: C = A @ B
-            Dequantize_and_compute(
-                    qB0 ,
-                    m_size,
-                    K,
-                    n_size,
-                    w1_scale_0,
-                    w1_zp_0,
-                    A,
-                    C0_f,
-                    Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                    sym_quant_weight);
+          Dequantize_and_compute(
+              qB0,
+              m_size,
+              K,
+              n_size,
+              w1_scale_0,
+              w1_zp_0,
+              A,
+              C0_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              sym_quant_weight);
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
-            Dequantize_and_compute(
-                    qB1 ,
-                    m_size,
-                    K,
-                    n_size,
-                    w1_scale_1,
-                    w1_zp_1,
-                    A,
-                    C1_f,
-                    Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                    sym_quant_weight);
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb1 * BLOCK_N;
+          Dequantize_and_compute(
+              qB1,
+              m_size,
+              K,
+              n_size,
+              w1_scale_1,
+              w1_zp_1,
+              A,
+              C1_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              sym_quant_weight);
 
-        }else{
-          const scalar_t* __restrict__ B0 = packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
+        } else {
+          const scalar_t* __restrict__ B0 =
+              packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           torch_ipex::cpu::tinygemm_kernel<scalar_t, scalar_t>(
-            /*   A */ A,
-            /*   B */ B0 /* nb * BLOCK_N * K */,
-            /*   C */ C0_f,
-            /*scale*/ 0.f,
-            /*   M */ m_size,
-            /*   N */ n_size,
-            /*   K */ K,
-            /* lda */ K,
-            /* ldb */ n_size,
-            /* ldc */ BLOCK_N);
-          const scalar_t* __restrict__ B1 = packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
+              /*   A */ A,
+              /*   B */ B0 /* nb * BLOCK_N * K */,
+              /*   C */ C0_f,
+              /*scale*/ 0.f,
+              /*   M */ m_size,
+              /*   N */ n_size,
+              /*   K */ K,
+              /* lda */ K,
+              /* ldb */ n_size,
+              /* ldc */ BLOCK_N);
+          const scalar_t* __restrict__ B1 =
+              packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           torch_ipex::cpu::tinygemm_kernel<scalar_t, scalar_t>(
-            /*   A */ A,
-            /*   B */ B1 /* nb * BLOCK_N * K */,
-            /*   C */ C1_f,
-            /*scale*/ 0.f,
-            /*   M */ m_size,
-            /*   N */ n_size,
-            /*   K */ K,
-            /* lda */ K,
-            /* ldb */ n_size,
-            /* ldc */ BLOCK_N);
+              /*   A */ A,
+              /*   B */ B1 /* nb * BLOCK_N * K */,
+              /*   C */ C1_f,
+              /*scale*/ 0.f,
+              /*   M */ m_size,
+              /*   N */ n_size,
+              /*   K */ K,
+              /* lda */ K,
+              /* ldb */ n_size,
+              /* ldc */ BLOCK_N);
         }
       }
- 
+
       const int offset = offsets[mb];
       if (is_woq) {
         silu_and_mul<scalar_t, Q_BLOCK_N>(
@@ -713,11 +724,10 @@ void fused_experts_kernel_impl(
         silu_and_mul<scalar_t, T_BLOCK_N>(
             ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
       }
-      if(use_brgemm){
+      if (use_brgemm) {
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
   // stage 2: intermediate_cache2 = intermediate_cache1 @ w2
   //   w2 : [E, K, N] as [E, OC, IC]
@@ -734,7 +744,7 @@ void fused_experts_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     // we won't be using C1 for gemm2
-    float*  C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB2;
       int nb = i % NB2;
@@ -743,58 +753,61 @@ void fused_experts_kernel_impl(
       int n_size = std::min(OC - nb * BLOCK_N, BLOCK_N);
       // A ptr from ic1 of [M * topk, N] in sorted order
       // so as to avoid copy A to tmp buffer again
-      const scalar_t*  A = ic1 + offsets[mb] * N; // + nb * BLOCK_N;
+      const scalar_t* A = ic1 + offsets[mb] * N; // + nb * BLOCK_N;
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       // B shape [IC, n_size] in vnni format
       int32_t expert_id = expert_ids[mb];
-      if(use_brgemm){
+      if (use_brgemm) {
         torch::Tensor dequant_packed_w2 = torch::empty(
-          {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
-          uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = sym_quant_weight? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
+          uint8_t* qB =
+              packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+          scalar_t* w2_zp_ = sym_quant_weight
+              ? nullptr
+              : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           for (int k_i = 0; k_i < IC; k_i = k_i + Q_BLOCK_K) {
-            if(sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
-              scalar_t, // dequant dtype
-              Q_BLOCK_N,
-              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-              WOQ_DTYPE_INT8, // qw_type_
-              true, // sym_quant_w
-              false>:: // use_g_idx
-              call(
-                qB + k_i * BLOCK_N,
-                  Q_BLOCK_K,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                  0,
-                  nullptr); // g_idx_ptr
-            }else{
+                  scalar_t, // dequant dtype
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w2_scale_,
+                      w2_zp_,
+                      dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            } else {
               Dequantize<
-              scalar_t, // dequant dtype
-              Q_BLOCK_N,
-              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-              WOQ_DTYPE_INT8, // qw_type_
-              false, // sym_quant_w
-              false>:: // use_g_idx
-              call(
-                qB + k_i * BLOCK_N,
-                  Q_BLOCK_K,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                  0,
-                  nullptr); // g_idx_ptr
+                  scalar_t, // dequant dtype
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w2_scale_,
+                      w2_zp_,
+                      dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
             }
           }
         }
         const scalar_t* __restrict__ B = is_woq
-        ? dequant_packed_w2.data_ptr<scalar_t>()
-        : packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+            ? dequant_packed_w2.data_ptr<scalar_t>()
+            : packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
         at::native::cpublas::brgemm(
             /* M     */ m_size,
             /* N     */ n_size,
@@ -806,27 +819,30 @@ void fused_experts_kernel_impl(
             /* A     */ A,
             /* B     */ B,
             /* C     */ C_f);
-      }else{
+      } else {
         if (is_woq) { // Dequant loop
           uint8_t* qB =
               packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = sym_quant_weight? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = sym_quant_weight
+              ? nullptr
+              : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           // 2.a gemm: C = A @ B
           Dequantize_and_compute(
-                  qB ,
-                  m_size,
-                  IC,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  A,
-                  C_f,
-                  Q_BLOCK_N,
-                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-                  sym_quant_weight);
-        }else{
-          const scalar_t* __restrict__ B = packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+              qB,
+              m_size,
+              IC,
+              n_size,
+              w2_scale_,
+              w2_zp_,
+              A,
+              C_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+              sym_quant_weight);
+        } else {
+          const scalar_t* __restrict__ B =
+              packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
           torch_ipex::cpu::tinygemm_kernel<at::BFloat16, at::BFloat16>(
               /*   A */ A,
               /*   B */ B /* nb * BLOCK_N * K */,
@@ -849,11 +865,10 @@ void fused_experts_kernel_impl(
         copy_mul_stub(
             ic2 + index * K + nb * BLOCK_N, C_f + m * BLOCK_N, weight, n_size);
       }
-      if(use_brgemm){
+      if (use_brgemm) {
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
   // stage 3: out = intermediate_cache2.sum(dim=1)
   //   from [M, topk, K] to [M, K]
@@ -883,7 +898,8 @@ void _dequant_and_store(
     int32_t a_zp = *(zp_a + m * ldsa);
 #pragma omp simd
     for (int n = 0; n < N; ++n) {
-      float dq_val = (float)(input[m * ld + n] - a_zp * comp_b[n]) * a_scale * scale_b[n];
+      float dq_val =
+          (float)(input[m * ld + n] - a_zp * comp_b[n]) * a_scale * scale_b[n];
       if constexpr (accum) {
         output[m * ld + n] += dq_val;
       } else {
@@ -920,7 +936,6 @@ void fused_experts_woq_da8w8_kernel_impl(
     float* w2_scale,
     int32_t* w1_compensation,
     int32_t* w2_compensation) {
-
   // handle 2 tiles per block
   uint8_t* packed_qw1 = nullptr;
   uint8_t* packed_qw2 = nullptr;
@@ -949,8 +964,8 @@ void fused_experts_woq_da8w8_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     uint8_t* __restrict__ A = A_tmp + tid * BLOCK_M * K;
-    float*  C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
-    float*  C1_f = C0_f + BLOCK_M * BLOCK_N;
+    float* C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C1_f = C0_f + BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB;
       int nb = i % NB;
@@ -962,26 +977,34 @@ void fused_experts_woq_da8w8_kernel_impl(
 
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       int m_size = offsets[mb + 1] - offsets[mb];
-      bool use_brgemm = m_size > SMALL_M_THRESHOLD && Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
+      bool use_brgemm = m_size > SMALL_M_THRESHOLD &&
+          Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
       alignas(64) float A_scale_buf[m_size * num_k_groups];
       alignas(64) int32_t A_zp_buf[m_size * num_k_groups];
 
       for (int m = 0; m < m_size; ++m) {
         int32_t index = A_ids[m] / topk;
         copy_stub(A + m * K, input + index * K, K);
-        copy_stub(A_scale_buf + m * num_k_groups, input_scales + index * num_k_groups, num_k_groups);
-        copy_stub(A_zp_buf + m * num_k_groups, input_zp + index * num_k_groups, num_k_groups);
+        copy_stub(
+            A_scale_buf + m * num_k_groups,
+            input_scales + index * num_k_groups,
+            num_k_groups);
+        copy_stub(
+            A_zp_buf + m * num_k_groups,
+            input_zp + index * num_k_groups,
+            num_k_groups);
       }
 
       uint8_t* qB0 =
           packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
       float* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
-      int32_t* w1_comp_0 = w1_compensation + expert_id * 2 * N * num_k_groups + nb0 * BLOCK_N * num_k_groups;
+      int32_t* w1_comp_0 = w1_compensation + expert_id * 2 * N * num_k_groups +
+          nb0 * BLOCK_N * num_k_groups;
       uint8_t* qB1 =
           packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
       float* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
-      int32_t* w1_comp_1 = w1_compensation + expert_id * 2 * N * num_k_groups + nb1 * BLOCK_N * num_k_groups;
-
+      int32_t* w1_comp_1 = w1_compensation + expert_id * 2 * N * num_k_groups +
+          nb1 * BLOCK_N * num_k_groups;
 
       if (use_brgemm) {
         alignas(64) int32_t* C_int32_buf0 = new int32_t[m_size * n_size * 2];
@@ -1019,18 +1042,50 @@ void fused_experts_woq_da8w8_kernel_impl(
 
           if (k == 0) {
             _dequant_and_store</* accum */ false>(
-                C0_f, C_int32_buf0, A_scale_data, A_zp_data, w1_scale_0, B_comp_data0,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C0_f,
+                C_int32_buf0,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_0,
+                B_comp_data0,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
             _dequant_and_store</* accum */ false>(
-                C1_f, C_int32_buf1, A_scale_data, A_zp_data, w1_scale_1, B_comp_data1,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C1_f,
+                C_int32_buf1,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_1,
+                B_comp_data1,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
           } else {
             _dequant_and_store</* accum */ true>(
-                C0_f, C_int32_buf0, A_scale_data, A_zp_data, w1_scale_0, B_comp_data0,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C0_f,
+                C_int32_buf0,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_0,
+                B_comp_data0,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
             _dequant_and_store</* accum */ true>(
-                C1_f, C_int32_buf1, A_scale_data, A_zp_data, w1_scale_1, B_comp_data1,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C1_f,
+                C_int32_buf1,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_1,
+                B_comp_data1,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
           }
         }
         delete[] C_int32_buf0;
@@ -1045,29 +1100,37 @@ void fused_experts_woq_da8w8_kernel_impl(
               // buffer to hold int32 gemm output
               __m512i vc0 = _mm512_setzero_epi32();
               __m512i vc1 = _mm512_setzero_epi32();
-              #pragma GCC unroll 4
+#pragma GCC unroll 4
               for (int ki = k; ki < k + Q_BLOCK_K; ki += VNNI_SIZE) {
                 // load a & b and compute dot product in a block of K
                 __m512i va = _mm512_set1_epi32(*(int32_t*)(A + m * K + ki));
-                __m512i vb0 = _mm512_loadu_epi32((int32_t*)(qB0 + ki * n_size + n * VNNI_SIZE));
-                __m512i vb1 = _mm512_loadu_epi32((int32_t*)(qB1 + ki * n_size + n * VNNI_SIZE));
+                __m512i vb0 = _mm512_loadu_epi32(
+                    (int32_t*)(qB0 + ki * n_size + n * VNNI_SIZE));
+                __m512i vb1 = _mm512_loadu_epi32(
+                    (int32_t*)(qB1 + ki * n_size + n * VNNI_SIZE));
                 vc0 = _mm512_dpbusd_epi32(vc0, va, vb0);
                 vc1 = _mm512_dpbusd_epi32(vc1, va, vb1);
               }
               // compute c = c - a_zp * b_comp
-              __m512i vb_comp0 = _mm512_loadu_epi32(w1_comp_0 + k_group_idx * n_size + n);
-              __m512i vb_comp1 = _mm512_loadu_epi32(w1_comp_1 + k_group_idx * n_size + n);
-              __m512i va_zp = _mm512_set1_epi32(*(int32_t*)(A_zp_buf + m * num_k_groups + k_group_idx));
+              __m512i vb_comp0 =
+                  _mm512_loadu_epi32(w1_comp_0 + k_group_idx * n_size + n);
+              __m512i vb_comp1 =
+                  _mm512_loadu_epi32(w1_comp_1 + k_group_idx * n_size + n);
+              __m512i va_zp = _mm512_set1_epi32(
+                  *(int32_t*)(A_zp_buf + m * num_k_groups + k_group_idx));
               vc0 = _mm512_sub_epi32(vc0, _mm512_mullo_epi32(vb_comp0, va_zp));
               vc1 = _mm512_sub_epi32(vc1, _mm512_mullo_epi32(vb_comp1, va_zp));
               // compute c = c * a_scale * b_scale
               __m512 vc_float0 = _mm512_cvtepi32_ps(vc0);
               __m512 vc_float1 = _mm512_cvtepi32_ps(vc1);
-              __m512 va_scale = _mm512_set1_ps(*(float*)(A_scale_buf + m * num_k_groups + k_group_idx));
+              __m512 va_scale = _mm512_set1_ps(
+                  *(float*)(A_scale_buf + m * num_k_groups + k_group_idx));
               vc_float0 = _mm512_mul_ps(vc_float0, va_scale);
               vc_float1 = _mm512_mul_ps(vc_float1, va_scale);
-              vc_float0 =  _mm512_mul_ps(vc_float0, _mm512_loadu_ps(w1_scale_0 + n));
-              vc_float1 =  _mm512_mul_ps(vc_float1, _mm512_loadu_ps(w1_scale_1 + n));
+              vc_float0 =
+                  _mm512_mul_ps(vc_float0, _mm512_loadu_ps(w1_scale_0 + n));
+              vc_float1 =
+                  _mm512_mul_ps(vc_float1, _mm512_loadu_ps(w1_scale_1 + n));
               // reduction
               vc_accum0 = _mm512_add_ps(vc_float0, vc_accum0);
               vc_accum1 = _mm512_add_ps(vc_float1, vc_accum1);
@@ -1077,7 +1140,7 @@ void fused_experts_woq_da8w8_kernel_impl(
           } // for n
         } // for m
       } // not brgemm
- 
+
       const int offset = offsets[mb];
       silu_and_mul<scalar_t, Q_BLOCK_N>(
           ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
@@ -1086,7 +1149,6 @@ void fused_experts_woq_da8w8_kernel_impl(
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
 
   // stage 2: intermediate_cache2 = intermediate_cache1 @ w2
@@ -1110,8 +1172,9 @@ void fused_experts_woq_da8w8_kernel_impl(
   auto A_dtype = torch::CppTypeToScalarType<scalar_t>();
   auto options = torch::TensorOptions().dtype(A_dtype);
   auto A2_tensor = torch::from_blob(ic1, {M_SIZE, IC}, options);
-  auto [qA_tensor, A_scale_tensor, A_zp_tensor] = dynamic_quantize_per_block<scalar_t>(
-        A2_tensor, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
+  auto [qA_tensor, A_scale_tensor, A_zp_tensor] =
+      dynamic_quantize_per_block<scalar_t>(
+          A2_tensor, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
   auto qA_buf = (uint8_t*)qA_tensor.data_ptr();
   auto A_scale_buf = (float*)A_scale_tensor.data_ptr();
   auto A_zp_buf = (int32_t*)A_zp_tensor.data_ptr();
@@ -1121,22 +1184,25 @@ void fused_experts_woq_da8w8_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     // we won't be using C1 for gemm2
-    float*  C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB2;
       int nb = i % NB2;
       int m_size = offsets[mb + 1] - offsets[mb];
       int n_size = std::min(OC - nb * BLOCK_N, BLOCK_N);
-      bool use_brgemm = m_size > SMALL_M_THRESHOLD && Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
+      bool use_brgemm = m_size > SMALL_M_THRESHOLD &&
+          Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
       const uint8_t* qA = qA_buf + offsets[mb] * IC;
       const float* A_scale = A_scale_buf + offsets[mb] * num_k_groups;
       const int32_t* A_zp = A_zp_buf + offsets[mb] * num_k_groups;
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       // B shape [IC, n_size] in vnni format
       int32_t expert_id = expert_ids[mb];
-      uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+      uint8_t* qB =
+          packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
       float* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
-      int32_t* w2_comp = w2_compensation + expert_id * OC * num_k_groups + nb * BLOCK_N * num_k_groups;
+      int32_t* w2_comp = w2_compensation + expert_id * OC * num_k_groups +
+          nb * BLOCK_N * num_k_groups;
 
       if (use_brgemm) {
         alignas(64) int32_t* C_int32_buf = new int32_t[m_size * n_size];
@@ -1157,10 +1223,28 @@ void fused_experts_woq_da8w8_kernel_impl(
               /* C     */ C_int32_buf);
           if (k == 0) {
             _dequant_and_store</* accum */ false>(
-                C_f, C_int32_buf, A_scale + k_group_idx, A_zp + k_group_idx, w2_scale_, pB_comp, m_size, n_size, n_size, num_k_groups);
+                C_f,
+                C_int32_buf,
+                A_scale + k_group_idx,
+                A_zp + k_group_idx,
+                w2_scale_,
+                pB_comp,
+                m_size,
+                n_size,
+                n_size,
+                num_k_groups);
           } else {
             _dequant_and_store</* accum */ true>(
-                C_f, C_int32_buf, A_scale + k_group_idx, A_zp + k_group_idx, w2_scale_, pB_comp, m_size, n_size, n_size, num_k_groups);
+                C_f,
+                C_int32_buf,
+                A_scale + k_group_idx,
+                A_zp + k_group_idx,
+                w2_scale_,
+                pB_comp,
+                m_size,
+                n_size,
+                n_size,
+                num_k_groups);
           }
         }
         delete[] C_int32_buf;
@@ -1172,22 +1256,27 @@ void fused_experts_woq_da8w8_kernel_impl(
             for (int k = 0; k < IC; k += Q_BLOCK_K) {
               int k_group_idx = k / Q_BLOCK_K;
               __m512i vc = _mm512_setzero_epi32();
-              #pragma GCC unroll 4
+#pragma GCC unroll 4
               for (int ki = k; ki < k + Q_BLOCK_K; ki += VNNI_SIZE) {
                 // load a & b and compute dot product
                 __m512i va = _mm512_set1_epi32(*(int32_t*)(qA + m * IC + ki));
-                __m512i vb = _mm512_loadu_epi8(qB + ki * n_size + n * VNNI_SIZE);
+                __m512i vb =
+                    _mm512_loadu_epi8(qB + ki * n_size + n * VNNI_SIZE);
                 vc = _mm512_dpbusd_epi32(vc, va, vb);
               }
               // compute c = c - a_zp * b_comp
-              __m512i vb_comp = _mm512_loadu_epi32(w2_comp + k_group_idx * n_size + n);
-              __m512i va_zp = _mm512_set1_epi32(*(A_zp + m * num_k_groups + k_group_idx));
+              __m512i vb_comp =
+                  _mm512_loadu_epi32(w2_comp + k_group_idx * n_size + n);
+              __m512i va_zp =
+                  _mm512_set1_epi32(*(A_zp + m * num_k_groups + k_group_idx));
               vc = _mm512_sub_epi32(vc, _mm512_mullo_epi32(vb_comp, va_zp));
               // compute c = c * a_scale * b_scale
               __m512 vc_float = _mm512_cvtepi32_ps(vc);
-              __m512 va_scale = _mm512_set1_ps(*(A_scale + m * num_k_groups + k_group_idx));
+              __m512 va_scale =
+                  _mm512_set1_ps(*(A_scale + m * num_k_groups + k_group_idx));
               vc_float = _mm512_mul_ps(vc_float, va_scale);
-              vc_float =  _mm512_mul_ps(vc_float, _mm512_loadu_ps(w2_scale_ + n));
+              vc_float =
+                  _mm512_mul_ps(vc_float, _mm512_loadu_ps(w2_scale_ + n));
               // reduction
               vc_accum = _mm512_add_ps(vc_float, vc_accum);
             } // for k
@@ -1208,7 +1297,6 @@ void fused_experts_woq_da8w8_kernel_impl(
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
 
   // stage 3: out = intermediate_cache2.sum(dim=1)
@@ -1338,17 +1426,27 @@ at::Tensor fused_experts_impl(
   //
   using scalar_t = c10::BFloat16;
 #if defined(CPU_CAPABILITY_AMX)
-  if (is_woq && woq_weight_dtype == WOQ_DTYPE_INT8 && woq_lowp_mode == LOWP_MODE_INT8) {
-    TORCH_CHECK(w1_scale.has_value() && w1_scale.value().defined() && w1_scale.value().scalar_type() == at::kFloat);
-    TORCH_CHECK(w2_scale.has_value() && w2_scale.value().defined() && w2_scale.value().scalar_type() == at::kFloat);
-    TORCH_CHECK(w1_compensation.has_value() && w1_compensation.value().defined() && w1_compensation.value().scalar_type() == at::kInt);
-    TORCH_CHECK(w2_compensation.has_value() && w2_compensation.value().defined() && w2_compensation.value().scalar_type() == at::kInt);
+  if (is_woq && woq_weight_dtype == WOQ_DTYPE_INT8 &&
+      woq_lowp_mode == LOWP_MODE_INT8) {
+    TORCH_CHECK(
+        w1_scale.has_value() && w1_scale.value().defined() &&
+        w1_scale.value().scalar_type() == at::kFloat);
+    TORCH_CHECK(
+        w2_scale.has_value() && w2_scale.value().defined() &&
+        w2_scale.value().scalar_type() == at::kFloat);
+    TORCH_CHECK(
+        w1_compensation.has_value() && w1_compensation.value().defined() &&
+        w1_compensation.value().scalar_type() == at::kInt);
+    TORCH_CHECK(
+        w2_compensation.has_value() && w2_compensation.value().defined() &&
+        w2_compensation.value().scalar_type() == at::kInt);
     auto buffer2 = at::empty(
         {M * topk * N + M * topk * K + /* num_threads * BLOCK_M * K + */
-        num_threads * 2 * BLOCK_M * BLOCK_N *
-            /* sizeof(float) / sizeof(scalar_t) */ 2},
+         num_threads * 2 * BLOCK_M * BLOCK_N *
+             /* sizeof(float) / sizeof(scalar_t) */ 2},
         hidden_states.options());
-    auto buffer_A_tmp = at::empty({num_threads * BLOCK_M * K}, hidden_states.options().dtype(c10::kByte));
+    auto buffer_A_tmp = at::empty(
+        {num_threads * BLOCK_M * K}, hidden_states.options().dtype(c10::kByte));
     scalar_t* __restrict__ intermediate_cache1 = buffer2.data_ptr<scalar_t>();
     scalar_t* __restrict__ intermediate_cache2 =
         intermediate_cache1 + M * topk * N;
@@ -1358,40 +1456,41 @@ at::Tensor fused_experts_impl(
     float* __restrict__ C_tmp_f =
         (float*)((void*)(intermediate_cache2 + M * topk * K));
     int Q_BLOCK_K = packed_w1.size(3);
-    auto [q_hidden_states, qscales, qzeros] = dynamic_quantize_per_block<scalar_t>(
-        hidden_states, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
+    auto [q_hidden_states, qscales, qzeros] =
+        dynamic_quantize_per_block<scalar_t>(
+            hidden_states, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
     fused_experts_woq_da8w8_kernel_impl<scalar_t>(
-      out_hidden_states.data_ptr<scalar_t>(),
-      intermediate_cache1,
-      intermediate_cache2,
-      A_tmp,
-      C_tmp,
-      C_tmp_f,
-      q_hidden_states.data_ptr<uint8_t>(),
-      qscales.data_ptr<float>(),
-      qzeros.data_ptr<int32_t>(),
-      packed_w1,
-      packed_w2,
-      topk_weights.data_ptr<float>(),
-      sorted_ids,
-      expert_ids,
-      offsets,
-      M,
-      N,
-      K,
-      E,
-      topk,
-      num_tokens_post_pad,
-      w1_scale.value().data_ptr<float>(),
-      w2_scale.value().data_ptr<float>(),
-      w1_compensation.value().data_ptr<int32_t>(),
-      w2_compensation.value().data_ptr<int32_t>());
+        out_hidden_states.data_ptr<scalar_t>(),
+        intermediate_cache1,
+        intermediate_cache2,
+        A_tmp,
+        C_tmp,
+        C_tmp_f,
+        q_hidden_states.data_ptr<uint8_t>(),
+        qscales.data_ptr<float>(),
+        qzeros.data_ptr<int32_t>(),
+        packed_w1,
+        packed_w2,
+        topk_weights.data_ptr<float>(),
+        sorted_ids,
+        expert_ids,
+        offsets,
+        M,
+        N,
+        K,
+        E,
+        topk,
+        num_tokens_post_pad,
+        w1_scale.value().data_ptr<float>(),
+        w2_scale.value().data_ptr<float>(),
+        w1_compensation.value().data_ptr<int32_t>(),
+        w2_compensation.value().data_ptr<int32_t>());
   } else {
 #endif
     auto buffer2 = at::empty(
         {M * topk * N + M * topk * K + num_threads * BLOCK_M * K +
-        num_threads * 2 * BLOCK_M * BLOCK_N *
-            /* sizeof(float) / sizeof(scalar_t) */ 2},
+         num_threads * 2 * BLOCK_M * BLOCK_N *
+             /* sizeof(float) / sizeof(scalar_t) */ 2},
         hidden_states.options());
     scalar_t* __restrict__ intermediate_cache1 = buffer2.data_ptr<scalar_t>();
     scalar_t* __restrict__ intermediate_cache2 =
@@ -1401,10 +1500,14 @@ at::Tensor fused_experts_impl(
         (scalar_t*)((void*)(A_tmp + num_threads * BLOCK_M * K));
     float* __restrict__ C_tmp_f =
         (float*)((void*)(A_tmp + num_threads * BLOCK_M * K));
-    scalar_t* w1_scale_ptr = w1_scale.has_value() ? w1_scale.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w1_zp_ptr = w1_zp.has_value() ? w1_zp.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w2_scale_ptr = w2_scale.has_value() ? w2_scale.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w2_zp_ptr = w2_zp.has_value() ? w2_zp.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w1_scale_ptr =
+        w1_scale.has_value() ? w1_scale.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w1_zp_ptr =
+        w1_zp.has_value() ? w1_zp.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w2_scale_ptr =
+        w2_scale.has_value() ? w2_scale.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w2_zp_ptr =
+        w2_zp.has_value() ? w2_zp.value().data_ptr<scalar_t>() : nullptr;
     fused_experts_kernel_impl<scalar_t>(
         out_hidden_states.data_ptr<scalar_t>(),
         intermediate_cache1,
@@ -1438,7 +1541,6 @@ at::Tensor fused_experts_impl(
   }
   return out_hidden_states;
 }
-
 
 template <typename scalar_t>
 void fused_mlp_kernel_impl(
@@ -1498,8 +1600,8 @@ void fused_mlp_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     scalar_t* __restrict__ A = A_tmp + tid * BLOCK_M * K;
-    float*  C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
-    float*  C1_f = C0_f + BLOCK_M * BLOCK_N;
+    float* C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C1_f = C0_f + BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB;
       int nb = i % NB;
@@ -1517,23 +1619,27 @@ void fused_mlp_kernel_impl(
         copy_stub(A + m * K, input + index * K, K);
       }
 
-      if(use_brgemm){
+      if (use_brgemm) {
         torch::Tensor dequant_packed_w1_0 = torch::empty(
-          {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         torch::Tensor dequant_packed_w1_1 = torch::empty(
-          {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {K / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb0 * BLOCK_N;
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb1 * BLOCK_N;
 
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            if(sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -1550,7 +1656,7 @@ void fused_mlp_kernel_impl(
                       dequant_packed_w1_0.data_ptr<scalar_t>() + k_i * BLOCK_N,
                       0,
                       nullptr); // g_idx_ptr
-            }else{
+            } else {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -1570,7 +1676,7 @@ void fused_mlp_kernel_impl(
             }
           }
           for (int k_i = 0; k_i < K; k_i = k_i + Q_BLOCK_K) {
-            if(sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -1587,7 +1693,7 @@ void fused_mlp_kernel_impl(
                       dequant_packed_w1_1.data_ptr<scalar_t>() + k_i * BLOCK_N,
                       0,
                       nullptr); // g_idx_ptr
-            }else{
+            } else {
               Dequantize<
                   scalar_t, // target : bf16  gjn here dequant
                   Q_BLOCK_N,
@@ -1608,11 +1714,11 @@ void fused_mlp_kernel_impl(
           }
         }
         const scalar_t* __restrict__ B0 = is_woq
-        ? dequant_packed_w1_0.data_ptr<scalar_t>()
-        : packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
+            ? dequant_packed_w1_0.data_ptr<scalar_t>()
+            : packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
         const scalar_t* __restrict__ B1 = is_woq
-        ? dequant_packed_w1_1.data_ptr<scalar_t>()
-        : packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
+            ? dequant_packed_w1_1.data_ptr<scalar_t>()
+            : packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
         at::native::cpublas::brgemm(
             /* M     */ m_size,
             /* N     */ n_size,
@@ -1636,70 +1742,76 @@ void fused_mlp_kernel_impl(
             /* A     */ A,
             /* B     */ B1,
             /* C     */ C1_f);
-      }else{
+      } else {
         if (is_woq) { // Dequant loop
           uint8_t* qB0 =
               packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_0 = w1_scale + expert_id * 2* N + nb0 * BLOCK_N;
-          scalar_t* w1_zp_0 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb0 * BLOCK_N;
+          scalar_t* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
+          scalar_t* w1_zp_0 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb0 * BLOCK_N;
           // 2.a gemm: C = A @ B
-            Dequantize_and_compute(
-                    qB0 ,
-                    m_size,
-                    K,
-                    n_size,
-                    w1_scale_0,
-                    w1_zp_0,
-                    A,
-                    C0_f,
-                    Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N),
-                    sym_quant_weight); // N_GROUP_SIZE
+          Dequantize_and_compute(
+              qB0,
+              m_size,
+              K,
+              n_size,
+              w1_scale_0,
+              w1_zp_0,
+              A,
+              C0_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N),
+              sym_quant_weight); // N_GROUP_SIZE
           uint8_t* qB1 =
               packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
-          scalar_t* w1_scale_1 = w1_scale + expert_id * 2* N + nb1 * BLOCK_N;
-          scalar_t* w1_zp_1 = sym_quant_weight? nullptr : w1_zp + expert_id * 2* N + nb1 * BLOCK_N;
-            Dequantize_and_compute(
-                    qB1 ,
-                    m_size,
-                    K,
-                    n_size,
-                    w1_scale_1,
-                    w1_zp_1,
-                    A,
-                    C1_f,
-                    Q_BLOCK_N,
-                    get_n_group_size(Q_BLOCK_N),
-                    sym_quant_weight); // N_GROUP_SIZE
+          scalar_t* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
+          scalar_t* w1_zp_1 = sym_quant_weight
+              ? nullptr
+              : w1_zp + expert_id * 2 * N + nb1 * BLOCK_N;
+          Dequantize_and_compute(
+              qB1,
+              m_size,
+              K,
+              n_size,
+              w1_scale_1,
+              w1_zp_1,
+              A,
+              C1_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N),
+              sym_quant_weight); // N_GROUP_SIZE
 
-        }else{
-          const scalar_t* __restrict__ B0 = packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
+        } else {
+          const scalar_t* __restrict__ B0 =
+              packed_w1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
           torch_ipex::cpu::tinygemm_kernel<scalar_t, scalar_t>(
-            /*   A */ A,
-            /*   B */ B0 /* nb * BLOCK_N * K */,
-            /*   C */ C0_f,
-            /*scale*/ 0.f,
-            /*   M */ m_size,
-            /*   N */ n_size,
-            /*   K */ K,
-            /* lda */ K,
-            /* ldb */ n_size,
-            /* ldc */ BLOCK_N);
-          const scalar_t* __restrict__ B1 = packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
+              /*   A */ A,
+              /*   B */ B0 /* nb * BLOCK_N * K */,
+              /*   C */ C0_f,
+              /*scale*/ 0.f,
+              /*   M */ m_size,
+              /*   N */ n_size,
+              /*   K */ K,
+              /* lda */ K,
+              /* ldb */ n_size,
+              /* ldc */ BLOCK_N);
+          const scalar_t* __restrict__ B1 =
+              packed_w1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
           torch_ipex::cpu::tinygemm_kernel<scalar_t, scalar_t>(
-            /*   A */ A,
-            /*   B */ B1 /* nb * BLOCK_N * K */,
-            /*   C */ C1_f,
-            /*scale*/ 0.f,
-            /*   M */ m_size,
-            /*   N */ n_size,
-            /*   K */ K,
-            /* lda */ K,
-            /* ldb */ n_size,
-            /* ldc */ BLOCK_N);
+              /*   A */ A,
+              /*   B */ B1 /* nb * BLOCK_N * K */,
+              /*   C */ C1_f,
+              /*scale*/ 0.f,
+              /*   M */ m_size,
+              /*   N */ n_size,
+              /*   K */ K,
+              /* lda */ K,
+              /* ldb */ n_size,
+              /* ldc */ BLOCK_N);
         }
       }
- 
+
       const int offset = offsets[mb];
       if (is_woq) {
         silu_and_mul<scalar_t, Q_BLOCK_N>(
@@ -1708,11 +1820,10 @@ void fused_mlp_kernel_impl(
         silu_and_mul<scalar_t, T_BLOCK_N>(
             ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
       }
-      if(use_brgemm){
+      if (use_brgemm) {
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
   // stage 2: intermediate_cache2 = intermediate_cache1 @ w2
   //   w2 : [E, K, N] as [E, OC, IC]
@@ -1729,7 +1840,7 @@ void fused_mlp_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     // we won't be using C1 for gemm2
-    float*  C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB2;
       int nb = i % NB2;
@@ -1738,58 +1849,61 @@ void fused_mlp_kernel_impl(
       int n_size = std::min(OC - nb * BLOCK_N, BLOCK_N);
       // A ptr from ic1 of [M * topk, N] in sorted order
       // so as to avoid copy A to tmp buffer again
-      const scalar_t*  A = ic1 + offsets[mb] * N; // + nb * BLOCK_N;
+      const scalar_t* A = ic1 + offsets[mb] * N; // + nb * BLOCK_N;
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       // B shape [IC, n_size] in vnni format
       int32_t expert_id = expert_ids[mb];
-      if(use_brgemm){
+      if (use_brgemm) {
         torch::Tensor dequant_packed_w2 = torch::empty(
-          {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
+            {IC / 2, BLOCK_N, 2}, c10::CppTypeToScalarType<scalar_t>::value);
         if (is_woq) { // Dequant loop
-          uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = sym_quant_weight? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
+          uint8_t* qB =
+              packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+          scalar_t* w2_zp_ = sym_quant_weight
+              ? nullptr
+              : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           for (int k_i = 0; k_i < IC; k_i = k_i + Q_BLOCK_K) {
-            if (sym_quant_weight){
+            if (sym_quant_weight) {
               Dequantize<
-              scalar_t, // dequant dtype
-              Q_BLOCK_N,
-              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-              WOQ_DTYPE_INT8, // qw_type_
-              true, // sym_quant_w
-              false>:: // use_g_idx
-              call(
-                qB + k_i * BLOCK_N,
-                  Q_BLOCK_K,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                  0,
-                  nullptr); // g_idx_ptr
-            }else{
+                  scalar_t, // dequant dtype
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  true, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w2_scale_,
+                      w2_zp_,
+                      dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
+            } else {
               Dequantize<
-              scalar_t, // dequant dtype
-              Q_BLOCK_N,
-              get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
-              WOQ_DTYPE_INT8, // qw_type_
-              false, // sym_quant_w
-              false>:: // use_g_idx
-              call(
-                qB + k_i * BLOCK_N,
-                  Q_BLOCK_K,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
-                  0,
-                  nullptr); // g_idx_ptr
+                  scalar_t, // dequant dtype
+                  Q_BLOCK_N,
+                  get_n_group_size(Q_BLOCK_N), // N_GROUP_SIZE
+                  WOQ_DTYPE_INT8, // qw_type_
+                  false, // sym_quant_w
+                  false>:: // use_g_idx
+                  call(
+                      qB + k_i * BLOCK_N,
+                      Q_BLOCK_K,
+                      n_size,
+                      w2_scale_,
+                      w2_zp_,
+                      dequant_packed_w2.data_ptr<scalar_t>() + k_i * BLOCK_N,
+                      0,
+                      nullptr); // g_idx_ptr
             }
           }
         }
         const scalar_t* __restrict__ B = is_woq
-        ? dequant_packed_w2.data_ptr<scalar_t>()
-        : packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+            ? dequant_packed_w2.data_ptr<scalar_t>()
+            : packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
         at::native::cpublas::brgemm(
             /* M     */ m_size,
             /* N     */ n_size,
@@ -1801,27 +1915,30 @@ void fused_mlp_kernel_impl(
             /* A     */ A,
             /* B     */ B,
             /* C     */ C_f);
-      }else{
+      } else {
         if (is_woq) { // Dequant loop
           uint8_t* qB =
               packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
-          scalar_t* w2_zp_ = sym_quant_weight? nullptr : w2_zp + expert_id * OC + nb * BLOCK_N;
+          scalar_t* w2_zp_ = sym_quant_weight
+              ? nullptr
+              : w2_zp + expert_id * OC + nb * BLOCK_N;
           scalar_t* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
           // 2.a gemm: C = A @ B
           Dequantize_and_compute(
-                  qB ,
-                  m_size,
-                  IC,
-                  n_size,
-                  w2_scale_,
-                  w2_zp_,
-                  A,
-                  C_f,
-                  Q_BLOCK_N,
-                  get_n_group_size(Q_BLOCK_N),
-                  sym_quant_weight); // N_GROUP_SIZE
-        }else{
-          const scalar_t* __restrict__ B = packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+              qB,
+              m_size,
+              IC,
+              n_size,
+              w2_scale_,
+              w2_zp_,
+              A,
+              C_f,
+              Q_BLOCK_N,
+              get_n_group_size(Q_BLOCK_N),
+              sym_quant_weight); // N_GROUP_SIZE
+        } else {
+          const scalar_t* __restrict__ B =
+              packed_w2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
           torch_ipex::cpu::tinygemm_kernel<at::BFloat16, at::BFloat16>(
               /*   A */ A,
               /*   B */ B /* nb * BLOCK_N * K */,
@@ -1840,14 +1957,12 @@ void fused_mlp_kernel_impl(
       //   and also mul topk_weights in float32
       for (int m = 0; m < m_size; ++m) {
         int32_t index = A_ids[m];
-        copy_stub(
-          output + index * K + nb * BLOCK_N, C_f + m * BLOCK_N, n_size);
+        copy_stub(output + index * K + nb * BLOCK_N, C_f + m * BLOCK_N, n_size);
       }
-      if(use_brgemm){
+      if (use_brgemm) {
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
   // stage 3: out = intermediate_cache2.sum(dim=1)
   //   from [M, topk, K] to [M, K]
@@ -1888,7 +2003,6 @@ void fused_mlp_woq_da8w8_kernel_impl(
     float* w2_scale,
     int32_t* w1_compensation,
     int32_t* w2_compensation) {
-
   // handle 2 tiles per block
   uint8_t* packed_qw1 = nullptr;
   uint8_t* packed_qw2 = nullptr;
@@ -1917,8 +2031,8 @@ void fused_mlp_woq_da8w8_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     uint8_t* __restrict__ A = A_tmp + tid * BLOCK_M * K;
-    float*  C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
-    float*  C1_f = C0_f + BLOCK_M * BLOCK_N;
+    float* C0_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C1_f = C0_f + BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB;
       int nb = i % NB;
@@ -1930,26 +2044,34 @@ void fused_mlp_woq_da8w8_kernel_impl(
 
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       int m_size = offsets[mb + 1] - offsets[mb];
-      bool use_brgemm = m_size > SMALL_M_THRESHOLD && Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
+      bool use_brgemm = m_size > SMALL_M_THRESHOLD &&
+          Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
       alignas(64) float A_scale_buf[m_size * num_k_groups];
       alignas(64) int32_t A_zp_buf[m_size * num_k_groups];
 
       for (int m = 0; m < m_size; ++m) {
         int32_t index = A_ids[m] / topk;
         copy_stub(A + m * K, input + index * K, K);
-        copy_stub(A_scale_buf + m * num_k_groups, input_scales + index * num_k_groups, num_k_groups);
-        copy_stub(A_zp_buf + m * num_k_groups, input_zp + index * num_k_groups, num_k_groups);
+        copy_stub(
+            A_scale_buf + m * num_k_groups,
+            input_scales + index * num_k_groups,
+            num_k_groups);
+        copy_stub(
+            A_zp_buf + m * num_k_groups,
+            input_zp + index * num_k_groups,
+            num_k_groups);
       }
 
       uint8_t* qB0 =
           packed_qw1 + expert_id * stride_e + nb0 * BLOCK_N * stride_n;
       float* w1_scale_0 = w1_scale + expert_id * 2 * N + nb0 * BLOCK_N;
-      int32_t* w1_comp_0 = w1_compensation + expert_id * 2 * N * num_k_groups + nb0 * BLOCK_N * num_k_groups;
+      int32_t* w1_comp_0 = w1_compensation + expert_id * 2 * N * num_k_groups +
+          nb0 * BLOCK_N * num_k_groups;
       uint8_t* qB1 =
           packed_qw1 + expert_id * stride_e + nb1 * BLOCK_N * stride_n;
       float* w1_scale_1 = w1_scale + expert_id * 2 * N + nb1 * BLOCK_N;
-      int32_t* w1_comp_1 = w1_compensation + expert_id * 2 * N * num_k_groups + nb1 * BLOCK_N * num_k_groups;
-
+      int32_t* w1_comp_1 = w1_compensation + expert_id * 2 * N * num_k_groups +
+          nb1 * BLOCK_N * num_k_groups;
 
       if (use_brgemm) {
         alignas(64) int32_t* C_int32_buf0 = new int32_t[m_size * n_size * 2];
@@ -1987,18 +2109,50 @@ void fused_mlp_woq_da8w8_kernel_impl(
 
           if (k == 0) {
             _dequant_and_store</* accum */ false>(
-                C0_f, C_int32_buf0, A_scale_data, A_zp_data, w1_scale_0, B_comp_data0,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C0_f,
+                C_int32_buf0,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_0,
+                B_comp_data0,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
             _dequant_and_store</* accum */ false>(
-                C1_f, C_int32_buf1, A_scale_data, A_zp_data, w1_scale_1, B_comp_data1,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C1_f,
+                C_int32_buf1,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_1,
+                B_comp_data1,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
           } else {
             _dequant_and_store</* accum */ true>(
-                C0_f, C_int32_buf0, A_scale_data, A_zp_data, w1_scale_0, B_comp_data0,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C0_f,
+                C_int32_buf0,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_0,
+                B_comp_data0,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
             _dequant_and_store</* accum */ true>(
-                C1_f, C_int32_buf1, A_scale_data, A_zp_data, w1_scale_1, B_comp_data1,
-                m_size, n_size, BLOCK_N, num_k_groups);
+                C1_f,
+                C_int32_buf1,
+                A_scale_data,
+                A_zp_data,
+                w1_scale_1,
+                B_comp_data1,
+                m_size,
+                n_size,
+                BLOCK_N,
+                num_k_groups);
           }
         }
         delete[] C_int32_buf0;
@@ -2013,29 +2167,37 @@ void fused_mlp_woq_da8w8_kernel_impl(
               // buffer to hold int32 gemm output
               __m512i vc0 = _mm512_setzero_epi32();
               __m512i vc1 = _mm512_setzero_epi32();
-              #pragma GCC unroll 4
+#pragma GCC unroll 4
               for (int ki = k; ki < k + Q_BLOCK_K; ki += VNNI_SIZE) {
                 // load a & b and compute dot product in a block of K
                 __m512i va = _mm512_set1_epi32(*(int32_t*)(A + m * K + ki));
-                __m512i vb0 = _mm512_loadu_epi32((int32_t*)(qB0 + ki * n_size + n * VNNI_SIZE));
-                __m512i vb1 = _mm512_loadu_epi32((int32_t*)(qB1 + ki * n_size + n * VNNI_SIZE));
+                __m512i vb0 = _mm512_loadu_epi32(
+                    (int32_t*)(qB0 + ki * n_size + n * VNNI_SIZE));
+                __m512i vb1 = _mm512_loadu_epi32(
+                    (int32_t*)(qB1 + ki * n_size + n * VNNI_SIZE));
                 vc0 = _mm512_dpbusd_epi32(vc0, va, vb0);
                 vc1 = _mm512_dpbusd_epi32(vc1, va, vb1);
               }
               // compute c = c - a_zp * b_comp
-              __m512i vb_comp0 = _mm512_loadu_epi32(w1_comp_0 + k_group_idx * n_size + n);
-              __m512i vb_comp1 = _mm512_loadu_epi32(w1_comp_1 + k_group_idx * n_size + n);
-              __m512i va_zp = _mm512_set1_epi32(*(int32_t*)(A_zp_buf + m * num_k_groups + k_group_idx));
+              __m512i vb_comp0 =
+                  _mm512_loadu_epi32(w1_comp_0 + k_group_idx * n_size + n);
+              __m512i vb_comp1 =
+                  _mm512_loadu_epi32(w1_comp_1 + k_group_idx * n_size + n);
+              __m512i va_zp = _mm512_set1_epi32(
+                  *(int32_t*)(A_zp_buf + m * num_k_groups + k_group_idx));
               vc0 = _mm512_sub_epi32(vc0, _mm512_mullo_epi32(vb_comp0, va_zp));
               vc1 = _mm512_sub_epi32(vc1, _mm512_mullo_epi32(vb_comp1, va_zp));
               // compute c = c * a_scale * b_scale
               __m512 vc_float0 = _mm512_cvtepi32_ps(vc0);
               __m512 vc_float1 = _mm512_cvtepi32_ps(vc1);
-              __m512 va_scale = _mm512_set1_ps(*(float*)(A_scale_buf + m * num_k_groups + k_group_idx));
+              __m512 va_scale = _mm512_set1_ps(
+                  *(float*)(A_scale_buf + m * num_k_groups + k_group_idx));
               vc_float0 = _mm512_mul_ps(vc_float0, va_scale);
               vc_float1 = _mm512_mul_ps(vc_float1, va_scale);
-              vc_float0 =  _mm512_mul_ps(vc_float0, _mm512_loadu_ps(w1_scale_0 + n));
-              vc_float1 =  _mm512_mul_ps(vc_float1, _mm512_loadu_ps(w1_scale_1 + n));
+              vc_float0 =
+                  _mm512_mul_ps(vc_float0, _mm512_loadu_ps(w1_scale_0 + n));
+              vc_float1 =
+                  _mm512_mul_ps(vc_float1, _mm512_loadu_ps(w1_scale_1 + n));
               // reduction
               vc_accum0 = _mm512_add_ps(vc_float0, vc_accum0);
               vc_accum1 = _mm512_add_ps(vc_float1, vc_accum1);
@@ -2045,7 +2207,7 @@ void fused_mlp_woq_da8w8_kernel_impl(
           } // for n
         } // for m
       } // not brgemm
- 
+
       const int offset = offsets[mb];
       silu_and_mul<scalar_t, Q_BLOCK_N>(
           ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
@@ -2054,7 +2216,6 @@ void fused_mlp_woq_da8w8_kernel_impl(
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
 
   // stage 2: intermediate_cache2 = intermediate_cache1 @ w2
@@ -2078,8 +2239,9 @@ void fused_mlp_woq_da8w8_kernel_impl(
   auto A_dtype = torch::CppTypeToScalarType<scalar_t>();
   auto options = torch::TensorOptions().dtype(A_dtype);
   auto A2_tensor = torch::from_blob(ic1, {M_SIZE, IC}, options);
-  auto [qA_tensor, A_scale_tensor, A_zp_tensor] = dynamic_quantize_per_block<scalar_t>(
-        A2_tensor, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
+  auto [qA_tensor, A_scale_tensor, A_zp_tensor] =
+      dynamic_quantize_per_block<scalar_t>(
+          A2_tensor, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
   auto qA_buf = (uint8_t*)qA_tensor.data_ptr();
   auto A_scale_buf = (float*)A_scale_tensor.data_ptr();
   auto A_zp_buf = (int32_t*)A_zp_tensor.data_ptr();
@@ -2089,22 +2251,25 @@ void fused_mlp_woq_da8w8_kernel_impl(
     // get local pointers
     int tid = at::get_thread_num();
     // we won't be using C1 for gemm2
-    float*  C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
+    float* C_f = C_tmp_f + tid * 2 * BLOCK_M * BLOCK_N;
     for (int i = begin; i < end; ++i) {
       int mb = i / NB2;
       int nb = i % NB2;
       int m_size = offsets[mb + 1] - offsets[mb];
       int n_size = std::min(OC - nb * BLOCK_N, BLOCK_N);
-      bool use_brgemm = m_size > SMALL_M_THRESHOLD && Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
+      bool use_brgemm = m_size > SMALL_M_THRESHOLD &&
+          Q_BLOCK_K % VNNI_SIZE == 0 && n_size % 16 == 0;
       const uint8_t* qA = qA_buf + offsets[mb] * IC;
       const float* A_scale = A_scale_buf + offsets[mb] * num_k_groups;
       const int32_t* A_zp = A_zp_buf + offsets[mb] * num_k_groups;
       const int32_t* A_ids = sorted_ids + mb * BLOCK_M;
       // B shape [IC, n_size] in vnni format
       int32_t expert_id = expert_ids[mb];
-      uint8_t* qB = packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
+      uint8_t* qB =
+          packed_qw2 + expert_id * stride_e2 + nb * BLOCK_N * stride_oc;
       float* w2_scale_ = w2_scale + expert_id * OC + nb * BLOCK_N;
-      int32_t* w2_comp = w2_compensation + expert_id * OC * num_k_groups + nb * BLOCK_N * num_k_groups;
+      int32_t* w2_comp = w2_compensation + expert_id * OC * num_k_groups +
+          nb * BLOCK_N * num_k_groups;
 
       if (use_brgemm) {
         alignas(64) int32_t* C_int32_buf = new int32_t[m_size * n_size];
@@ -2125,10 +2290,28 @@ void fused_mlp_woq_da8w8_kernel_impl(
               /* C     */ C_int32_buf);
           if (k == 0) {
             _dequant_and_store</* accum */ false>(
-                C_f, C_int32_buf, A_scale + k_group_idx, A_zp + k_group_idx, w2_scale_, pB_comp, m_size, n_size, n_size, num_k_groups);
+                C_f,
+                C_int32_buf,
+                A_scale + k_group_idx,
+                A_zp + k_group_idx,
+                w2_scale_,
+                pB_comp,
+                m_size,
+                n_size,
+                n_size,
+                num_k_groups);
           } else {
             _dequant_and_store</* accum */ true>(
-                C_f, C_int32_buf, A_scale + k_group_idx, A_zp + k_group_idx, w2_scale_, pB_comp, m_size, n_size, n_size, num_k_groups);
+                C_f,
+                C_int32_buf,
+                A_scale + k_group_idx,
+                A_zp + k_group_idx,
+                w2_scale_,
+                pB_comp,
+                m_size,
+                n_size,
+                n_size,
+                num_k_groups);
           }
         }
         delete[] C_int32_buf;
@@ -2140,22 +2323,27 @@ void fused_mlp_woq_da8w8_kernel_impl(
             for (int k = 0; k < IC; k += Q_BLOCK_K) {
               int k_group_idx = k / Q_BLOCK_K;
               __m512i vc = _mm512_setzero_epi32();
-              #pragma GCC unroll 4
+#pragma GCC unroll 4
               for (int ki = k; ki < k + Q_BLOCK_K; ki += VNNI_SIZE) {
                 // load a & b and compute dot product
                 __m512i va = _mm512_set1_epi32(*(int32_t*)(qA + m * IC + ki));
-                __m512i vb = _mm512_loadu_epi8(qB + ki * n_size + n * VNNI_SIZE);
+                __m512i vb =
+                    _mm512_loadu_epi8(qB + ki * n_size + n * VNNI_SIZE);
                 vc = _mm512_dpbusd_epi32(vc, va, vb);
               }
               // compute c = c - a_zp * b_comp
-              __m512i vb_comp = _mm512_loadu_epi32(w2_comp + k_group_idx * n_size + n);
-              __m512i va_zp = _mm512_set1_epi32(*(A_zp + m * num_k_groups + k_group_idx));
+              __m512i vb_comp =
+                  _mm512_loadu_epi32(w2_comp + k_group_idx * n_size + n);
+              __m512i va_zp =
+                  _mm512_set1_epi32(*(A_zp + m * num_k_groups + k_group_idx));
               vc = _mm512_sub_epi32(vc, _mm512_mullo_epi32(vb_comp, va_zp));
               // compute c = c * a_scale * b_scale
               __m512 vc_float = _mm512_cvtepi32_ps(vc);
-              __m512 va_scale = _mm512_set1_ps(*(A_scale + m * num_k_groups + k_group_idx));
+              __m512 va_scale =
+                  _mm512_set1_ps(*(A_scale + m * num_k_groups + k_group_idx));
               vc_float = _mm512_mul_ps(vc_float, va_scale);
-              vc_float =  _mm512_mul_ps(vc_float, _mm512_loadu_ps(w2_scale_ + n));
+              vc_float =
+                  _mm512_mul_ps(vc_float, _mm512_loadu_ps(w2_scale_ + n));
               // reduction
               vc_accum = _mm512_add_ps(vc_float, vc_accum);
             } // for k
@@ -2168,14 +2356,12 @@ void fused_mlp_woq_da8w8_kernel_impl(
       //   and also mul topk_weights in float32
       for (int m = 0; m < m_size; ++m) {
         int32_t index = A_ids[m];
-        copy_stub(
-          output + index * K + nb * BLOCK_N, C_f + m * BLOCK_N, n_size);
+        copy_stub(output + index * K + nb * BLOCK_N, C_f + m * BLOCK_N, n_size);
       }
       if (use_brgemm) {
         at::native::cpublas::brgemm_release();
       }
     }
-
   });
 
   // stage 3: out = intermediate_cache2.sum(dim=1)
@@ -2256,7 +2442,7 @@ at::Tensor fused_mlp_impl(
   auto buffer = at::empty(
       {max_num_tokens_padded + max_num_blocks + (num_threads + 1) * E +
        (E + 1) + (max_num_blocks + 1)},
-       at::kInt);
+      at::kInt);
   int32_t* __restrict__ sorted_ids = buffer.data_ptr<int32_t>();
   int32_t* __restrict__ expert_ids = sorted_ids + max_num_tokens_padded;
   int32_t* __restrict__ total_cnts = expert_ids + max_num_blocks;
@@ -2299,17 +2485,27 @@ at::Tensor fused_mlp_impl(
   //   4. C_tmp : [T, 2 * BLOCK_M * BLOCK_N] x 2
 
 #if defined(CPU_CAPABILITY_AMX)
-  if (is_woq && woq_weight_dtype == WOQ_DTYPE_INT8 && woq_lowp_mode == LOWP_MODE_INT8) {
-    TORCH_CHECK(w1_scale.has_value() && w1_scale.value().defined() && w1_scale.value().scalar_type() == at::kFloat);
-    TORCH_CHECK(w2_scale.has_value() && w2_scale.value().defined() && w2_scale.value().scalar_type() == at::kFloat);
-    TORCH_CHECK(w1_compensation.has_value() && w1_compensation.value().defined() && w1_compensation.value().scalar_type() == at::kInt);
-    TORCH_CHECK(w2_compensation.has_value() && w2_compensation.value().defined() && w2_compensation.value().scalar_type() == at::kInt);
+  if (is_woq && woq_weight_dtype == WOQ_DTYPE_INT8 &&
+      woq_lowp_mode == LOWP_MODE_INT8) {
+    TORCH_CHECK(
+        w1_scale.has_value() && w1_scale.value().defined() &&
+        w1_scale.value().scalar_type() == at::kFloat);
+    TORCH_CHECK(
+        w2_scale.has_value() && w2_scale.value().defined() &&
+        w2_scale.value().scalar_type() == at::kFloat);
+    TORCH_CHECK(
+        w1_compensation.has_value() && w1_compensation.value().defined() &&
+        w1_compensation.value().scalar_type() == at::kInt);
+    TORCH_CHECK(
+        w2_compensation.has_value() && w2_compensation.value().defined() &&
+        w2_compensation.value().scalar_type() == at::kInt);
     auto buffer2 = at::empty(
         {M * topk * N + M * topk * K + /* num_threads * BLOCK_M * K + */
-        num_threads * 2 * BLOCK_M * BLOCK_N *
-            /* sizeof(float) / sizeof(scalar_t) */ 2},
+         num_threads * 2 * BLOCK_M * BLOCK_N *
+             /* sizeof(float) / sizeof(scalar_t) */ 2},
         hidden_states.options());
-    auto buffer_A_tmp = at::empty({num_threads * BLOCK_M * K}, hidden_states.options().dtype(c10::kByte));
+    auto buffer_A_tmp = at::empty(
+        {num_threads * BLOCK_M * K}, hidden_states.options().dtype(c10::kByte));
     scalar_t* __restrict__ intermediate_cache1 = buffer2.data_ptr<scalar_t>();
     scalar_t* __restrict__ intermediate_cache2 =
         intermediate_cache1 + M * topk * N;
@@ -2319,42 +2515,43 @@ at::Tensor fused_mlp_impl(
     float* __restrict__ C_tmp_f =
         (float*)((void*)(intermediate_cache2 + M * topk * K));
     int Q_BLOCK_K = packed_w1.size(3);
-    auto [q_hidden_states, qscales, qzeros] = dynamic_quantize_per_block<scalar_t>(
-        hidden_states, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
+    auto [q_hidden_states, qscales, qzeros] =
+        dynamic_quantize_per_block<scalar_t>(
+            hidden_states, Q_BLOCK_K, QUANT_A_PER_M_K_BLOCK);
     fused_mlp_woq_da8w8_kernel_impl<scalar_t>(
-      out_hidden_states.data_ptr<scalar_t>(),
-      intermediate_cache1,
-      intermediate_cache2,
-      A_tmp,
-      C_tmp,
-      C_tmp_f,
-      q_hidden_states.data_ptr<uint8_t>(),
-      qscales.data_ptr<float>(),
-      qzeros.data_ptr<int32_t>(),
-      packed_w1,
-      packed_w2,
-      sorted_ids,
-      expert_ids,
-      offsets,
-      M,
-      N,
-      K,
-      E,
-      topk,
-      num_tokens_post_pad,
-      woq_weight_dtype,
-      woq_group_size,
-      woq_lowp_mode,
-      w1_scale.value().data_ptr<float>(),
-      w2_scale.value().data_ptr<float>(),
-      w1_compensation.value().data_ptr<int32_t>(),
-      w2_compensation.value().data_ptr<int32_t>());
+        out_hidden_states.data_ptr<scalar_t>(),
+        intermediate_cache1,
+        intermediate_cache2,
+        A_tmp,
+        C_tmp,
+        C_tmp_f,
+        q_hidden_states.data_ptr<uint8_t>(),
+        qscales.data_ptr<float>(),
+        qzeros.data_ptr<int32_t>(),
+        packed_w1,
+        packed_w2,
+        sorted_ids,
+        expert_ids,
+        offsets,
+        M,
+        N,
+        K,
+        E,
+        topk,
+        num_tokens_post_pad,
+        woq_weight_dtype,
+        woq_group_size,
+        woq_lowp_mode,
+        w1_scale.value().data_ptr<float>(),
+        w2_scale.value().data_ptr<float>(),
+        w1_compensation.value().data_ptr<int32_t>(),
+        w2_compensation.value().data_ptr<int32_t>());
   } else {
 #endif
     auto buffer2 = at::empty(
         {M * topk * N + M * topk * K + num_threads * BLOCK_M * K +
-        num_threads * 2 * BLOCK_M * BLOCK_N *
-            /* sizeof(float) / sizeof(scalar_t) */ 2},
+         num_threads * 2 * BLOCK_M * BLOCK_N *
+             /* sizeof(float) / sizeof(scalar_t) */ 2},
         hidden_states.options());
     scalar_t* __restrict__ intermediate_cache1 = buffer2.data_ptr<scalar_t>();
     scalar_t* __restrict__ intermediate_cache2 =
@@ -2364,10 +2561,14 @@ at::Tensor fused_mlp_impl(
         (scalar_t*)((void*)(A_tmp + num_threads * BLOCK_M * K));
     float* __restrict__ C_tmp_f =
         (float*)((void*)(A_tmp + num_threads * BLOCK_M * K));
-    scalar_t* w1_scale_ptr = w1_scale.has_value() ? w1_scale.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w1_zp_ptr = w1_zp.has_value() ? w1_zp.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w2_scale_ptr = w2_scale.has_value() ? w2_scale.value().data_ptr<scalar_t>() : nullptr;
-    scalar_t* w2_zp_ptr = w2_zp.has_value() ? w2_zp.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w1_scale_ptr =
+        w1_scale.has_value() ? w1_scale.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w1_zp_ptr =
+        w1_zp.has_value() ? w1_zp.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w2_scale_ptr =
+        w2_scale.has_value() ? w2_scale.value().data_ptr<scalar_t>() : nullptr;
+    scalar_t* w2_zp_ptr =
+        w2_zp.has_value() ? w2_zp.value().data_ptr<scalar_t>() : nullptr;
     fused_mlp_kernel_impl<scalar_t>(
         out_hidden_states.data_ptr<scalar_t>(),
         intermediate_cache1,
@@ -2401,8 +2602,6 @@ at::Tensor fused_mlp_impl(
   }
   return out_hidden_states;
 }
-
-
 
 } // anonymous namespace
 

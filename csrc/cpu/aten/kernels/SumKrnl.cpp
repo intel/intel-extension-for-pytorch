@@ -107,9 +107,9 @@ template <typename vec_t, typename vacc_t>
 struct InnerSumCastLoadPolicy<
     vec_t,
     vacc_t,
-    std::enable_if_t<(
-        !at::vec::is_reduced_floating_point_v<
-            at::vec::vechold_type<vec_t>>)&&!std::is_same_v<vec_t, vacc_t>>> {
+    std::enable_if_t<
+        (!at::vec::is_reduced_floating_point_v<at::vec::vechold_type<vec_t>>) &&
+        !std::is_same_v<vec_t, vacc_t>>> {
   using scalar_t = at::vec::vechold_type<vec_t>;
   using acc_t = at::vec::vechold_type<vacc_t>;
 
@@ -162,9 +162,9 @@ template <typename vec_t, typename vacc_t>
 struct OuterSumCastLoadPolicy<
     vec_t,
     vacc_t,
-    std::enable_if_t<(
-        !at::vec::is_reduced_floating_point_v<
-            at::vec::vechold_type<vec_t>>)&&!std::is_same_v<vec_t, vacc_t>>> {
+    std::enable_if_t<
+        (!at::vec::is_reduced_floating_point_v<at::vec::vechold_type<vec_t>>) &&
+        !std::is_same_v<vec_t, vacc_t>>> {
   using scalar_t = at::vec::vechold_type<vec_t>;
   using acc_t = at::vec::vechold_type<vacc_t>;
 
@@ -275,9 +275,9 @@ template <typename vec_t, typename vacc_t>
 struct InnerNanSumCastLoadPolicy<
     vec_t,
     vacc_t,
-    std::enable_if_t<(
-        !at::vec::is_reduced_floating_point_v<
-            at::vec::vechold_type<vec_t>>)&&!std::is_same_v<vec_t, vacc_t>>> {
+    std::enable_if_t<
+        (!at::vec::is_reduced_floating_point_v<at::vec::vechold_type<vec_t>>) &&
+        !std::is_same_v<vec_t, vacc_t>>> {
   using scalar_t = at::vec::vechold_type<vec_t>;
   using acc_t = at::vec::vechold_type<vacc_t>;
 

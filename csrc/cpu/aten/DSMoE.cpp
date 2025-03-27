@@ -1,10 +1,10 @@
 #include "DSMoE.h"
+#include <ATen/cpu/vec/vec.h>
+#include <ATen/native/CPUBlas.h>
 #include <aten/utils/amx.h>
 #include <aten/utils/common.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include <ATen/cpu/vec/vec.h>
-#include <ATen/native/CPUBlas.h>
 namespace torch_ipex {
 namespace cpu {
 
@@ -54,42 +54,42 @@ at::Tensor fused_experts(
 }
 
 at::Tensor fused_mlp(
-  const at::Tensor& hidden_states,
-  const at::Tensor& w1,
-  const at::Tensor& w2,
-  bool inplace,
-  bool is_vnni,
-  bool is_distributed,
-  bool is_woq,
-  int64_t woq_weight_dtype,
-  int64_t woq_group_size,
-  int64_t woq_lowp_mode,
-  const std::optional<at::Tensor>& w1_scale,
-  const std::optional<at::Tensor>& w1_zp,
-  const std::optional<at::Tensor>& w1_compensation,
-  const std::optional<at::Tensor>& w2_scale,
-  const std::optional<at::Tensor>& w2_zp,
-  const std::optional<at::Tensor>& w2_compensation) {
-RECORD_FUNCTION("ipex::fused_mlp", c10::ArrayRef<c10::IValue>({}));
+    const at::Tensor& hidden_states,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    bool inplace,
+    bool is_vnni,
+    bool is_distributed,
+    bool is_woq,
+    int64_t woq_weight_dtype,
+    int64_t woq_group_size,
+    int64_t woq_lowp_mode,
+    const std::optional<at::Tensor>& w1_scale,
+    const std::optional<at::Tensor>& w1_zp,
+    const std::optional<at::Tensor>& w1_compensation,
+    const std::optional<at::Tensor>& w2_scale,
+    const std::optional<at::Tensor>& w2_zp,
+    const std::optional<at::Tensor>& w2_compensation) {
+  RECORD_FUNCTION("ipex::fused_mlp", c10::ArrayRef<c10::IValue>({}));
 
-return fused_mlp_impl_stub(
-    kCPU,
-    hidden_states,
-    w1,
-    w2,
-    inplace,
-    is_vnni,
-    is_distributed,
-    is_woq,
-    woq_weight_dtype,
-    woq_group_size,
-    woq_lowp_mode,
-    w1_scale,
-    w1_zp,
-    w1_compensation,
-    w2_scale,
-    w2_zp,
-    w2_compensation);
+  return fused_mlp_impl_stub(
+      kCPU,
+      hidden_states,
+      w1,
+      w2,
+      inplace,
+      is_vnni,
+      is_distributed,
+      is_woq,
+      woq_weight_dtype,
+      woq_group_size,
+      woq_lowp_mode,
+      w1_scale,
+      w1_zp,
+      w1_compensation,
+      w2_scale,
+      w2_zp,
+      w2_compensation);
 }
 constexpr int block_size_m() {
   return 1 * TILE_M;
@@ -116,7 +116,6 @@ inline void pack_vnni(
     }
   }
 }
-
 
 at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
   // weight : [E, OC, IC]
@@ -160,7 +159,8 @@ at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
 }
 
 // template <typename scalar_t, int SIZE>
-// inline void softmax(float* __restrict__ out, const scalar_t* __restrict__ input) {
+// inline void softmax(float* __restrict__ out, const scalar_t* __restrict__
+// input) {
 //   using bVec = at::vec::Vectorized<scalar_t>;
 //   using fVec = at::vec::Vectorized<float>;
 
@@ -223,7 +223,8 @@ at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
 //   }
 // }
 // template <typename scalar_t, int SIZE>
-// inline void sigmoid(float* __restrict__ out, const scalar_t* __restrict__ input) {
+// inline void sigmoid(float* __restrict__ out, const scalar_t* __restrict__
+// input) {
 //   using bVec = at::vec::Vectorized<scalar_t>;
 //   using fVec = at::vec::Vectorized<float>;
 
@@ -272,7 +273,9 @@ at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
 //   }
 // }
 template <typename scalar_t, int SIZE>
-inline void sigmoid(float* __restrict__ out, const scalar_t* __restrict__ input) {
+inline void sigmoid(
+    float* __restrict__ out,
+    const scalar_t* __restrict__ input) {
   using bVec = at::vec::Vectorized<scalar_t>;
   using fVec = at::vec::Vectorized<float>;
   constexpr int kVecSize = bVec::size();
@@ -299,11 +302,13 @@ inline void sigmoid(float* __restrict__ out, const scalar_t* __restrict__ input)
   // out = 1/ div_out
   if constexpr (SIZE < fVec::size()) {
     // SIZE = 1, 2, 4, 8
-    fVec x_fvec = one_fvec / (one_fvec + (zero_fvec-fVec::loadu(out, SIZE)).exp_u20());
+    fVec x_fvec =
+        one_fvec / (one_fvec + (zero_fvec - fVec::loadu(out, SIZE)).exp_u20());
     x_fvec.store(out, SIZE);
   } else {
     for (int d = 0; d < SIZE; d += fVec::size()) {
-      fVec x_fvec= one_fvec/(one_fvec + (zero_fvec-fVec::loadu(out + d)).exp_u20());
+      fVec x_fvec =
+          one_fvec / (one_fvec + (zero_fvec - fVec::loadu(out + d)).exp_u20());
       x_fvec.store(out + d);
     }
   }
@@ -320,11 +325,10 @@ void grouped_topk_kernel_impl(
     bool renormalize,
     float* __restrict__ e_score_correction_bias,
     float* routed_scaling_factor) {
-
   const int num_experts_per_group = NUM_EXPERTS / num_groups;
   parallel_for(num_tokens, [&](int begin, int end) {
-    static thread_local float  scores[NUM_EXPERTS];
-    static thread_local float  ori_scores[NUM_EXPERTS];
+    static thread_local float scores[NUM_EXPERTS];
+    static thread_local float ori_scores[NUM_EXPERTS];
     using elem_t = std::pair<float, int32_t>;
     std::vector<elem_t> queue_temp(num_groups);
     std::vector<elem_t> queue(num_groups);
@@ -336,7 +340,8 @@ void grouped_topk_kernel_impl(
       for (int g = 0; g < NUM_EXPERTS; ++g) {
         ori_scores[g] = scores[g];
         scores[g] = scores[g] + e_score_correction_bias[g];
-        // scores[g] = gating_output[i*NUM_EXPERTS + g] + e_score_correction_bias[g];
+        // scores[g] = gating_output[i*NUM_EXPERTS + g] +
+        // e_score_correction_bias[g];
       }
       // find max score per group
       for (int g = 0; g < num_groups; ++g) {
@@ -351,16 +356,20 @@ void grouped_topk_kernel_impl(
         int count_pervious_max = 1;
         float gmax = -std::numeric_limits<float>::infinity();
         for (int e = 0; e < num_experts_per_group; ++e) {
-          if(count_pervious_max == 1 && scores[g * num_experts_per_group + e] == pervious_max){
+          if (count_pervious_max == 1 &&
+              scores[g * num_experts_per_group + e] == pervious_max) {
             count_pervious_max--;
-          }else{
-              gmax = std::max(gmax, scores[g * num_experts_per_group + e]);
+          } else {
+            gmax = std::max(gmax, scores[g * num_experts_per_group + e]);
           }
         }
-        queue[g] = {gmax+pervious_max, g};
+        queue[g] = {gmax + pervious_max, g};
       }
       // find group topk
-      std::partial_sort(queue.begin(), queue.begin() + topk_group, queue.end(),
+      std::partial_sort(
+          queue.begin(),
+          queue.begin() + topk_group,
+          queue.end(),
           [](const elem_t& x, const elem_t& y) -> bool {
             return x.first > y.first;
           });
@@ -369,11 +378,15 @@ void grouped_topk_kernel_impl(
         int32_t group_idx = queue[g].second;
         for (int e = 0; e < num_experts_per_group; ++e) {
           int32_t expert_idx = group_idx * num_experts_per_group + e;
-          queue2[g * num_experts_per_group + e] = {scores[expert_idx], expert_idx};
+          queue2[g * num_experts_per_group + e] = {
+              scores[expert_idx], expert_idx};
         }
       }
       // find global topk
-      std::partial_sort(queue2.begin(), queue2.begin() + topk, queue2.end(),
+      std::partial_sort(
+          queue2.begin(),
+          queue2.begin() + topk,
+          queue2.end(),
           [](const elem_t& x, const elem_t& y) -> bool {
             return x.first > y.first;
           });
@@ -392,25 +405,25 @@ void grouped_topk_kernel_impl(
         }
       }
       for (int j = 0; j < topk; ++j) {
-        topk_weights[i * topk + j] = topk_weights[i * topk + j]*routed_scaling_factor[0];
+        topk_weights[i * topk + j] =
+            topk_weights[i * topk + j] * routed_scaling_factor[0];
       }
-    }   
+    }
   });
 }
 
-#define LAUNCH_GROUPED_TOPK_KERNEL(NE)                      \
-    grouped_topk_kernel_impl<at::BFloat16, NE>(                 \
-        topk_weights.data_ptr<float>(),                     \
-        topk_ids.data_ptr<int32_t>(),                       \
-        gating_output.data_ptr<at::BFloat16>(),                 \
-        num_tokens,                                         \
-        topk,                                               \
-        num_expert_group,                                   \
-        topk_group,                                         \
-        renormalize,                                        \
-        e_score_correction_bias.data_ptr<float>(),   \
-        routed_scaling_factor.data_ptr<float>()); 
-
+#define LAUNCH_GROUPED_TOPK_KERNEL(NE)           \
+  grouped_topk_kernel_impl<at::BFloat16, NE>(    \
+      topk_weights.data_ptr<float>(),            \
+      topk_ids.data_ptr<int32_t>(),              \
+      gating_output.data_ptr<at::BFloat16>(),    \
+      num_tokens,                                \
+      topk,                                      \
+      num_expert_group,                          \
+      topk_group,                                \
+      renormalize,                               \
+      e_score_correction_bias.data_ptr<float>(), \
+      routed_scaling_factor.data_ptr<float>());
 
 //
 std::tuple<at::Tensor, at::Tensor> grouped_topk(
@@ -422,7 +435,6 @@ std::tuple<at::Tensor, at::Tensor> grouped_topk(
     int64_t topk_group,
     at::Tensor& e_score_correction_bias,
     at::Tensor& routed_scaling_factor) {
-
   // CHECK_EQ(topk_weights.sizes(), topk_ids.sizes());
 
   const auto st = hidden_states.scalar_type();
@@ -436,17 +448,36 @@ std::tuple<at::Tensor, at::Tensor> grouped_topk(
   auto topk_weights = at::empty({num_tokens, topk}, at::kFloat);
   auto topk_ids = at::empty_like(topk_weights, at::kInt);
   // AT_DISPATCH_REDUCED_FLOATING_TYPES(st, "grouped_topk_kernel", [&] {
-  switch(num_experts) {
-    case 1:   LAUNCH_GROUPED_TOPK_KERNEL(1);   break;
-    case 2:   LAUNCH_GROUPED_TOPK_KERNEL(2);   break;
-    case 4:   LAUNCH_GROUPED_TOPK_KERNEL(4);   break;
-    case 8:   LAUNCH_GROUPED_TOPK_KERNEL(8);   break;
-    case 16:  LAUNCH_GROUPED_TOPK_KERNEL(16);  break;
-    case 32:  LAUNCH_GROUPED_TOPK_KERNEL(32);  break;
-    case 64:  LAUNCH_GROUPED_TOPK_KERNEL(64);  break;
-    case 128: LAUNCH_GROUPED_TOPK_KERNEL(128); break;
-    case 256: LAUNCH_GROUPED_TOPK_KERNEL(256); break;
-    default: TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
+  switch (num_experts) {
+    case 1:
+      LAUNCH_GROUPED_TOPK_KERNEL(1);
+      break;
+    case 2:
+      LAUNCH_GROUPED_TOPK_KERNEL(2);
+      break;
+    case 4:
+      LAUNCH_GROUPED_TOPK_KERNEL(4);
+      break;
+    case 8:
+      LAUNCH_GROUPED_TOPK_KERNEL(8);
+      break;
+    case 16:
+      LAUNCH_GROUPED_TOPK_KERNEL(16);
+      break;
+    case 32:
+      LAUNCH_GROUPED_TOPK_KERNEL(32);
+      break;
+    case 64:
+      LAUNCH_GROUPED_TOPK_KERNEL(64);
+      break;
+    case 128:
+      LAUNCH_GROUPED_TOPK_KERNEL(128);
+      break;
+    case 256:
+      LAUNCH_GROUPED_TOPK_KERNEL(256);
+      break;
+    default:
+      TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
   }
   return std::make_tuple(topk_ids, topk_weights);
   // });
@@ -465,16 +496,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.impl(
       "fused_experts", c10::DispatchKey::CPU, torch_ipex::cpu::fused_experts);
   m.def(
-        "fused_mlp(Tensor hidden_states, Tensor w1, Tensor w2, bool inplace, bool is_vnni, \
+      "fused_mlp(Tensor hidden_states, Tensor w1, Tensor w2, bool inplace, bool is_vnni, \
          bool is_distributed, bool is_woq, int woq_weight_dtype, int woq_group_size, int woq_lowp_mode, \
          Tensor? w1_scale, Tensor? w1_zp, Tensor? w1_compensation, Tensor? w2_scale, Tensor? w2_zp, Tensor? w2_compensation) -> Tensor");
-  m.impl(
-        "fused_mlp", c10::DispatchKey::CPU, torch_ipex::cpu::fused_mlp);
+  m.impl("fused_mlp", c10::DispatchKey::CPU, torch_ipex::cpu::fused_mlp);
   m.def(
-        "grouped_topk(Tensor hidden_states, Tensor gating_output, \
+      "grouped_topk(Tensor hidden_states, Tensor gating_output, \
         int topk, bool renormalize, int num_expert_group, int topk_group, Tensor e_score_correction_bias, Tensor routed_scaling_factor)  -> (Tensor, Tensor)");
-  m.impl(
-        "grouped_topk", c10::DispatchKey::CPU, torch_ipex::cpu::grouped_topk);
+  m.impl("grouped_topk", c10::DispatchKey::CPU, torch_ipex::cpu::grouped_topk);
   m.def("convert_weight_packed_bf16(Tensor weight) -> Tensor");
   m.impl(
       "convert_weight_packed_bf16",

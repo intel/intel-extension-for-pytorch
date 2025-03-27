@@ -34,29 +34,20 @@ at::Tensor decode_attention_forward_cpu(
       offset);
 }
 
-
-
 // query: [bs, cur_len, num_heads, head_size]
 // output: [bs, num_heads, cur_len, head_size_v]
 // kv_cache: [max_positions, beam_batch, kv_num_heads, head_size]
 // attn_logits: [bs, num_heads, num_kv_splits, head_size_v + 1]
 at::Tensor decode_attention_opt_forward_cpu(
-  at::Tensor& query,
-  at::Tensor& output,
-  at::Tensor& kv_cache,
-  at::Tensor& attn_logits,
-  double scaling,
-  double logit_cap,
-  int64_t offset) {
-return decode_attention_opt_kernel_stub(
-    kCPU,
-    query,
-    output,
-    kv_cache,
-    attn_logits,
-    scaling,
-    logit_cap,
-    offset);
+    at::Tensor& query,
+    at::Tensor& output,
+    at::Tensor& kv_cache,
+    at::Tensor& attn_logits,
+    double scaling,
+    double logit_cap,
+    int64_t offset) {
+  return decode_attention_opt_kernel_stub(
+      kCPU, query, output, kv_cache, attn_logits, scaling, logit_cap, offset);
 }
 } // namespace cpu
 } // namespace torch_ipex

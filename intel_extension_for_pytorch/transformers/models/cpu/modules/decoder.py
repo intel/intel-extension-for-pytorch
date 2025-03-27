@@ -49,7 +49,11 @@ def woq_quant_and_pack(weight, group_size, dtype, lowp_mode, sym_quant_weight):
         False,  # cache_weight_for_large_batch
     )
     # qweight: {N/block_n, K/block_k, block_k, block_n}
-    if dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8 and _op_context.get_weight().dim() == 4:
+    if (
+        dtype == WoqWeightDtype.INT8
+        and lowp_mode == WoqLowpMode.INT8
+        and _op_context.get_weight().dim() == 4
+    ):
         n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
         weight_view = qweight.view([n_blocks, block_n, k_blocks, block_k])
         compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
@@ -83,7 +87,11 @@ def woq_pack(plain_qweight, plain_scales, plain_zp, group_size, dtype, lowp_mode
         WoqActQuantMode.NONE,  # act_quant_mode
         False,  # cache_weight_for_large_batch
     )
-    if dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8 and _op_context.get_weight().dim() == 4:
+    if (
+        dtype == WoqWeightDtype.INT8
+        and lowp_mode == WoqLowpMode.INT8
+        and _op_context.get_weight().dim() == 4
+    ):
         n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
         weight_view = plain_qweight.view([n_blocks, block_n, k_blocks, block_k])
         compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
@@ -97,6 +105,7 @@ def woq_pack(plain_qweight, plain_scales, plain_zp, group_size, dtype, lowp_mode
         _op_context.get_zero_points(),
         compensation,
     )
+
 
 class _IPEXDecoderLayerCPU(nn.Module):
     def __init__(self, module, config, tpp=False, woq=False):
@@ -241,7 +250,10 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         self.unify_experts = True
                         self.unify_shared_expert_id = config.n_routed_experts + 1
                         print("[INFO] using unify_experts for shared MOE...")
-                    if hasattr(self, "deepseek_lowbit_load") and self.deepseek_lowbit_load:
+                    if (
+                        hasattr(self, "deepseek_lowbit_load")
+                        and self.deepseek_lowbit_load
+                    ):
                         w13_shared_qweight_list = []
                         w13_shared_scale_list = []
                         w13_shared_zp_list = []
@@ -252,26 +264,39 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         w2_shared_compensation_list = []
                         dtype = torch.bfloat16
                         self.woq_weight_dtype = module.mlp.experts[0].gate_proj.dtype
-                        self.woq_group_size = module.mlp.experts[0].gate_proj._group_size
+                        self.woq_group_size = module.mlp.experts[
+                            0
+                        ].gate_proj._group_size
                         self.woq_lowp_mode = module.mlp.experts[0].gate_proj._lowp_mode
-                        self.woq_weight_qscheme = module.mlp.experts[0].gate_proj._weight_qscheme
+                        self.woq_weight_qscheme = module.mlp.experts[
+                            0
+                        ].gate_proj._weight_qscheme
                         is_da8w8 = (
                             self.woq_weight_dtype == WoqWeightDtype.INT8
                             and self.woq_lowp_mode == WoqLowpMode.INT8
                         )
-                        assert self.woq_group_size == -1, "Block wise WOQ fusedMoE is not supported yet..."
+                        assert (
+                            self.woq_group_size == -1
+                        ), "Block wise WOQ fusedMoE is not supported yet..."
                         shared_moe_gate_proj_weight = module.mlp.shared_experts.gate_proj._op_context.to_public(
                             module.mlp.shared_experts.gate_proj._op_context.get_weight()
                         )
-                        shared_moe_gate_proj_scale = module.mlp.shared_experts.gate_proj._op_context.get_scales()
-                        shared_moe_gate_proj_zp = module.mlp.shared_experts.gate_proj._op_context.get_zero_points()
-
+                        shared_moe_gate_proj_scale = (
+                            module.mlp.shared_experts.gate_proj._op_context.get_scales()
+                        )
+                        shared_moe_gate_proj_zp = (
+                            module.mlp.shared_experts.gate_proj._op_context.get_zero_points()
+                        )
 
                         shared_moe_up_proj_weight = module.mlp.shared_experts.up_proj._op_context.to_public(
                             module.mlp.shared_experts.up_proj._op_context.get_weight()
                         )
-                        shared_moe_up_proj_scale = module.mlp.shared_experts.up_proj._op_context.get_scales()
-                        shared_moe_up_proj_zp = module.mlp.shared_experts.up_proj._op_context.get_zero_points()
+                        shared_moe_up_proj_scale = (
+                            module.mlp.shared_experts.up_proj._op_context.get_scales()
+                        )
+                        shared_moe_up_proj_zp = (
+                            module.mlp.shared_experts.up_proj._op_context.get_zero_points()
+                        )
 
                         shared_weights_list = [
                             shared_moe_gate_proj_weight,
@@ -295,9 +320,18 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             if len(shared_zp_list) > 0
                             else None
                         )
-                        pack_shared_weight, pack_shared_scale, shared_zp, shared_comp = woq_pack(
-                            concat_shared_weight, concat_shared_scale, concat_shared_zp,
-                            self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode
+                        (
+                            pack_shared_weight,
+                            pack_shared_scale,
+                            shared_zp,
+                            shared_comp,
+                        ) = woq_pack(
+                            concat_shared_weight,
+                            concat_shared_scale,
+                            concat_shared_zp,
+                            self.woq_group_size,
+                            self.woq_weight_dtype,
+                            self.woq_lowp_mode,
                         )
                         w13_shared_qweight_list.append(pack_shared_weight)
                         w13_shared_scale_list.append(pack_shared_scale)
@@ -308,15 +342,27 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
                         del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
 
-                        shared_moe_down_proj = module.mlp.shared_experts.down_proj._op_context.get_weight()
-                        shared_moe_down_proj_scale = module.mlp.shared_experts.down_proj._op_context.get_scales()
-                        shared_moe_down_proj_zp = module.mlp.shared_experts.down_proj._op_context.get_zero_points()
-                        shared_moe_down_proj_plain = module.mlp.shared_experts.down_proj._op_context.to_public(
-                            shared_moe_down_proj
+                        shared_moe_down_proj = (
+                            module.mlp.shared_experts.down_proj._op_context.get_weight()
+                        )
+                        shared_moe_down_proj_scale = (
+                            module.mlp.shared_experts.down_proj._op_context.get_scales()
+                        )
+                        shared_moe_down_proj_zp = (
+                            module.mlp.shared_experts.down_proj._op_context.get_zero_points()
+                        )
+                        shared_moe_down_proj_plain = (
+                            module.mlp.shared_experts.down_proj._op_context.to_public(
+                                shared_moe_down_proj
+                            )
                         )
                         w2_qweight, w2_scale, w2_zp, w2_comp = woq_pack(
-                            shared_moe_down_proj_plain, shared_moe_down_proj_scale, shared_moe_down_proj_zp,
-                            self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode
+                            shared_moe_down_proj_plain,
+                            shared_moe_down_proj_scale,
+                            shared_moe_down_proj_zp,
+                            self.woq_group_size,
+                            self.woq_weight_dtype,
+                            self.woq_lowp_mode,
                         )
 
                         w2_shared_qweight_list.append(w2_qweight)
@@ -327,9 +373,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             w2_shared_compensation_list.append(w2_comp)
                         del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
 
-                        self.w13_shared_weight = torch.stack(w13_shared_qweight_list).detach()
+                        self.w13_shared_weight = torch.stack(
+                            w13_shared_qweight_list
+                        ).detach()
                         self.w13_shared_scale = (
-                            torch.stack(w13_shared_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                            torch.stack(w13_shared_scale_list)
+                            .detach()
+                            .to(torch.float if is_da8w8 else dtype)
                         )
                         self.w13_shared_zp = (
                             torch.stack(w13_shared_zp_list).detach().to(dtype)
@@ -341,9 +391,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             if len(w13_shared_compensation_list) > 0
                             else None
                         )
-                        self.w2_shared_weight = torch.stack(w2_shared_qweight_list).detach()
+                        self.w2_shared_weight = torch.stack(
+                            w2_shared_qweight_list
+                        ).detach()
                         self.w2_shared_scale = (
-                            torch.stack(w2_shared_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                            torch.stack(w2_shared_scale_list)
+                            .detach()
+                            .to(torch.float if is_da8w8 else dtype)
                         )
                         self.w2_shared_zp = (
                             torch.stack(w2_shared_zp_list).detach().to(dtype)
@@ -356,29 +410,33 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             else None
                         )
 
-                        print("[INFO] Using fused shared MOE WOQ INT8 lowbit weights path...")
+                        print(
+                            "[INFO] Using fused shared MOE WOQ INT8 lowbit weights path..."
+                        )
                     else:
                         if (
-                            self.use_fused_moe or self.use_fused_moe_woq
-                        ) and self.mlp.shared_experts.w13_shared_weight.device.type != "meta":
+                            (self.use_fused_moe or self.use_fused_moe_woq)
+                            and self.mlp.shared_experts.w13_shared_weight.device.type
+                            != "meta"
+                        ):
                             dtype = self.mlp.shared_experts.w13_shared_weight.dtype
                             if not self.use_fused_moe_woq:
                                 w13_shared_weight = torch.stack(
-                                    [
-                                        self.mlp.shared_experts.w13_shared_weight
-                                    ]
+                                    [self.mlp.shared_experts.w13_shared_weight]
                                 ).detach()
                                 self.w13_shared_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(w13_shared_weight)
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
+                                        w13_shared_weight
+                                    )
                                 )
                                 del self.mlp.shared_experts.w13_shared_weight
                                 w2_shared_weight = torch.stack(
-                                    [
-                                        self.mlp.shared_experts.w2_shared_weight
-                                    ]
+                                    [self.mlp.shared_experts.w2_shared_weight]
                                 ).detach()
-                                self.w2_shared_weight = torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                    w2_shared_weight
+                                self.w2_shared_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
+                                        w2_shared_weight
+                                    )
                                 )
                                 del self.mlp.shared_experts.w2_shared_weight
                                 # dummy scale/zps
@@ -401,14 +459,25 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 self.woq_weight_dtype = self.qconfig.weight_dtype
                                 self.woq_group_size = self.qconfig.group_size
                                 self.woq_lowp_mode = self.qconfig.lowp_mode
-                                sym_quant_weight = self.qconfig.weight_qscheme == WoqWeightQScheme.SYMMETRIC
+                                sym_quant_weight = (
+                                    self.qconfig.weight_qscheme
+                                    == WoqWeightQScheme.SYMMETRIC
+                                )
                                 is_da8w8 = (
                                     self.woq_weight_dtype == WoqWeightDtype.INT8
                                     and self.woq_lowp_mode == WoqLowpMode.INT8
                                 )
-                                w13_shared_qweight, w13_shared_scale, w13_shared_zp, w13_shared_comp = woq_quant_and_pack(
+                                (
+                                    w13_shared_qweight,
+                                    w13_shared_scale,
+                                    w13_shared_zp,
+                                    w13_shared_comp,
+                                ) = woq_quant_and_pack(
                                     self.mlp.shared_experts.w13_shared_weight,
-                                    self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode, sym_quant_weight
+                                    self.woq_group_size,
+                                    self.woq_weight_dtype,
+                                    self.woq_lowp_mode,
+                                    sym_quant_weight,
                                 )
                                 del self.mlp.shared_experts.w13_shared_weight
                                 w13_shared_qweight_list.append(w13_shared_qweight)
@@ -418,9 +487,17 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 if is_da8w8 and w13_shared_comp is not None:
                                     w13_shared_compensation_list.append(w13_shared_comp)
 
-                                w2_shared_qweight, w2_shared_scale, w2_shared_zp, w2_shared_comp = woq_quant_and_pack(
+                                (
+                                    w2_shared_qweight,
+                                    w2_shared_scale,
+                                    w2_shared_zp,
+                                    w2_shared_comp,
+                                ) = woq_quant_and_pack(
                                     self.mlp.shared_experts.w2_shared_weight,
-                                    self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode, sym_quant_weight
+                                    self.woq_group_size,
+                                    self.woq_weight_dtype,
+                                    self.woq_lowp_mode,
+                                    sym_quant_weight,
                                 )
                                 del self.mlp.shared_experts.w2_shared_weight
                                 w2_shared_qweight_list.append(w2_shared_qweight)
@@ -430,9 +507,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 if w2_shared_comp is not None:
                                     w2_shared_compensation_list.append(w2_shared_comp)
 
-                                self.w13_shared_weight = torch.stack(w13_shared_qweight_list).detach()
+                                self.w13_shared_weight = torch.stack(
+                                    w13_shared_qweight_list
+                                ).detach()
                                 self.w13_shared_scale = (
-                                    torch.stack(w13_shared_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                                    torch.stack(w13_shared_scale_list)
+                                    .detach()
+                                    .to(torch.float if is_da8w8 else dtype)
                                 )
                                 self.w13_shared_zp = (
                                     torch.stack(w13_shared_zp_list).detach().to(dtype)
@@ -444,9 +525,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     if len(w13_shared_compensation_list) > 0
                                     else None
                                 )
-                                self.w2_shared_weight = torch.stack(w2_shared_qweight_list).detach()
+                                self.w2_shared_weight = torch.stack(
+                                    w2_shared_qweight_list
+                                ).detach()
                                 self.w2_shared_scale = (
-                                    torch.stack(w2_shared_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                                    torch.stack(w2_shared_scale_list)
+                                    .detach()
+                                    .to(torch.float if is_da8w8 else dtype)
                                 )
                                 self.w2_shared_zp = (
                                     torch.stack(w2_shared_zp_list).detach().to(dtype)
@@ -462,11 +547,16 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 print("[INFO] Using fused shared MOE WOQ INT8 path...")
 
                 if hasattr(self.mlp, "experts"):
-                    self.woq_weight_dtype = WoqWeightDtype.INT8 # not used if not WOQ
-                    self.woq_group_size = -1 # not used if not WOQ
-                    self.woq_lowp_mode = WoqLowpMode.NONE # not used if not WOQ
-                    self.woq_weight_qscheme = WoqWeightQScheme.UNDEFINED # not used if not WOQ
-                    if hasattr(self, "deepseek_lowbit_load") and self.deepseek_lowbit_load:
+                    self.woq_weight_dtype = WoqWeightDtype.INT8  # not used if not WOQ
+                    self.woq_group_size = -1  # not used if not WOQ
+                    self.woq_lowp_mode = WoqLowpMode.NONE  # not used if not WOQ
+                    self.woq_weight_qscheme = (
+                        WoqWeightQScheme.UNDEFINED
+                    )  # not used if not WOQ
+                    if (
+                        hasattr(self, "deepseek_lowbit_load")
+                        and self.deepseek_lowbit_load
+                    ):
                         w13_qweight_list = []
                         w13_scale_list = []
                         w13_zp_list = []
@@ -478,26 +568,46 @@ class _IPEXDecoderLayerCPU(nn.Module):
                         dtype = torch.bfloat16
 
                         self.woq_weight_dtype = module.mlp.experts[0].gate_proj.dtype
-                        self.woq_group_size = module.mlp.experts[0].gate_proj._group_size
+                        self.woq_group_size = module.mlp.experts[
+                            0
+                        ].gate_proj._group_size
                         self.woq_lowp_mode = module.mlp.experts[0].gate_proj._lowp_mode
-                        self.woq_weight_qscheme = module.mlp.experts[0].gate_proj._weight_qscheme
+                        self.woq_weight_qscheme = module.mlp.experts[
+                            0
+                        ].gate_proj._weight_qscheme
                         is_da8w8 = (
                             self.woq_weight_dtype == WoqWeightDtype.INT8
                             and self.woq_lowp_mode == WoqLowpMode.INT8
                         )
-                        assert self.woq_group_size == -1, "Block wise WOQ fusedMoE is not supported yet..."
+                        assert (
+                            self.woq_group_size == -1
+                        ), "Block wise WOQ fusedMoE is not supported yet..."
                         for idx in range(config.n_routed_experts):
-                            moe_gate_proj_weight = module.mlp.experts[idx].gate_proj._op_context.to_public(
-                                module.mlp.experts[idx].gate_proj._op_context.get_weight()
+                            moe_gate_proj_weight = module.mlp.experts[
+                                idx
+                            ].gate_proj._op_context.to_public(
+                                module.mlp.experts[
+                                    idx
+                                ].gate_proj._op_context.get_weight()
                             )
-                            moe_gate_proj_scale = module.mlp.experts[idx].gate_proj._op_context.get_scales()
-                            moe_gate_proj_zp = module.mlp.experts[idx].gate_proj._op_context.get_zero_points()
+                            moe_gate_proj_scale = module.mlp.experts[
+                                idx
+                            ].gate_proj._op_context.get_scales()
+                            moe_gate_proj_zp = module.mlp.experts[
+                                idx
+                            ].gate_proj._op_context.get_zero_points()
 
-                            moe_up_proj_weight = module.mlp.experts[idx].up_proj._op_context.to_public(
+                            moe_up_proj_weight = module.mlp.experts[
+                                idx
+                            ].up_proj._op_context.to_public(
                                 module.mlp.experts[idx].up_proj._op_context.get_weight()
                             )
-                            moe_up_proj_scale = module.mlp.experts[idx].up_proj._op_context.get_scales()
-                            moe_up_proj_zp = module.mlp.experts[idx].up_proj._op_context.get_zero_points()
+                            moe_up_proj_scale = module.mlp.experts[
+                                idx
+                            ].up_proj._op_context.get_scales()
+                            moe_up_proj_zp = module.mlp.experts[
+                                idx
+                            ].up_proj._op_context.get_zero_points()
 
                             weights_list = [
                                 moe_gate_proj_weight,
@@ -515,15 +625,19 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             concat_weight = torch.concat(weights_list, 0)
                             concat_scale = torch.concat(scale_list, 0)
                             concat_zp = (
-                                 torch.concat(zp_list, 0)
-                                 if zp_list[0] is not None
-                                 else None
+                                torch.concat(zp_list, 0)
+                                if zp_list[0] is not None
+                                else None
                             )
                             del self.__dict__["_modules"]["mlp"].experts[idx].gate_proj
                             del self.__dict__["_modules"]["mlp"].experts[idx].up_proj
                             w13_qweight, w13_scale, w13_zp, w13_comp = woq_pack(
-                                concat_weight, concat_scale, concat_zp,
-                                self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode
+                                concat_weight,
+                                concat_scale,
+                                concat_zp,
+                                self.woq_group_size,
+                                self.woq_weight_dtype,
+                                self.woq_lowp_mode,
                             )
                             w13_qweight_list.append(w13_qweight)
                             w13_scale_list.append(w13_scale)
@@ -532,15 +646,25 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             if is_da8w8 and w13_comp is not None:
                                 w13_compensation_list.append(w13_comp)
 
-                            moe_down_proj_weight = module.mlp.experts[idx].down_proj._op_context.get_weight()
-                            moe_down_proj_scale = module.mlp.experts[idx].down_proj._op_context.get_scales()
-                            moe_down_proj_zp = module.mlp.experts[idx].down_proj._op_context.get_zero_points()
-                            moe_down_proj_plain_weight = module.mlp.experts[idx].down_proj._op_context.to_public(
-                                moe_down_proj_weight
-                            )
+                            moe_down_proj_weight = module.mlp.experts[
+                                idx
+                            ].down_proj._op_context.get_weight()
+                            moe_down_proj_scale = module.mlp.experts[
+                                idx
+                            ].down_proj._op_context.get_scales()
+                            moe_down_proj_zp = module.mlp.experts[
+                                idx
+                            ].down_proj._op_context.get_zero_points()
+                            moe_down_proj_plain_weight = module.mlp.experts[
+                                idx
+                            ].down_proj._op_context.to_public(moe_down_proj_weight)
                             w2_qweight, w2_scale, w2_zp, w2_comp = woq_pack(
-                                moe_down_proj_plain_weight, moe_down_proj_scale, moe_down_proj_zp,
-                                self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode
+                                moe_down_proj_plain_weight,
+                                moe_down_proj_scale,
+                                moe_down_proj_zp,
+                                self.woq_group_size,
+                                self.woq_weight_dtype,
+                                self.woq_lowp_mode,
                             )
                             w2_qweight_list.append(moe_down_proj_weight)
                             w2_scale_list.append(moe_down_proj_scale)
@@ -558,7 +682,9 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 w13_zp_list.append(self.w13_shared_zp[0])
                                 del self.w13_shared_zp
                             if self.w13_shared_compensation is not None:
-                                w13_compensation_list.append(self.w13_shared_compensation[0])
+                                w13_compensation_list.append(
+                                    self.w13_shared_compensation[0]
+                                )
                                 del self.w13_shared_compensation
                             w2_qweight_list.append(self.w2_shared_weight[0])
                             del self.w2_shared_weight
@@ -568,10 +694,16 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 w2_zp_list.append(self.w2_shared_zp[0])
                                 del self.w2_shared_zp
                             if self.w2_shared_compensation is not None:
-                                w2_compensation_list.append(self.w2_shared_compensation[0])
+                                w2_compensation_list.append(
+                                    self.w2_shared_compensation[0]
+                                )
                                 del self.w2_shared_compensation
                         self.w13_weight = torch.stack(w13_qweight_list).detach()
-                        self.w13_scale = torch.stack(w13_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                        self.w13_scale = (
+                            torch.stack(w13_scale_list)
+                            .detach()
+                            .to(torch.float if is_da8w8 else dtype)
+                        )
                         self.w13_zp = (
                             torch.stack(w13_zp_list).detach().to(dtype)
                             if len(w13_zp_list) > 0
@@ -583,7 +715,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             else None
                         )
                         self.w2_weight = torch.stack(w2_qweight_list).detach()
-                        self.w2_scale = torch.stack(w2_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                        self.w2_scale = (
+                            torch.stack(w2_scale_list)
+                            .detach()
+                            .to(torch.float if is_da8w8 else dtype)
+                        )
                         self.w2_zp = (
                             torch.stack(w2_zp_list).detach().to(dtype)
                             if len(w2_zp_list) > 0
@@ -610,7 +746,9 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     ]
                                 ).detach()
                                 self.w13_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(w13_weight)
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
+                                        w13_weight
+                                    )
                                 )
                                 for idx in range(len(self.mlp.experts)):
                                     del self.mlp.experts[idx].w13_weight
@@ -620,8 +758,10 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                         for idx in range(len(self.mlp.experts))
                                     ]
                                 ).detach()
-                                self.w2_weight = torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                    w2_weight
+                                self.w2_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
+                                        w2_weight
+                                    )
                                 )
                                 for idx in range(len(self.mlp.experts)):
                                     del self.mlp.experts[idx].w2_weight
@@ -646,14 +786,23 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 self.woq_weight_dtype = self.qconfig.weight_dtype
                                 self.woq_group_size = self.qconfig.group_size
                                 self.woq_lowp_mode = self.qconfig.lowp_mode
-                                sym_quant_weight = self.qconfig.weight_qscheme == WoqWeightQScheme.SYMMETRIC
+                                sym_quant_weight = (
+                                    self.qconfig.weight_qscheme
+                                    == WoqWeightQScheme.SYMMETRIC
+                                )
                                 is_da8w8 = (
                                     self.woq_weight_dtype == WoqWeightDtype.INT8
                                     and self.woq_lowp_mode == WoqLowpMode.INT8
                                 )
                                 for idx in range(len(self.mlp.experts)):
-                                    w13_qweight, w13_scale, w13_zp, w13_comp = woq_quant_and_pack(
-                                        self.mlp.experts[idx].w13_weight, self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode, sym_quant_weight
+                                    w13_qweight, w13_scale, w13_zp, w13_comp = (
+                                        woq_quant_and_pack(
+                                            self.mlp.experts[idx].w13_weight,
+                                            self.woq_group_size,
+                                            self.woq_weight_dtype,
+                                            self.woq_lowp_mode,
+                                            sym_quant_weight,
+                                        )
                                     )
                                     del self.mlp.experts[idx].w13_weight
                                     w13_qweight_list.append(w13_qweight)
@@ -663,8 +812,14 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     if is_da8w8 and w13_comp is not None:
                                         w13_compensation_list.append(w13_comp)
 
-                                    w2_qweight, w2_scale, w2_zp, w2_comp = woq_quant_and_pack(
-                                        self.mlp.experts[idx].w2_weight, self.woq_group_size, self.woq_weight_dtype, self.woq_lowp_mode, sym_quant_weight
+                                    w2_qweight, w2_scale, w2_zp, w2_comp = (
+                                        woq_quant_and_pack(
+                                            self.mlp.experts[idx].w2_weight,
+                                            self.woq_group_size,
+                                            self.woq_weight_dtype,
+                                            self.woq_lowp_mode,
+                                            sym_quant_weight,
+                                        )
                                     )
                                     del self.mlp.experts[idx].w2_weight
                                     w2_qweight_list.append(w2_qweight)
@@ -683,7 +838,9 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                         w13_zp_list.append(self.w13_shared_zp[0])
                                         del self.w13_shared_zp
                                     if self.w13_shared_compensation is not None:
-                                        w13_compensation_list.append(self.w13_shared_compensation[0])
+                                        w13_compensation_list.append(
+                                            self.w13_shared_compensation[0]
+                                        )
                                         del self.w13_shared_compensation
                                     w2_qweight_list.append(self.w2_shared_weight[0])
                                     del self.w2_shared_weight
@@ -693,11 +850,15 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                         w2_zp_list.append(self.w2_shared_zp[0])
                                         del self.w2_shared_zp
                                     if self.w2_shared_compensation is not None:
-                                        w2_compensation_list.append(self.w2_shared_compensation[0])
+                                        w2_compensation_list.append(
+                                            self.w2_shared_compensation[0]
+                                        )
                                         del self.w2_shared_compensation
                                 self.w13_weight = torch.stack(w13_qweight_list).detach()
                                 self.w13_scale = (
-                                    torch.stack(w13_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                                    torch.stack(w13_scale_list)
+                                    .detach()
+                                    .to(torch.float if is_da8w8 else dtype)
                                 )
                                 self.w13_zp = (
                                     torch.stack(w13_zp_list).detach().to(dtype)
@@ -711,7 +872,9 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 )
                                 self.w2_weight = torch.stack(w2_qweight_list).detach()
                                 self.w2_scale = (
-                                    torch.stack(w2_scale_list).detach().to(torch.float if is_da8w8 else dtype)
+                                    torch.stack(w2_scale_list)
+                                    .detach()
+                                    .to(torch.float if is_da8w8 else dtype)
                                 )
                                 self.w2_zp = (
                                     torch.stack(w2_zp_list).detach().to(dtype)

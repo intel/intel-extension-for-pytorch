@@ -20,10 +20,11 @@ inline Vectorized<scalar_t> convert_from_float_ext(
 #if defined(CPU_CAPABILITY_AVX512_BF16)
 
 // at::vec::convert_from_float<>` from PyTorch doesn't have avx512-bf16
-// intrinsics use native instruction for bfloat16->float32 conversion 
-template<> 
-inline Vectorized<at::BFloat16> convert_from_float_ext<at::BFloat16>(const
-Vectorized<float>& a, const Vectorized<float>& b) {
+// intrinsics use native instruction for bfloat16->float32 conversion
+template <>
+inline Vectorized<at::BFloat16> convert_from_float_ext<at::BFloat16>(
+    const Vectorized<float>& a,
+    const Vectorized<float>& b) {
   return (__m512i)(_mm512_cvtne2ps_pbh(__m512(b), __m512(a)));
 }
 

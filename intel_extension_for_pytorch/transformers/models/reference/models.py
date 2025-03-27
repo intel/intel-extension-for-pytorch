@@ -5842,59 +5842,6 @@ def JambaForCausalLM_forward(
         output = (aux_loss,) + output
     return (loss,) + output if loss is not None else output
 
-
-# scores_for_choice = scores.view(bsz * seq_len, -1) + self.e_score_correction_bias.unsqueeze(0)
-# group_scores = (
-#     scores_for_choice.view(bsz * seq_len, self.n_group, -1).topk(2, dim=-1)[0].sum(dim = -1)
-# )  # [n, n_group]
-# group_idx = torch.topk(
-#     group_scores, k=self.topk_group, dim=-1, sorted=False
-# )[
-#     1
-# ]  # [n, top_k_group]
-# group_mask = torch.zeros_like(group_scores)  # [n, n_group]
-# group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-# score_mask = (
-#     group_mask.unsqueeze(-1)
-#     .expand(
-#         bsz * seq_len, self.n_group, self.n_routed_experts // self.n_group
-#     )
-#     .reshape(bsz * seq_len, -1)
-# )  # [n, e]
-# tmp_scores = scores_for_choice.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
-# _, topk_idx = torch.topk(
-#     tmp_scores, k=self.top_k, dim=-1, sorted=False
-# )
-# topk_weight = scores.gather(1, topk_idx)
-
-
-# group_scores = (
-#   scores.view(bsz * seq_len, self.n_group, -1).max(dim=-1).values
-# )  # [n, n_group]
-# group_idx = torch.topk(
-#   group_scores, k=self.topk_group, dim=-1, sorted=False
-# )[
-#   1
-# ]  # [n, top_k_group]
-# group_mask = torch.zeros_like(group_scores)  # [n, n_group]
-# group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-# score_mask = (
-#   group_mask.unsqueeze(-1)
-#   .expand(
-#       bsz * seq_len, self.n_group, self.n_routed_experts // self.n_group
-#   )
-#   .reshape(bsz * seq_len, -1)
-# )  # [n, e]
-# tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
-# topk_weight, topk_idx = torch.topk(
-#   tmp_scores, k=self.top_k, dim=-1, sorted=False
-# )
-
-#   m.def(
-#         "grouped_topk(Tensor topk_weights, Tensor topk_ids, Tensor hidden_states, Tensor gating_output, \
-#         int topk, bool renormalize, int num_expert_group, int topk_group, Tensor e_score_correction_bias)
-
-
 class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -5914,8 +5861,9 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
         # topk selection algorithm
         self.norm_topk_prob = config.norm_topk_prob
         self.gating_dim = config.hidden_size
-        # self.weight = module.weight
-        self.weight = torch.ops.torch_ipex.convert_weight_packed(module.weight.unsqueeze(0).detach(), True)
+        self.weight = torch.ops.torch_ipex.convert_weight_packed(
+            module.weight.unsqueeze(0).detach(), True
+        )
         self.fp8_fake_scale = torch.tensor(0).to(module.weight.dtype)
         if self.topk_method == "noaux_tc":
             self.e_score_correction_bias_2 = torch.tensor(
@@ -5928,7 +5876,13 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
 
     def forward(self, hidden_states):
         # compute gating score
-        logits = torch.ops.torch_ipex.moe_gate_bmm_forward(hidden_states, self.weight, True, torch.tensor(self.n_routed_experts), self.fp8_fake_scale)
+        logits = torch.ops.torch_ipex.moe_gate_bmm_forward(
+            hidden_states,
+            self.weight,
+            True,
+            torch.tensor(self.n_routed_experts),
+            self.fp8_fake_scale,
+        )
         # logits = torch.nn.functional.linear(hidden_states, self.weight, None)
         if self.scoring_func == "softmax":
             scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
@@ -5961,55 +5915,6 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
                 self.top_k,
             )
         elif self.topk_method == "noaux_tc":
-            # breakpoint()
-            # topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
-            #     hidden_states,
-            #     scores,
-            #     torch.tensor(self.routed_scaling_factor),
-            #     self.n_group,
-            #     self.topk_group,
-            #     self.n_routed_experts,
-            #     self.top_k,
-            #     self.e_score_correction_bias,
-            # )
-
-            # # breakpoint()
-            # n_group = 8 topk_group 4, n_routed_experts: 256, num_experts_per_tok = topk: 8,
-            # scores_for_choice = scores.view(
-            #     hidden_states.size(0), -1
-            # ) + self.e_score_correction_bias.unsqueeze(0)
-            # # breakpoint()
-            # group_scores = (
-            #     scores_for_choice.view(hidden_states.size(0), self.n_group, -1)
-            #     .topk(2, dim=-1)[0]
-            #     .sum(dim=-1)
-            # )  # [n, n_group]
-            # # breakpoint()
-            # group_idx = torch.topk(
-            #     group_scores, k=self.topk_group, dim=-1, sorted=False
-            # )[
-            #     1
-            # ]  # [n, top_k_group]
-            # group_mask = torch.zeros_like(group_scores)  # [n, n_group]
-            # group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-            # score_mask = (
-            #     group_mask.unsqueeze(-1)
-            #     .expand(
-            #         hidden_states.size(0),
-            #         self.n_group,
-            #         self.n_routed_experts // self.n_group,  # 32
-            #     )
-            #     .reshape(hidden_states.size(0), -1)
-            # )  # [n, e]
-            # tmp_scores = scores_for_choice.masked_fill(
-            #     ~score_mask.bool(), 0.0
-            # )  # [n, e]
-            # _, topk_idx = torch.topk(tmp_scores, k=self.top_k, dim=-1, sorted=False)
-            # topk_weight = scores.gather(1, topk_idx).to(torch.float)
-            # denominator = topk_weight.sum(dim=-1, keepdim=True) + 1e-20
-            # topk_weight = topk_weight / denominator
-
-            # topk_idx, topk_weight = torch.ops.torch_ipex.grouped_topk(hidden_states, scores, self.top_k, True, self.n_group, self.topk_group,  self.e_score_correction_bias_2, self.routed_scaling_factor_r1)
             topk_idx, topk_weight = torch.ops.torch_ipex.grouped_topk(
                 hidden_states,
                 scores,
@@ -6030,9 +5935,6 @@ class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
             topk_weight = topk_weight / denominator
         elif self.topk_method == "greedy":
             topk_weight = topk_weight * self.routed_scaling_factor
-
-        # if self.topk_method == "noaux_tc":
-        #     topk_weight = topk_weight * self.routed_scaling_factor
 
         aux_loss = None
         return topk_idx, topk_weight, aux_loss
