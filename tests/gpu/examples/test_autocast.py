@@ -1,3 +1,5 @@
+import unittest
+import platform
 import torch
 from torch.testing._internal.common_utils import TestCase
 
@@ -7,6 +9,13 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 checking_atol = 1e-2
 checking_rtol = 3e-2
+cpu_name = platform.processor()
+skipIfNoAvx2Vnni2 = unittest.skipIf(
+    # Arrow lake and Lunar lake
+    cpu_name == "Intel64 Family 6 Model 198 Stepping 2, GenuineIntel"
+    or cpu_name == "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+    "Skip on Arrow/Lunar lake because they do not support avx2_vnni_2",
+)
 
 
 class TestNet(torch.nn.Module):
@@ -57,6 +66,7 @@ class TestTorchMethod(TestCase):
         print(y_xpu.to("cpu"))
         self.assertEqual(y_xpu.dtype, torch.float16)
 
+    @skipIfNoAvx2Vnni2
     def test_autocast_simple_backward_bf16(self):
         model = TestNet()
         x = torch.ones([2, 3, 8, 6], dtype=torch.float)
