@@ -5838,6 +5838,7 @@ def JambaForCausalLM_forward(
         output = (aux_loss,) + output
     return (loss,) + output if loss is not None else output
 
+
 class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()

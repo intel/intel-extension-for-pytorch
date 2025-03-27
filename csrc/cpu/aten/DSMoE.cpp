@@ -158,120 +158,6 @@ at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
   return packed_weight;
 }
 
-// template <typename scalar_t, int SIZE>
-// inline void softmax(float* __restrict__ out, const scalar_t* __restrict__
-// input) {
-//   using bVec = at::vec::Vectorized<scalar_t>;
-//   using fVec = at::vec::Vectorized<float>;
-
-//   // TODO: unroll this?
-//   constexpr int kVecSize = bVec::size();
-
-//   // step 1: get max
-//   fVec max_fvec = fVec(-std::numeric_limits<float>::infinity());
-//   if constexpr (SIZE < kVecSize) {
-//     // SIZE = 1, 2, 4, 8, 16; only the top half is used
-//     bVec x_bvec = bVec::loadu(input, SIZE);
-//     fVec x_fvec0, x_fvec1;
-//     std::tie(x_fvec0, x_fvec1) = at::vec::convert_to_float(x_bvec);
-//     x_fvec0 = fVec::set(max_fvec, x_fvec0, SIZE);
-//     max_fvec = at::vec::maximum(max_fvec, x_fvec0);
-//     x_fvec0.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += kVecSize) {
-//       bVec x_bvec = bVec::loadu(input + d);
-//       fVec x_fvec0, x_fvec1;
-//       std::tie(x_fvec0, x_fvec1) = at::vec::convert_to_float(x_bvec);
-
-//       max_fvec = at::vec::maximum(max_fvec, x_fvec0);
-//       max_fvec = at::vec::maximum(max_fvec, x_fvec1);
-//       x_fvec0.store(out + d);
-//       x_fvec1.store(out + d + fVec::size());
-//     }
-//   }
-//   float max_val = vec_reduce_max(max_fvec);
-//   max_fvec = fVec(max_val);
-
-//   // step 2: sum of (x - max).exp()
-//   fVec sum_fvec = fVec(float(0));
-//   if constexpr (SIZE < fVec::size()) {
-//     // SIZE = 1, 2, 4, 8
-//     fVec x_fvec = (fVec::loadu(out, SIZE) - max_fvec).exp_u20();
-//     x_fvec = fVec::set(sum_fvec, x_fvec, SIZE);
-//     sum_fvec += x_fvec;
-//     x_fvec.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += fVec::size()) {
-//       fVec x_fvec= (fVec::loadu(out + d) - max_fvec).exp_u20();
-//       sum_fvec += x_fvec;
-//       x_fvec.store(out + d);
-//     }
-//   }
-//   float sum_val = vec_reduce_sum(sum_fvec);
-
-//   // step 3: x * (1 / sum)
-//   sum_fvec = fVec(1.f / sum_val);
-//   if constexpr (SIZE < fVec::size()) {
-//     // SIZE = 1, 2, 4, 8
-//     fVec out_fvec = fVec::loadu(out, SIZE) * sum_fvec;
-//     out_fvec.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += fVec::size()) {
-//       fVec out_fvec = fVec::loadu(out + d) * sum_fvec;
-//       out_fvec.store(out + d);
-//     }
-//   }
-// }
-// template <typename scalar_t, int SIZE>
-// inline void sigmoid(float* __restrict__ out, const scalar_t* __restrict__
-// input) {
-//   using bVec = at::vec::Vectorized<scalar_t>;
-//   using fVec = at::vec::Vectorized<float>;
-
-//   // TODO: unroll this?
-//   constexpr int kVecSize = bVec::size();
-
-//   // step 0: convert input
-//   fVec one_fvec = fVec(1.0);
-//   if constexpr (SIZE < kVecSize) {
-//     // SIZE = 1, 2, 4, 8, 16; only the top half is used
-//     bVec x_bvec = bVec::loadu(input, SIZE);
-//     fVec x_fvec0, x_fvec1;
-//     std::tie(x_fvec0, x_fvec1) = at::vec::convert_to_float(x_bvec);
-//     x_fvec0.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += kVecSize) {
-//       bVec x_bvec = bVec::loadu(input + d);
-//       fVec x_fvec0, x_fvec1;
-//       std::tie(x_fvec0, x_fvec1) = at::vec::convert_to_float(x_bvec);
-//       x_fvec0.store(out + d);
-//       x_fvec1.store(out + d + fVec::size());
-//     }
-//   }
-//   // step 1: div_out = (1 + (-x).exp())
-//   if constexpr (SIZE < fVec::size()) {
-//     // SIZE = 1, 2, 4, 8
-//     fVec x_fvec = one_fvec + (fVec::loadu(out, SIZE)).exp_u20();
-//     x_fvec.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += fVec::size()) {
-//       fVec x_fvec= one_fvec + fVec::loadu(out + d).exp_u20();
-//       x_fvec.store(out + d);
-//     }
-//   }
-
-//   // step 3: out = 1/ div_out
-//   if constexpr (SIZE < fVec::size()) {
-//     // SIZE = 1, 2, 4, 8
-//     fVec out_fvec = one_fvec / fVec::loadu(out, SIZE);
-//     out_fvec.store(out, SIZE);
-//   } else {
-//     for (int d = 0; d < SIZE; d += fVec::size()) {
-//       fVec out_fvec = one_fvec / fVec::loadu(out + d);
-//       out_fvec.store(out + d);
-//     }
-//   }
-// }
 template <typename scalar_t, int SIZE>
 inline void sigmoid(
     float* __restrict__ out,
@@ -340,8 +226,6 @@ void grouped_topk_kernel_impl(
       for (int g = 0; g < NUM_EXPERTS; ++g) {
         ori_scores[g] = scores[g];
         scores[g] = scores[g] + e_score_correction_bias[g];
-        // scores[g] = gating_output[i*NUM_EXPERTS + g] +
-        // e_score_correction_bias[g];
       }
       // find max score per group
       for (int g = 0; g < num_groups; ++g) {
@@ -435,19 +319,14 @@ std::tuple<at::Tensor, at::Tensor> grouped_topk(
     int64_t topk_group,
     at::Tensor& e_score_correction_bias,
     at::Tensor& routed_scaling_factor) {
-  // CHECK_EQ(topk_weights.sizes(), topk_ids.sizes());
-
   const auto st = hidden_states.scalar_type();
   CHECK_EQ(gating_output.scalar_type(), st);
-  // CHECK_EQ(topk_ids.scalar_type(), at::kInt);
-  // CHECK_EQ(topk_weights.scalar_type(), at::kFloat);
 
   int64_t num_tokens = hidden_states.size(0);
   int64_t num_experts = gating_output.size(1);
   TORCH_CHECK(gating_output.size(0) == num_tokens, "Number of tokens mismatch");
   auto topk_weights = at::empty({num_tokens, topk}, at::kFloat);
   auto topk_ids = at::empty_like(topk_weights, at::kInt);
-  // AT_DISPATCH_REDUCED_FLOATING_TYPES(st, "grouped_topk_kernel", [&] {
   switch (num_experts) {
     case 1:
       LAUNCH_GROUPED_TOPK_KERNEL(1);
@@ -480,7 +359,6 @@ std::tuple<at::Tensor, at::Tensor> grouped_topk(
       TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
   }
   return std::make_tuple(topk_ids, topk_weights);
-  // });
 }
 } // namespace cpu
 } // namespace torch_ipex

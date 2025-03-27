@@ -82,9 +82,6 @@ static inline void tinygemm_kernel_nn_woq(
     int ldc,
     int BLOCK_M,
     int BLOCK_N) {
-  // std::cout << "### tinygemm_kernel_nn: M = " << BLOCK_M << "; N = " <<
-  // BLOCK_N << ";  K = " << K << std::endl;
-
   constexpr int ROWS = 1;
   constexpr int COLS = 32 / 16;
 
@@ -119,8 +116,6 @@ static inline void tinygemm_kernel_nn_woq(
       }
     }
     vc[i] = _mm512_dpbf16_ps(vc[i], va, vb[col]);
-    // _mm512_storeu_ps(reinterpret_cast<__m512*>(C + row * ldc + col * 16),
-    // vc[i]);
   };
   for (int k = 0; k < K2; ++k) {
     Unroll<ROWS * COLS>{}(compute, k);
@@ -134,24 +129,6 @@ static inline void tinygemm_kernel_nn_woq(
         reinterpret_cast<__m512*>(C + row * ldc + col * 16), vc[i]);
   };
   Unroll<ROWS * COLS>{}(storec);
-  // auto storec = [&](auto i) {
-  //   constexpr int row = i / COLS;
-  //   constexpr int col = i % COLS;
-  //   // for COLS = 2, 4 use 512bit store
-  //   // for COLS = 1, 3 use 256bit store
-  //   if constexpr (COLS % 2 == 0) {
-  //     if constexpr (col % 2 == 0) {
-  //       _mm512_storeu_si512(
-  //           reinterpret_cast<__m512i*>((C + row * ldc + col * 16)),
-  //           (__m512i)(_mm512_cvtne2ps_pbh(vc[row * COLS + col + 1], vc[row *
-  //           COLS + col])));
-  //     }
-  //   } else {
-  //     _mm256_storeu_si256(
-  //         reinterpret_cast<__m256i*>(C + row * ldc + col * 16),
-  //         (__m256i)(_mm512_cvtneps_pbh(vc[i])));
-  //   }
-  // };
 }
 #else
 template <typename scalar_t, typename packed_t>
@@ -180,13 +157,6 @@ struct tinygemm_kernel_nn<at::BFloat16, at::BFloat16, BLOCK_M, BLOCK_N> {
       int lda,
       int ldb,
       int ldc) {
-    // std::cout<<"===K:"<<K<<std::endl;
-    // std::cout<<"===lda:"<<lda<<std::endl;
-    // std::cout<<"===ldb:"<<ldb<<std::endl;
-    // std::cout<<"===ldc:"<<ldc<<std::endl;
-    // std::cout << "### tinygemm_kernel_nn: M = " << BLOCK_M << "; N = " <<
-    // BLOCK_N << ";  K = " << K << std::endl;
-
     constexpr int ROWS = BLOCK_M;
     constexpr int COLS = BLOCK_N / 16;
 
@@ -221,8 +191,6 @@ struct tinygemm_kernel_nn<at::BFloat16, at::BFloat16, BLOCK_M, BLOCK_N> {
         }
       }
       vc[i] = _mm512_dpbf16_ps(vc[i], va, vb[col]);
-      // _mm512_storeu_ps(reinterpret_cast<__m512*>(C + row * ldc + col * 16),
-      // vc[i]);
     };
     for (int k = 0; k < K2; ++k) {
       Unroll<ROWS * COLS>{}(compute, k);
@@ -236,48 +204,8 @@ struct tinygemm_kernel_nn<at::BFloat16, at::BFloat16, BLOCK_M, BLOCK_N> {
           reinterpret_cast<__m512*>(C + row * ldc + col * 16), vc[i]);
     };
     Unroll<ROWS * COLS>{}(storec);
-    // auto storec = [&](auto i) {
-    //   constexpr int row = i / COLS;
-    //   constexpr int col = i % COLS;
-    //   // for COLS = 2, 4 use 512bit store
-    //   // for COLS = 1, 3 use 256bit store
-    //   if constexpr (COLS % 2 == 0) {
-    //     if constexpr (col % 2 == 0) {
-    //       _mm512_storeu_si512(
-    //           reinterpret_cast<__m512i*>((C + row * ldc + col * 16)),
-    //           (__m512i)(_mm512_cvtne2ps_pbh(vc[row * COLS + col + 1], vc[row
-    //           * COLS + col])));
-    //     }
-    //   } else {
-    //     _mm256_storeu_si256(
-    //         reinterpret_cast<__m256i*>(C + row * ldc + col * 16),
-    //         (__m256i)(_mm512_cvtneps_pbh(vc[i])));
-    //   }
-    // };
   }
 };
-// tinygemm_kernel_nn_woq(act, vbs_t, out+k*N_GROUP_SIZE, 2, 2, N_GROUP_SIZE,
-// N_GROUP_SIZE, 1 , N_GROUP_SIZE);
-
-// void print_16x16(const __m256i x) {
-//   at::BFloat16 a[16];
-//   _mm256_storeu_si256((__m256i *)a, x);
-
-//   for (int i = 0; i < 16; i++){
-//     std::cout << a[i] << " ";
-//   }
-//   std::cout << std::endl;
-// }
-
-// void print_32x16(const __m512i x) {
-//   at::BFloat16 a[32];
-//   _mm512_storeu_si512((__m512i *)a, x);
-
-//   for (int i = 0; i < 32; i++){
-//     std::cout << a[i] << " ";
-//   }
-//   std::cout << std::endl;
-// }
 
 #define MM512_SET_M256I(a, b) \
   _mm512_inserti64x4(_mm512_castsi256_si512(a), b, 1)
@@ -458,11 +386,6 @@ void tinygemm_kernel(
     int ldc
     // bool brg
 ) {
-  // if (brg) {
-  //   brgemm<scalar_t, packed_t>::apply(A, B, C, Ctmp, M, N, K, lda, ldb, ldc);
-  //   return;
-  // }
-
   // pattern: 1-8-8
   if (M == 1) {
     constexpr int BLOCK_N = 32;
@@ -668,9 +591,6 @@ static inline void dequant_n_grouped_and_compute(
         vzps = load_qparam(zps + n);
       }
       // convert to vnni: [K/2, N, 2]
-      // torch::Tensor vbs_ = torch::empty(
-      //   {1, N, 2}, c10::CppTypeToScalarType<at::BFloat16>::value);
-      // at::BFloat16*  vbs_t = vbs_.data_ptr<at::BFloat16>();
       for (int k = 0; k < K; k += 2) {
         // load and dequant qB to vb
         auto vbs_k0 = load_qint_as_fp(&qB[k * ldb + n], vscales, vzps);
@@ -691,44 +611,11 @@ static inline void dequant_n_grouped_and_compute(
           } else {
             vas_[1] = _vec_store_two_floats_as_bfloat16_no_addr(low, high);
           }
-          // vbs[i * 2 / COLS][i * 2 % COLS] = low;
-          // vbs[(i * 2 + 1) / COLS][(i * 2 + 1) % COLS] = high;
         });
-        // store vb to B: low: [k + n*2 / N, n*2 % N], high: [k +
-        // (n*2+N_GROUP_SIZE) / N, (n*2+N_GROUP_SIZE) % N]
-        // _vec_store_two_floats_as_bfloat16(vbs_t,vbs[0], vbs[1]);
-        // auto store = [&](auto p, auto vbs) {
-        //   compile_time_for<COLS / 2>::op([&](auto idx) {
-        //     _vec_store_two_floats_as_bfloat16(
-        //         p + idx * 32, vbs[idx * 2], vbs[idx * 2 + 1]);
-        //   });
-        // };
-
-        // auto store = [&](auto vbs, int id) {
-        //   compile_time_for<COLS / 2>::op([&](auto idx) {
-        //     vas_[id] = _vec_store_two_floats_as_bfloat16_no_addr(vbs[idx *
-        //     2], vbs[idx * 2 + 1]);
-        //   });
-        // };
-        // store(vbs[0], 0);
-        // // // B + (k + (n * 2) / N)*N + (n * 2) % N
-
-        // store(vbs[1], 1);
-        // store(ADDRESS(vbs_t, (n * 2) / N, (n * 2) % N, N), vbs[0]);
-        // // // B + (k + (n * 2) / N)*N + (n * 2) % N
-
-        // store(
-        //     ADDRESS(
-        //       vbs_t,
-        //         (n * 2 + N_GROUP_SIZE) / N,
-        //         (n * 2 + N_GROUP_SIZE) % N,
-        //         N),
-        //     vbs[1]);
 
         const int K2 = 2 >> 1;
         const int lda2 = 2 >> 1;
-        const int ldb2 = N; // ldb * 2 >> 1;
-        // float* b_ptr = reinterpret_cast<float*>(vbs_t);
+        const int ldb2 = N;
         const float* a_ptr = reinterpret_cast<const float*>(act + m * K + k);
         auto compute = [&](auto i, int k_) {
           constexpr int row = i / COLS_;
@@ -761,44 +648,5 @@ static inline void dequant_n_grouped_and_compute(
 #endif
 }
 
-// static inline void Dequantize_and_compute(
-// uint8_t* qB,
-// long K,
-// long N,
-// at::BFloat16* scales,
-// at::BFloat16* zps,
-// const at::BFloat16* act,
-// float* out,
-// long ldb,
-// long N_GROUP_SIZE,
-// at::BFloat16* B) {
-// #if defined(CPU_CAPABILITY_AVX512_BF16)
-// using T = at::BFloat16;
-// using VT = typename VecType<T>::type;
-// using V = VecOps<VT>;
-// // lookup table converting uint8 to float, 15.0f - 0.0f
-// // _mm512_permutexvar_ph needs 5 bits while we only need 4 bits, init the
-// // table to honor the lower 4 bits regardless of the the highest bit, thus
-// // saving an "and" op
-// VT lut;
-// lut = V::set_0_to_15();
-// dequant_n_grouped_and_compute(qB, K, N, scales, zps, act, out, 32, 32, B);
-// torch_ipex::cpu::tinygemm_kernel<at::BFloat16, at::BFloat16>(
-//   /*   A */ act,
-//   /*   B */ B/* nb * BLOCK_N * K */,
-//   /*   C */ out,
-//   /*scale*/ 0.f,
-//   /*   M */ 1,
-//   /*   N */ N,
-//   /*   K */ K,
-//   /* lda */ K,
-//   /* ldb */ N,
-//   /* ldc */ 32);
-// #else
-
-// #endif
-// }
-
-// }
 } // namespace cpu
 } // namespace torch_ipex
