@@ -9,6 +9,7 @@ namespace torch_ipex {
 namespace cpu {
 
 IPEX_DEFINE_DISPATCH(causal_conv1d_update_kernel_stub);
+IPEX_DEFINE_DISPATCH(causal_conv1d_fn_kernel_stub);
 std::vector<int64_t> calc_conv_output_size(
     at::IntArrayRef input_size,
     at::IntArrayRef kernel_size,
@@ -514,6 +515,7 @@ at::Tensor convolution_forward(
  * @param conv_weights (dim, width)
  * @param conv_bias (dim,)
  * @param silu_activation If true, apply the SiLU activation function.
+ * @param cache_seqlens (batch,) or None
  * @return (hidden_states, conv_states)
  */
 std::tuple<at::Tensor, at::Tensor> causal_conv1d_update(
@@ -521,7 +523,8 @@ std::tuple<at::Tensor, at::Tensor> causal_conv1d_update(
     const at::Tensor& conv_states,
     const at::Tensor& conv_weights,
     const c10::optional<at::Tensor>& conv_bias,
-    bool silu_activation) {
+    bool silu_activation,
+    const c10::optional<at::Tensor>& cache_seqlens) {
   RECORD_FUNCTION("causal_conv1d_update", c10::ArrayRef<c10::IValue>({}));
   return causal_conv1d_update_kernel_stub(
       kCPU,
@@ -529,6 +532,38 @@ std::tuple<at::Tensor, at::Tensor> causal_conv1d_update(
       conv_states,
       conv_weights,
       conv_bias,
+      silu_activation,
+      cache_seqlens);
+}
+
+/**
+ * Official Python implementation: causal_conv1d_ref:
+ * https://github.com/Dao-AILab/causal-conv1d/blob/main/causal_conv1d/causal_conv1d_interface.py#L133
+ * @param x (batch, dim, seqlen)
+ * @param conv_weights (dim, width)
+ * @param conv_bias (dim,)
+ * @param initial_states (batch, dim, width - 1)
+ * @param final_states_out (batch, dim, width - 1)
+ * @param silu_activation If true, apply the SiLU activation function.
+ * @return (out, final_states_out)
+ * out: (batch, dim, seqlen)
+ * final_states_out: (batch, dim, width - 1)
+ */
+std::tuple<at::Tensor, at::Tensor> causal_conv1d_fn(
+    const at::Tensor& x,
+    const at::Tensor& conv_weights,
+    const c10::optional<at::Tensor>& conv_bias,
+    const c10::optional<at::Tensor>& initial_states,
+    const c10::optional<at::Tensor>& final_states_out,
+    bool silu_activation) {
+  RECORD_FUNCTION("causal_conv1d_fn", c10::ArrayRef<c10::IValue>({}));
+  return causal_conv1d_fn_kernel_stub(
+      kCPU,
+      x,
+      conv_weights,
+      conv_bias,
+      initial_states,
+      final_states_out,
       silu_activation);
 }
 
@@ -589,11 +624,17 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::CPU,
       torch_ipex::cpu::convolution_forward_impl);
   m.def(
-      "causal_conv1d_update(Tensor hidden_states, Tensor conv_states, Tensor conv_weights, Tensor? conv_bias, bool silu_activation) -> (Tensor, Tensor)");
+      "causal_conv1d_update(Tensor hidden_states, Tensor conv_states, Tensor conv_weights, Tensor? conv_bias, bool silu_activation, Tensor? cache_seqlens=None) -> (Tensor, Tensor)");
   m.impl(
       "causal_conv1d_update",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::causal_conv1d_update);
+  m.def(
+      "causal_conv1d_fn(Tensor x, Tensor conv_weights, Tensor? conv_bias, Tensor? initial_states, Tensor? final_states_out, bool silu_activation) -> (Tensor, Tensor)");
+  m.impl(
+      "causal_conv1d_fn",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::causal_conv1d_fn);
   // bw
   m.def(
       "convolution_backward(Tensor input, Tensor weight, Tensor? bias, Tensor grad_output, bool[3] out_mask, "

@@ -116,7 +116,13 @@ parser.add_argument(
     help='Data type for kv cache storage. If "auto", will use model '
     "data type. fp8 type now supports e5m2.",
 )
-
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+)
 args = parser.parse_args()
 print(args)
 
@@ -189,14 +195,53 @@ if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
 if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
+if re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model_type = "phi4mm"
+    model_class = MODEL_CLASSES[model_type]
+    prompt = args.prompt
+    _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+    _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+    image_in_prompt = len(re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt))
+    audio_in_prompt = len(re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt))
+    is_vision = image_in_prompt > 0
+    is_speech = audio_in_prompt > 0
+    audio_batch_size = args.batch_size
+    if is_vision:
+        assert (
+            image_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple images, the user needs to \
+            insert multiple image placeholders in the prompt as below: \
+            <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+    if is_speech:
+        if not is_vision:
+            assert (
+                audio_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple audios, the user needs to \
+                insert multiple audio placeholders in the prompt as below: \
+                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+        else:
+            audio_batch_size = audio_in_prompt
+    if not is_vision and not is_speech:
+        config.input_mode = 0
+    elif is_vision and not is_speech:
+        config.input_mode = 1
+    elif not is_vision and is_speech:
+        config.input_mode = 2
+    else:
+        config.input_mode = 3
 
+    assert config.input_mode == int(
+        args.input_mode
+    ), "Input mode in prompt is not consistent with the input mode in the command line."
 if model_type != "llava":
+    config._attn_implementation = "eager"
     model = model_class[0].from_pretrained(
         args.model_id,
         torch_dtype=amp_dtype,
         config=config,
         low_cpu_mem_usage=True if model_type != "maira2" else False,
         trust_remote_code=True,
+        attn_implementation="eager",
     )
     tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 else:
@@ -244,7 +289,9 @@ elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search
             image = Image.open(image_file).convert("RGB")
         return image
 
-elif re.search("mllama", model.config.architectures[0], re.IGNORECASE):
+elif re.search("mllama", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "phi4mm", model.config.architectures[0], re.IGNORECASE
+):
     from PIL import Image
 
     def load_image(image_file):
@@ -284,10 +331,20 @@ if re.search("yuan", model.config.architectures[0], re.IGNORECASE) or re.search(
     "jamba", model.config.architectures[0], re.IGNORECASE
 ):
     model.config.batch_size = int(args.batch_size) * num_beams
+if re.search("phi4mm", model.config.architectures[0], re.IGNORECASE):
+    model.config.batch_size = int(args.batch_size) * num_beams
+    model.config.audio_batch_size = audio_batch_size * num_beams
 if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
     import librosa
 
     sample = librosa.load(args.audio, sr=16000)
+if re.search("phi4mm", model.config.architectures[0], re.IGNORECASE):
+    if config.input_mode in [2, 3]:
+        import soundfile
+
+        sample = soundfile.read(args.audio)
+    else:
+        sample = None
 
 
 def trace_handler(prof):
@@ -352,6 +409,8 @@ if args.benchmark:
             if hasattr(tokenizer, "process_reporting_input")
             else tokenizer.format_and_preprocess_reporting_input
         )
+    elif model_type == "phi4mm":
+        prompt = args.prompt
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -436,6 +495,18 @@ if args.benchmark:
                 )
                 input_ids = processed_inputs["input_ids"]
                 output = model.generate(**processed_inputs, **generate_kwargs)
+            elif model_type == "phi4mm":
+                raw_image = load_image(args.image_url) if is_vision else None
+                raw_image = [raw_image] * args.batch_size
+                samples = [sample] * audio_batch_size
+                inputs = tokenizer(
+                    text=prompt[0],
+                    images=raw_image if is_vision else None,
+                    audios=samples if is_speech else None,
+                    return_tensors="pt",
+                )
+                input_ids = inputs["input_ids"]
+                output = model.generate(**inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = model.generate(input_ids, **generate_kwargs)
@@ -443,7 +514,7 @@ if args.benchmark:
             gen_text = tokenizer.batch_decode(
                 (
                     gen_ids[:, input_ids.shape[1] :]
-                    if model_type in ["llava", "maira2"]
+                    if model_type in ["llava", "maira2", "phi4mm"]
                     else gen_ids
                 ),
                 skip_special_tokens=True,
@@ -519,6 +590,17 @@ if args.benchmark:
                             get_grounding=False,
                         )
                         output = model.generate(**processed_inputs, **generate_kwargs)
+                    elif model_type == "phi4mm":
+                        raw_image = load_image(args.image_url) if is_vision else None
+                        raw_image = [raw_image] * args.batch_size
+                        samples = [sample] * audio_batch_size
+                        inputs = tokenizer(
+                            text=prompt[0],
+                            images=raw_image if is_vision else None,
+                            audios=samples if is_speech else None,
+                            return_tensors="pt",
+                        )
+                        output = model.generate(**inputs, **generate_kwargs)
                     else:
                         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                         output = model.generate(input_ids, **generate_kwargs)

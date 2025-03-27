@@ -459,68 +459,6 @@ static IPEX_FORCE_INLINE void mul_and_sum_s16x128_to_s32x16(
   out = _mm512_add_epi32(a_0_i, a_2_i);
 }
 
-static IPEX_FORCE_INLINE void mul_and_sum_s8x128x2_to_s32x16x2(
-    __m512i& out0,
-    __m512i& out1,
-    const int8_t* a0,
-    const int8_t* b0,
-    const int8_t* a1,
-    const int8_t* b1) {
-  auto a0_0 = _mm256_loadu_si256((__m256i*)a0);
-  auto a0_1 = _mm256_loadu_si256((__m256i*)(a0 + 32));
-  auto a0_2 = _mm256_loadu_si256((__m256i*)(a0 + 64));
-  auto a0_3 = _mm256_loadu_si256((__m256i*)(a0 + 96));
-  auto b0_0 = _mm256_loadu_si256((__m256i*)b0);
-  auto b0_1 = _mm256_loadu_si256((__m256i*)(b0 + 32));
-  auto b0_2 = _mm256_loadu_si256((__m256i*)(b0 + 64));
-  auto b0_3 = _mm256_loadu_si256((__m256i*)(b0 + 96));
-  auto a0_0_i = _mm512_cvtepi8_epi16(a0_0);
-  auto a0_1_i = _mm512_cvtepi8_epi16(a0_1);
-  auto a0_2_i = _mm512_cvtepi8_epi16(a0_2);
-  auto a0_3_i = _mm512_cvtepi8_epi16(a0_3);
-  auto b0_0_i = _mm512_cvtepi8_epi16(b0_0);
-  auto b0_1_i = _mm512_cvtepi8_epi16(b0_1);
-  auto b0_2_i = _mm512_cvtepi8_epi16(b0_2);
-  auto b0_3_i = _mm512_cvtepi8_epi16(b0_3);
-  auto a1_0 = _mm256_loadu_si256((__m256i*)a1);
-  auto a1_1 = _mm256_loadu_si256((__m256i*)(a1 + 32));
-  auto a1_2 = _mm256_loadu_si256((__m256i*)(a1 + 64));
-  auto a1_3 = _mm256_loadu_si256((__m256i*)(a1 + 96));
-  auto b1_0 = _mm256_loadu_si256((__m256i*)b1);
-  auto b1_1 = _mm256_loadu_si256((__m256i*)(b1 + 32));
-  auto b1_2 = _mm256_loadu_si256((__m256i*)(b1 + 64));
-  auto b1_3 = _mm256_loadu_si256((__m256i*)(b1 + 96));
-  auto a1_0_i = _mm512_cvtepi8_epi16(a1_0);
-  auto a1_1_i = _mm512_cvtepi8_epi16(a1_1);
-  auto a1_2_i = _mm512_cvtepi8_epi16(a1_2);
-  auto a1_3_i = _mm512_cvtepi8_epi16(a1_3);
-  auto b1_0_i = _mm512_cvtepi8_epi16(b1_0);
-  auto b1_1_i = _mm512_cvtepi8_epi16(b1_1);
-  auto b1_2_i = _mm512_cvtepi8_epi16(b1_2);
-  auto b1_3_i = _mm512_cvtepi8_epi16(b1_3);
-  a0_0_i = _mm512_madd_epi16(a0_0_i, b0_0_i);
-  a0_2_i = _mm512_madd_epi16(a0_2_i, b0_2_i);
-  a1_0_i = _mm512_madd_epi16(a1_0_i, b1_0_i);
-  a1_2_i = _mm512_madd_epi16(a1_2_i, b1_2_i);
-#ifdef CPU_CAPABILITY_AVX512_VNNI
-  a0_0_i = _mm512_dpwssd_epi32(a0_0_i, a0_1_i, b0_1_i);
-  a1_0_i = _mm512_dpwssd_epi32(a1_0_i, a1_1_i, b1_1_i);
-  a0_2_i = _mm512_dpwssd_epi32(a0_2_i, a0_3_i, b0_3_i);
-  a1_2_i = _mm512_dpwssd_epi32(a1_2_i, a1_3_i, b1_3_i);
-#else
-  a0_1_i = _mm512_madd_epi16(a0_1_i, b0_1_i);
-  a0_3_i = _mm512_madd_epi16(a0_3_i, b0_3_i);
-  a1_1_i = _mm512_madd_epi16(a1_1_i, b1_1_i);
-  a1_3_i = _mm512_madd_epi16(a1_3_i, b1_3_i);
-  a0_0_i = _mm512_add_epi32(a0_0_i, a0_1_i);
-  a0_2_i = _mm512_add_epi32(a0_2_i, a0_3_i);
-  a1_0_i = _mm512_add_epi32(a1_0_i, a1_1_i);
-  a1_2_i = _mm512_add_epi32(a1_2_i, a1_3_i);
-#endif
-  out0 = _mm512_add_epi32(a0_0_i, a0_2_i);
-  out1 = _mm512_add_epi32(a1_0_i, a1_2_i);
-}
-
 static IPEX_FORCE_INLINE void mul_and_sum_s16x128x2_to_s32x16x2(
     __m512i& out0,
     __m512i& out1,
@@ -632,40 +570,6 @@ static IPEX_FORCE_INLINE void reduce_add_s32x16x16_with_scales(
   _mm_storeu_si128((__m128i*)outs, out_16);
 }
 
-static IPEX_FORCE_INLINE void reduce_add_s32x16x16x4_with_scales(
-    int8_t* outs,
-    __m512i* acc_sums,
-    const __m512 (&scales)[4]) {
-  auto l1 = reduce_add_s32x16x16(acc_sums);
-  auto l2 = reduce_add_s32x16x16(acc_sums + 16);
-  auto l3 = reduce_add_s32x16x16(acc_sums + 32);
-  auto l4 = reduce_add_s32x16x16(acc_sums + 48);
-  auto l1_f = _mm512_cvtepi32_ps(l1);
-  auto l2_f = _mm512_cvtepi32_ps(l2);
-  auto l3_f = _mm512_cvtepi32_ps(l3);
-  auto l4_f = _mm512_cvtepi32_ps(l4);
-  l1_f = _mm512_mul_round_ps(
-      l1_f, scales[0], (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
-  l2_f = _mm512_mul_round_ps(
-      l2_f, scales[1], (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
-  l3_f = _mm512_mul_round_ps(
-      l3_f, scales[2], (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
-  l4_f = _mm512_mul_round_ps(
-      l4_f, scales[3], (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
-  l1 = _mm512_cvtps_epi32(l1_f);
-  l2 = _mm512_cvtps_epi32(l2_f);
-  l3 = _mm512_cvtps_epi32(l3_f);
-  l4 = _mm512_cvtps_epi32(l4_f);
-  auto out1_16 = _mm512_cvtsepi32_epi8(l1);
-  auto out2_16 = _mm512_cvtsepi32_epi8(l2);
-  auto out3_16 = _mm512_cvtsepi32_epi8(l3);
-  auto out4_16 = _mm512_cvtsepi32_epi8(l4);
-  _mm_storeu_si128((__m128i*)outs, out1_16);
-  _mm_storeu_si128((__m128i*)(outs + 16), out2_16);
-  _mm_storeu_si128((__m128i*)(outs + 32), out3_16);
-  _mm_storeu_si128((__m128i*)(outs + 48), out4_16);
-}
-
 static IPEX_FORCE_INLINE void reduce_add_s32x16x16_with_scales_and_mask_store(
     int8_t* outs,
     __mmask16 mask,
@@ -732,10 +636,10 @@ static IPEX_FORCE_INLINE int8_t _dot_s8s8_scale_s32s8(
     float scale) {
   int32_t c = 0;
   size_t i = 0;
-  for (; i < len - 127; i += 128) {
+  for (; (i + 127) < len; i += 128) {
     c += mul_and_sum_int8_128(a + i, b + i);
   }
-  if ((len - i) > 63) {
+  if ((i + 63) < len) {
     c += mul_and_sum_int8_64(a + i, b + i);
     i += 64;
   }

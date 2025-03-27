@@ -255,6 +255,7 @@ class PagedAttentionTest(TestCase):
         seed: int,
         key_is_contiguous: bool,
         value_is_contiguous: bool,
+        flash: bool,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
@@ -284,13 +285,22 @@ class PagedAttentionTest(TestCase):
         cloned_value_cache = value_cache.clone()
 
         # Call the reshape_and_cache kernel.
-        ipex.llm.modules.PagedAttention.reshape_and_cache(
-            key,
-            value,
-            key_cache,
-            value_cache,
-            slot_mapping,
-        )
+        if flash:
+            ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+                key,
+                value,
+                key_cache,
+                value_cache,
+                slot_mapping,
+            )
+        else:
+            ipex.llm.modules.PagedAttention.reshape_and_cache(
+                key,
+                value,
+                key_cache,
+                value_cache,
+                slot_mapping,
+            )
 
         # Run the reference implementation.
         block_indicies = torch.div(slot_mapping, block_size, rounding_mode="floor")
@@ -316,6 +326,7 @@ class PagedAttentionTest(TestCase):
         dtypes = [torch.bfloat16, torch.float]
         key_modes = [True, False]
         value_modes = [True, False]
+        flashs = [True, False]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         seeds = [0]
@@ -328,6 +339,7 @@ class PagedAttentionTest(TestCase):
             seed,
             key_is_contiguous,
             value_is_contiguous,
+            flash,
         ) in product(
             num_tokens,
             num_kv_heads,
@@ -337,6 +349,7 @@ class PagedAttentionTest(TestCase):
             seeds,
             key_modes,
             value_modes,
+            flashs,
         ):
             self._test_reshape_and_cache_func(
                 num_token,
@@ -348,6 +361,7 @@ class PagedAttentionTest(TestCase):
                 seed,
                 key_is_contiguous,
                 value_is_contiguous,
+                flash,
             )
 
 

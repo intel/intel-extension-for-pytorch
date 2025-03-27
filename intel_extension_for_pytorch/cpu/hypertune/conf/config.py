@@ -191,10 +191,10 @@ class Conf(object):
                 validated_conf = schema.validate(conf)
             return validated_conf
 
-        except BaseException:
+        except BaseException as e:
             raise RuntimeError(
                 "The yaml file format is not correct. Please refer to document."
-            )
+            ) from e
 
     def _convert_conf(self, src, dst):
         hyperparam_default_val = {"launcher": launcher_hyperparam_default_val}
@@ -246,10 +246,10 @@ class Conf(object):
                 line = lineseg.group(1)
                 objective = ast.literal_eval(line)
                 objective = objective_schema.validate(objective)
-            except BaseException:
+            except BaseException as e:
                 raise RuntimeError(
                     f"Parsing @hypertune failed for line {line} of {program_fpath} file"
-                )
+                ) from e
             return objective
 
         with Path(program_fpath).open("r") as f:

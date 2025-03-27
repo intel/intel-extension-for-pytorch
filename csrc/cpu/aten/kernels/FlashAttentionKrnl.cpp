@@ -1365,20 +1365,18 @@ inline typename std::enable_if_t<use_vnni, void> cpu_flash_attention(
       });
 }
 
-#define AT_DISPATCH_MASK_TYPES(TYPE, NAME, ...)                      \
-  AT_DISPATCH_SWITCH(                                                \
-      TYPE,                                                          \
-      NAME,                                                          \
-      AT_PRIVATE_CASE_TYPE_USING_HINT(                               \
-          at::ScalarType::Bool, mask_t, __VA_ARGS__)                 \
-          AT_PRIVATE_CASE_TYPE_USING_HINT(                           \
-              at::ScalarType::Float, mask_t, __VA_ARGS__)            \
-              AT_PRIVATE_CASE_TYPE_USING_HINT(                       \
-                  at::ScalarType::Double, mask_t, __VA_ARGS__)       \
-                  AT_PRIVATE_CASE_TYPE_USING_HINT(                   \
-                      at::ScalarType::BFloat16, mask_t, __VA_ARGS__) \
-                      AT_PRIVATE_CASE_TYPE_USING_HINT(               \
-                          at::ScalarType::Half, mask_t, __VA_ARGS__))
+#define AT_DISPATCH_MASK_TYPES(TYPE, NAME, ...)                  \
+  AT_DISPATCH_SWITCH(                                            \
+      TYPE,                                                      \
+      NAME,                                                      \
+      AT_PRIVATE_CASE_TYPE_USING_HINT(                           \
+          at::ScalarType::Float, mask_t, __VA_ARGS__)            \
+          AT_PRIVATE_CASE_TYPE_USING_HINT(                       \
+              at::ScalarType::Double, mask_t, __VA_ARGS__)       \
+              AT_PRIVATE_CASE_TYPE_USING_HINT(                   \
+                  at::ScalarType::BFloat16, mask_t, __VA_ARGS__) \
+                  AT_PRIVATE_CASE_TYPE_USING_HINT(               \
+                      at::ScalarType::Half, mask_t, __VA_ARGS__))
 
 #define FLASH_ATTENTION_KERNEL(FNAME, PACK, TYPE1, TYPE2, SEQ1, SEQ2, ...) \
   if (PACK) {                                                              \
@@ -1395,10 +1393,14 @@ inline bool use_vnni(
     const int64_t num_head,
     const int64_t headSize,
     const bool is_causal) {
+#if defined(CPU_CAPABILITY_AVX512)
   if (!((dtype == at::kHalf && utils::isa_has_amx_fp16_support()) ||
-        (dtype == at::kBFloat16))) {
+        dtype == at::kBFloat16)) {
     return false;
   }
+#else
+  return false;
+#endif
   int64_t q_split_size = qSize >= 768 ? 256 : (qSize >= 192 ? 64 : 32);
   int64_t qSplitSize = q_split_size > qSize ? qSize : q_split_size;
   int64_t qSlice = (qSize - 1) / qSplitSize + 1;

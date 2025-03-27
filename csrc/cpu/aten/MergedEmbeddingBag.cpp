@@ -40,10 +40,11 @@ std::vector<Tensor> merged_embeddingbag_forward(
       torch::Dispatcher::singleton()
           .findSchemaOrThrow("torch_ipex::merged_embeddingbag_forward", "")
           .typed<decltype(merged_embeddingbag_forward)>();
-  bool cast_to_bfloat16 =
-      !at::GradMode::is_enabled() && at::kBFloat16 == get_autocast_dtype();
+  auto target_type = get_autocast_dtype();
+  bool cast_to_lowp = !at::GradMode::is_enabled() &&
+      (at::kBFloat16 == target_type || at::kHalf == target_type);
   auto casted_weights =
-      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weights) : weights;
+      cast_to_lowp ? cpu_cached_cast(target_type, weights) : weights;
   return op.call(
       casted_weights, indices, offsets, pooling_mode, include_last_offsets);
 }

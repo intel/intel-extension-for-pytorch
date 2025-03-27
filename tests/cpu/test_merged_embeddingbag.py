@@ -49,13 +49,19 @@ class TestMergedEmbedding(TestCase):
         1,
     ]
 
-    def _test_autocast(self, m: torch.nn.Module, refm: torch.nn.Module, inputs: tuple):
+    def _test_autocast(
+        self,
+        m: torch.nn.Module,
+        refm: torch.nn.Module,
+        inputs: tuple,
+        dtype: torch.dtype,
+    ):
         m.eval()
         refm.eval()
-        with torch.no_grad(), torch.cpu.amp.autocast():
+        with torch.no_grad(), torch.amp.autocast("cpu", dtype=dtype):
             out = m.forward(*inputs)
             ref_out = refm.forward(*inputs)
-        self.assertTrue(all(o.dtype is torch.bfloat16 for o in out))
+        self.assertTrue(all(o.dtype is dtype for o in out))
         # refm(embedding_bag) may not support autocast (while fallback)
         self.assertEqual(
             [o.float() for o in out], [o.float() for o in ref_out], atol=0.1, rtol=0.1
@@ -150,7 +156,12 @@ class TestMergedEmbedding(TestCase):
                             self._test_inference(m, ref_m, (indices, offsets))
 
                             if dtype == torch.float:
-                                self._test_autocast(m, ref_m, (indices, offsets))
+                                self._test_autocast(
+                                    m, ref_m, (indices, offsets), dtype=torch.bfloat16
+                                )
+                                self._test_autocast(
+                                    m, ref_m, (indices, offsets), dtype=torch.float16
+                                )
 
                             # test merged emb + cat
                             if mode == "mean":

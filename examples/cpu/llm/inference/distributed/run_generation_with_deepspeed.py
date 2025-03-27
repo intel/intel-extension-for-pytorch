@@ -226,6 +226,13 @@ parser.add_argument(
     help="Print verbose information for debugging",
 )
 
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
+)
 
 args = parser.parse_args()
 
@@ -414,6 +421,47 @@ if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generatio
 num_beams = 1 if args.greedy else 4
 if model_type in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
+if re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model_type = "phi4mm"
+    model_class = MODEL_CLASSES[model_type]
+    tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
+    prompt = args.prompt
+    _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+    _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+    image_in_prompt = len(re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt))
+    audio_in_prompt = len(re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt))
+    is_vision = image_in_prompt > 0
+    is_speech = audio_in_prompt > 0
+    audio_batch_size = args.batch_size
+    if is_vision:
+        assert (
+            image_in_prompt == args.batch_size
+        ), "Prompt is invalid. For multiple images, the user needs to insert \
+            multiple image placeholders in the prompt as below: \
+            <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+    if is_speech:
+        if not is_vision:
+            assert (
+                audio_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple audios, the user needs to insert \
+                multiple audio placeholders in the prompt as below: \
+                <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+        else:
+            audio_batch_size = audio_in_prompt
+    if not is_vision and not is_speech:
+        config.input_mode = 0
+    elif is_vision and not is_speech:
+        config.input_mode = 1
+    elif not is_vision and is_speech:
+        config.input_mode = 2
+    else:
+        config.input_mode = 3
+
+    assert config.input_mode == int(
+        args.input_mode
+    ), "Input mode in prompt is not consistent with the input mode in the command line."
+    config.batch_size = int(args.batch_size) * num_beams
+    config.audio_batch_size = audio_batch_size
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -447,6 +495,7 @@ elif world_size == 1 or model_type in [
     "yuan",
     "whisper",
     "jamba",
+    "phi4mm",
 ]:
     model = model_class[0].from_pretrained(
         model_name,
@@ -454,6 +503,7 @@ elif world_size == 1 or model_type in [
         low_cpu_mem_usage=True if model_type != "maira2" else False,
         torch_dtype=load_dtype,
         trust_remote_code=True,
+        attn_implementation="eager",
     )
 elif model_type == "maira2":
     model = model_class[0].from_pretrained(
@@ -468,7 +518,9 @@ else:  # Construct model with fake meta tensors, later will be replaced during d
         else:
             model = (
                 model_class[0]
-                .from_config(config, trust_remote_code=True)
+                .from_config(
+                    config, trust_remote_code=True, attn_implementation="eager"
+                )
                 .to(load_dtype)
             )
 
@@ -786,7 +838,24 @@ elif model_type == "mllama":
     inputs = tokenizer(raw_image, prompt, return_tensors="pt")
     input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
-    inputs = prompt
+    inputs = [prompt] * args.batch_size
+elif model_type == "phi4mm":
+    from PIL import Image
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    import soundfile
+
+    sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
+    prompt = args.prompt
+    inputs = [prompt] * args.batch_size
 elif model_type == "maira2":
     from PIL import Image
     import requests
@@ -882,6 +951,17 @@ def generate():
             get_grounding=False,
         )
         input_ids = input_tokens["input_ids"]
+    elif model_type == "phi4mm":
+        raw_image = load_image(args.image_url) if is_vision else None
+        raw_image = [raw_image] * args.batch_size
+        samples = [sample] * audio_batch_size
+        input_tokens = tokenizer(
+            text=inputs[0],
+            images=raw_image if is_vision else None,
+            audios=samples if is_speech else None,
+            return_tensors="pt",
+        )
+        input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"
@@ -908,7 +988,7 @@ def generate():
     gen_text = tokenizer.batch_decode(
         (
             gen_ids[:, input_ids.shape[1] :]
-            if model_type in ["llava", "maira2"]
+            if model_type in ["llava", "maira2", "phi4mm"]
             else gen_ids
         ),
         skip_special_tokens=True,

@@ -1123,8 +1123,8 @@ at::Tensor dil_qinteraction_kernel_impl(
             feature_size);
         _interaction_s8s8_scale_s32s8_128(
             flat_buf, feature_nums, out_in_scales, convert_to_s16_buf, cat_buf);
+        continue;
       }
-      continue;
 #endif
       for (int k = 0; k < feature_nums; k++) {
         input_addr[k] = &input_data[k][row_len];

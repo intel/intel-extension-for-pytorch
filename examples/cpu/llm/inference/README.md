@@ -43,6 +43,8 @@
 |Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ |   | ✅ | ✅ |
+|Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ |   | ✅ | ✅ |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ | ✅ |
 |Maira| microsoft/maira-2 | ✅ | ✅ |   | ✅ | ✅ |
 |Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
@@ -116,6 +118,8 @@ python run.py --help # for more detailed usages
 | generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
 | streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
 | KV Cache dtype |   default: auto, use "--kv-cache-dtype=fp8_e5m2" to enable e5m2 KV Cache. More information refer to [vLLM FP8 E5M2 KV Cache](https://docs.vllm.ai/en/v0.6.6/quantization/fp8_e5m2_kvcache.html) |
+| input mode | default: 0, use "--input-mode" to choose input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision and speech |
+| input audios | default: None, use "--audio" to choose the audio link address for speech tasks |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
@@ -220,7 +224,6 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Met
 # Assuming the pre-sharded Llama model is generated at "saved_results/llama_local_shard/" folder.
 # run_accuracy_with_deepspeed.py script is under "distributed" directory.
 cd distributed
-unset KMP_AFFINITY
 
 # Distributed inference in FP32
 deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype float32 --ipex --tasks lambada_openai
@@ -427,11 +430,7 @@ If your INT4 checkpoints are not from HuggingFace or INC, please make sure the d
 
 ### 2.2.2 Run generation in distributed way
 
-#### 2.2.2.1 Prepare:
-
-```bash
-unset KMP_AFFINITY
-```
+#### 2.2.2.1 Prologue:
 
 In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight sizes more even for better memory usage when running with DeepSpeed.
 
@@ -656,7 +655,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Met
 
 ### 3.2.2 Run in distributed way
 
-#### 3.2.2.1 Prepare:
+#### 3.2.2.1 Prologue:
 
 We provided a `run_accuracy_with_deepspeed.py` script for testing accuracy
 for the models benchmarked in distributed way via `deepspeed`.
@@ -672,7 +671,6 @@ the path of the folder of the sharded model instead of original model ID.
 ```bash
 # Run distributed accuracy with 2 ranks of one node
 cd ./distributed
-unset KMP_AFFINITY
 ```
 
 #### 3.2.2.2 FP32:

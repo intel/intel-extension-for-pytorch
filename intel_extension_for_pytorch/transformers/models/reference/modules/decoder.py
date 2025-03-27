@@ -116,6 +116,78 @@ def MllamaVisionEncoderLayer_forward(
     return outputs
 
 
+def SiglipEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor]:
+    residual = hidden_states
+
+    hidden_states = self.layer_norm1(hidden_states)
+    hidden_states, attn_weights = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        output_attentions=output_attentions,
+    )
+    if hasattr(self, "mha_linear_add"):
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.layer_norm2(hidden_states)
+    if hasattr(self, "linear_newgelu"):
+        hidden_states = self.linear_newgelu(hidden_states)
+    else:
+        hidden_states = self.mlp.fc1(hidden_states)
+        hidden_states = self.mlp.activation_fn(hidden_states)
+    if hasattr(self, "mlp_linear_add"):
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
+def ConformerEncoderLayer_forward(
+    self,
+    x,
+    pos_k,
+    pos_v,
+    mask,
+    relative_attention_bias=None,
+):
+    x = x + 0.5 * self.feed_forward_in(x)
+    norm_x = self.layer_norm_att(x)
+
+    attn_out = self.self_attn(
+        norm_x,
+        pos_k=pos_k,
+        pos_v=pos_v,
+        mask=mask,
+        relative_attention_bias=relative_attention_bias,
+    )
+    if hasattr(self, "mha_linear_add"):
+        x = self.mha_linear_add(attn_out, x)
+    else:
+        x = x + self.self_attn.linear_out(attn_out)
+    x = x + self.conv(x)
+
+    x = x + 0.5 * self.feed_forward_out(x)
+
+    out = self.layer_norm(x)
+
+    return out, pos_k, pos_v, mask
+
+
 def OPTDecoderLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -1391,6 +1463,63 @@ def Phi3DecoderLayer_forward(
     return outputs
 
 
+def PhiODecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    attn_outputs, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+        cache_position=cache_position,
+    )
+    if self.config.input_mode == 0 and hasattr(self, "mha_linear_add"):
+        hidden_states = self.mha_linear_add(attn_outputs, residual)
+    else:
+        attn_outputs = self.self_attn.o_proj(attn_outputs)
+        hidden_states = residual + self.resid_attn_dropout(attn_outputs)
+
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    # hidden_states = self.mlp(hidden_states)
+    if self.config.input_mode == 0 and hasattr(self, "linear_silu_mul"):
+        hidden_states = self.linear_silu_mul(hidden_states)
+    else:
+        up_states = self.mlp.gate_up_proj(hidden_states)
+        gate, up_states = up_states.chunk(2, dim=-1)
+        hidden_states = up_states * self.mlp.activation_fn(gate)
+    if self.config.input_mode == 0 and hasattr(self, "mlp_linear_add"):
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.down_proj(hidden_states)
+        hidden_states = residual + self.resid_mlp_dropout(hidden_states)
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 def WhisperEncoderLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -2421,6 +2550,42 @@ class _IPEXDecoderLayerRef(nn.Module):
                     )
                     del self.__dict__["_modules"]["mlp"].gate_proj
                     del self.__dict__["_modules"]["mlp"].up_proj
+        elif self.model_backbone == "Phi4MMForCausalLM":
+            if not hasattr(config, "input_mode"):
+                config.input_mode = 0
+            if config.input_mode == 0:
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(
+                        module.self_attn.o_proj.base_layer
+                    )
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                    self.mlp_linear_add = _IPEXlinearAddRef(
+                        module.mlp.down_proj.base_layer
+                    )
+                    del self.__dict__["_modules"]["mlp"].down_proj
+                if self.config.hidden_act == "silu":
+                    assert module.mlp.gate_up_proj.base_layer.out_features % 2 == 0
+
+                    gate_weights, up_weights = (
+                        module.mlp.gate_up_proj.base_layer.weight.chunk(2, dim=0)
+                    )
+                    has_bias = module.mlp.gate_up_proj.base_layer.bias is not None
+                    gate_linear = torch.nn.Linear(
+                        gate_weights.shape[1], gate_weights.shape[0], has_bias
+                    )
+                    up_linear = torch.nn.Linear(
+                        up_weights.shape[1], up_weights.shape[0], has_bias
+                    )
+                    gate_linear.weight.data = gate_weights
+                    up_linear.weight.data = up_weights
+                    if has_bias:
+                        gate_bias, up_bias = (
+                            module.mlp.gate_up_proj.base_layer.bias.chunk(2, dim=0)
+                        )
+                        gate_linear.bias.data = gate_bias
+                        up_linear.bias.data = up_bias
+                    self.linear_silu_mul = _IPEXlinearSiluMulRef(gate_linear, up_linear)
+                    del self.__dict__["_modules"]["mlp"].gate_up_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2702,6 +2867,17 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 past_key_value,
             )
+        elif self.model_backbone == "Phi4MMForCausalLM":
+            return PhiODecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+                cache_position,
+            )
         elif self.model_backbone == "WhisperForConditionalGeneration":
             if encoder_hidden_states is not None:
                 return WhisperDecoderLayer_forward(
@@ -2784,6 +2960,25 @@ class _IPEXEncoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc2
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
             del self.__dict__["_modules"]["mlp"].fc1
+        elif self.model_backbone == "Phi4MMForCausalLM":
+            self.is_vision_encoder = False
+            if module._get_name() == "SiglipEncoderLayer":
+                self.is_vision_encoder = True
+                if not self.distributed:
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                    del self.__dict__["_modules"]["mlp"].fc2
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
+                    del self.__dict__["_modules"]["self_attn"].out_proj
+                self.linear_newgelu = _IPEXlinearNewGeluRef(module.mlp.fc1)
+                del self.__dict__["_modules"]["mlp"].fc1
+            elif module._get_name() == "ConformerEncoderLayer":
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.linear_out)
+                    del self.__dict__["_modules"]["self_attn"].linear_out
+            else:
+                AssertionError(
+                    False, f"Do not support the optimization of {module._get_name()}"
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2792,6 +2987,7 @@ class _IPEXEncoderLayerRef(nn.Module):
         hidden_state: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = None,
+        **kwargs,
     ):
         if self.model_backbone == "MllamaForConditionalGeneration":
             return MllamaVisionEncoderLayer_forward(
@@ -2799,6 +2995,19 @@ class _IPEXEncoderLayerRef(nn.Module):
                 hidden_state,
                 attention_mask,
                 output_attentions,
+            )
+        elif self.model_backbone == "Phi4MMForCausalLM":
+            if self.is_vision_encoder:
+                return SiglipEncoderLayer_forward(
+                    self,
+                    hidden_state,
+                    attention_mask,
+                    output_attentions,
+                )
+            return ConformerEncoderLayer_forward(
+                self,
+                hidden_state,
+                **kwargs,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

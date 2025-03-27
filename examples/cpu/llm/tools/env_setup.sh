@@ -134,8 +134,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
                 echo "[Error] Command \"conda\" is not available."
                 exit 5
             else
-                conda install -y sysroot_linux-64 -c conda-forge
-                conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+                conda install -y sysroot_linux-64==2.28 c-compiler cxx-compiler gcc==12.3 gxx==12.3 zstd -c conda-forge
                 if [ -z ${CONDA_BUILD_SYSROOT} ]; then
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh

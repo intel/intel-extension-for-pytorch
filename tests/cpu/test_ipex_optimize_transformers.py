@@ -17,7 +17,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.46.2"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.48.0"]
     )
     import transformers
     from transformers import AutoConfig
@@ -169,12 +169,12 @@ class OptimizeTransformersTester(TestCase):
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
         return_dict = [False, True]
-        for m, torchcompile, dtype, jit, return_dict in itertools.product(
+        for m, torchcompile, dtype, jit, ret_dict in itertools.product(
             supported_models, enable_torchcompile, dtypes, deployment_mode, return_dict
         ):
             if torchcompile and deployment_mode:
                 continue
-            self.model_replacement_check(m, dtype, jit, torchcompile, return_dict)
+            self.model_replacement_check(m, dtype, jit, torchcompile, ret_dict)
         _disable_tpp()
 
     def _model_replacement_check_woq(self, model):
