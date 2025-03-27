@@ -10,9 +10,6 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearMulRef,
     _IPEXlinearSiluMulRef,
 )
-from ..fusions.linear_fusion import (
-    _IPEXConcatLinearRef,
-)
 from .....llm.functional.fusions import add_layer_norm
 from torch.nn import functional as F
 from .....utils._logger import logger, WarningType
@@ -1844,11 +1841,15 @@ def moe_infer(self, x, topk_ids, topk_weight):
                 True,  # is_vnni
                 self.distributed,  # is distributed
                 self.use_fused_moe_woq,  # is_woq
-                self.fuse_moe_woq_sym,
+                self.woq_weight_dtype,
+                self.woq_group_size,
+                self.woq_lowp_mode,
                 self.w13_scale,
                 self.w13_zp,
+                self.w13_compensation,
                 self.w2_scale,
                 self.w2_zp,
+                self.w2_compensation,
             )
         else:
             final_out = torch.ops.torch_ipex.fused_experts(
@@ -1861,11 +1862,15 @@ def moe_infer(self, x, topk_ids, topk_weight):
                 True,  # is_vnni
                 self.distributed,  # is distributed
                 self.use_fused_moe_woq,  # is_woq
-                self.fuse_moe_woq_sym,
+                self.woq_weight_dtype,
+                self.woq_group_size,
+                self.woq_lowp_mode,
                 self.w13_scale,
                 self.w13_zp,
+                self.w13_compensation,
                 self.w2_scale,
                 self.w2_zp,
+                self.w2_compensation,
             )
     else:
         if self.moe_linear_type in [0, 1]:
@@ -1934,11 +1939,15 @@ def moe_infer_shared(self, identity, hidden_states, residual):
             True,  # is_vnni
             self.distributed,  # is distributed
             self.use_fused_moe_woq,  # is_woq
-            self.fuse_moe_woq_sym,
+            self.woq_weight_dtype,
+            self.woq_group_size,
+            self.woq_lowp_mode,
             self.w13_shared_scale,
             self.w13_shared_zp,
+            self.w13_shared_compensation,
             self.w2_shared_scale,
             self.w2_shared_zp,
+            self.w2_shared_compensation,
         ).view(
             *orig_shape
         )
@@ -2365,11 +2374,12 @@ class _IPEXDecoderLayerRef(nn.Module):
                 ) and config.n_routed_experts is not None:
                     self.deepseek_lowbit_load = False
                     if (
-                        hasattr(module.mlp.experts[0].gate_proj, "_op_context")
+                        hasattr(module.mlp.experts[0], "gate_proj")
+                        and hasattr(module.mlp.experts[0].gate_proj, "_op_context")
                         and module.mlp.experts[0].gate_proj._op_context is not None
                     ):
                         self.deepseek_lowbit_load = True
-                    else:
+                    elif hasattr(module.mlp.experts[0], "gate_proj"):
                         for idx in range(config.n_routed_experts):
                             weights_list = [
                                 module.mlp.experts[idx].gate_proj.weight,

@@ -11,20 +11,24 @@ namespace cpu {
 IPEX_DEFINE_DISPATCH(fused_experts_impl_stub);
 IPEX_DEFINE_DISPATCH(fused_mlp_impl_stub);
 at::Tensor fused_experts(
-    at::Tensor& hidden_states,
-    at::Tensor& w1,
-    at::Tensor& w2,
-    at::Tensor& topk_weights,
-    at::Tensor& topk_ids,
+    const at::Tensor& hidden_states,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& topk_weights,
+    const at::Tensor& topk_ids,
     bool inplace,
     bool is_vnni,
     bool is_distributed,
     bool is_woq,
-    bool is_woq_sym,
-    at::Tensor w1_scale,
-    at::Tensor w1_zp,
-    at::Tensor w2_scale,
-    at::Tensor w2_zp) {
+    int64_t woq_weight_dtype,
+    int64_t woq_group_size,
+    int64_t woq_lowp_mode,
+    const std::optional<at::Tensor>& w1_scale,
+    const std::optional<at::Tensor>& w1_zp,
+    const std::optional<at::Tensor>& w1_compensation,
+    const std::optional<at::Tensor>& w2_scale,
+    const std::optional<at::Tensor>& w2_zp,
+    const std::optional<at::Tensor>& w2_compensation) {
   RECORD_FUNCTION("ipex::fused_experts", c10::ArrayRef<c10::IValue>({}));
 
   return fused_experts_impl_stub(
@@ -38,26 +42,34 @@ at::Tensor fused_experts(
       is_vnni,
       is_distributed,
       is_woq,
-      is_woq_sym,
+      woq_weight_dtype,
+      woq_group_size,
+      woq_lowp_mode,
       w1_scale,
       w1_zp,
+      w1_compensation,
       w2_scale,
-      w2_zp);
+      w2_zp,
+      w2_compensation);
 }
 
 at::Tensor fused_mlp(
-  at::Tensor& hidden_states,
-  at::Tensor& w1,
-  at::Tensor& w2,
+  const at::Tensor& hidden_states,
+  const at::Tensor& w1,
+  const at::Tensor& w2,
   bool inplace,
   bool is_vnni,
   bool is_distributed,
   bool is_woq,
-  bool is_woq_sym,
-  at::Tensor w1_scale,
-  at::Tensor w1_zp,
-  at::Tensor w2_scale,
-  at::Tensor w2_zp) {
+  int64_t woq_weight_dtype,
+  int64_t woq_group_size,
+  int64_t woq_lowp_mode,
+  const std::optional<at::Tensor>& w1_scale,
+  const std::optional<at::Tensor>& w1_zp,
+  const std::optional<at::Tensor>& w1_compensation,
+  const std::optional<at::Tensor>& w2_scale,
+  const std::optional<at::Tensor>& w2_zp,
+  const std::optional<at::Tensor>& w2_compensation) {
 RECORD_FUNCTION("ipex::fused_mlp", c10::ArrayRef<c10::IValue>({}));
 
 return fused_mlp_impl_stub(
@@ -69,11 +81,15 @@ return fused_mlp_impl_stub(
     is_vnni,
     is_distributed,
     is_woq,
-    is_woq_sym,
+    woq_weight_dtype,
+    woq_group_size,
+    woq_lowp_mode,
     w1_scale,
     w1_zp,
+    w1_compensation,
     w2_scale,
-    w2_zp);
+    w2_zp,
+    w2_compensation);
 }
 constexpr int block_size_m() {
   return 1 * TILE_M;
@@ -443,13 +459,15 @@ namespace {
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "fused_experts(Tensor hidden_states, Tensor w1, Tensor w2, Tensor topk_weights, \
-      Tensor topk_ids, bool inplace, bool is_vnni, \
-       bool is_distributed, bool is_woq, bool is_woq_sym, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
+       Tensor topk_ids, bool inplace, bool is_vnni, \
+       bool is_distributed, bool is_woq, int woq_weight_dtype, int woq_group_size, int woq_lowp_mode, \
+       Tensor? w1_scale, Tensor? w1_zp, Tensor? w1_compensation, Tensor? w2_scale, Tensor? w2_zp, Tensor? w2_compensation) -> Tensor");
   m.impl(
       "fused_experts", c10::DispatchKey::CPU, torch_ipex::cpu::fused_experts);
   m.def(
         "fused_mlp(Tensor hidden_states, Tensor w1, Tensor w2, bool inplace, bool is_vnni, \
-         bool is_distributed, bool is_woq, bool is_woq_sym, Tensor w1_scale, Tensor w1_zp, Tensor w2_scale, Tensor w2_zp) -> Tensor");
+         bool is_distributed, bool is_woq, int woq_weight_dtype, int woq_group_size, int woq_lowp_mode, \
+         Tensor? w1_scale, Tensor? w1_zp, Tensor? w1_compensation, Tensor? w2_scale, Tensor? w2_zp, Tensor? w2_compensation) -> Tensor");
   m.impl(
         "fused_mlp", c10::DispatchKey::CPU, torch_ipex::cpu::fused_mlp);
   m.def(

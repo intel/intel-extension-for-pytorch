@@ -3,28 +3,26 @@ import torch
 import torch.nn.functional as F
 from common_utils import TestCase
 import torch.nn as nn
+from intel_extension_for_pytorch.quantization import (
+    WoqWeightDtype,
+    WoqLowpMode,
+    WoqActQuantMode,
+    quantize_per_channel,
+    quantize_per_block,
+)
 
 torch.manual_seed(128)
 
 
-def woq_quant_and_pack(weight, group_size, is_sym=False):
-    from intel_extension_for_pytorch.quantization import (
-        WoqWeightDtype,
-        WoqLowpMode,
-        WoqActQuantMode,
-        quantize_per_channel,
-        quantize_per_block,
-    )
+def woq_quant_and_pack(weight, group_size, dtype, lowp_mode, sym_quant):
 
-    dtype = WoqWeightDtype.INT8
-    assert group_size == -1, "current fused MOE WOQ only support group size = -1"
     if group_size == -1:
         qweight, scales, zero_points = quantize_per_channel(
-            weight, dtype, None, None, is_sym
+            weight, dtype, None, None, sym_quant
         )
     else:
         qweight, scales, zero_points = quantize_per_block(
-            weight, dtype, group_size, None, None, is_sym
+            weight, dtype, group_size, None, None, sym_quant
         )
 
     _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
@@ -37,17 +35,22 @@ def woq_quant_and_pack(weight, group_size, is_sym=False):
         None,  # g_idx
         None,  # batch size
         group_size,
-        WoqLowpMode.BF16,  # lowp-mode
-        WoqActQuantMode.NONE,  # act_quant_mode
+        lowp_mode,
+        WoqActQuantMode.PER_BATCH_IC_BLOCK,  # act_quant_mode
         False,  # cache_weight_for_large_batch
     )
     # qweight: {N/block_n, K/block_k, block_k, block_n}
-    return (
-        _op_context.get_weight(),
-        _op_context.get_scales(),
-        _op_context.get_zero_points(),
-        _op_context,
-    )
+    if dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8 and _op_context.get_weight().dim() == 4:
+        n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
+        weight_view = qweight.view([n_blocks, block_n, k_blocks, block_k])
+        compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
+        compensation = compensation.permute([0, 2, 1]).contiguous()
+    else:
+        compensation = None
+    qweight = _op_context.get_weight()
+    scale = _op_context.get_scales()
+    zero_point = _op_context.get_zero_points()
+    return (qweight, scale, zero_point, compensation, _op_context)
 
 
 pres = {
@@ -197,7 +200,8 @@ def torch_naive_moe(a, w1, w2, score, topk, renormalize):
 
 
 def ipex_default_woq_moe(
-    a, w1_list, w3_list, w2_list, score, topk, renormalize, is_woq_sym=False
+    a, w1_list, w3_list, w2_list, score, topk, renormalize,
+    group_size=-1, weight_dtype=WoqWeightDtype.INT8, lowp_mode=WoqLowpMode.BF16, sym_quant_weight=False
 ):
     G = 1
     topk_group = 1
@@ -212,16 +216,15 @@ def ipex_default_woq_moe(
     gate_ctx = []
     up_ctx = []
     down_ctx = []
-    group_size = -1
     for expert_idx in range(E):
-        _, _, _, w1_op_context = woq_quant_and_pack(
-            w1_list[expert_idx], group_size, is_woq_sym
+        *_, w1_op_context = woq_quant_and_pack(
+            w1_list[expert_idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
         )
-        _, _, _, w3_op_context = woq_quant_and_pack(
-            w3_list[expert_idx], group_size, is_woq_sym
+        *_, w3_op_context = woq_quant_and_pack(
+            w3_list[expert_idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
         )
-        _, _, _, w2_op_context = woq_quant_and_pack(
-            w2_list[expert_idx], group_size, is_woq_sym
+        *_, w2_op_context = woq_quant_and_pack(
+            w2_list[expert_idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
         )
         gate_ctx.append(w1_op_context)
         up_ctx.append(w3_op_context)
@@ -416,7 +419,7 @@ class DeepSeekTester(TestCase):
     # testing fusedMoE modules
     def test_fused_moe(self):
         def fused_moe(
-            a, w1, w2, score, topk, renormalize, is_woq=False, is_woq_sym=False
+            a, w1, w2, score, topk, renormalize, is_woq=False, sym_quant_weight=False
         ):
             G = 1
             topk_group = 1
@@ -428,6 +431,9 @@ class DeepSeekTester(TestCase):
                 a, score, topk, renormalize, G, topk_group
             )
 
+            group_size = -1
+            weight_dtype = WoqWeightDtype.INT8
+            lowp_mode = WoqLowpMode.BF16
             if is_woq:
                 E = w1.size(0)
                 dtype = a.dtype
@@ -437,16 +443,15 @@ class DeepSeekTester(TestCase):
                 w2_qweight_list = []
                 w2_scale_list = []
                 w2_zp_list = []
-                group_size = -1
                 for idx in range(E):
-                    w13_qweight, w13_scale, w13_zp, _ = woq_quant_and_pack(
-                        w1[idx], group_size, is_woq_sym
+                    w13_qweight, w13_scale, w13_zp, *_ = woq_quant_and_pack(
+                        w1[idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
                     )
                     w13_qweight_list.append(w13_qweight)
                     w13_scale_list.append(w13_scale)
                     w13_zp_list.append(w13_zp)
-                    w2_qweight, w2_scale, w2_zp, _ = woq_quant_and_pack(
-                        w2[idx], group_size, is_woq_sym
+                    w2_qweight, w2_scale, w2_zp, *_ = woq_quant_and_pack(
+                        w2[idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
                     )
                     w2_qweight_list.append(w2_qweight)
                     w2_scale_list.append(w2_scale)
@@ -454,24 +459,28 @@ class DeepSeekTester(TestCase):
                 packed_w1 = torch.stack(w13_qweight_list).detach()
                 w13_scale = torch.stack(w13_scale_list).detach().to(dtype)
                 w13_zp = (
-                    torch.tensor(0).to(dtype)
-                    if is_woq_sym
+                    None
+                    if sym_quant_weight
                     else torch.stack(w13_zp_list).detach().to(dtype)
                 )
+                w13_comp = None
                 packed_w2 = torch.stack(w2_qweight_list).detach()
                 w2_scale = torch.stack(w2_scale_list).detach().to(dtype)
                 w2_zp = (
-                    torch.tensor(0).to(dtype)
-                    if is_woq_sym
+                    None
+                    if sym_quant_weight
                     else torch.stack(w2_zp_list).detach().to(dtype)
                 )
+                w2_comp = None
             else:
                 packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
                 packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
-                w13_scale = torch.tensor(0).to(a.dtype)
-                w13_zp = torch.tensor(0).to(a.dtype)
-                w2_scale = torch.tensor(0).to(a.dtype)
-                w2_zp = torch.tensor(0).to(a.dtype)
+                w13_scale = None
+                w13_zp = None
+                w13_comp = None
+                w2_scale = None
+                w2_zp = None
+                w2_comp = None
 
             inplace = False
             return torch.ops.torch_ipex.fused_experts(
@@ -484,15 +493,19 @@ class DeepSeekTester(TestCase):
                 True,
                 False,
                 is_woq,
-                is_woq_sym,
+                weight_dtype,
+                group_size,
+                lowp_mode,
                 w13_scale,
                 w13_zp,
+                w13_comp,
                 w2_scale,
                 w2_zp,
+                w2_comp,
             )
 
         def run_single_test(
-            m, n, k, e, topk, dtype, renormalize=False, is_woq=False, is_woq_sym=False
+            m, n, k, e, topk, dtype, renormalize=False, is_woq=False, sym_quant_weight=False
         ):
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 10
             score = torch.randn((m, e), device="cpu", dtype=dtype)
@@ -520,7 +533,7 @@ class DeepSeekTester(TestCase):
                     score,
                     topk,
                     renormalize,
-                    is_woq_sym=is_woq_sym,
+                    sym_quant_weight=sym_quant_weight,
                 )
             else:
                 torch_output = torch_naive_moe(a, w13, w2, score, topk, renormalize)
@@ -532,17 +545,17 @@ class DeepSeekTester(TestCase):
                 topk,
                 renormalize,
                 is_woq=is_woq,
-                is_woq_sym=is_woq_sym,
+                sym_quant_weight=sym_quant_weight,
             )
 
             compare(torch_output, fused_output)
 
         for is_woq in [True, False]:
             if is_woq:
-                is_woq_sym = [True, False]
+                sym_quant_weight = [True, False]
             else:
-                is_woq_sym = [False]
-            for is_sym in is_woq_sym:
+                sym_quant_weight = [False]
+            for is_sym in sym_quant_weight:
                 run_single_test(
                     2,
                     2048,
@@ -552,7 +565,7 @@ class DeepSeekTester(TestCase):
                     torch.bfloat16,
                     renormalize=True,
                     is_woq=is_woq,
-                    is_woq_sym=is_sym,
+                    sym_quant_weight=is_sym,
                 )
                 run_single_test(
                     2,
@@ -563,7 +576,7 @@ class DeepSeekTester(TestCase):
                     torch.bfloat16,
                     renormalize=True,
                     is_woq=is_woq,
-                    is_woq_sym=is_sym,
+                    sym_quant_weight=is_sym,
                 )
                 run_single_test(
                     2,
@@ -574,7 +587,7 @@ class DeepSeekTester(TestCase):
                     torch.bfloat16,
                     renormalize=True,
                     is_woq=is_woq,
-                    is_woq_sym=is_sym,
+                    sym_quant_weight=is_sym,
                 )
                 run_single_test(
                     2,
@@ -585,7 +598,7 @@ class DeepSeekTester(TestCase):
                     torch.bfloat16,
                     renormalize=True,
                     is_woq=is_woq,
-                    is_woq_sym=is_sym,
+                    sym_quant_weight=is_sym,
                 )
                 run_single_test(
                     2,
@@ -596,8 +609,133 @@ class DeepSeekTester(TestCase):
                     torch.bfloat16,
                     renormalize=True,
                     is_woq=is_woq,
-                    is_woq_sym=is_sym,
+                    sym_quant_weight=is_sym,
                 )
+
+    def test_fused_moe_da8w8(self):
+        is_woq = True
+        group_size = -1
+        weight_dtype = WoqWeightDtype.INT8
+        lowp_mode = WoqLowpMode.INT8
+        sym_quant_weight = True
+
+        def fused_moe(
+            a, w1, w2, score, topk, renormalize
+        ):
+            G = 1
+            topk_group = 1
+
+            B, D = a.shape
+            topk_weights = torch.empty(B, topk, dtype=torch.float32)
+            topk_ids = torch.empty(B, topk, dtype=torch.int32)
+            topk_weights, topk_ids = grouped_topk_native(
+                a, score, topk, renormalize, G, topk_group
+            )
+
+            E = w1.size(0)
+            w13_qweight_list = []
+            w13_scale_list = []
+            w13_comp_list =[]
+            w2_qweight_list = []
+            w2_scale_list = []
+            w2_comp_list = []
+            for idx in range(E):
+                w13_qweight, w13_scale, w13_zp, w13_comp, _ = woq_quant_and_pack(
+                    w1[idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
+                )
+                w13_qweight_list.append(w13_qweight)
+                w13_scale_list.append(w13_scale)
+                w13_comp_list.append(w13_comp)
+                w2_qweight, w2_scale, w2_zp, w2_comp, _ = woq_quant_and_pack(
+                    w2[idx], group_size, weight_dtype, lowp_mode, sym_quant_weight
+                )
+                w2_qweight_list.append(w2_qweight)
+                w2_scale_list.append(w2_scale)
+                w2_comp_list.append(w2_comp)
+            packed_w1 = torch.stack(w13_qweight_list).detach()
+            w13_scale = torch.stack(w13_scale_list).detach().to(torch.float)
+            w13_zp = None
+            w13_comp = torch.stack(w13_comp_list).detach()
+            packed_w2 = torch.stack(w2_qweight_list).detach()
+            w2_scale = torch.stack(w2_scale_list).detach().to(torch.float)
+            w2_zp = None
+            w2_comp = torch.stack(w2_comp_list).detach()
+
+            inplace = False
+            return torch.ops.torch_ipex.fused_experts(
+                a,
+                packed_w1,
+                packed_w2,
+                topk_weights,
+                topk_ids,
+                inplace,
+                True,
+                False,
+                is_woq,
+                weight_dtype,
+                group_size,
+                lowp_mode,
+                w13_scale,
+                w13_zp,
+                w13_comp,
+                w2_scale,
+                w2_zp,
+                w2_comp,
+            )
+
+        def run_single_test(
+            m, n, k, e, topk, dtype, renormalize=False
+        ):
+            a = torch.randn((m, k), device="cpu", dtype=dtype) / 20
+            score = torch.randn((m, e), device="cpu", dtype=dtype)
+            w13_list = []
+            w1_list = []
+            w3_list = []
+            w2_list = []
+            for _ in range(e):
+                w1_ = torch.randn((n, k), device="cpu", dtype=dtype) / 10
+                w3_ = torch.randn((n, k), device="cpu", dtype=dtype) / 10
+                w2_ = torch.randn((k, n), device="cpu", dtype=dtype) / 10
+                w13_concat = torch.concat([w1_, w3_], 0)
+                w13_list.append(w13_concat)
+                w1_list.append(w1_)
+                w3_list.append(w3_)
+                w2_list.append(w2_)
+            w13 = torch.stack(w13_list).detach().to(dtype)
+            w2 = torch.stack(w2_list).detach().to(dtype)
+            torch_output = ipex_default_woq_moe(
+                a,
+                w1_list,
+                w3_list,
+                w2_list,
+                score,
+                topk,
+                renormalize,
+                group_size,
+                weight_dtype,
+                lowp_mode,
+                sym_quant_weight,
+            )
+            fused_output = fused_moe(
+                a,
+                w13,
+                w2,
+                score,
+                topk,
+                renormalize,
+            )
+
+            compare(torch_output, fused_output)
+
+        shape_list = [
+            [2, 2048, 2048],
+            [2, 128, 7168],
+            [2, 128, 2048],
+            [2, 7168, 512],
+            [2, 2048, 512],
+        ]
+        for m, n, k in shape_list:
+            run_single_test(m, n, k, 4, 2, torch.bfloat16, renormalize=True)
 
     # testing fusedMoE + shardMoE fusion modules
     def test_fuse_moe_with_shared_expert(self):
@@ -621,11 +759,16 @@ class DeepSeekTester(TestCase):
             topk_ids = torch.cat((topk_ids.to(torch.int), pad_ids), -1).to(torch.int)
             packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
             packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
-            w13_scale = torch.tensor(0).to(a.dtype)
-            w13_zp = torch.tensor(0).to(a.dtype)
-            w2_scale = torch.tensor(0).to(a.dtype)
-            w2_zp = torch.tensor(0).to(a.dtype)
+            w13_scale = None
+            w13_zp = None
+            w13_comp = None
+            w2_scale = None
+            w2_zp = None
+            w2_comp = None
             inplace = False
+            group_size = -1
+            weight_dtype = WoqWeightDtype.INT8
+            lowp_mode = WoqLowpMode.BF16
             return torch.ops.torch_ipex.fused_experts(
                 a,
                 packed_w1,
@@ -636,11 +779,15 @@ class DeepSeekTester(TestCase):
                 True,
                 False,
                 False,
-                False,
+                weight_dtype,
+                group_size,
+                lowp_mode,
                 w13_scale,
                 w13_zp,
+                w13_comp,
                 w2_scale,
                 w2_zp,
+                w2_comp,
             )
 
         def run_single_test(m, n, k, e, topk, dtype, renormalize=False):

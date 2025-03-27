@@ -2224,6 +2224,13 @@ def optimize(
                     quantization_config,
                     None,
                 )
+                # for fused moe
+                if _model.config.architectures[0] in [
+                    "DeepseekV2ForCausalLM",
+                    "DeepseekV3ForCausalLM",
+                ]:
+                    for layer in _model.model.layers:
+                        layer.qconfig = quantization_config.global_qconfig
 
         # model lowering conversion
         logger.debug("ipex.llm.optimize is lowering model")

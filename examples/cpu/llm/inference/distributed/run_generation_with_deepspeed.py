@@ -645,6 +645,7 @@ if use_ipex:
         else:
             low_precision_checkpoint = None
 
+    deepspeed.comm.barrier()
     logger.debug(f"Applying ipex.llm.optimize on rank {local_rank}/{world_size}")
     model = ipex.llm.optimize(
         model.eval(),
@@ -656,6 +657,7 @@ if use_ipex:
         low_precision_checkpoint=low_precision_checkpoint,
     )
     logger.debug(f"Applying ipex.llm.optimize done on rank {local_rank}/{world_size}")
+    deepspeed.comm.barrier()
 # Generate
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
