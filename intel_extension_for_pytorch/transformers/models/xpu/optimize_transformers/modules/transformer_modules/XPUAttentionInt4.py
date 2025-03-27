@@ -183,10 +183,12 @@ class IPEXAttentionInt4(IPEXAttention):
         torch.xpu.synchronize()
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        if (
-            hidden_states.shape[0] > self.beam_size
-            or hidden_states.shape[1] > self.beam_size
-        ) and xpu_gemm_use_xetla():
+        if query.dim() == 2:
+            curr_len, bs, _ = hidden_states.size()
+            query = query.reshape(curr_len, bs, -1).contiguous()
+        else:
+            _, curr_len, _ = hidden_states.size()
+        if curr_len > 1 and xpu_gemm_use_xetla():
             # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
             if (
                 self.q_proj_quant.qweight is None
@@ -197,8 +199,8 @@ class IPEXAttentionInt4(IPEXAttention):
                 mk = key.shape[-1]
                 if IPEXAttention.cache_type == "static":
                     query = qkv_out[:, :, :mq]
-                    key.copy_(qkv_out[:, :, mq : mq + mk]).contiguous()
-                    value.copy_(qkv_out[:, :, mq + mk :]).contiguous()
+                    key.copy_(qkv_out[:, :, mq : mq + mk])
+                    value.copy_(qkv_out[:, :, mq + mk :])
                 else:
                     query = qkv_out[:, :, :mq]
                     key = qkv_out[:, :, mq : mq + mk]
@@ -207,7 +209,7 @@ class IPEXAttentionInt4(IPEXAttention):
                 dequant_gemm_block(hidden_states, self.q_proj_quant, output=query)
                 dequant_gemm_block(hidden_states, self.k_proj_quant, output=key)
                 dequant_gemm_block(hidden_states, self.v_proj_quant, output=value)
-            return query, key, value
+            return query.contiguous(), key.contiguous(), value.contiguous()
         if self.q_proj_quant.g_idx is not None:
             # qkv fusion cannot apply actorder
             return self.compute_qkv_gemm_separate(hidden_states, query, key, value)
@@ -294,10 +296,7 @@ class IPEXAttentionInt4(IPEXAttention):
         return query, key, value
 
     def out_proj_compute(self, attn_output, residual=None):
-        if (
-            attn_output.shape[0] > self.beam_size
-            or attn_output.shape[1] > self.beam_size
-        ) and xpu_gemm_use_xetla():
+        if attn_output.shape[1] > 1 and xpu_gemm_use_xetla():
             # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
             attn_output = dequant_gemm_block(attn_output, self.out_proj_quant)
             if residual is not None:
