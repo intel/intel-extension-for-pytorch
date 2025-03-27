@@ -137,11 +137,10 @@ at::Tensor embedding_bag(
                        .findSchemaOrThrow("torch_ipex::embedding_bag", "")
                        .typed<decltype(embedding_bag)>();
   auto target_type = get_autocast_dtype();
-  // only have bf16 support now, keep fp32 for other target_type
-  bool cast_to_bfloat16 =
-      !at::GradMode::is_enabled() && at::kBFloat16 == target_type;
+  bool cast_to_lowp = !at::GradMode::is_enabled() &&
+      (at::kBFloat16 == target_type || at::kHalf == target_type);
   auto casted_weight =
-      cast_to_bfloat16 ? cpu_cached_cast(at::kBFloat16, weight) : weight;
+      cast_to_lowp ? cpu_cached_cast(target_type, weight) : weight;
   return op.call(casted_weight, indices, offsets, sparse, include_last_offset);
 }
 

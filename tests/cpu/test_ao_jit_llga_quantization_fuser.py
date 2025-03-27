@@ -10,6 +10,8 @@ from test_ao_jit_llga_utils import (
     JitLlgaTestCase,
     LLGA_FUSION_GROUP,
     get_eltwise_fn,
+    skipIfNoVNNI,
+    skipIfNoTorchVision,
 )
 from torch.quantization.quantize_fx import prepare_fx, convert_fx
 from torch.ao.quantization.quantize_fx import convert_to_reference_fx, prepare_qat_fx
@@ -52,18 +54,9 @@ static_qconfig = [
     ),
 ]
 
-try:
-    import torchvision
-
-    HAS_TORCHVISION = True
-except ImportError:
-    HAS_TORCHVISION = False
-except RuntimeError:
-    HAS_TORCHVISION = False
-skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
-
 
 class TestOp(JitLlgaTestCase):
+    @skipIfNoVNNI
     def test_conv_int8_in_f32_out(self):
         for [
             spatial,
@@ -118,6 +111,7 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ["aten::_convolution", "aten::dequantize"])
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_deconv_int8_in_f32_out(self):
         class M(nn.Module):
             def __init__(
@@ -245,6 +239,7 @@ class TestOp(JitLlgaTestCase):
         )
         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv_share_dequant_weight(self):
         class M(nn.Module):
             def __init__(self):
@@ -276,6 +271,7 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ["aten::_convolution", "aten::dequantize"])
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_linear_int8_in_f32_out(self):
         for bias in [True, False]:
             x = torch.rand(32, 28)
@@ -290,6 +286,7 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ["aten::linear", "aten::dequantize"])
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_linear_int8_in_int8_out(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -352,6 +349,7 @@ class TestOp(JitLlgaTestCase):
                 self.assertFused(graph, ["aten::dequantize", "aten::linear"])
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_max_pool2d(self):
         class M(nn.Module):
             def __init__(self, **kargs):
@@ -424,6 +422,7 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
         self.assertGraphContainsExactly(graph, "aten::add", 3)
 
+    @skipIfNoVNNI
     def test_reshape_6D_linear(self):
         class M(nn.Module):
             def __init__(self):
@@ -566,6 +565,8 @@ class TestOp(JitLlgaTestCase):
 
 
 class TestFusionPattern(JitLlgaTestCase):
+
+    @skipIfNoVNNI
     def test_conv2d_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn):
@@ -628,6 +629,7 @@ class TestFusionPattern(JitLlgaTestCase):
                         )
                         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv2d_clamp(self):
         class M(nn.Module):
             def __init__(self):
@@ -762,6 +764,7 @@ class TestFusionPattern(JitLlgaTestCase):
             graph = self.checkQuantizeTrace(m, [x, y], atol=2e-1, qconfig=qconfig)
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
+    @skipIfNoVNNI
     def test_conv2d_bn(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -796,6 +799,7 @@ class TestFusionPattern(JitLlgaTestCase):
                     )
                     self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv2d_bn_relu(self):
         class M(nn.Module):
             def __init__(self):
@@ -824,6 +828,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 )
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_linear_bn(self):
         class M(nn.Module):
             def __init__(self, dim):
@@ -854,6 +859,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 self.assertFused(graph, ["ipex::batch_norm"])
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv_bn_linear_bn(self):
         class M(nn.Module):
             def __init__(
@@ -885,6 +891,7 @@ class TestFusionPattern(JitLlgaTestCase):
             self.assertFused(graph, ["ipex::batch_norm"])
             self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_linear_eltwise(self):
         class M(nn.Module):
             def __init__(self, eltwise_fn, bias):
@@ -1014,6 +1021,7 @@ class TestFusionPattern(JitLlgaTestCase):
         )
         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv_eltwise_tensor_method(self):
         class ConvSigmoid(nn.Module):
             def __init__(self):
@@ -1114,6 +1122,7 @@ class TestFusionPattern(JitLlgaTestCase):
                     )
                     self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_add_quantization(self):
         class M(nn.Module):
             def __init__(self, bias=False):
@@ -1141,6 +1150,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::_convolution", "aten::quantize_per_channel"])
         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv2d_sigmoid_mul_(self):
         class M(nn.Module):
             def __init__(self, in_channels, out_channels, kernel_size, image_size):
@@ -1220,6 +1230,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 )
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_conv2d_hardsigmoid_mul_(self):
         class M(nn.Module):
             def __init__(self, in_channels, out_channels, kernel_size, image_size):
@@ -1330,6 +1341,7 @@ class TestFusionPattern(JitLlgaTestCase):
             )
             self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_linear_with_multiple_add(self):
         class M(nn.Module):
             def __init__(self):
@@ -1488,6 +1500,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 )
                 self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_lift_up_quant(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -1592,6 +1605,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::dequantize", "aten::linear", "aten::matmul"])
         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_lift_up_quant_unsupported(self):
         # Original graph:
         #          |
@@ -1672,6 +1686,7 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::_convolution", "aten::quantize_per_channel"])
         self.checkPatterns(graph, patterns)
 
+    @skipIfNoVNNI
     def test_bmm_div_scalar(self):
         class M(nn.Module):
             def __init__(self, div_value):
@@ -2192,6 +2207,7 @@ class TestFusionPattern(JitLlgaTestCase):
             ],
         )
 
+    @skipIfNoVNNI
     def test_ffn_residual(self):
         class FFN_Residual(nn.Module):
             def __init__(self, hidden_size, intermediate_size):
@@ -2321,6 +2337,7 @@ class TestShapeFallback(JitLlgaTestCase):
             # Bailout get triggered here
             y2 = m(x2)
 
+    @skipIfNoVNNI
     def test_conv_reshape(self):
         class M(nn.Module):
             def __init__(self):
@@ -2346,6 +2363,7 @@ class TestShapeFallback(JitLlgaTestCase):
                 # TODO: enable this check when size peephole optimization is enabled
                 # self.assertGraphContainsExactly(graph, "aten::size", 0)
 
+    @skipIfNoVNNI
     def test_add_recipe(self):
         class ConvAddRelu(nn.Module):
             def __init__(self, in_channels, out_channels, kernel_size, image_size):
@@ -2384,8 +2402,11 @@ class TestShapeFallback(JitLlgaTestCase):
 
 
 class TestModel(JitLlgaTestCase):
+    @skipIfNoVNNI
     @skipIfNoTorchVision
     def _test_vision(self, model_name):
+        import torchvision
+
         for memory_format in [torch.contiguous_format, torch.channels_last]:
             m = getattr(torchvision.models, model_name)().eval()
             x = (torch.rand(1, 3, 224, 224) / 10).to(memory_format=memory_format)

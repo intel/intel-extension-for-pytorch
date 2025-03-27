@@ -143,7 +143,7 @@ class RotaryEmbedding(torch.nn.Module):
             ]
             scale = max_position_embeddings / self.original_max_position_embeddings
             if scale > 1.0:
-                if "type" in kwargs and kwargs["type"] == "su":
+                if "type" in kwargs and kwargs["type"] in ["su", "longrope"]:
                     self.scaling_factor = math.sqrt(
                         1
                         + math.log(scale)
@@ -285,7 +285,9 @@ class RotaryEmbedding(torch.nn.Module):
 
     def forward(self, seq_len=None):
         rope_type = 0
-        if self.model_backbone == "Phi3ForCausalLM" and hasattr(self, "long_factor"):
+        if self.model_backbone in ["Phi3ForCausalLM", "Phi4MMForCausalLM"] and hasattr(
+            self, "long_factor"
+        ):
             rope_type = 1
         elif self.model_backbone in ["FalconForCausalLM", "RWForCausalLM"]:
             rope_type = 2

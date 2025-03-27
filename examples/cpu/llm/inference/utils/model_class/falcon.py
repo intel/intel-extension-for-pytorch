@@ -14,8 +14,8 @@ class FALCONConfig(LLMConfig):
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
 
-    def get_user_model(self, config, benchmark):
-        super().get_user_model(config, benchmark)
+    def get_user_model(self, config, load_to_meta_device):
+        super().get_user_model(config, load_to_meta_device)
         input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
         attention_mask = torch.ones_like(input_ids)
         example_inputs = self.model.prepare_inputs_for_generation(

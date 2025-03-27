@@ -445,6 +445,105 @@ struct load_dequant_zp_only_int8<16, sym_quant> {
 #endif
 };
 
+template <long N_GROUP_SIZE>
+struct load_dequant_cvt_only_fp8 {
+  template <typename VAT>
+  static inline VAT call(uint8_t* p) {
+    TLA_ASSERT(false, "not implemented");
+  }
+};
+
+template <>
+struct load_dequant_cvt_only_fp8<32> {
+  template <typename VAT>
+  static inline VAT call(uint8_t* p) {
+    TLA_ASSERT(false, "not implemented");
+  }
+};
+
+#if defined(CPU_CAPABILITY_AVX512)
+static inline __m512 convert_fp8_e4m3_to_fp32(__m128i fp8_vec) {
+  __m512i x = _mm512_cvtepu8_epi32(fp8_vec);
+  // mask = x & 0x7f
+  auto mask = _mm512_cmpneq_epi32_mask(
+      _mm512_and_si512(x, _mm512_set1_epi32(127)), _mm512_setzero_si512());
+  // mant = (x & 0x7) << 20
+  auto mantissa =
+      _mm512_slli_epi32(_mm512_and_si512(x, _mm512_set1_epi32(7)), 20);
+  // x >> 3 & 0xf + 120
+  auto exponent = _mm512_add_epi32(
+      _mm512_and_si512(_mm512_srli_epi32(x, 3), _mm512_set1_epi32(15)),
+      _mm512_set1_epi32(120));
+  // mant + (exponent << 23)
+  auto nonsign = _mm512_maskz_mov_epi32(
+      mask, _mm512_or_si512(mantissa, _mm512_slli_epi32(exponent, 23)));
+  auto fp32_vec = _mm512_or_si512(
+      nonsign,
+      _mm512_slli_epi32(_mm512_and_si512(x, _mm512_set1_epi32(128)), 24));
+  return _mm512_castsi512_ps(fp32_vec);
+}
+
+template <>
+inline std::array<__m512, 2> load_dequant_cvt_only_fp8<32>::call<>(uint8_t* p) {
+  using T = float;
+  using VA = VecArray<32, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm256_loadu_si256((__m256i*)p);
+  VAT vbs;
+  compile_time_for<COLS>::op([&](auto i) {
+    constexpr long imm = i;
+    auto int8 = _mm256_extracti128_si256(packed, imm);
+    vbs[i] = convert_fp8_e4m3_to_fp32(int8);
+  });
+  return vbs;
+}
+#endif
+
+#if defined(CPU_CAPABILITY_AVX512_FP16)
+static inline __m512h convert_fp8_e4m3_to_fp16(__m256i fp8_vals) {
+  // Split the 32-byte vector into two halves (each 16 bytes).
+  __m128i lo_128 = _mm256_castsi256_si128(fp8_vals);
+  __m128i hi_128 = _mm256_extracti128_si256(fp8_vals, 1);
+
+  // Convert each half from fp8 to fp32.
+  __m512 fp32_lo = convert_fp8_e4m3_to_fp32(lo_128);
+  __m512 fp32_hi = convert_fp8_e4m3_to_fp32(hi_128);
+
+  // Convert the resulting fp32 values to fp16.
+  // _mm512_cvtps_ph converts 16 single-precision floats (in __m512)
+  // into 16 half-precision floats (in __m256h). The rounding mode here
+  // is set to "to nearest" without raising exceptions.
+  __m256i fp16_lo =
+      _mm512_cvtps_ph(fp32_lo, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+  __m256i fp16_hi =
+      _mm512_cvtps_ph(fp32_hi, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+
+  // Combine the two 16-element (__m256h) vectors into one 32-element (__m512h)
+  // vector. We first cast each __m256h to __m256i (since half values are 16
+  // bits) then combine.
+  __m512i combined = _mm512_castsi256_si512(fp16_lo);
+  combined = _mm512_inserti64x4(combined, fp16_hi, 1);
+
+  // Reinterpret the combined __m512i as __m512h.
+  return _mm512_castsi512_ph(combined);
+}
+
+template <>
+inline std::array<__m512h, 1> load_dequant_cvt_only_fp8<32>::call<>(
+    uint8_t* p) {
+  using T = tpp::half;
+  using VA = VecArray<32, T>;
+  using VAT = typename VA::type;
+  constexpr long COLS = VA::num_vec;
+  auto packed = _mm256_loadu_si256((__m256i*)p);
+  VAT vbs;
+  compile_time_for<COLS>::op(
+      [&](auto i) { vbs[i] = convert_fp8_e4m3_to_fp16(packed); });
+  return vbs;
+}
+#endif
+
 #if defined(CPU_CAPABILITY_AVX512)
 inline __m512i combine_m256i(__m256i a, __m256i b) {
   __m512i c = _mm512_castsi256_si512(a);
@@ -625,6 +724,22 @@ struct load_dequant_int8 {
   }
 };
 
+template <long N, typename T>
+struct load_dequant_fp8 {
+  using VT = typename VecType<T>::type;
+  using V = VecOps<VT>;
+  using VA = VecArray<N, T>;
+  using VAT = typename VA::type;
+  constexpr static long COLS = VA::num_vec;
+
+  static inline VAT call(uint8_t* p, VAT vscales) {
+    auto vbs = load_dequant_cvt_only_fp8<N>::template call<VAT>(p);
+    compile_time_for<COLS>::op(
+        [&](auto idx) { vbs[idx] = V::mul(vbs[idx], vscales[idx]); });
+    return vbs;
+  }
+};
+
 constexpr int get_n_group_size(int N) {
   return N == 16 ? 16 : (N == 32 ? 32 : 64);
 }
@@ -758,6 +873,10 @@ struct GemmMicroKernel<
                     ADDRESS(B, k, col * V::VLEN / 2, ldb / 2),
                     lut,
                     vzps[cbidx]);
+          } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
+            vb[cbidx] =
+                load_dequant_cvt_only_fp8<N_GROUP_SIZE>::template call<VArrayT>(
+                    ADDRESS(B, k, col * V::VLEN / 2, ldb / 2));
           } else {
             vb[cbidx] =
                 load_dequant_zp_only_int8<N_GROUP_SIZE, sym_quant_w>::call(
@@ -770,6 +889,9 @@ struct GemmMicroKernel<
                 vscales[cbidx],
                 lut,
                 vzps[cbidx]);
+          } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
+            vb[cbidx] = load_dequant_fp8<N_GROUP_SIZE, T>::call(
+                ADDRESS(B, k, col * V::VLEN, ldb), vscales[cbidx]);
           } else {
             vb[cbidx] = load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
                 ADDRESS(B, k, col * V::VLEN, ldb), vscales[cbidx], vzps[cbidx]);
@@ -1309,7 +1431,7 @@ struct Dequantize<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx> {
       float* B,
       int k_start = 0,
       int* g_idx = nullptr) {
-#if defined(__AVX512F__)
+#if defined(CPU_CAPABILITY_AVX512)
     using T = float;
     using VT = typename VecType<T>::type;
     using V = VecOps<VT>;
@@ -1334,6 +1456,8 @@ struct Dequantize<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx> {
       if constexpr (is_4bit_flag) {
         return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
             p, vscales, lut, vzps);
+      } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
+        return load_dequant_fp8<N_GROUP_SIZE, T>::call(p, vscales);
       } else {
         return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
             p, vscales, vzps);
@@ -1418,6 +1542,8 @@ struct Dequantize<
       if constexpr (is_4bit_flag) {
         return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, float>::call(
             p, vscales, lut, vzps);
+      } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
+        return load_dequant_fp8<N_GROUP_SIZE, float>::call(p, vscales);
       } else {
         return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, float>::call(
             p, vscales, vzps);
@@ -1499,6 +1625,8 @@ struct Dequantize<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx> {
       if constexpr (is_4bit_flag) {
         return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
             p, vscales, lut, vzps);
+      } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
+        return load_dequant_fp8<N_GROUP_SIZE, T>::call(p, vscales);
       } else {
         return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
             p, vscales, vzps);
@@ -2302,7 +2430,8 @@ void qlinear_woq_affine_dequant_upfront_impl(
               int,
               WOQ_DTYPE_INT8,
               WOQ_DTYPE_INT4,
-              WOQ_DTYPE_NF4>,
+              WOQ_DTYPE_NF4,
+              WOQ_DTYPE_FP8>,
           enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>,
           enumerate_dispatcher<bool, false, true>>>::
       call(
@@ -2915,7 +3044,8 @@ void qlinear_woq_affine_impl(
               int,
               WOQ_DTYPE_INT8,
               WOQ_DTYPE_INT4,
-              WOQ_DTYPE_NF4>,
+              WOQ_DTYPE_NF4,
+              WOQ_DTYPE_FP8>,
           enumerate_dispatcher<bool, false, true>,
           enumerate_dispatcher<bool, false, true>>>::
       call(

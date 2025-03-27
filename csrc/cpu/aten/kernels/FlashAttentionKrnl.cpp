@@ -29,8 +29,9 @@ inline void _store(scalar_t* dst, at::vec::Vectorized<scalar_t> src) {
 }
 
 template <typename scalar_t>
-inline typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, void>
-_store(scalar_t* dst, at::vec::Vectorized<float> src) {
+inline typename std::
+    enable_if_t<at::vec::is_reduced_floating_point_v<scalar_t>, void>
+    _store(scalar_t* dst, at::vec::Vectorized<float> src) {
   auto res = at::vec::convert_from_float<scalar_t>(src, src);
   res.store(dst, at::vec::Vectorized<float>::size());
 }
@@ -204,7 +205,9 @@ inline void _scale_attn_mask_fusion_kernel(
   const auto vec_size1 = at::vec::Vectorized<T1>::size();
   const auto vec_size2 = at::vec::Vectorized<T2>::size();
   constexpr int64_t T1_n =
-      (vec_size2 == vec_size1 * 2 && is_reduced_floating_point_v<T2>) ? 2 : 1;
+      (vec_size2 == vec_size1 * 2 && at::vec::is_reduced_floating_point_v<T2>)
+      ? 2
+      : 1;
   constexpr int64_t T2_n = 1;
   auto vec_scale = at::vec::VectorizedN<T1, T1_n>(val);
   int64_t i = 0;
@@ -428,7 +431,8 @@ inline typename std::enable_if_t<!use_vnni, void> cpu_flash_attention(
   at::Tensor key = k.transpose(1, 2);
   at::Tensor value = v.transpose(1, 2);
 
-  constexpr bool is_reduced_dtype = is_reduced_floating_point_v<scalar_t>;
+  constexpr bool is_reduced_dtype =
+      at::vec::is_reduced_floating_point_v<scalar_t>;
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
   accum_t scaling_factor = calculate_scale(query, scale).as_float_unchecked();
@@ -705,7 +709,7 @@ inline typename std::enable_if_t<use_vnni, void> cpu_flash_attention(
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale) {
   TORCH_CHECK(
-      is_reduced_floating_point_v<scalar_t>,
+      at::vec::is_reduced_floating_point_v<scalar_t>,
       "cpu_flash_attention with packing only supports Half/BFloat16");
   // Query (Batch x Num_heads  x Q_seq_len  x Dim_per_head)
   //    -> (Batch x Q_seq_len  x Num_heads  x Dim_per_head)

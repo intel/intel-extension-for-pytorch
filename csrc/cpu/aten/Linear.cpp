@@ -597,7 +597,7 @@ at::Tensor woq_linear_forward_v2(
         bias.value().size() == 3, "IPEX WOQ: expect list of bias has length 3");
   }
   auto& bias_list = bias.has_value() ? bias.value() : empty_bias_list;
-  return woq_linear_kernel(
+  auto y = woq_linear_kernel(
       input,
       qweight,
       WOQ_DTYPE_MAP.at(weight_dtype),
@@ -608,6 +608,11 @@ at::Tensor woq_linear_forward_v2(
       lowp_mode,
       act_quant_mode,
       compensation);
+  if (y.size(-1) != weight_shape[0]) {
+    int64_t N = weight_shape[0];
+    return at::narrow(y, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_unary_kernel(

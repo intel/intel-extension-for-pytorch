@@ -8,3 +8,4 @@ tiktoken
 unzip
 librosa
 soundfile
+backoff

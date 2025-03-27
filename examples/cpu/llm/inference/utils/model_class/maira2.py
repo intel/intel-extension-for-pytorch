@@ -14,8 +14,8 @@ class MAIRA2Config(LLMConfig):
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_POS_KV
         self.use_global_past_key_value = True
 
-    def get_user_model(self, config, benchmark):
-        if benchmark:
+    def get_user_model(self, config, load_to_meta_device):
+        if load_to_meta_device:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = AutoModelForCausalLM._from_config(

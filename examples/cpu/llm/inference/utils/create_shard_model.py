@@ -53,7 +53,7 @@ if args.local_rank == 0:
     )
     if model_type == "llama" and args.vision_text_model:
         model_type = "mllama"
-    if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
+    if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
         model_type = model_type.replace("-", "")
     model_class = MODEL_CLASSES[model_type]
     load_dtype = torch.float32
@@ -70,6 +70,7 @@ if args.local_rank == 0:
             torch_dtype=load_dtype,
             low_cpu_mem_usage=True if model_type != "maira2" else False,
             trust_remote_code=True,
+            _attn_implementation="eager",
         )
     else:
         tokenizer, model, image_processor, context_len = load_pretrained_model(
@@ -80,10 +81,12 @@ if args.local_rank == 0:
         max_shard_size=args.max_shard_size,
         safe_serialization=False,
     )
+    if model_type == "phi4mm":
+        tokenizer.chat_template = None
     tokenizer.save_pretrained(save_directory=args.save_path)
     if model_type == "llava":
         image_processor.save_pretrained(save_directory=args.save_path)
-    if model_type in ["maira2", "deepseekv2", "deepseekv3", "deepseekr1"]:
+    if model_type in ["maira2", "deepseekv2", "deepseekv3"]:
         import inspect
         import shutil
 

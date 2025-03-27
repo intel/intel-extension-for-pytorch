@@ -14,8 +14,8 @@ class MLLAMAConfig(LLMConfig):
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
         self.use_global_past_key_value = True
 
-    def get_user_model(self, config, benchmark):
-        if benchmark:
+    def get_user_model(self, config, load_to_meta_device):
+        if load_to_meta_device:
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = MllamaForConditionalGeneration._from_config(config)

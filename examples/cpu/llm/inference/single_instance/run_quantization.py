@@ -16,6 +16,7 @@ from intel_extension_for_pytorch.llm.utils import (
 )
 from ast import literal_eval
 import sys
+import os
 
 sys.path.append(sys.path[0] + "/../../../")
 
@@ -43,6 +44,7 @@ from llm.inference.utils.model_class.git import GitConfig
 from llm.inference.utils.model_class.llava import LlavaConfig
 from llm.inference.utils.model_class.phi import PhiConfig
 from llm.inference.utils.model_class.phi import Phi3Config
+from llm.inference.utils.model_class.phi import Phi4MMConfig
 from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
 from llm.inference.utils.model_class.maira2 import MAIRA2Config
@@ -198,7 +200,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4", "NF4"],
+    choices=["INT8", "INT4", "NF4", "FP8"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation"
@@ -277,6 +279,13 @@ parser.add_argument(
     action="store_true",
     help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
     " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
+)
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
 )
 args = parser.parse_args()
 
@@ -418,6 +427,63 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         roles = conv.roles
 elif re.search("phi3", config.architectures[0], re.IGNORECASE):
     model = Phi3Config(args.model_id)
+elif re.search("phi4mm", config.architectures[0], re.IGNORECASE):
+    model = Phi4MMConfig(args.model_id)
+    from PIL import Image
+    import soundfile
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    audio_batch_size = args.batch_size
+    if args.prompt:
+        prompt = args.prompt
+        _COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN = r"<\|image_\d+\|>"
+        _COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN = r"<\|audio_\d+\|>"
+        image_in_prompt = len(
+            re.findall(_COMPATIBLE_IMAGE_SPECIAL_TOKEN_PATTERN, prompt)
+        )
+        audio_in_prompt = len(
+            re.findall(_COMPATIBLE_AUDIO_SPECIAL_TOKEN_PATTERN, prompt)
+        )
+        is_vision = image_in_prompt > 0
+        is_speech = audio_in_prompt > 0
+        if is_vision:
+            assert (
+                image_in_prompt == args.batch_size
+            ), "Prompt is invalid. For multiple images, the user needs to \
+                insert multiple image placeholders in the prompt as below: \
+                <|user|><|image_1|><|image_2|><|image_3|>Summarize the content of the images.<|end|><|assistant|>"
+        if is_speech:
+            if not is_vision:
+                assert (
+                    audio_in_prompt == args.batch_size
+                ), "Prompt is invalid. For multiple audios, the user needs to \
+                    insert multiple audio placeholders in the prompt as below: \
+                    <|user|><|audio_1|><|audio_2|><|audio_3|>Transcribe the audio clip into text.<|end|><|assistant|>"
+            else:
+                audio_batch_size = audio_in_prompt
+        if not is_vision and not is_speech:
+            config.input_mode = 0
+        elif is_vision and not is_speech:
+            config.input_mode = 1
+        elif not is_vision and is_speech:
+            config.input_mode = 2
+        else:
+            config.input_mode = 3
+        assert config.input_mode == int(
+            args.input_mode
+        ), "Input mode in prompt is not consistent with the input mode in the command line."
+    else:
+        config.input_mode = int(args.input_mode)
+        if config.input_mode == 3:
+            audio_batch_size = 1
 elif re.search("phi", config.architectures[0], re.IGNORECASE):
     model = PhiConfig(args.model_id)
 elif re.search("yuan", config.architectures[0], re.IGNORECASE):
@@ -441,8 +507,6 @@ elif re.search("deepseekv2", config.architectures[0], re.IGNORECASE):
     model = DeepseekV2Config(args.model_id)
 elif re.search("deepseekv3", config.architectures[0], re.IGNORECASE):
     model = DeepseekV3Config(args.model_id)
-    if "deepseek-r1" in args.model_id.lower() or "deepseekr1" in args.model_id.lower():
-        model.name = "deepseekr1"
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -466,6 +530,9 @@ if model.name == "mpt" and args.prompt is None:
     config.max_seq_len = max_seq_len
 if model.name in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
+if model.name == "phi4mm":
+    config.batch_size = int(args.batch_size) * num_beams
+    config.audio_batch_size = audio_batch_size * num_beams
 if model.name == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
 
@@ -474,7 +541,18 @@ if args.lm_head_generation and not hasattr(config, "lm_head_generation"):
 if model.name == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
 
-user_model = model.get_user_model(config, args.benchmark)
+# Users gives the model by path to int4 checkpoint directory
+if (
+    not args.low_precision_checkpoint
+    and hasattr(config, "quantization_config")
+    and os.path.isdir(args.model_id)
+):
+    args.low_precision_checkpoint = args.model_id
+
+load_to_meta_device = args.benchmark or (
+    args.ipex_weight_only_quantization and args.low_precision_checkpoint != ""
+)
+user_model = model.get_user_model(config, load_to_meta_device)
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
@@ -669,7 +747,38 @@ def get_example_inputs(model):
         if model.name == "mllama":
             cross_attention_mask = torch.ones(1, 32, 1, 4)
             example_inputs = example_inputs + (cross_attention_mask,)
-
+        if model.name == "phi4mm":
+            input_mode = config.input_mode
+            batch_size = config.batch_size
+            audio_batch_size = config.audio_batch_size
+            example_inputs = example_inputs + (
+                torch.tensor([input_mode]),
+                (
+                    torch.rand(1, 7, 3, 448, 448).repeat(batch_size, 1, 1, 1, 1)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.tensor([[896, 1344]]).repeat(batch_size, 1)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.ones(1, 7, 32, 32).repeat(batch_size, 1, 1, 1)
+                    if input_mode in [1, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.rand(1, 498, 80).repeat(audio_batch_size, 1, 1)
+                    if input_mode in [2, 3]
+                    else torch.tensor([])
+                ),
+                (
+                    torch.tensor([63]).repeat(audio_batch_size)
+                    if input_mode in [2, 3]
+                    else torch.tensor([])
+                ),
+            )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
         example_inputs = (
             input_ids.unsqueeze(0),
@@ -1141,13 +1250,27 @@ elif args.ipex_weight_only_quantization:
         WoqWeightQScheme,
     )
 
+    if args.low_precision_checkpoint != "":
+        pathname = args.low_precision_checkpoint
+        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+        low_precision_checkpoint = (low_precision_checkpoint, quant_config)
+
+        if args.gptq_legacy_format:
+            raise AssertionError(
+                "gptq legacy format is deprecated and not supported now."
+            )
+    else:
+        low_precision_checkpoint = None
+
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
     elif args.weight_dtype == "INT4":
         weight_dtype = WoqWeightDtype.INT4
-    else:
-        assert args.weight_dtype == "NF4"
+    elif args.weight_dtype == "NF4":
         weight_dtype = WoqWeightDtype.NF4
+    else:
+        assert args.weight_dtype == "FP8"
+        weight_dtype = WoqWeightDtype.FP8
 
     if args.lowp_mode == "INT8":
         lowp_mode = ipex.quantization.WoqLowpMode.INT8
@@ -1158,7 +1281,10 @@ elif args.ipex_weight_only_quantization:
     elif args.lowp_mode == "BF16":
         lowp_mode = ipex.quantization.WoqLowpMode.BF16
     else:  # AUTO
-        if args.low_precision_checkpoint != "" or weight_dtype == WoqWeightDtype.INT4:
+        if weight_dtype == WoqWeightDtype.INT4 or (
+            low_precision_checkpoint is not None
+            and low_precision_checkpoint[1]["quant_method"] != "fp8"
+        ):
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         else:
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
@@ -1185,17 +1311,6 @@ elif args.ipex_weight_only_quantization:
         group_size=args.group_size,
         weight_qscheme=weight_qscheme,
     )
-    if args.low_precision_checkpoint != "":
-        pathname = args.low_precision_checkpoint
-        low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
-        low_precision_checkpoint = (low_precision_checkpoint, quant_config)
-
-        if args.gptq_legacy_format:
-            raise AssertionError(
-                "gptq legacy format is deprecated and not supported now."
-            )
-    else:
-        low_precision_checkpoint = None
 
     user_model = ipex.llm.optimize(
         user_model.eval(),
@@ -1288,6 +1403,39 @@ elif args.ipex_weight_only_quantization:
             )
             self_jit_next = torch.jit.freeze(self_jit_next.eval())
             self_jit_next.save(args.output_dir + "/" + args.quant_model_name + "2")
+        elif model.name == "phi4mm":
+            batch_size = config.batch_size
+            audio_batch_size = config.audio_batch_size
+            if config.input_mode == 1:
+                input_ids = torch.ones(1851 * batch_size).to(torch.long).unsqueeze(0)
+                input_ids[:, : 1841 * batch_size] = 200010
+                example_inputs[7][:, 3, :, -1] = 0
+            elif config.input_mode == 2:
+                input_ids = (
+                    torch.ones(96 * audio_batch_size).to(torch.long).unsqueeze(0)
+                )
+                input_ids[:, : 63 * audio_batch_size] = 200011
+            elif config.input_mode == 3:
+                input_ids = torch.ones(1907 * batch_size).to(torch.long).unsqueeze(0)
+                input_ids[:, : 1841 * batch_size] = 200010
+                input_ids[
+                    :, 1841 * batch_size : 1841 * batch_size + 63 * audio_batch_size
+                ] = 200011
+                example_inputs[7][:, 3, :, -1] = 0
+            if config.input_mode > 0:
+                attention_mask = torch.ones_like(input_ids)
+                position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+                example_inputs = (
+                    input_ids,
+                    attention_mask,
+                    example_inputs[2],
+                    position_ids,
+                ) + example_inputs[4:]
+                self_jit_first = torch.jit.trace(
+                    user_model.eval(), example_inputs, strict=False, check_trace=False
+                )
+                self_jit_first = torch.jit.freeze(self_jit_first.eval())
+                self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 
 if args.benchmark:
@@ -1305,7 +1453,9 @@ if args.benchmark:
         try:
             self_jit = torch.jit.load(args.quantized_model_path)
             self_jit = torch.jit.freeze(self_jit.eval())
-            if model.name in ["yuan", "mllama", "maira2"]:
+            if model.name in ["yuan", "mllama", "maira2"] or (
+                model.name == "phi4mm" and config.input_mode > 0
+            ):
                 self_jit_first = torch.jit.load(args.quantized_model_path + "2")
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
             if model.name in ["jamba"]:
@@ -1314,7 +1464,9 @@ if args.benchmark:
         except Exception as e:
             print("warning: loading failed.", e)
             self_jit = quant_model
-        if model.name in ["yuan", "mllama", "maira2"]:
+        if model.name in ["yuan", "mllama", "maira2"] or (
+            model.name == "phi4mm" and config.input_mode > 0
+        ):
             ipex._set_optimized_model_for_generation(
                 user_model,
                 optimized_model=self_jit,
@@ -1364,6 +1516,9 @@ if args.benchmark:
             if hasattr(tokenizer, "process_reporting_input")
             else tokenizer.format_and_preprocess_reporting_input
         )
+    elif model.name == "phi4mm":
+        prompt = args.prompt
+        sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -1447,6 +1602,18 @@ if args.benchmark:
                 )
                 input_ids = processed_inputs["input_ids"]
                 output = user_model.generate(**processed_inputs, **generate_kwargs)
+            elif model.name == "phi4mm":
+                raw_image = load_image(args.image_url) if is_vision else None
+                raw_image = [raw_image] * args.batch_size
+                samples = [sample] * audio_batch_size
+                inputs = tokenizer(
+                    text=prompt[0],
+                    images=raw_image if is_vision else None,
+                    audios=samples if is_speech else None,
+                    return_tensors="pt",
+                )
+                input_ids = inputs["input_ids"]
+                output = user_model.generate(**inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
@@ -1454,7 +1621,7 @@ if args.benchmark:
             gen_text = tokenizer.batch_decode(
                 (
                     gen_ids[:, input_ids.shape[1] :]
-                    if model.name in ["llava", "maira2"]
+                    if model.name in ["llava", "maira2", "phi4mm"]
                     else gen_ids
                 ),
                 skip_special_tokens=True,
@@ -1535,6 +1702,18 @@ if args.benchmark:
                     )
                     input_ids = processed_inputs["input_ids"]
                     output = user_model.generate(**processed_inputs, **generate_kwargs)
+                elif model.name == "phi4mm":
+                    raw_image = load_image(args.image_url) if is_vision else None
+                    raw_image = [raw_image] * args.batch_size
+                    samples = [sample] * audio_batch_size
+                    inputs = tokenizer(
+                        text=prompt[0],
+                        images=raw_image if is_vision else None,
+                        audios=samples if is_speech else None,
+                        return_tensors="pt",
+                    )
+                    input_ids = inputs["input_ids"]
+                    output = user_model.generate(**inputs, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)
@@ -1542,7 +1721,7 @@ if args.benchmark:
                 gen_text = tokenizer.batch_decode(
                     (
                         gen_ids[:, input_ids.shape[1] :]
-                        if model.name == "llava"
+                        if model.name in ["llava", "phi4mm"]
                         else gen_ids
                     ),
                     skip_special_tokens=True,

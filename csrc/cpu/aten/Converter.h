@@ -7,8 +7,6 @@ namespace cpu {
 
 namespace {
 
-void bf16_to_fp32(void* dst, const void* src, int len);
-void fp32_to_bf16(void* dst, const void* src, int len);
 at::Tensor cat_bfloat16_float_kernel_impl(
     const at::Tensor top_half,
     const at::Tensor bottom_half);

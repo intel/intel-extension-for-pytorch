@@ -182,6 +182,26 @@ using deepseek_moegate_kernel_fn = std::tuple<at::Tensor, at::Tensor> (*)(
     const int64_t n_routed_experts,
     const int64_t top_k,
     c10::optional<at::Tensor> e_score_cbias);
+using convert_e4m3_to_bf16_intrinsic_fn = void (*)(
+    at::Float8_e4m3fn* src_ptr,
+    at::BFloat16* dst_ptr,
+    const int64_t len,
+    bool with_denorm,
+    bool with_lut);
+using convert_e4m3_to_fp32_intrinsic_fn = void (*)(
+    at::Float8_e4m3fn* src_ptr,
+    float* dst_ptr,
+    const int64_t len,
+    bool with_denorm,
+    bool with_lut);
+using convert_e4m3_to_fp16_intrinsic_fn = void (*)(
+    at::Float8_e4m3fn* src_ptr,
+    at::Half* dst_ptr,
+    const int64_t len,
+    bool with_denorm,
+    bool with_lut);
+using convert_e5m2_to_fp16_intrinsic_fn =
+    void (*)(at::Float8_e5m2* src_ptr, at::Half* dst_ptr, const int64_t len);
 IPEX_DECLARE_DISPATCH(mixtral_moe_tpp_kernel_fn, mixtral_moe_tpp_kernel_stub);
 IPEX_DECLARE_DISPATCH(deepseek_moe_tpp_kernel_fn, deepseek_moe_tpp_kernel_stub);
 IPEX_DECLARE_DISPATCH(mixtral_moe_woq_kernel_fn, mixtral_moe_woq_kernel_stub);
@@ -190,5 +210,17 @@ IPEX_DECLARE_DISPATCH(mixtral_moe_kernel_fn, mixtral_moe_kernel_stub);
 IPEX_DECLARE_DISPATCH(deepseek_moe_kernel_fn, deepseek_moe_kernel_stub);
 IPEX_DECLARE_DISPATCH(deepseek_moe_mkl_kernel_fn, deepseek_moe_mkl_kernel_stub);
 IPEX_DECLARE_DISPATCH(deepseek_moegate_kernel_fn, deepseek_moegate_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    convert_e4m3_to_bf16_intrinsic_fn,
+    convert_e4m3_to_bf16_intrinsic_stub);
+IPEX_DECLARE_DISPATCH(
+    convert_e4m3_to_fp32_intrinsic_fn,
+    convert_e4m3_to_fp32_intrinsic_stub);
+IPEX_DECLARE_DISPATCH(
+    convert_e4m3_to_fp16_intrinsic_fn,
+    convert_e4m3_to_fp16_intrinsic_stub);
+IPEX_DECLARE_DISPATCH(
+    convert_e5m2_to_fp16_intrinsic_fn,
+    convert_e5m2_to_fp16_intrinsic_stub);
 } // namespace cpu
 } // namespace torch_ipex

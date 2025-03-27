@@ -7,75 +7,29 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 
 # 2. Environment Setup
 
+**Note**: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup),
+in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+
 **Note**: Please be aware that in order to enable the latest optimizations for MoE models (DeepSeek, Mixtral, etc.) in `DeepSpeed`,
 we are setting a different argument for `env_setup.sh` in IPEX v2.6.0+cpu comparing with previous versions,
 in order to build `DeepSpeed` from source code with a recent commit.
 
-## 2.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
+## 2.1 [Recommended] Docker-based environment setup with compilation from source
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.6.0+cpu
-git submodule sync
-git submodule update --init --recursive
-
-# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
-# To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/llm/Dockerfile --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0 .
-
-# Run the container with command below
-docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0 bash
-
-# When the command prompt shows inside the docker container, enter llm examples directory
-cd llm
-
-# Activate environment variables
-# set bash script argument to "inference" or "fine-tuning" for different usages
-source ./tools/env_activate.sh [inference|fine-tuning]
-```
-
-## 2.2 Conda-based environment setup with pre-built wheels
-
-```bash
-# Get the Intel® Extension for PyTorch\* source code
-git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch
-git checkout v2.6.0+cpu
-git submodule sync
-git submodule update --init --recursive
-
-# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
-# Create a conda environment
-conda create -n llm python=3.10 -y
-conda activate llm
-
-# Setup the environment with the provided script
-cd examples/cpu/llm
-bash ./tools/env_setup.sh 15
-
-# Activate environment variables
-# set bash script argument to "inference" or "fine-tuning" for different usages
-source ./tools/env_activate.sh [inference|fine-tuning]
-```
-
-## 2.3 Docker-based environment setup with compilation from source
-
-```bash
-# Get the Intel® Extension for PyTorch\* source code
-git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch
-git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
 # To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0 .
+docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:main .
 
 # Run the container with command below
-docker run --rm -it --net host --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0 bash
+docker run --rm -it --net host --privileged -v /dev/shm:/dev/shm ipex-llm:main bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -85,13 +39,12 @@ cd llm
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
 
-## 2.4 Conda-based environment setup with compilation from source
+## 2.2 Conda-based environment setup with compilation from source
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.6.0+cpu
 git submodule sync
 git submodule update --init --recursive
 

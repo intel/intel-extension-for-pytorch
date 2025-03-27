@@ -1234,7 +1234,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.6.0"
-    max_version = "4.46.2"
+    max_version = "4.48.0"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "Please installed the transformers with version: between {} and {}".format(

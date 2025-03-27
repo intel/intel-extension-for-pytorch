@@ -6,30 +6,6 @@
 
 using namespace at::vec;
 
-inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
-  for (int j = 0; j < len; j++) {
-    *(dst + j) = *(src + j);
-  }
-}
-
-inline void cvt_fp16_to_fp32(float* dst, const at::Half* src, int len) {
-  for (int j = 0; j < len; j++) {
-    *(dst + j) = *(src + j);
-  }
-}
-
-inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
-  for (int j = 0; j < len; j++) {
-    *(dst + j) = *(src + j);
-  }
-}
-
-inline void cvt_fp32_to_fp16(at::Half* dst, const float* src, int len) {
-  for (int j = 0; j < len; j++) {
-    *(dst + j) = *(src + j);
-  }
-}
-
 /*
   Following the namespace convention of PyTorch, we put ISA-specific kernels
   under at::vec::[CPU_CAPABILITY] with [CPU_CAPABILITY] as the inline namespace.
@@ -117,39 +93,10 @@ inline void packed_bf16_add_ker(
   }
 }
 
-static IPEX_FORCE_INLINE void move_ker_load_aligned(
-    at::BFloat16* out,
-    const float* in,
-    int64_t len) {
-  move_ker(out, in, len);
-}
-
-static IPEX_FORCE_INLINE void move_ker_load_aligned(
-    float* out,
-    const float* in,
-    int64_t len) {
-  move_ker(out, in, len);
-}
-
-static IPEX_FORCE_INLINE void move_ker_load_aligned(
-    at::BFloat16* out,
-    const at::BFloat16* in,
-    int64_t len) {
-  move_ker(out, in, len);
-}
-
 template <typename T>
 inline float toFloat(T val) {
   float ret = float(val);
   return ret;
-}
-
-template <typename T1, typename T2>
-inline void madd_ker(T1* inout, T2* in, int len, float alpha) {
-#pragma omp simd
-  for (long v = 0; v < len; v++) {
-    inout[v] += toFloat(in[v]) * alpha;
-  }
 }
 
 } // namespace kernel
