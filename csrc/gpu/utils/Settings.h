@@ -99,7 +99,6 @@ class IPEX_API Settings final {
 
   bool is_onemkl_enabled() const;
 
-  bool is_channels_last_1d_enabled() const;
   bool is_xetla_enabled() const;
 
   bool is_pti_enabled() const;

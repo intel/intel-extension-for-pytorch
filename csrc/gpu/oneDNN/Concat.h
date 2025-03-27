@@ -63,9 +63,8 @@ static void concat(
   TORCH_CHECK(dimension >= 0, "invalid dimension");
 
   auto smf = cat_compute_output_memory_format(srcs);
-  bool is_channels_last =
-      (CHANNELSLAST1D_DPCPP == smf || at::MemoryFormat::ChannelsLast == smf ||
-       at::MemoryFormat::ChannelsLast3d == smf)
+  bool is_channels_last = (at::MemoryFormat::ChannelsLast == smf ||
+                           at::MemoryFormat::ChannelsLast3d == smf)
       ? true
       : false;
 
@@ -92,12 +91,7 @@ static void concat(
     }
   }
 
-  if (CHANNELSLAST1D_DPCPP == smf) {
-    dst.resize_(dst_tz, at::MemoryFormat::Contiguous);
-    dst = convert_tensor_to_channels_last_1d(dst);
-  } else {
-    dst.resize_(dst_tz, smf);
-  }
+  dst.resize_(dst_tz, smf);
 
   auto engine = GpuEngineManager::Instance().get_engine(
       {kXPU, at::xpu::current_device()});

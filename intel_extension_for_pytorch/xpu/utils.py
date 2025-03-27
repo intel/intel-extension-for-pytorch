@@ -1,7 +1,6 @@
 # coding: utf-8
 from enum import Enum
 from functools import lru_cache
-from typing_extensions import deprecated
 import torch
 from .. import _C
 from .. import frontend
@@ -11,14 +10,6 @@ from .intrinsic import clip_grad_norm_  # noqa F401
 
 def has_onemkl():
     return _C._is_onemkl_enabled()
-
-
-@deprecated(
-    "`ipex.xpu.has_channels_last_1d()` is deprecated.",
-    category=FutureWarning,
-)
-def has_channels_last_1d():
-    return _C._is_channels_last_1d_enabled()
 
 
 @lru_cache(None)

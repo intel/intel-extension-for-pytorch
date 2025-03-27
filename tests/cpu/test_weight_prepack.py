@@ -4,10 +4,6 @@ import copy
 import os
 import time
 import sys
-from intel_extension_for_pytorch.utils.channels_last_1d import (
-    to_channels_last_1d,
-    is_contiguous_channels_last_1d,
-)
 
 try:
     import torchvision
@@ -57,66 +53,6 @@ def get_rand_seed():
 
 
 class TestPrepackCases(TestCase):
-    def test_channels_last_1d_forward(self):
-        class Conv1d(torch.nn.Module):
-            def __init__(
-                self, in_channels, out_channels, kernel_size, stride, padding, bias
-            ):
-                super(Conv1d, self).__init__()
-                self.conv = torch.nn.Conv1d(
-                    in_channels,
-                    out_channels,
-                    kernel_size=kernel_size,
-                    stride=stride,
-                    padding=padding,
-                    bias=bias,
-                )
-
-            def forward(self, x):
-                return self.conv(x)
-
-        input_shapes = [
-            (2, 2, 3),
-            (4, 4, 4),
-            (4, 4, 1),
-            (4, 1, 4),
-            (4, 1, 1),
-            (1, 4, 4),
-            (1, 4, 1),
-            (1, 1, 4),
-        ]
-        for x_shape in input_shapes:
-            M = 5
-            C = x_shape[1]
-            x = torch.randn(x_shape, dtype=torch.float32)
-            model = (
-                Conv1d(
-                    in_channels=C,
-                    out_channels=M,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1,
-                    bias=False,
-                )
-                .float()
-                .eval()
-            )
-
-            x_nwc = to_channels_last_1d(copy.deepcopy(x))
-            model = to_channels_last_1d(model)
-
-            ipex_model = ipex.optimize(model, dtype=torch.float32, level="O1")
-            y_ipex = ipex_model(x)
-            y = model(x)
-            self.assertEqual(y, y_ipex)
-
-            y_ipex_nwc = ipex_model(x_nwc)
-            y_nwc = model(x_nwc)
-            self.assertEqual(y_nwc, y_ipex_nwc)
-            self.assertEqual(y_ipex, y_ipex_nwc)
-            self.assertTrue(is_contiguous_channels_last_1d(y_ipex))
-            self.assertTrue(is_contiguous_channels_last_1d(y_ipex_nwc))
-
     def _test_convolution_base(self, dim, dtype, is_train, rtol=None, atol=None):
         class ConvNd(torch.nn.Module):
             def __init__(
@@ -347,14 +283,6 @@ class TestPrepackCases(TestCase):
                 y2 = ipex_model1(x2)
                 # ipex path with inplace=True
                 y3 = ipex_model2(x3)
-                if dim == 1:
-                    x4 = to_channels_last_1d(copy.deepcopy(x2))
-                    y4 = ipex_model1(x4)
-                    self.assertEqual(y1.float(), y4.float(), rtol=rtol, atol=atol)
-                    self.assertTrue(is_contiguous_channels_last_1d(y2))
-                    self.assertTrue(is_contiguous_channels_last_1d(y3))
-                    self.assertTrue(is_contiguous_channels_last_1d(y4))
-
             if is_train:
                 grad_x = (
                     torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()

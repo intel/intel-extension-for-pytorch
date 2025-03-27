@@ -4,7 +4,6 @@ from typing import List, Optional
 import torch
 import torch.library
 from torch._prims_common import IntLike
-from .utils.channels_last_1d import to_channels_last_1d
 
 
 @functools.lru_cache(None)
@@ -190,9 +189,6 @@ def meta_convolution_forward(
 
     out = input.new_empty(shape_out)
     out = out.to(memory_format=memory_format)  # type: ignore[call-overload]
-
-    if input.dim() == 3:
-        out = to_channels_last_1d(out)
 
     return out
 

@@ -58,7 +58,6 @@
 #
 # XPU build options:
 # USE_ONEMKL            - to use oneMKL in operators
-# USE_CHANNELS_LAST_1D  - to use channels last 1d feature
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_QUEUE_BARRIER     - to use queue submit_barrier API

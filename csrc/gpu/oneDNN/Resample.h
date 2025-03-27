@@ -110,13 +110,7 @@ static void resample(
 
   Tensor src = src_;
   if (is_smf_channels_last(src_)) {
-    auto cl_tag = get_cl_tag_by_ndim(ndims);
-    if (CHANNELSLAST1D_DPCPP == cl_tag) {
-      dst.resize_(dst_dims);
-      convert_tensor_to_channels_last_1d(dst);
-    } else {
-      dst.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
-    }
+    dst.resize_(dst_dims, get_cl_tag_by_ndim(ndims));
   } else {
     src = src_.contiguous(src_.suggest_memory_format());
     dst.resize_(dst_dims, src_.suggest_memory_format());
@@ -210,16 +204,8 @@ static void resample_backward(
 
   Tensor diff_dst;
   if (is_smf_channels_last(diff_dst_)) {
-    auto cl_tag = get_cl_tag_by_ndim(ndims);
-    if (CHANNELSLAST1D_DPCPP == cl_tag) {
-      diff_src.resize_(src_dims);
-      convert_tensor_to_channels_last_1d(diff_src);
-      auto tmp = diff_dst_.contiguous(at::MemoryFormat::Contiguous);
-      diff_dst = convert_tensor_to_channels_last_1d(tmp);
-    } else {
-      diff_src.resize_(src_dims, get_cl_tag_by_ndim(ndims));
-      diff_dst = diff_dst_.contiguous(get_cl_tag_by_ndim(ndims));
-    }
+    diff_src.resize_(src_dims, get_cl_tag_by_ndim(ndims));
+    diff_dst = diff_dst_.contiguous(get_cl_tag_by_ndim(ndims));
   } else {
     diff_src.resize_(src_dims, diff_dst_.suggest_memory_format());
     diff_dst = diff_dst_.contiguous(diff_dst_.suggest_memory_format());

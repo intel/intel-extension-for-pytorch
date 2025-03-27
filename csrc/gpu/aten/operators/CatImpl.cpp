@@ -426,14 +426,7 @@ static void cat(
     }
     size[dim] = result_dim_size;
   }
-
-  if (CHANNELSLAST1D_DPCPP == ft_smf) {
-    result.resize_(size, at::MemoryFormat::Contiguous);
-    result = convert_tensor_to_channels_last_1d(result);
-  } else {
-    result.resize_(size, ft_smf);
-  }
-
+  result.resize_(size, ft_smf);
   const bool all32BitIndexable =
       std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
         return torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(t);
