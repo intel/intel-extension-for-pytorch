@@ -419,6 +419,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         return self.is_beam_search() is True and curr_len == 1
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        query = query.reshape(hidden_states.shape[0], hidden_states.shape[1], -1)
         query, key, value = self.qkv_proj(hidden_states, query, key, value)
         return query, key, value
 
@@ -457,7 +458,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             and not self.beam_search_first_iter(curr_len)
         ):
             query = torch.empty(
-                [curr_len, bs, self.num_heads * self.head_dim],
+                [curr_len * bs, self.num_heads * self.head_dim],
                 dtype=hidden_states.dtype,
                 device=hidden_states.device,
             )
