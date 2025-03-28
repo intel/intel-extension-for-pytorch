@@ -187,9 +187,6 @@ inline bool data_index_step(T& x, const T& X, Args&&... args) {
 #else
 #define ALWAYS_INLINE inline
 #endif
-// TODO: remove me
-#define STRINGIFY(x) #x // Turns the argument into a string
-#define TOSTRING(x) STRINGIFY(x) // Handles nested macros
 template <int n>
 struct Unroll {
   template <typename Func, typename... Args>

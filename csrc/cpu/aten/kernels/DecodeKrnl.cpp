@@ -185,9 +185,6 @@ inline bool data_index_step(T& x, const T& X, Args&&... args) {
 #else
 #define ALWAYS_INLINE inline
 #endif
-// TODO: remove me
-#define STRINGIFY(x) #x // Turns the argument into a string
-#define TOSTRING(x) STRINGIFY(x) // Handles nested macros
 template <int n>
 struct Unroll {
   template <typename Func, typename... Args>
@@ -1651,7 +1648,6 @@ void decode_attention_grouped_kernel_impl(
     int beam_stride0) {
   using Vec = at::vec::Vectorized<float>;
   // block length for k_cache and v_cache
-  // TODO: tune BLOCK_N 256/512
   constexpr int BLOCK_N = 512;
   // block length for heads
   constexpr int BLOCK_H = 16;
@@ -1829,7 +1825,6 @@ void decode_attention_grouped_opt_kernel_impl(
     int max_total_num_tokens) {
   using Vec = at::vec::Vectorized<float>;
   // block length for k_cache and v_cache
-  // TODO: tune BLOCK_N 256/512
   constexpr int BLOCK_N = 512;
   // block length for heads
   constexpr int BLOCK_H = 6;
