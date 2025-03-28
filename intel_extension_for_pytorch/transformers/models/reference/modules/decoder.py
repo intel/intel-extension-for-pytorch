@@ -1989,6 +1989,7 @@ def Qwen3MoeDecoderLayer_forward(
     # hidden_states = self.mlp(hidden_states)
     router_logits = None
     if hasattr(self.mlp, "experts"):
+        orig_shape = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
         # router_logits: (batch * sequence_length, n_experts)
         router_logits = self.mlp.gate(hidden_states)
@@ -2001,55 +2002,10 @@ def Qwen3MoeDecoderLayer_forward(
             routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         # we cast back to the input dtype
         routing_weights = routing_weights.to(hidden_states.dtype)
-
-        # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
-        if self.moe_linear_type in [0, 1]:
-            hidden_states = torch.ops.torch_ipex.deepseek_moe_tpp(
-                hidden_states,
-                selected_experts,
-                self.gate_weights,
-                self.up_weights,
-                self.down_weights,
-                self.moe_linear_type == 0,
-                routing_weights,
-                self.distributed,
-            )
-        elif self.moe_linear_type == 2:
-            hidden_states = torch.ops.torch_ipex.deepseek_moe(
-                hidden_states,
-                selected_experts,
-                self.gate_weights,
-                self.gate_ctx,
-                self.up_weights,
-                self.up_ctx,
-                self.down_weights,
-                self.down_ctx,
-                routing_weights,
-                self.distributed,
-            )
-        elif self.moe_linear_type == 3:
-            hidden_states = torch.ops.torch_ipex.deepseek_moe_mkl(
-                hidden_states,
-                selected_experts,
-                self.gate_weights,
-                self.gate_ctx,
-                self.up_weights,
-                self.up_ctx,
-                self.down_weights,
-                self.down_ctx,
-                routing_weights,
-                self.distributed,
-            )
-        else:
-            hidden_states = torch.ops.torch_ipex.deepseek_moe_woq(
-                hidden_states,
-                selected_experts,
-                self.gate_ctx,
-                self.up_ctx,
-                self.down_ctx,
-                routing_weights,
-                self.distributed,
-            )
+        hidden_states = moe_infer(
+            self, hidden_states, selected_experts, routing_weights
+        ).view(*orig_shape)
+        hidden_states = residual + hidden_states
     else:
         mlp_gate = self.linear_silu_mul(hidden_states)
 
@@ -2058,8 +2014,6 @@ def Qwen3MoeDecoderLayer_forward(
         else:
             hidden_states = self.mlp.down_proj(mlp_gate)
             hidden_states = residual + hidden_states
-
-    hidden_states = residual + hidden_states
 
     outputs = (hidden_states,)
     if output_attentions:
@@ -2293,19 +2247,6 @@ class _IPEXDecoderLayerRef(nn.Module):
             )
             del self.__dict__["_modules"]["mlp"].gate_proj
             del self.__dict__["_modules"]["mlp"].up_proj
-        elif self.model_backbone == "Qwen3MoeForCausalLM":
-            if not self.distributed:
-                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
-                del self.__dict__["_modules"]["self_attn"].o_proj
-                if hasattr(module.mlp, "down_proj"):
-                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
-                    del self.__dict__["_modules"]["mlp"].down_proj
-            if hasattr(module.mlp, "gate_proj") and hasattr(module.mlp, "up_proj"):
-                self.linear_silu_mul = _IPEXlinearSiluMulRef(
-                    module.mlp.gate_proj, module.mlp.up_proj
-                )
-                del self.__dict__["_modules"]["mlp"].gate_proj
-                del self.__dict__["_modules"]["mlp"].up_proj
         elif self.model_backbone == "StableLmForCausalLM":
             if not self.distributed:
                 if (
@@ -2545,7 +2486,11 @@ class _IPEXDecoderLayerRef(nn.Module):
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
                     del self.__dict__["_modules"]["mamba"].out_proj
-        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
+        elif self.model_backbone in [
+            "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
+            "Qwen3MoeForCausalLM",
+        ]:
             # use fused moe only when bf16/woq
             self.use_fused_moe = (
                 True
@@ -2564,7 +2509,12 @@ class _IPEXDecoderLayerRef(nn.Module):
             self.deepseek_lowbit_load = False
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
-                if config.n_shared_experts is not None:
+                if self.model_backbone == "Qwen3MoeForCausalLM":
+                    config.n_routed_experts = config.num_experts
+                if (
+                    hasattr(config, "n_shared_experts")
+                    and config.n_shared_experts is not None
+                ):
                     if self.use_fused_moe or self.use_fused_moe_woq:
                         from intel_extension_for_pytorch.quantization import (
                             WoqWeightDtype,

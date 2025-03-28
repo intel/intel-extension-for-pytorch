@@ -933,7 +933,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             self.gate_ctx = []
                             self.up_ctx = []
                             self.down_ctx = []
-                            offset = self.mlp.ep_rank * self.mlp.experts_per_rank
+                            offset = (
+                                0
+                                if self.model_backbone == "Qwen3MoeForCausalLM"
+                                else self.mlp.ep_rank * self.mlp.experts_per_rank
+                            )
                             for expert_idx in range(len(self.mlp.experts)):
                                 expert_layer = self.mlp.experts[expert_idx + offset]
                                 if self.moe_linear_type in [0, 1]:

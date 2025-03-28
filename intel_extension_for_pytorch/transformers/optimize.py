@@ -2481,6 +2481,7 @@ def optimize(
                 if _model.config.architectures[0] in [
                     "DeepseekV2ForCausalLM",
                     "DeepseekV3ForCausalLM",
+                    "Qwen3MoeForCausalLM",
                 ]:
                     for layer in _model.model.layers:
                         layer.qconfig = quantization_config.global_qconfig
