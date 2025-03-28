@@ -23,6 +23,25 @@ masked_multihead_self_attention(
     const c10::optional<at::Tensor>& attention_mask /* optional */,
     c10::optional<bool> add_casual_mask /* optional */);
 
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+deepseekv2_mla_forward_cpu(
+    at::Tensor& query,
+    at::Tensor& kv,
+    at::Tensor& k_pe,
+    at::Tensor& kv_cache,
+    at::Tensor& kv_b_weight,
+    at::Tensor& w_kc,
+    at::Tensor& w_vc,
+    at::Tensor& beam_idx,
+    at::Tensor seq_info,
+    const double scale_attn,
+    int64_t max_positions,
+    int64_t v_head_dim,
+    const c10::optional<at::Tensor>& head_mask /* optional */,
+    const c10::optional<at::Tensor>& attention_mask /* optional */,
+    const c10::optional<at::Tensor>& w_scale /* optional */,
+    c10::optional<bool> add_casual_mask /* optional */);
+
 at::Tensor prepare_4d_causal_attention_mask_forward_cpu(
     at::Tensor& attention_mask,
     at::Tensor& inputs_embeds,
@@ -45,10 +64,29 @@ using masked_multihead_self_attention_kernel_fn =
         const c10::optional<at::Tensor>& head_mask /* optional */,
         const c10::optional<at::Tensor>& attention_mask /* optional */,
         c10::optional<bool> add_casual_mask /* optional */);
+using deepseekv2_mla_kernel_fn =
+    std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> (*)(
+        at::Tensor& query,
+        at::Tensor& kv,
+        at::Tensor& k_pe,
+        at::Tensor& kv_cache,
+        at::Tensor& kv_b_weight,
+        at::Tensor& w_kc,
+        at::Tensor& w_vc,
+        at::Tensor& beam_idx,
+        at::Tensor seq_info,
+        const double scale_attn,
+        int64_t max_positions,
+        int64_t v_head_dim,
+        const c10::optional<at::Tensor>& head_mask /* optional */,
+        const c10::optional<at::Tensor>& attention_mask /* optional */,
+        const c10::optional<at::Tensor>& w_scale /* optional */,
+        c10::optional<bool> add_casual_mask /* optional */);
 
 IPEX_DECLARE_DISPATCH(
     masked_multihead_self_attention_kernel_fn,
     masked_multihead_self_attention_kernel_stub);
+IPEX_DECLARE_DISPATCH(deepseekv2_mla_kernel_fn, deepseekv2_mla_kernel_stub);
 using prepare_4d_causal_attention_mask_kernel_fn = at::Tensor (*)(
     at::Tensor& attention_mask,
     at::Tensor& inputs_embeds,

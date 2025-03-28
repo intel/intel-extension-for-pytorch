@@ -371,9 +371,11 @@ at::Tensor sd_mha_base_kernel(
                 kvBlockSize,
                 headSize,
                 1.f,
-                (const MKL_BF16*)(query + i * qSize * qStride + headSize * j + k * qSplitSize * qStride),
+                (const MKL_BF16*)(query + i * qSize * qStride + headSize * j +
+                                  k * qSplitSize * qStride),
                 qStride,
-                (const MKL_BF16*)(key + i * kvSize * kStride + headSize * j + l * kvSplitSize * kStride),
+                (const MKL_BF16*)(key + i * kvSize * kStride + headSize * j +
+                                  l * kvSplitSize * kStride),
                 kStride,
                 0.f,
                 qk_fp32_ptr + ompIdx * qSplitSize * kvSplitSize,
@@ -422,9 +424,11 @@ at::Tensor sd_mha_base_kernel(
                 headSize,
                 kvBlockSize,
                 1.f,
-                (const MKL_BF16*)(qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize),
+                (const MKL_BF16*)(qk_bf16_ptr +
+                                  ompIdx * qSplitSize * kvSplitSize),
                 kvBlockSize,
-                (const MKL_BF16*)(value + i * kvSize * vStride + headSize * j + l * kvSplitSize * vStride),
+                (const MKL_BF16*)(value + i * kvSize * vStride + headSize * j +
+                                  l * kvSplitSize * vStride),
                 vStride,
                 l == 0 ? 0.f : 1.f,
                 dst_fp32_ptr + ompIdx * qSplitSize * headSize,
@@ -543,9 +547,13 @@ at::Tensor bert_mha_kernel_impl(
               kvBlockSize,
               headSize,
               1.f,
-              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() + i * sequenceSize * qkvColSize + headSize * j + k * qSplitSize * qkvColSize),
+              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() +
+                                i * sequenceSize * qkvColSize + headSize * j +
+                                k * qSplitSize * qkvColSize),
               qkvColSize,
-              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() + i * sequenceSize * qkvColSize + hiddenSize + headSize * j + l * kvSplitSize * qkvColSize),
+              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() +
+                                i * sequenceSize * qkvColSize + hiddenSize +
+                                headSize * j + l * kvSplitSize * qkvColSize),
               qkvColSize,
               0.f,
               qk_fp32.data_ptr<float>() + ompIdx * qSplitSize * kvSplitSize,
@@ -574,9 +582,12 @@ at::Tensor bert_mha_kernel_impl(
               headSize,
               kvBlockSize,
               1.f,
-              (const MKL_BF16*)(qk_bf16.data_ptr<at::BFloat16>() + ompIdx * qSplitSize * kvSplitSize),
+              (const MKL_BF16*)(qk_bf16.data_ptr<at::BFloat16>() +
+                                ompIdx * qSplitSize * kvSplitSize),
               kvBlockSize,
-              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() + i * sequenceSize * qkvColSize + hiddenSize * 2 + headSize * j + l * kvSplitSize * qkvColSize),
+              (const MKL_BF16*)(qkv.data_ptr<at::BFloat16>() +
+                                i * sequenceSize * qkvColSize + hiddenSize * 2 +
+                                headSize * j + l * kvSplitSize * qkvColSize),
               qkvColSize,
               l == 0 ? 0.f : 1.f,
               dst_fp32.data_ptr<float>() + ompIdx * qSplitSize * headSize,

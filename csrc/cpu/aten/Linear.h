@@ -310,5 +310,14 @@ IPEX_DECLARE_DISPATCH(dequant_nf4_fn, dequant_nf4_stub);
 
 #endif
 
+using fp8_bmm_fn = void (*)(
+    at::Tensor&,
+    at::Tensor&,
+    at::Tensor&,
+    bool,
+    std::optional<at::Tensor>&);
+
+IPEX_DECLARE_DISPATCH(fp8_bmm_fn, fp8_bmm_stub);
+
 } // namespace cpu
 } // namespace torch_ipex

@@ -53,7 +53,7 @@ if args.local_rank == 0:
     )
     if model_type == "llama" and args.vision_text_model:
         model_type = "mllama"
-    if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+    if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
         model_type = model_type.replace("-", "")
     model_class = MODEL_CLASSES[model_type]
     load_dtype = torch.float32
@@ -86,7 +86,7 @@ if args.local_rank == 0:
     tokenizer.save_pretrained(save_directory=args.save_path)
     if model_type == "llava":
         image_processor.save_pretrained(save_directory=args.save_path)
-    if model_type in ["maira2", "deepseekv2", "deepseekv3"]:
+    if model_type in ["maira2", "deepseekv2", "deepseekv3", "deepseekr1"]:
         import inspect
         import shutil
 

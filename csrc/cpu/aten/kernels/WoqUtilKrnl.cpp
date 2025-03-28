@@ -317,6 +317,15 @@ at::Tensor qlinear_woq_unpack(
     }
   } else {
     TLA_ASSERT(qw_packed.dim() == 2, "qw_packed must be 2D or 4D");
+    if (qw_type == WOQ_DTYPE_FP8 && lowp_mode == LOWP_MODE_BF16) {
+      int N = qw_packed.size(0);
+      int K = qw_packed.size(1);
+      constexpr int BLOCK_N_FP8 = 64;
+      return qw_packed.view({N / BLOCK_N_FP8, K / 2, BLOCK_N_FP8, 2})
+          .permute({0, 2, 1, 3})
+          .contiguous()
+          .view({N, K});
+    }
     return qw_packed;
   }
 }

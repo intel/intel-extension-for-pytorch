@@ -79,10 +79,10 @@ at::Tensor nms_cpu_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
     for (int64_t _j = _i + 1; _j < ndets; _j++) {
@@ -160,10 +160,10 @@ at::Tensor nms_cpu_kernel</*scalar_t*/ float, /*sorted*/ true>(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int i = 0; i < ndets_up_scale; i += 16) {
@@ -246,10 +246,10 @@ at::Tensor nms_cpu_kernel</*scalar_t*/ float, /*sorted*/ true>(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
     for (int64_t _j = 0; _j < ndets_i_up_scale; _j += 16) {
@@ -405,10 +405,10 @@ batch_score_nms_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   // skip background (i = 0)
@@ -463,10 +463,10 @@ batch_score_nms_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int bs = 0; bs < nbatch; bs++) {
@@ -518,10 +518,10 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int i = 0; i < nbatch; i++) {
@@ -584,10 +584,10 @@ box_head_nms_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int bs = 0; bs < nbatch; bs++) {
@@ -634,10 +634,10 @@ box_head_nms_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int bs = 0; bs < nbatch; bs++) {

@@ -22,8 +22,12 @@ TORCH_API at::Tensor& _amp_update_scale_cpu_(
 using _amp_foreach_non_finite_check_and_unscale_cpu__fn =
     void (*)(std::vector<at::Tensor>, at::Tensor&, const at::Tensor&);
 
-using _amp_update_scale_cpu__fn = at::
-    Tensor& (*)(at::Tensor&, at::Tensor&, const at::Tensor&, double, double, int64_t);
+using _amp_update_scale_cpu__fn = at::Tensor& (*)(at::Tensor&,
+                                                  at::Tensor&,
+                                                  const at::Tensor&,
+                                                  double,
+                                                  double,
+                                                  int64_t);
 
 IPEX_DECLARE_DISPATCH(
     _amp_foreach_non_finite_check_and_unscale_cpu__fn,

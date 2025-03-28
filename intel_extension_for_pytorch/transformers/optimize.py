@@ -223,7 +223,8 @@ def model_convert_reference(_model):
         JambaForCausalLM_forward,
         DeepseekV2ForCausalLM_forward,
         DeepseekV2Model_forward,
-        Deepseek_MoEGate_forward,
+        # Deepseek_MoEGate_forward,
+        _IPEXDeepSeekV3MoEGate,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -1228,11 +1229,18 @@ def model_convert_reference(_model):
     ]:
         convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
         convert_function(_model.model, "forward", DeepseekV2Model_forward)
-        convert_functions(
+        # convert_functions(
+        #     _model,
+        #     type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
+        #     "forward",
+        #     Deepseek_MoEGate_forward,
+        # )
+        convert_class(
             _model,
             type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
-            "forward",
-            Deepseek_MoEGate_forward,
+            _IPEXDeepSeekV3MoEGate,
+            _model.config,
+            distributed=distributed,
         )
         convert_class(
             _model,
@@ -1374,6 +1382,22 @@ def get_dummy_input(_model, return_dict=False):
                     )
                 )
                 for i in range(_model.config.num_hidden_layers)
+            ]
+        )
+    elif _model.config.architectures[0] in [
+        "DeepseekV2ForCausalLM",
+        "DeepseekV3ForCausalLM",
+    ]:
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                )
+                for i in range(model_num_layers)
             ]
         )
     else:
@@ -1914,12 +1938,14 @@ def model_convert_lowering(
                 enabled=True if dtype in [torch.bfloat16, torch.half] else False,
                 dtype=dtype,
             ):
+                logger.debug("Doing jit.trace")
                 trace_model = torch.jit.trace(
                     _model,
                     example_kwarg_inputs=sample_inputs,
                     strict=False,
                     check_trace=False,
                 )
+                logger.debug("Doing jit.freeze")
                 trace_model = torch.jit.freeze(trace_model)
                 if _model.config.architectures[0] == "MllamaForConditionalGeneration":
                     pixel_values = torch.rand(
@@ -2333,12 +2359,16 @@ def optimize(
                     "quant_method": "gptq",
                     "group_size": None,
                 }
+            logger.debug(
+                "ipex.llm.optimize is converting with low_precision_checkpoint"
+            )
             _model = _convert_woq_with_low_precision_checkpoint(
                 _model, quantization_config, state_dict, quant_config
             )
             use_low_precision_checkpoint = True
 
         # model reference conversion
+        logger.debug("ipex.llm.optimize is converting model to reference model")
         _model = model_convert_reference(_model)
 
         # model quantization if needed
@@ -2447,8 +2477,16 @@ def optimize(
                     quantization_config,
                     None,
                 )
+                # for fused moe
+                if _model.config.architectures[0] in [
+                    "DeepseekV2ForCausalLM",
+                    "DeepseekV3ForCausalLM",
+                ]:
+                    for layer in _model.model.layers:
+                        layer.qconfig = quantization_config.global_qconfig
 
         # model lowering conversion
+        logger.debug("ipex.llm.optimize is lowering model")
         _model = model_convert_lowering(
             _model,
             device,

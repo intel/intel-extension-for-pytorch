@@ -166,10 +166,10 @@ at::Tensor scale_back_batch_kernel(
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
 #pragma omp parallel for simd schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #else
 #pragma omp parallel for schedule( \
-    static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
+        static) if (omp_get_max_threads() > 1 && !omp_in_parallel())
 #endif
 #endif
   for (int64_t k = 0; k < ndets; k++) {

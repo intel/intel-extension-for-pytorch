@@ -456,6 +456,24 @@ class PagedAttention:
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
 
+    [class method]: reshape_and_cache_flash
+    ipex.llm.modules.PagedAttention.reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
+    This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+    This method implementation is the same as reshape_and_cache but we need this to align with XPU.
+
+    Args:
+        key (torch.Tensor): The keytensor. The shape should be [num_seqs, num_heads, head_size].
+        value (torch.Tensor): The value tensor. The shape should be [num_seqs, num_heads, head_size].
+        key_cache (torch.Tensor):  The pre-allocated buffer to store the key cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        value_cache (torch.Tensor): The pre-allocated buffer to store the value cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
+            The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
+            can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
+
     [class method]: single_query_cached_kv_attention
 
     .. highlight:: python
@@ -561,6 +579,23 @@ class PagedAttention:
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache(
+            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+        )
+
+    @classmethod
+    def reshape_and_cache_flash(
+        cls,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        key_cache: torch.Tensor,
+        value_cache: torch.Tensor,
+        slot_mapping: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
+        ).reshape_and_cache_flash(
             key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
         )
 

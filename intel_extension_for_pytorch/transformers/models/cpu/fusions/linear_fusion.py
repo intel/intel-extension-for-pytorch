@@ -56,6 +56,13 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return nn.functional.silu(
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                )
             return torch.ops.torch_ipex.woq_linear_silu(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -90,6 +97,13 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return nn.functional.relu(
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                )
             return torch.ops.torch_ipex.woq_linear_relu(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -126,6 +140,14 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return (
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                    * y
+                )
             return torch.ops.torch_ipex.woq_linear_mul(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -164,6 +186,14 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return (
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                    + y
+                )
             return torch.ops.torch_ipex.woq_linear_add(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -204,6 +234,15 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return (
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                    + y
+                    + z
+                )
             return torch.ops.torch_ipex.woq_linear_add_add(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -239,6 +278,22 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                x = torch.ops.torch_ipex.ipex_woq_linear(
+                    x,
+                    self.linear._op_context.get_data_handle(),
+                )
+                return (
+                    0.5
+                    * x
+                    * (
+                        1.0
+                        + torch.tanh(
+                            math.sqrt(2.0 / math.pi)
+                            * (x + 0.044715 * torch.pow(x, 3.0))
+                        )
+                    )
+                )
             return torch.ops.torch_ipex.woq_linear_new_gelu(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -284,6 +339,13 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return self.gelu(
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear._op_context.get_data_handle(),
+                    )
+                )
             return torch.ops.torch_ipex.woq_linear_gelu(
                 x,
                 self.linear._op_context.get_data_handle(),
@@ -318,6 +380,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 isinstance(linear, WeightOnlyQuantizedLinear)
                 for linear in self.linear_list
             )
+            and self.linear_list[0].weight.dtype != torch.float8_e4m3fn
         ):
             # Quantization is done before lowering to CPU.
             # We assume weights are all in shape [N, K].
@@ -478,6 +541,20 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             and hasattr(self.linear_m, "_op_context")
             and self.linear_m._op_context is not None
         ):
+            if self.linear_s.weight.dtype == torch.float8_e4m3fn:
+                y = nn.functional.silu(
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear_s._op_context.get_data_handle(),
+                    )
+                )
+                return (
+                    torch.ops.torch_ipex.ipex_woq_linear(
+                        x,
+                        self.linear_m._op_context.get_data_handle(),
+                    )
+                    * y
+                )
             y = torch.ops.torch_ipex.woq_linear_silu(
                 x,
                 self.linear_s._op_context.get_data_handle(),
@@ -521,6 +598,16 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
             and hasattr(self.linear, "_op_context")
             and self.linear._op_context is not None
         ):
+            if self.linear.weight.dtype == torch.float8_e4m3fn:
+                return (
+                    nn.functional.silu(
+                        torch.ops.torch_ipex.ipex_woq_linear(
+                            x,
+                            self.linear._op_context.get_data_handle(),
+                        )
+                    )
+                    * y
+                )
             return (
                 torch.ops.torch_ipex.woq_linear_silu(
                     x,

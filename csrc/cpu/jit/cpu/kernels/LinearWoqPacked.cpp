@@ -98,7 +98,9 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
         for (size_t i = 0; i < num_row; ++i) {
           for (size_t j = 0; j < num_col; ++j) {
             zp_fp32_ptr[i * num_col + j] =
-                (float)((zp_int32_ptr[i * num_col_zp + j / 8] >> ((j % 8) * 4)) & 0xf);
+                (float)((zp_int32_ptr[i * num_col_zp + j / 8] >>
+                         ((j % 8) * 4)) &
+                        0xf);
           }
         }
       } else if (zero_points.numel() == scales_fp32.numel()) {
@@ -320,6 +322,12 @@ ContextLinearWoq create(
         group_size,
         lowp_mode,
         weight_format);
+  } else if (weight_dtype == WOQ_DTYPE_FP8 && lowp_mode == LOWP_MODE_BF16) {
+    constexpr int BLOCK_N_FP8 = 64;
+    packed_weight = weight.view({N / BLOCK_N_FP8, BLOCK_N_FP8, K / 2, 2})
+                        .permute({0, 2, 1, 3})
+                        .contiguous()
+                        .view({N, K});
   } else {
     packed_weight = woq_linear_pack_weight(
         weight,
