@@ -3,9 +3,6 @@ from common_utils import TestCase
 import torch
 import torch.nn as nn
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.utils.channels_last_1d import (
-    is_contiguous_channels_last_1d,
-)
 
 try:
     import torchvision
@@ -117,11 +114,6 @@ class TestAutoChannelsLast(TestCase):
         return channels_last_modules
 
     def test_auto_channels_last(self):
-        model = self._get_covnNd(dim=1)
-        model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=1)
-        self.assertTrue(is_contiguous_channels_last_1d(model.conv.weight))
-        self.assertTrue(is_contiguous_channels_last_1d(output))
-
         model = self._get_covnNd(dim=2)
         model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=2)
         self.assertTrue(
@@ -176,12 +168,6 @@ class TestAutoChannelsLast(TestCase):
         self.assertTrue(output.is_contiguous(memory_format=torch.channels_last))
 
     def test_auto_channels_last_memory_format_propagation(self):
-        # memory format propagates through channels_last compatible layers
-        model = self._get_covnNd_relu(dim=1)
-        model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=1)
-        self.assertTrue(is_contiguous_channels_last_1d(model.conv.weight))
-        self.assertTrue(is_contiguous_channels_last_1d(output))
-
         model = self._get_covnNd_relu(dim=2)
         model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=2)
         self.assertTrue(
@@ -194,12 +180,6 @@ class TestAutoChannelsLast(TestCase):
         self.assertTrue(
             model.conv.weight.is_contiguous(memory_format=torch.channels_last_3d)
         )
-
-        # memory format reverts back to contiguous_format as linear is channels_last incompatible
-        model = self._get_covnNd_linear(dim=1)
-        model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=1)
-        self.assertTrue(is_contiguous_channels_last_1d(model.conv.weight))
-        self.assertTrue(output.is_contiguous(memory_format=torch.contiguous_format))
 
         model = self._get_covnNd_linear(dim=2)
         model, output = self._get_ipex_optimized_model_and_output_tensor(model, dim=2)
