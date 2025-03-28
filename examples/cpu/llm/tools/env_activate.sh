@@ -69,7 +69,7 @@ if [ ${MODE} == "inference" ]; then
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget -O prompt.json http://mlpc.intel.com/downloads/LLM/prompt-deepseekr1-16.json
+    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json
