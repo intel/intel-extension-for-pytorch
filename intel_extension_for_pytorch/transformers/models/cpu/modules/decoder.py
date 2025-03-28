@@ -468,6 +468,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     self.woq_weight_dtype == WoqWeightDtype.INT8
                                     and self.woq_lowp_mode == WoqLowpMode.INT8
                                 )
+                                assert (
+                                    self.woq_weight_dtype is WoqWeightDtype.INT8
+                                ), "DeepSeek only supports WOQ WoqWeightDtype.INT8..."
+                                assert self.woq_lowp_mode in [
+                                    WoqLowpMode.INT8,
+                                    WoqLowpMode.BF16,
+                                ], "DeepSeek only supports WOQ LowpMode in [WoqLowpMode.INT8, WoqLowpMode.BF16]..."
                                 (
                                     w13_shared_qweight,
                                     w13_shared_scale,
@@ -795,6 +802,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                     self.woq_weight_dtype == WoqWeightDtype.INT8
                                     and self.woq_lowp_mode == WoqLowpMode.INT8
                                 )
+                                assert (
+                                    self.woq_weight_dtype is WoqWeightDtype.INT8
+                                ), "DeepSeek only supports WOQ WoqWeightDtype.INT8..."
+                                assert self.woq_lowp_mode in [
+                                    WoqLowpMode.INT8,
+                                    WoqLowpMode.BF16,
+                                ], "DeepSeek only supports WOQ LowpMode in [WoqLowpMode.INT8, WoqLowpMode.BF16]..."
                                 for idx in range(len(self.mlp.experts)):
                                     w13_qweight, w13_scale, w13_zp, w13_comp = (
                                         woq_quant_and_pack(

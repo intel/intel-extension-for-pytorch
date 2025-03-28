@@ -59,18 +59,6 @@ inline float vec_reduce_max(const Vectorized<float>& a) {
 }
 #endif
 
-// debug
-template <typename scalar_t>
-void print_array(scalar_t* ptr, int size) {
-  for (int d = 0; d < size; ++d) {
-    if (d % 16 == 0) {
-      std::cout << std::endl;
-    }
-    std::cout << ptr[d] << " ";
-  }
-  std::cout << std::endl;
-}
-
 // } // anonymous namespace
 } // namespace cpu
 } // namespace torch_ipex

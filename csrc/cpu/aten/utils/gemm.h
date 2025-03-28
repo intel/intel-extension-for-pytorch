@@ -7,31 +7,11 @@
 // namespace {
 namespace torch_ipex {
 namespace cpu {
-// global float8 LUT
-alignas(64) static uint16_t e4m3_to_16bit[256];
-// block size for AMX gemm in moe.cpp
 constexpr int block_size_m() {
   return 1 * TILE_M;
 }
 constexpr int block_size_n() {
   return 8 * TILE_N;
-}
-template <typename T>
-static void initialize_e4m3_to_16bit_tables() {
-  // run only once
-  static bool initialized_16bit = false;
-  if (!initialized_16bit) {
-    std::cout << "\n@@@@ doing lut init ..." << std::endl;
-    for (uint8_t u8 = 0; u8 < 256; ++u8) {
-      auto value = static_cast<T>(c10::bit_cast<c10::Float8_e4m3fn>(u8));
-      uint16_t value_bits = c10::bit_cast<uint16_t>(value);
-      e4m3_to_16bit[u8] = value_bits;
-      if (u8 == 255) {
-        break;
-      }
-    }
-    initialized_16bit = true;
-  }
 }
 
 template <typename scalar_t>
@@ -206,114 +186,21 @@ struct tinygemm_kernel_nn<at::BFloat16, at::BFloat16, BLOCK_M, BLOCK_N> {
     Unroll<ROWS * COLS>{}(storec);
   }
 };
-
-#define MM512_SET_M256I(a, b) \
-  _mm512_inserti64x4(_mm512_castsi256_si512(a), b, 1)
-
+#else
 template <int BLOCK_M, int BLOCK_N>
-struct tinygemm_kernel_nn<at::BFloat16, at::Float8_e4m3fn, BLOCK_M, BLOCK_N> {
+struct tinygemm_kernel_nn<at::BFloat16, at::BFloat16, BLOCK_M, BLOCK_N> {
   static inline void apply(
       const at::BFloat16* __restrict__ A,
-      const at::Float8_e4m3fn* __restrict__ B,
-      at::BFloat16* __restrict__ C,
+      const at::BFloat16* __restrict__ B,
+      float* __restrict__ C,
       float scale,
       int K,
       int lda,
       int ldb,
       int ldc) {
-    TORCH_CHECK(
-        BLOCK_N % 32 == 0, "tinygemm float8 requires BLOCK_N to be 32x.");
-
-    // std::cout << "\n### tinygemm_kernel_nn fp8, scale = " << scale <<
-    // std::endl;
-    constexpr int ROWS = BLOCK_M;
-    constexpr int COLS = BLOCK_N / 16;
-
-    // prefetch distance
-    constexpr int PREFETCH_SIZE_K = 0;
-
-    __m512bh va;
-    __m512bh vb[COLS];
-    __m512 vc[ROWS * COLS];
-
-    __m512 vscale = _mm512_set1_ps(scale);
-
-    auto loadc = [&](auto i) { vc[i] = _mm512_set1_ps(0.f); };
-    Unroll<ROWS * COLS>{}(loadc);
-
-    const int K2 = K >> 1;
-    const int lda2 = lda >> 1;
-    const int ldb2 = ldb; // ldb * 2 >> 1;
-    const float* a_ptr = reinterpret_cast<const float*>(A);
-    const uint16_t* b_ptr = reinterpret_cast<const uint16_t*>(B);
-
-    auto compute = [&](auto i, int k) {
-      constexpr int row = i / COLS;
-      constexpr int col = i % COLS;
-
-      if constexpr (col == 0) {
-        va = (__m512bh)(_mm512_set1_ps(a_ptr[row * lda2 + k]));
-      }
-      if constexpr (row == 0) {
-        if constexpr (col % 2 == 0) {
-          __m512i b8 = _mm512_loadu_si512(b_ptr + k * ldb2 + col * 16);
-          if constexpr (PREFETCH_SIZE_K > 0) {
-            _mm_prefetch(
-                b_ptr + (k + PREFETCH_SIZE_K) * ldb2 + col * 16, _MM_HINT_T0);
-          }
-          __m512i idx0 = _mm512_cvtepu8_epi32(_mm512_castsi512_si128(b8));
-          __m512i idx1 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(b8, 1));
-          __m512i idx2 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(b8, 2));
-          __m512i idx3 = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(b8, 3));
-
-          __m512i bf16_i32_vec0 =
-              _mm512_i32gather_epi32(idx0, e4m3_to_16bit, 2);
-          __m512i bf16_i32_vec1 =
-              _mm512_i32gather_epi32(idx1, e4m3_to_16bit, 2);
-          __m512i bf16_i32_vec2 =
-              _mm512_i32gather_epi32(idx2, e4m3_to_16bit, 2);
-          __m512i bf16_i32_vec3 =
-              _mm512_i32gather_epi32(idx3, e4m3_to_16bit, 2);
-
-          __m256i bf16_i16_vec0 = _mm512_cvtepi32_epi16(bf16_i32_vec0);
-          __m256i bf16_i16_vec1 = _mm512_cvtepi32_epi16(bf16_i32_vec1);
-          __m256i bf16_i16_vec2 = _mm512_cvtepi32_epi16(bf16_i32_vec2);
-          __m256i bf16_i16_vec3 = _mm512_cvtepi32_epi16(bf16_i32_vec3);
-
-          vb[col + 0] =
-              (__m512bh)(MM512_SET_M256I(bf16_i16_vec0, bf16_i16_vec1));
-          vb[col + 1] =
-              (__m512bh)(MM512_SET_M256I(bf16_i16_vec2, bf16_i16_vec3));
-
-          // if (k == 0) {
-          //   print_16x16(bf16_i16_vec0);
-          //   print_16x16(bf16_i16_vec1);
-          //   print_32x16((__m512i)vb[col + 0]);
-          // }
-        }
-      }
-      vc[i] = _mm512_dpbf16_ps(vc[i], va, vb[col]);
-    };
-    for (int k = 0; k < K2; ++k) {
-      Unroll<ROWS * COLS>{}(compute, k);
-    }
-
-    auto storec = [&](auto i) {
-      constexpr int row = i / COLS;
-      constexpr int col = i % COLS;
-      // for COLS = 2, 4 use 512bit store
-      if constexpr (col % 2 == 0) {
-        __m512 vc0 = _mm512_mul_ps(vc[row * COLS + col + 0], vscale);
-        __m512 vc1 = _mm512_mul_ps(vc[row * COLS + col + 1], vscale);
-        _mm512_storeu_si512(
-            reinterpret_cast<__m512i*>((C + row * ldc + col * 16)),
-            (__m512i)(_mm512_cvtne2ps_pbh(vc1, vc0)));
-      }
-    };
-    Unroll<ROWS * COLS>{}(storec);
+    TORCH_CHECK(false, "tinygemm_kernel_avx: scalar path not implemented!");
   }
 };
-
 #endif
 
 #define LAUNCH_TINYGEMM_KERNEL_NN(MB_SIZE, NB_SIZE)                \
@@ -328,64 +215,17 @@ struct tinygemm_kernel_nn<at::BFloat16, at::Float8_e4m3fn, BLOCK_M, BLOCK_N> {
       ldc);
 
 template <typename scalar_t, typename packed_t>
-struct brgemm {};
-
-template <typename scalar_t>
-struct brgemm<scalar_t, scalar_t> {
-  static inline void apply(
-      const scalar_t* __restrict__ A,
-      const scalar_t* __restrict__ B,
-      scalar_t* __restrict__ C,
-      float* __restrict__ Ctmp,
-      int M,
-      int N,
-      int K,
-      int lda,
-      int ldb,
-      int ldc) {
-    constexpr int BLOCK_N = block_size_n();
-    at::native::cpublas::brgemm(
-        M, N, K, lda, ldb, BLOCK_N, /* add_C */ false, A, B, Ctmp);
-
-    // copy from Ctmp to C
-    for (int m = 0; m < M; ++m) {
-      copy_stub(C + m * ldc, Ctmp + m * BLOCK_N, N);
-    }
-  }
-};
-
-template <>
-struct brgemm<at::BFloat16, at::Float8_e4m3fn> {
-  static inline void apply(
-      const at::BFloat16* __restrict__ A,
-      const at::Float8_e4m3fn* __restrict__ B,
-      at::BFloat16* __restrict__ C,
-      float* __restrict__ Ctmp,
-      int M,
-      int N,
-      int K,
-      int lda,
-      int ldb,
-      int ldc) {
-    std::cout << "### brgemm fp8" << std::endl;
-  }
-};
-
-template <typename scalar_t, typename packed_t>
 void tinygemm_kernel(
     const scalar_t* __restrict__ A,
     const packed_t* __restrict__ B,
     float* __restrict__ C,
-    // float* __restrict__ Ctmp,
     float scale,
     int M,
     int N,
     int K,
     int lda,
     int ldb,
-    int ldc
-    // bool brg
-) {
+    int ldc) {
   // pattern: 1-8-8
   if (M == 1) {
     constexpr int BLOCK_N = 32;

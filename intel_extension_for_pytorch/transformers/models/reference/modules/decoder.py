@@ -2056,48 +2056,6 @@ def moe_infer(self, x, topk_ids, topk_weight):
     return final_out
 
 
-def moe_infer_shared(self, identity, hidden_states, residual):
-    # input shape:
-    # identity/hidden_states/residual [BS, seqlen, dims]
-    if self.use_fused_moe or self.use_fused_moe_woq:
-        orig_shape = hidden_states.shape
-        identity = identity.view(-1, hidden_states.shape[-1])
-        # identity [BS*seqlen, dims]
-        identity = torch.ops.torch_ipex.fused_mlp(
-            identity,
-            self.w13_shared_weight,
-            self.w2_shared_weight,
-            # torch.ones(identity.size(0), 1),
-            # torch.zeros(identity.size(0), 1).to(torch.int),
-            False,  # inplace
-            True,  # is_vnni
-            self.distributed,  # is distributed
-            self.use_fused_moe_woq,  # is_woq
-            self.woq_weight_dtype,
-            self.woq_group_size,
-            self.woq_lowp_mode,
-            self.w13_shared_scale,
-            self.w13_shared_zp,
-            self.w13_shared_compensation,
-            self.w2_shared_scale,
-            self.w2_shared_zp,
-            self.w2_shared_compensation,
-        ).view(*orig_shape)
-        hidden_states = hidden_states + identity
-        hidden_states = residual + hidden_states
-    else:
-        identity = self.shared_linear_silu_mul(identity)
-        if not self.distributed:
-            hidden_states = self.shared_linear_add_add(
-                identity, hidden_states, residual
-            )
-        else:
-            identity = self.mlp.shared_experts.down_proj(identity)
-            hidden_states = hidden_states + identity
-            hidden_states = residual + hidden_states
-    return hidden_states
-
-
 def DeepseekV2DecoderLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -2143,10 +2101,19 @@ def DeepseekV2DecoderLayer_forward(
         hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
             *orig_shape
         )
-        if not self.unify_experts and hasattr(self.mlp, "shared_experts"):
-            hidden_states = moe_infer_shared(self, identity, hidden_states, residual)
-        else:
-            hidden_states = residual + hidden_states
+        if hasattr(self.mlp, "shared_experts"):
+            if not self.unify_experts:
+                identity = self.shared_linear_silu_mul(identity)
+                if not self.distributed:
+                    hidden_states = self.shared_linear_add_add(
+                        identity, hidden_states, residual
+                    )
+                else:
+                    identity = self.mlp.shared_experts.down_proj(identity)
+                    hidden_states = hidden_states + identity
+                    hidden_states = residual + hidden_states
+            else:  # sharedMoE has already calculated in moe_infer func if unify_experts
+                hidden_states = residual + hidden_states
     else:  # DeepseekV2MLP
         hidden_states = self.mlp_linear_silu_mul(hidden_states)
         if not self.distributed:
@@ -2467,13 +2434,22 @@ class _IPEXDecoderLayerRef(nn.Module):
                 # shared_experts
                 if config.n_shared_experts is not None:
                     if self.use_fused_moe or self.use_fused_moe_woq:
+                        from intel_extension_for_pytorch.quantization import (
+                            WoqWeightDtype,
+                            WoqLowpMode,
+                        )
+
                         if (
                             hasattr(module.mlp.shared_experts.gate_proj, "_op_context")
                             and module.mlp.shared_experts.gate_proj._op_context
                             is not None
+                            and module.mlp.shared_experts.gate_proj.dtype
+                            is WoqWeightDtype.INT8
+                            and module.mlp.shared_experts.gate_proj._lowp_mode
+                            in [WoqLowpMode.BF16, WoqLowpMode.INT8]
                         ):
                             self.deepseek_lowbit_load = True
-                        else:
+                        else:  # below is bf16 path
                             shared_weights_list = [
                                 module.mlp.shared_experts.gate_proj.weight,
                                 module.mlp.shared_experts.up_proj.weight,
@@ -2519,13 +2495,21 @@ class _IPEXDecoderLayerRef(nn.Module):
                     self.use_fused_moe or self.use_fused_moe_woq
                 ) and config.n_routed_experts is not None:
                     self.deepseek_lowbit_load = False
+                    from intel_extension_for_pytorch.quantization import (
+                        WoqWeightDtype,
+                        WoqLowpMode,
+                    )
+
                     if (
                         hasattr(module.mlp.experts[0], "gate_proj")
                         and hasattr(module.mlp.experts[0].gate_proj, "_op_context")
                         and module.mlp.experts[0].gate_proj._op_context is not None
+                        and module.mlp.experts[0].gate_proj.dtype is WoqWeightDtype.INT8
+                        and module.mlp.experts[0].gate_proj._lowp_mode
+                        in [WoqLowpMode.BF16, WoqLowpMode.INT8]
                     ):
                         self.deepseek_lowbit_load = True
-                    elif hasattr(module.mlp.experts[0], "gate_proj"):
+                    elif hasattr(module.mlp.experts[0], "gate_proj"):  # bf16 path below
                         for idx in range(config.n_routed_experts):
                             weights_list = [
                                 module.mlp.experts[idx].gate_proj.weight,

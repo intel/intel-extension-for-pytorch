@@ -37,17 +37,7 @@ inline Vectorized<at::BFloat16> convert_from_float_ext<at::BFloat16>(
 #define CVT_FP16_TO_FP32(a) \
   _mm512_cvtps_ph(a, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC))
 #endif
-// debug
-template <typename scalar_t>
-void print_array(scalar_t* ptr, int size) {
-  for (int d = 0; d < size; ++d) {
-    if (d % 16 == 0) {
-      std::cout << std::endl;
-    }
-    std::cout << ptr[d] << " ";
-  }
-  std::cout << std::endl;
-}
+
 } // anonymous namespace
 
 namespace {
