@@ -69,17 +69,17 @@
 - func: multilabel_margin_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction, Tensor is_target) -> Tensor
   python_module: nn
   dispatch:
-    XPU: multilabel_margin_loss_backward_xpu
+    XPU: multilabel_margin_loss_backward_xpu_
 
 - func: multilabel_margin_loss_forward.output(Tensor self, Tensor target, int reduction, *, Tensor(a!) output, Tensor(b!) is_target) -> (Tensor(a!), Tensor(b!))
   python_module: nn
   dispatch:
-    XPU: multilabel_margin_loss_forward_out_xpu
+    XPU: multilabel_margin_loss_forward_out_xpu_
 
 - func: multilabel_margin_loss_forward(Tensor self, Tensor target, int reduction) -> (Tensor output, Tensor is_target)
   python_module: nn
   dispatch:
-    XPU: multilabel_margin_loss_forward_xpu
+    XPU: multilabel_margin_loss_forward_xpu_
 
 - func: _linalg_det(Tensor A) -> (Tensor result, Tensor LU, Tensor pivots)
   structured_delegate: _linalg_det.result

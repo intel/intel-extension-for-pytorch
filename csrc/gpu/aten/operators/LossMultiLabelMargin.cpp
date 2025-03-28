@@ -530,7 +530,7 @@ void multilabel_margin_loss_backward_xpu_out_template(
 namespace at {
 namespace native {
 
-std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out_xpu(
+std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out_xpu_(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction,
@@ -541,7 +541,7 @@ std::tuple<Tensor&, Tensor&> multilabel_margin_loss_forward_out_xpu(
   return std::tuple<Tensor&, Tensor&>(output, is_target);
 }
 
-std::tuple<Tensor, Tensor> multilabel_margin_loss_forward_xpu(
+std::tuple<Tensor, Tensor> multilabel_margin_loss_forward_xpu_(
     const Tensor& self,
     const Tensor& target,
     int64_t reduction) {
@@ -564,7 +564,7 @@ Tensor& multilabel_margin_loss_backward_out_xpu(
   return grad_input;
 }
 
-Tensor multilabel_margin_loss_backward_xpu(
+Tensor multilabel_margin_loss_backward_xpu_(
     const Tensor& grad_output,
     const Tensor& self,
     const Tensor& target,
