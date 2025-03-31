@@ -67,6 +67,7 @@ struct paged_attention_fwd_kernel_args_t {
   void* query;
   void* key_cache;
   void* value_cache;
+  void* alibi_slopes;
   void* block_tables;
   void* context_lens;
   uint32_t num_queries_per_tokens;

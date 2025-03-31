@@ -168,11 +168,12 @@ def varlen_fwd_reference(
     if alibi is not None:
         col_indices = torch.arange(align_mask_seqlen).to("xpu").to(torch.float32)
         distances = col_indices.unsqueeze(0).expand(max_seqlen_q, align_mask_seqlen)
-        upper_triangular_mask = torch.triu(
-            torch.ones(max_seqlen_q, align_mask_seqlen, device="xpu"), diagonal=1
-        ).bool()
-        distances = distances.masked_fill(upper_triangular_mask, float("-inf"))
-        is_causal = False  # bias with causal can only be [B, 1, 1, T]
+        if is_causal is True:
+            upper_triangular_mask = torch.triu(
+                torch.ones(max_seqlen_q, align_mask_seqlen, device="xpu"), diagonal=1
+            ).bool()
+            distances = distances.masked_fill(upper_triangular_mask, float("-inf"))
+            is_causal = False  # bias with causal can only be [B, 1, 1, T]
         bias = alibi.unsqueeze(2).unsqueeze(3) * distances
         attn_mask = torch.where(
             torch.isinf(attn_mask) | torch.isinf(bias), -float("inf"), attn_mask + bias
