@@ -21,7 +21,8 @@ void single_query_cached_kv_attention(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale);
+    const double v_scale,
+    const double softcap);
 }
 
 void reshape_and_cache(
@@ -47,7 +48,8 @@ void flash_attn_varlen(
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale);
+    const double v_scale,
+    const double softcap);
 
 using single_query_cached_kv_attention_fn = void (*)(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
@@ -62,7 +64,8 @@ using single_query_cached_kv_attention_fn = void (*)(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale);
+    const double v_scale,
+    const double softcap);
 
 using reshape_and_cache_fn = void (*)(
     at::Tensor& key,
@@ -87,7 +90,8 @@ using flash_attn_var_len_fn = void (*)(
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale);
+    const double v_scale,
+    const double softcap);
 
 IPEX_DECLARE_DISPATCH(
     single_query_cached_kv_attention_fn,

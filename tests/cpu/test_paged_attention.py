@@ -45,8 +45,13 @@ class PagedAttentionTest(TestCase):
         value: torch.Tensor,
         scale: float,
         attn_mask: Optional[torch.Tensor] = None,
+        softcap: float = -1,
     ) -> torch.Tensor:
         attn_weights = scale * torch.einsum("qhd,khd->hqk", query, key).float()
+        if softcap != -1:
+            attn_weights = attn_weights / softcap
+            attn_weights = torch.nn.functional.tanh(attn_weights)
+            attn_weights = attn_weights * softcap
         if attn_mask is not None:
             attn_weights = attn_weights + attn_mask.float()
         attn_weights = torch.softmax(attn_weights, dim=-1).to(value.dtype)
@@ -64,6 +69,7 @@ class PagedAttentionTest(TestCase):
         context_lens: torch.Tensor,
         scale: float,
         alibi_slopes: Optional[torch.Tensor],
+        softcap: float,
     ) -> None:
         num_query_heads = query.shape[1]
         num_kv_head = value_cache.shape[1]
@@ -107,7 +113,7 @@ class PagedAttentionTest(TestCase):
                 alibi_bias = (position_ids - context_len + 1).float()
                 alibi_bias = alibi_slopes.view(-1, 1, 1) * alibi_bias.view(1, 1, -1)
 
-            out = self.ref_masked_attention(q, keys, values, scale, alibi_bias)
+            out = self.ref_masked_attention(q, keys, values, scale, alibi_bias, softcap)
             out = out.view(num_query_heads, head_size)
             output[i].copy_(out, non_blocking=True)
 
@@ -121,6 +127,7 @@ class PagedAttentionTest(TestCase):
         block_size: int,
         dtype: torch.dtype,
         seed: int,
+        softcap: float,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
@@ -188,6 +195,7 @@ class PagedAttentionTest(TestCase):
             block_size,
             max_context_len,
             alibi_slopes,
+            softcap=softcap,
         )
 
         # Run the reference implementation.
@@ -202,6 +210,7 @@ class PagedAttentionTest(TestCase):
             context_lens,
             scale,
             alibi_slopes,
+            softcap=softcap,
         )
         assert torch.allclose(output, ref_output, atol=5e-3, rtol=1e-3)
 
@@ -215,6 +224,7 @@ class PagedAttentionTest(TestCase):
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         use_alibis = [True, False]
+        softcaps = [-1, 50]
         seeds = [0]
         for (
             num_seqs,
@@ -224,6 +234,7 @@ class PagedAttentionTest(TestCase):
             block_size,
             dtype,
             seed,
+            softcap,
         ) in product(
             num_gen_seqs,
             num_heads,
@@ -232,6 +243,7 @@ class PagedAttentionTest(TestCase):
             block_sizes,
             dtypes,
             seeds,
+            softcaps,
         ):
             self._test_paged_attention_func(
                 num_seqs,
@@ -242,6 +254,7 @@ class PagedAttentionTest(TestCase):
                 block_size,
                 dtype,
                 seed,
+                softcap,
             )
 
     def _test_reshape_and_cache_func(

@@ -26,7 +26,8 @@ void single_query_cached_kv_attention_forward_cpu(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   return single_query_cached_kv_attention_kernel_stub(
       kCPU,
       out,
@@ -41,7 +42,8 @@ void single_query_cached_kv_attention_forward_cpu(
       max_context_len,
       alibi_slopes,
       k_scale,
-      v_scale);
+      v_scale,
+      softcap);
 }
 
 void reshape_and_cache_cpu(
@@ -70,7 +72,8 @@ void flash_attn_varlen_cpu(
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   return flash_attn_var_len_kernel_stub(
       kCPU,
       out,
@@ -86,7 +89,8 @@ void flash_attn_varlen_cpu(
       block_table,
       alibi_slopes,
       k_scale,
-      v_scale);
+      v_scale,
+      softcap);
 }
 
 } // namespace cpu

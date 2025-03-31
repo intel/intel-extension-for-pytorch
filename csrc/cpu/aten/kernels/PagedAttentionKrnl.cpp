@@ -101,6 +101,35 @@ inline c10::SymFloat calculate_scale(
   return c10::SymFloat(softmax_scale);
 }
 
+void softcap_kernel(
+    float* out,
+    float* score,
+    int64_t size,
+    float softcap,
+    float scale) {
+  using fVec = at::vec::Vectorized<float>;
+  auto vec_size = fVec::size();
+  int64_t id = 0;
+  fVec div_ = fVec(scale / softcap);
+  fVec mul_ = fVec(softcap);
+  while (id <= size - vec_size) {
+    auto score_ = at::vec::Vectorized<float>::loadu(score + id, vec_size);
+    score_ = score_ * div_;
+    score_ = score_.tanh();
+    score_ = score_ * mul_;
+    score_.store(out + id);
+    id = id + vec_size;
+  }
+  int64_t tile_size = size - id;
+  if (tile_size > 0) {
+    auto score_tile_ = at::vec::Vectorized<float>::loadu(score + id, tile_size);
+    score_tile_ = score_tile_ * div_;
+    score_tile_ = score_tile_.tanh();
+    score_tile_ = score_tile_ * mul_;
+    score_tile_.store(out + id, tile_size);
+  }
+}
+
 template <typename QT, typename KT>
 void reduce_head(
     const QT* q_ptr_start,
@@ -556,7 +585,10 @@ void single_query_cached_kv_attention_vnni_kernel(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
+  bool use_softcap = softcap == -1 ? false : true;
+  auto scale_ = use_softcap ? 1.0 : scale;
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
   auto key_cache_ptr = key_cache.data_ptr<cache_t>();
@@ -790,13 +822,17 @@ void single_query_cached_kv_attention_vnni_kernel(
       auto attn_w_start_reduced = is_reduced_type ? attn_weights_reduced_ptr +
               seq_id * attn_weights_strideN + head_id * attn_weights_strideH
                                                   : nullptr;
+      if (use_softcap) { // size : context_len
+        softcap_kernel(attn_w_start, attn_w_start, context_len, softcap, scale);
+      }
+
 #if defined(CPU_CAPABILITY_AVX512)
       if (alibi_slopes_ptr != nullptr) {
         auto alibi_slope = alibi_slopes_ptr[head_id];
         torch_ipex::cpu::kernel::
             _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
                 attn_w_start,
-                scale,
+                scale_,
                 context_len,
                 attn_w_start,
                 max_val,
@@ -806,7 +842,7 @@ void single_query_cached_kv_attention_vnni_kernel(
         torch_ipex::cpu::kernel::
             _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
                 attn_w_start,
-                scale,
+                scale_,
                 context_len,
                 attn_w_start,
                 max_val,
@@ -824,7 +860,7 @@ void single_query_cached_kv_attention_vnni_kernel(
 #else
       // div+add+softmax
       for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
-        attn_w_start[token_id] = attn_w_start[token_id] * scale;
+        attn_w_start[token_id] = attn_w_start[token_id] * scale_;
         if (alibi_slopes_ptr != nullptr) {
           auto alibi_slope = alibi_slopes_ptr[head_id];
           auto alibi_slopes_val =
@@ -987,7 +1023,10 @@ void single_query_cached_kv_attention_kernel(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
+  bool use_softcap = softcap == -1 ? false : true;
+  auto scale_ = use_softcap ? 1.0 : scale;
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
   auto key_cache_ptr = key_cache.data_ptr<cache_t>();
@@ -1114,11 +1153,19 @@ void single_query_cached_kv_attention_kernel(
         }
         // 2) calculate the max and exp_sum for this partition
         for (int hi = 0; hi < kv_head_group_size; hi++) {
+          if (use_softcap) { // size : context_len
+            softcap_kernel(
+                logits + hi * PARTITION_SIZE,
+                logits + hi * PARTITION_SIZE,
+                token_num,
+                softcap,
+                scale);
+          }
           auto partition_max = -std::numeric_limits<float>::infinity();
           if (alibi_slopes_ptr != nullptr) {
             _mul_alibi_reduce_max_fusion_kernel<float>(
                 logits + hi * PARTITION_SIZE,
-                scale,
+                scale_,
                 token_num,
                 logits + hi * PARTITION_SIZE,
                 partition_max,
@@ -1128,7 +1175,7 @@ void single_query_cached_kv_attention_kernel(
           } else {
             _mul_reduce_max_fusion_kernel<float>(
                 logits + hi * PARTITION_SIZE,
-                scale,
+                scale_,
                 token_num,
                 logits + hi * PARTITION_SIZE,
                 partition_max);
@@ -1377,7 +1424,9 @@ void flash_attn_varlen_kernel(
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
+  bool use_softcap = softcap == -1.0 ? false : true;
   auto kv_block_strideN = key_cache.stride(0);
   auto kv_block_strideH = key_cache.stride(1);
   auto kv_block_strideP = key_cache.stride(2);
@@ -1407,7 +1456,7 @@ void flash_attn_varlen_kernel(
   // ToDo(liangan1): align the scale semantic with other repo
   accum_t scaling_factor =
       calculate_scale(query, softmax_scale).as_float_unchecked();
-
+  accum_t scaling_factor_ = use_softcap ? 1.0 : scaling_factor;
   const auto dtype = query.scalar_type();
   const auto accumulate_dtype = at::toOpMathType(dtype);
   // allocate per thread temp buf (accumulate type)
@@ -1504,6 +1553,16 @@ void flash_attn_varlen_kernel(
               qk_data,
               kvSplitSize);
 
+          if (use_softcap) { // size : qBlockSize * kvBlockSize
+            for (int64_t q = 0; q < qBlockSize; q++) {
+              softcap_kernel(
+                  qk_data + q * kvSplitSize,
+                  qk_data + q * kvSplitSize,
+                  kvBlockSize,
+                  softcap,
+                  scaling_factor);
+            }
+          }
           // apply causal mask, fill unmasked position with -inf
           if (is_causal) {
             for (int64_t q = 0; q < qBlockSize; q++) {
@@ -1522,7 +1581,7 @@ void flash_attn_varlen_kernel(
 
             _mul_reduce_max_fusion_kernel<accum_t>(
                 qk_data + q * kvSplitSize,
-                scaling_factor,
+                scaling_factor_,
                 kvBlockSize,
                 qk_data + q * kvSplitSize,
                 tmp_max);
@@ -1598,7 +1657,8 @@ void single_query_cached_kv_attention_kernel_impl(
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   RECORD_FUNCTION(
       "ipex::single_query_cached_kv_attention_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
@@ -1629,7 +1689,8 @@ void single_query_cached_kv_attention_kernel_impl(
           max_context_len,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else if (out.scalar_type() == at::ScalarType::BFloat16) {
       single_query_cached_kv_attention_vnni_kernel<at::BFloat16, at::BFloat16>(
           out,
@@ -1643,7 +1704,8 @@ void single_query_cached_kv_attention_kernel_impl(
           max_context_len,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else if (out.scalar_type() == at::ScalarType::Half) {
       single_query_cached_kv_attention_vnni_kernel<at::Half, at::Half>(
           out,
@@ -1657,7 +1719,8 @@ void single_query_cached_kv_attention_kernel_impl(
           max_context_len,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else {
       TORCH_CHECK(
           false, "Unsupported data type for single_query_cached_kv_attention");
@@ -1677,7 +1740,8 @@ void single_query_cached_kv_attention_kernel_impl(
         max_context_len,
         alibi_slopes,
         k_scale,
-        v_scale);
+        v_scale,
+        softcap);
   } else if (out.scalar_type() == at::ScalarType::Float) {
     single_query_cached_kv_attention_kernel<float, float>(
         out,
@@ -1691,7 +1755,8 @@ void single_query_cached_kv_attention_kernel_impl(
         max_context_len,
         alibi_slopes,
         k_scale,
-        v_scale);
+        v_scale,
+        softcap);
   } else if (out.scalar_type() == at::ScalarType::BFloat16) {
     single_query_cached_kv_attention_kernel<at::BFloat16, at::BFloat16>(
         out,
@@ -1705,7 +1770,8 @@ void single_query_cached_kv_attention_kernel_impl(
         max_context_len,
         alibi_slopes,
         k_scale,
-        v_scale);
+        v_scale,
+        softcap);
   } else if (out.scalar_type() == at::ScalarType::Half) {
     single_query_cached_kv_attention_kernel<at::Half, at::Half>(
         out,
@@ -1719,7 +1785,8 @@ void single_query_cached_kv_attention_kernel_impl(
         max_context_len,
         alibi_slopes,
         k_scale,
-        v_scale);
+        v_scale,
+        softcap);
   } else {
     TORCH_CHECK(
         false, "Unsupported data type for single_query_cached_kv_attention");
@@ -1783,7 +1850,8 @@ void flash_attn_varlen_cpu_kernel_impl(
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   TORCH_CHECK(
       key.scalar_type() == value.scalar_type(),
       "key and value should have the same data type");
@@ -1815,7 +1883,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else if (max_seqlen_q >= 192) {
       flash_attn_varlen_kernel<float, float, 64>(
           out,
@@ -1831,7 +1900,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else {
       flash_attn_varlen_kernel<float, float, 32>(
           out,
@@ -1847,7 +1917,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     }
 
   } else if (query.scalar_type() == at::ScalarType::BFloat16) {
@@ -1866,7 +1937,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else if (max_seqlen_q >= 192) {
       flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 64>(
           out,
@@ -1882,7 +1954,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else {
       flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 32>(
           out,
@@ -1898,7 +1971,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     }
 
   } else if (query.scalar_type() == at::ScalarType::Half) {
@@ -1917,7 +1991,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else if (max_seqlen_q >= 192) {
       flash_attn_varlen_kernel<at::Half, at::Half, 64>(
           out,
@@ -1933,7 +2008,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     } else {
       flash_attn_varlen_kernel<at::Half, at::Half, 32>(
           out,
@@ -1949,7 +2025,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           block_table,
           alibi_slopes,
           k_scale,
-          v_scale);
+          v_scale,
+          softcap);
     }
 
   } else {

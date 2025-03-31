@@ -9,9 +9,10 @@ NUM_HEADS = [32]
 NUM_QUERIES_PER_KV = [1, 4]
 HEAD_SIZES = [128, 64]
 DTYPES = [torch.bfloat16, torch.float32, torch.float16]
+SOFTCAP = [-1, 50]
 
 
-def mha_ref(q, k, v, scale, is_causal):
+def mha_ref(q, k, v, scale, is_causal, softcap):
     if is_causal:
         # bottom corner of the mask
         cur_mask = torch.full(
@@ -30,6 +31,10 @@ def mha_ref(q, k, v, scale, is_causal):
     v = v.repeat_interleave(kv_groups, dim=1)
     attn = torch.matmul(q, k.transpose(-2, -1))
     attn = attn * scale
+    if softcap != -1:
+        attn = attn / softcap
+        attn = torch.nn.functional.tanh(attn)
+        attn = attn * softcap
     if is_causal:
         attn = attn + mask
     attn = torch.nn.functional.softmax(attn, dim=-1)
@@ -46,6 +51,7 @@ class TestFlashAttnVarLen(TestCase):
         num_queries_per_kv: int,
         head_size: int,
         dtype: torch.dtype,
+        softcap: float,
     ) -> None:
         random.seed(0)
         torch.manual_seed(0)
@@ -116,6 +122,7 @@ class TestFlashAttnVarLen(TestCase):
                 value_i.unsqueeze(0).transpose(1, 2),
                 scale,
                 is_causal=True,
+                softcap=softcap,
             )
             output_i = output_i.squeeze(0).transpose(0, 1)
             output_ref[cu_seq_lens_q[i] : cu_seq_lens_q[i + 1]] = output_i
@@ -134,17 +141,19 @@ class TestFlashAttnVarLen(TestCase):
             True,
             block_table,
             None,
+            softcap=softcap,
         )
+
         assert torch.allclose(
             output_ref, output, atol=1e-6 if dtype == torch.float else 5e-2
         )
 
     def test_flash_attn_varlen(self):
-        for num_heads, num_queries_per_kv, head_size, dtype in product(
-            NUM_HEADS, NUM_QUERIES_PER_KV, HEAD_SIZES, DTYPES
+        for num_heads, num_queries_per_kv, head_size, dtype, softcap in product(
+            NUM_HEADS, NUM_QUERIES_PER_KV, HEAD_SIZES, DTYPES, SOFTCAP
         ):
             self._test_flash_attn_varlen(
-                num_heads, num_queries_per_kv, head_size, dtype
+                num_heads, num_queries_per_kv, head_size, dtype, softcap
             )
 
 

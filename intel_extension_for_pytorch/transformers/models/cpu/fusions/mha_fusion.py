@@ -391,6 +391,7 @@ class _IPEXPagedAttentionCPU:
         alibi_slopes,
         k_scale=1.0,
         v_scale=1.0,
+        softcap=-1.0,
     ):
         torch.ops.torch_ipex.single_query_cached_kv_attention(
             output,
@@ -406,6 +407,7 @@ class _IPEXPagedAttentionCPU:
             alibi_slopes,
             k_scale,
             v_scale,
+            softcap,
         )
 
     @classmethod
@@ -425,6 +427,7 @@ class _IPEXPagedAttentionCPU:
         alibi_slopes=None,
         k_scale=1.0,
         v_scale=1.0,
+        softcap=-1.0,
     ):
         torch.ops.torch_ipex.flash_attn_varlen_func(
             output,
@@ -441,6 +444,7 @@ class _IPEXPagedAttentionCPU:
             alibi_slopes,
             k_scale,
             v_scale,
+            softcap,
         )
 
 
