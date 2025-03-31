@@ -1,5 +1,5 @@
 # Python dependencies required for development
-expecttest==0.1.6
+expecttest>=0.3.0
 hypothesis
 numpy
 psutil
