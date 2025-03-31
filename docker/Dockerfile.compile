@@ -35,21 +35,42 @@ RUN bash ./basekit_driver_install_helper.sh driver
 
 WORKDIR /root
 
-RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh && \
     bash miniforge.sh -b -p ./miniforge3 && \
     rm miniforge.sh
 
 FROM base AS dev
-ARG AOT=pytorch
+ARG AOT
 RUN bash /basekit_driver_install_helper.sh dev
 COPY . ./intel-extension-for-pytorch/
-RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
-    sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    bash compile_bundle.sh /opt/intel/oneapi ${AOT} && \
-    mkdir wheels && find . -name "dist" -exec bash -c "cp {}/*.whl ./wheels" \; && \
-    if [ "${AOT}" = "pytorch" ]; then cd intel-extension-for-pytorch; VERSION_TORCH=$(python ./scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:version); VERSION_TORCHVISION=$(python ./scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchvision:version); VERSION_TORCHAUDIO=$(python ./scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchaudio:version); echo "#/bin/bash\npython -m pip install torch==${VERSION_TORCH} torchvision==${VERSION_TORCHVISION} torchaudio==${VERSION_TORCHAUDIO} --index-url https://download.pytorch.org/whl/xpu" > ../wheels/pytorch_install.sh; fi
+    ARGS=""; \
+    if [ ! -z "${AOT}" ]; then \
+        ARGS="--install-pytorch compile --aot ${AOT}"; \
+    fi; \
+    python intel-extension-for-pytorch/scripts/compile_bundle.py ${ARGS} --with-vision --with-audio --with-torch-ccl /opt/intel/oneapi && \
+    mkdir wheels && find . -maxdepth 2 -name "dist" -exec bash -c "cp {}/*.whl ./wheels" \; && \
+    echo "#/bin/bash\n" > ./wheels/pytorch_install.sh; \
+    echo 'BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )\n' >> ./wheels/pytorch_install.sh; \
+    echo 'cd ${BASEFOLDER}\n' >> ./wheels/pytorch_install.sh; \
+    INDEX_URL=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:index-url); \
+    if [ ! -d pytorch ]; then \
+        VERSION_TORCH=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:version); \
+        VERSION_TORCHVISION=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchvision:version); \
+        VERSION_TORCHAUDIO=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchaudio:version); \
+        echo "python -m pip install torch==${VERSION_TORCH} torchvision==${VERSION_TORCHVISION} torchaudio==${VERSION_TORCHAUDIO} --index-url ${INDEX_URL}\n" >> ./wheels/pytorch_install.sh; \
+    fi; \
+    echo "python -m pip install *.whl" >> ./wheels/pytorch_install.sh; \
+    if [ -d pytorch ]; then \
+        VER_FILE="./pytorch/.ci/docker/triton_version.txt"; \
+        VER_TRITON=""; \
+        if [ -f ${VER_FILE} ]; then \
+            VER_TRITON="==$(cat ${VER_FILE})"; \
+        fi; \
+        echo "\n" >> ./wheels/pytorch_install.sh; \
+        echo "python -m pip install pytorch-triton-xpu${VER_TRITON} --index-url ${INDEX_URL}" >> ./wheels/pytorch_install.sh; \
+    fi;
 
 FROM base AS deploy
 RUN apt clean && \
@@ -61,8 +82,7 @@ COPY --from=dev /root/intel-extension-for-pytorch/scripts/tools/compilation_help
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
     conda install -y libstdcxx-ng libpng libjpeg-turbo && \
-    if [ -f ./wheels/pytorch_install.sh ]; then bash ./wheels/pytorch_install.sh; fi && \
-    python -m pip install ./wheels/*.whl && \
+    bash ./wheels/pytorch_install.sh && \
     python -m pip cache purge && \
     conda clean -a -y && \
     rm -rf ./wheels

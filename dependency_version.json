@@ -7,6 +7,7 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
+    "index-url": "https://download.pytorch.org/whl/xpu",
     "version": "2.7.0+xpu",
     "commit": "release/2.7"
   },
@@ -19,8 +20,8 @@
     "commit": "release/0.22"
   },
   "torch-ccl": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0+xpu"
+    "version": "2.7.0+xpu",
+    "commit": "v2.7.0+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {
@@ -32,10 +33,12 @@
       "windows": "2025.0.1"
     },
     "oneccl-devel": {
-      "linux": "2021.14.1"
+      "linux": "2021.14.1",
+      "windows": "N/A"
     },
     "impi-devel": {
-      "linux": "2021.14.1"
+      "linux": "2021.14.1",
+      "windows": "N/A"
     },
     "intel-pti": {
       "linux": "0.10",
