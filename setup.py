@@ -254,13 +254,14 @@ def _build_installation_dependency():
     install_requires.append("numpy")
     install_requires.append("packaging")
     install_requires.append("ruamel.yaml")
+    str_os = platform.system().lower()
     if _check_env_flag("ENABLE_ONEAPI_INTEGRATION", default="OFF"):
         for key, value in _get_basekit_rt().items():
             if key in ["oneccl-devel", "impi-devel", "intel-pti"] and not IS_LINUX:
                 continue
-            if len(value["version"].split(".")) != 3:
+            if len(value[str_os].split(".")) != 3:
                 continue
-            install_requires.append(f"{key}=={value['version']}")
+            install_requires.append(f"{key}=={value[str_os]}")
     return install_requires
 
 

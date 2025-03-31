@@ -30,21 +30,29 @@ RUN bash ./basekit_driver_install_helper.sh driver
 
 WORKDIR /root
 
-RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh && \
     bash miniforge.sh -b -p ./miniforge3 && \
     rm miniforge.sh
 
 FROM base AS dev
 # --build-arg COMPILE=ON to compile from source
 ARG COMPILE
-ARG AOT=pytorch
-RUN bash /basekit_driver_install_helper.sh dev
+ARG AOT
 COPY . ./intel-extension-for-pytorch/
 RUN . ./miniforge3/bin/activate && \
+    if [ ! -z "${COMPILE}" ]; then bash /basekit_driver_install_helper.sh dev; fi && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    cd intel-extension-for-pytorch/examples/gpu/llm && \
-    MODE=0; if [ -z ${COMPILE} ]; then (( MODE |= 0x06 )); else (( MODE |= 0x02 )); fi && \
-    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi ${AOT}
+    ARGS="--setup"; \
+    if [ ! -z "${COMPILE}" ] && \
+        ( [ "${COMPILE}" == "ON" ] || \
+        [ "${COMPILE}" == "on" ] || \
+        [ "${COMPILE}" == "1" ] ); then \
+        if [ ! -z "${AOT}" ]; then \
+            ARGS="${ARGS} --install-pytorch compile --aot ${AOT}"; \
+        fi; \
+        ARGS="${ARGS} --oneapi-root-dir /opt/intel/oneapi"; \
+    fi; \
+    python ./intel-extension-for-pytorch/examples/gpu/llm/tools/env_setup.py ${ARGS}
 
 FROM base AS deploy
 COPY --from=dev /root/intel-extension-for-pytorch/examples/gpu/llm ./llm
@@ -56,7 +64,7 @@ RUN apt clean && \
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && conda install -y libstdcxx-ng && \
     cd ./llm && \
-    bash tools/env_setup.sh 1 && \
+    python tools/env_setup.py --deploy && \
     python -m pip cache purge && \
     conda clean -a -y
 RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \

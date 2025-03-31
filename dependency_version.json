@@ -7,36 +7,42 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0"
+    "index-url": "https://download.pytorch.org/whl/xpu",
+    "version": "2.8.0+xpu",
+    "commit": "main"
   },
   "torchaudio": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0"
+    "version": "2.8.0+xpu",
+    "commit": "main"
   },
   "torchvision": {
-    "version": "0.21.0+xpu",
-    "commit": "v0.21.0"
+    "version": "0.23.0+xpu",
+    "commit": "main"
   },
   "torch-ccl": {
-    "version": "2.6.0+xpu",
-    "commit": "v2.6.0+xpu"
+    "version": "2.8.0+xpu",
+    "commit": "v2.8.0+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "version": "2025.0"
+      "linux": "2025.1",
+      "windows": "2025.1"
     },
     "mkl-dpcpp": {
-      "version": "2025.0.1"
+      "linux": "2025.1",
+      "windows": "2025.1"
     },
     "oneccl-devel": {
-      "version": "2021.14.1"
+      "linux": "2021.15.0",
+      "windows": "N/A"
     },
     "impi-devel": {
-      "version": "2021.14.1"
+      "linux": "2021.15.0",
+      "windows": "N/A"
     },
     "intel-pti": {
-      "version": "0.10"
+      "linux": "0.12",
+      "windows": "0.12"
     }
   }
 }
