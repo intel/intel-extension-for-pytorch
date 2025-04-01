@@ -25,44 +25,47 @@ def woq_quant_and_pack(weight, group_size, dtype, lowp_mode, sym_quant_weight):
         quantize_per_block,
     )
 
-    if group_size == -1:
-        qweight, scales, zero_points = quantize_per_channel(
-            weight, dtype, None, None, sym_quant_weight
-        )
-    else:
-        qweight, scales, zero_points = quantize_per_block(
-            weight, dtype, group_size, None, None, sym_quant_weight
-        )
+    with torch.no_grad():
+        if group_size == -1:
+            qweight, scales, zero_points = quantize_per_channel(
+                weight, dtype, None, None, sym_quant_weight
+            )
+        else:
+            qweight, scales, zero_points = quantize_per_block(
+                weight, dtype, group_size, None, None, sym_quant_weight
+            )
 
-    _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
-        qweight,
-        dtype,
-        [weight.shape[0], weight.shape[1]],
-        scales,
-        zero_points,
-        None,  # bias
-        None,  # g_idx
-        None,  # batch size
-        group_size,
-        lowp_mode,
-        WoqActQuantMode.NONE,  # act_quant_mode
-        False,  # cache_weight_for_large_batch
-    )
-    # qweight: {N/block_n, K/block_k, block_k, block_n}
-    if (
-        dtype == WoqWeightDtype.INT8
-        and lowp_mode == WoqLowpMode.INT8
-        and _op_context.get_weight().dim() == 4
-    ):
-        n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
-        weight_view = qweight.view([n_blocks, block_n, k_blocks, block_k])
-        compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
-        compensation = compensation.permute([0, 2, 1]).contiguous()
-    else:
-        compensation = None
-    qweight = _op_context.get_weight()
-    scale = _op_context.get_scales()
-    zero_point = _op_context.get_zero_points()
+        _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
+            qweight,
+            dtype,
+            [weight.shape[0], weight.shape[1]],
+            scales,
+            zero_points,
+            None,  # bias
+            None,  # g_idx
+            None,  # batch size
+            group_size,
+            lowp_mode,
+            WoqActQuantMode.NONE,  # act_quant_mode
+            False,  # cache_weight_for_large_batch
+        )
+        # qweight: {N/block_n, K/block_k, block_k, block_n}
+        if (
+            dtype == WoqWeightDtype.INT8
+            and lowp_mode == WoqLowpMode.INT8
+            and _op_context.get_weight().dim() == 4
+        ):
+            n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
+            weight_view = qweight.view([n_blocks, block_n, k_blocks, block_k])
+            compensation = torch.sum(
+                weight_view, dim=-1, keepdim=False, dtype=torch.int32
+            )
+            compensation = compensation.permute([0, 2, 1]).contiguous()
+        else:
+            compensation = None
+        qweight = _op_context.get_weight()
+        scale = _op_context.get_scales()
+        zero_point = _op_context.get_zero_points()
     return (qweight, scale, zero_point, compensation)
 
 
@@ -73,31 +76,34 @@ def woq_pack(plain_qweight, plain_scales, plain_zp, group_size, dtype, lowp_mode
         WoqActQuantMode,
     )
 
-    _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
-        plain_qweight,
-        dtype,
-        [plain_qweight.shape[0], plain_qweight.shape[1]],
-        plain_scales,
-        plain_zp,
-        None,  # bias
-        None,  # g_idx
-        None,  # batch size
-        group_size,
-        lowp_mode,
-        WoqActQuantMode.NONE,  # act_quant_mode
-        False,  # cache_weight_for_large_batch
-    )
-    if (
-        dtype == WoqWeightDtype.INT8
-        and lowp_mode == WoqLowpMode.INT8
-        and _op_context.get_weight().dim() == 4
-    ):
-        n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
-        weight_view = plain_qweight.view([n_blocks, block_n, k_blocks, block_k])
-        compensation = torch.sum(weight_view, dim=-1, keepdim=False, dtype=torch.int32)
-        compensation = compensation.permute([0, 2, 1]).contiguous()
-    else:
-        compensation = None
+    with torch.no_grad():
+        _op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
+            plain_qweight,
+            dtype,
+            [plain_qweight.shape[0], plain_qweight.shape[1]],
+            plain_scales,
+            plain_zp,
+            None,  # bias
+            None,  # g_idx
+            None,  # batch size
+            group_size,
+            lowp_mode,
+            WoqActQuantMode.NONE,  # act_quant_mode
+            False,  # cache_weight_for_large_batch
+        )
+        if (
+            dtype == WoqWeightDtype.INT8
+            and lowp_mode == WoqLowpMode.INT8
+            and _op_context.get_weight().dim() == 4
+        ):
+            n_blocks, k_blocks, block_k, block_n = _op_context.get_weight().shape
+            weight_view = plain_qweight.view([n_blocks, block_n, k_blocks, block_k])
+            compensation = torch.sum(
+                weight_view, dim=-1, keepdim=False, dtype=torch.int32
+            )
+            compensation = compensation.permute([0, 2, 1]).contiguous()
+        else:
+            compensation = None
     # pack_qweight: {N/block_n, K/block_k, block_k, block_n}
     return (
         _op_context.get_weight(),
@@ -245,11 +251,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 "DeepseekV2ForCausalLM",
                 "DeepseekV3ForCausalLM",
             ]:
-                self.unify_experts = False
-                if hasattr(self.mlp, "shared_experts"):
-                    if config.n_shared_experts == 1:
-                        self.unify_experts = True
-                        self.unify_shared_expert_id = config.n_routed_experts + 1
+                if hasattr(self.mlp, "shared_experts") and self.unify_experts:
                     if (
                         hasattr(self, "deepseek_lowbit_load")
                         and self.deepseek_lowbit_load

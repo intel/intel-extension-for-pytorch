@@ -2433,7 +2433,13 @@ class _IPEXDecoderLayerRef(nn.Module):
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
                 if config.n_shared_experts is not None:
-                    if self.use_fused_moe or self.use_fused_moe_woq:
+                    self.unify_experts = False
+                    if config.n_shared_experts == 1:
+                        self.unify_experts = True
+                        self.unify_shared_expert_id = config.n_routed_experts + 1
+                    if self.unify_experts and (
+                        self.use_fused_moe or self.use_fused_moe_woq
+                    ):
                         from intel_extension_for_pytorch.quantization import (
                             WoqWeightDtype,
                             WoqLowpMode,
