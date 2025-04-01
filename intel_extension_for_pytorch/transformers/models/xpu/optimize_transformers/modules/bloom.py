@@ -82,12 +82,11 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             dtype
         )
 
-        return IPEXTransformerConfig(
+        ipex_config = IPEXTransformerConfig(
             embedding_dim=self.config.hidden_size,
             intermediate_dim=4 * self.config.hidden_size,
             num_attention_head=self.config.n_head,
             num_key_value_head=self.config.n_head,
-            max_positions=max(2048, MAX_SEQ_LEN),
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=PositionalEmbedding,
             rotary_dim=None,
@@ -108,6 +107,8 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             tp_size=tp_size,
             tp_group=tp_group,
         )
+        ipex_config.max_positions = max(ipex_config.max_positions, MAX_SEQ_LEN)
+        return ipex_config
 
     def port_attn_parameter(self):
         embed_dim = self.ipex_config.embedding_dim
