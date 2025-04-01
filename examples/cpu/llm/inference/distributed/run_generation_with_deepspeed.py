@@ -713,10 +713,15 @@ if use_ipex:
 # Generate
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
+streamer = None
 if args.streaming:
-    streamer = TextStreamer(tokenizer)
-else:
-    streamer = None
+    if num_beams != 1 or args.batch_size != 1:
+        logger.warning(
+            "--streaming only supported in greedy search mode (--greedy) with --batch-size 1. Disabling streaming output."
+        )
+    elif local_rank == 0:
+        streamer = TextStreamer(tokenizer)
+
 generate_kwargs = dict(
     do_sample=False,
     num_beams=num_beams,

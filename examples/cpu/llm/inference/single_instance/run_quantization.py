@@ -579,10 +579,15 @@ logger.debug("get user model done")
 
 tokenizer = model.get_tokenizer()
 print("Data type of the model:", user_model.dtype)
+streamer = None
 if args.streaming:
-    streamer = TextStreamer(tokenizer)
-else:
-    streamer = None
+    if num_beams != 1 or args.batch_size != 1:
+        print(
+            "--streaming only supported in greedy search mode (--greedy) with --batch-size 1. Disabling streaming output."
+        )
+    else:
+        streamer = TextStreamer(tokenizer)
+
 generate_kwargs = dict(
     do_sample=False,
     temperature=0.9,
