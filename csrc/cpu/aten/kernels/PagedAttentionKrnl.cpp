@@ -413,6 +413,7 @@ inline void _exp_reduce_sum_fusion_kernel(
     const int& size,
     T2* out,
     T1& val) {
+  TORCH_CHECK(val != -std::numeric_limits<float>::infinity());
   auto vec_size = at::vec::Vectorized<T1>::size();
   auto vec_max = at::vec::Vectorized<T1>(val);
   T1 tmp_sum = 0;
@@ -1022,10 +1023,13 @@ void single_query_cached_kv_attention_kernel(
     int64_t block_size,
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size,
     const double k_scale,
     const double v_scale,
     const double softcap) {
   bool use_softcap = softcap == -1 ? false : true;
+  // TODO: Support both use_softcap and window_size
+  TORCH_CHECK(!(window_size > 0 && use_softcap == true));
   auto scale_ = use_softcap ? 1.0 : scale;
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
@@ -1068,6 +1072,21 @@ void single_query_cached_kv_attention_kernel(
       {num_seqs, num_heads, max_num_partitions, head_size},
       query.options().dtype(at::ScalarType::Float));
 
+  bool is_local = window_size > 0 && window_size < max_context_len;
+  if (is_local) {
+    max_logits = at::zeros(
+        {num_seqs, num_heads, max_num_partitions + 1},
+        query.options().dtype(at::ScalarType::Float));
+
+    exp_sum = at::zeros(
+        {num_seqs, num_heads, max_num_partitions + 1},
+        query.options().dtype(at::ScalarType::Float));
+
+    tmp_out = at::zeros(
+        {num_seqs, num_heads, max_num_partitions, head_size},
+        query.options().dtype(at::ScalarType::Float));
+  }
+
   auto tmp_out_ptr = tmp_out.data_ptr<float>();
   auto max_logits_ptr = max_logits.data_ptr<float>();
   auto exp_sum_ptr = exp_sum.data_ptr<float>();
@@ -1109,6 +1128,9 @@ void single_query_cached_kv_attention_kernel(
           continue;
         auto partition_end =
             std::min(partition_start + PARTITION_SIZE, context_len);
+        long sliding_window_start = is_local ? context_len - window_size : -1;
+        if (is_local && partition_end < sliding_window_start)
+          continue;
         auto token_num = partition_end - partition_start;
         auto block_num = (token_num + block_size - 1) / block_size;
         auto logical_block_start = partition_start / block_size;
@@ -1141,13 +1163,20 @@ void single_query_cached_kv_attention_kernel(
             auto k_cache_start = key_cache_ptr +
                 physical_block_id * kv_block_strideN +
                 block_offset * kv_block_strideP + kv_head_id * kv_block_strideH;
-            reduce_head(
-                q_ptr_start,
-                kv_head_group_size,
-                k_cache_start,
-                &(logits[logits_position]),
-                PARTITION_SIZE,
-                head_size);
+            if (is_local && token_id < sliding_window_start) {
+              for (auto i = 0; i < kv_head_group_size; i++) {
+                logits[logits_position + i * PARTITION_SIZE] =
+                    -std::numeric_limits<float>::infinity();
+              }
+            } else {
+              reduce_head(
+                  q_ptr_start,
+                  kv_head_group_size,
+                  k_cache_start,
+                  &(logits[logits_position]),
+                  PARTITION_SIZE,
+                  head_size);
+            }
             logits_position++;
           }
         }
@@ -1182,6 +1211,9 @@ void single_query_cached_kv_attention_kernel(
           }
           max_logits_ptr[max_logits_offset + hi * max_logits_strideH] =
               partition_max;
+          if (partition_max == -std::numeric_limits<float>::infinity()) {
+            partition_max = 0;
+          }
           _exp_reduce_sum_fusion_kernel<float, float>(
               logits + hi * PARTITION_SIZE,
               token_num,
@@ -1423,6 +1455,8 @@ void flash_attn_varlen_kernel(
     bool is_causal, // whether the attention is causal
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size_left,
+    int64_t window_size_right,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -1448,6 +1482,17 @@ void flash_attn_varlen_kernel(
   // kvSplitSize should be the same as block_size
   auto qSliceMax = (max_seqlen_q + qSplitSize - 1) / qSplitSize;
   auto kvSliceMax = (max_seqlens_k + kvSplitSize - 1) / kvSplitSize;
+
+  if (is_causal) {
+    window_size_right = 0;
+  }
+  if (window_size_left >= max_seqlens_k) {
+    window_size_left = -1;
+  }
+  if (window_size_right >= max_seqlens_k) {
+    window_size_right = -1;
+  }
+  bool is_local = (window_size_left != -1) | (window_size_right != -1);
 
   constexpr bool is_reduced_type =
       at::vec::is_reduced_floating_point_v<scalar_t>;
@@ -1534,6 +1579,14 @@ void flash_attn_varlen_kernel(
               physical_block_id * kv_block_strideN +
               kv_head_id * kv_block_strideH;
           int64_t kvBlockSize = std::min(kvSplitSize, kvSize - n);
+          if (window_size_left > 0 and
+              m + context_len - window_size_left > n + kvBlockSize) {
+            continue;
+          }
+          if (window_size_right >= 0 and
+              m + context_len + qBlockSize + window_size_right + 1 <= n) {
+            continue;
+          }
           // Calculate the scale * query * key
           // query block[qBlockSize, head_size], key block: [kvBlockSize,
           // head_size]
@@ -1563,17 +1616,25 @@ void flash_attn_varlen_kernel(
                   scaling_factor);
             }
           }
-          // apply causal mask, fill unmasked position with -inf
-          if (is_causal) {
+
+          // apply mask, fill unmasked position with -inf
+          if (is_local) {
             for (int64_t q = 0; q < qBlockSize; q++) {
               for (int64_t p = 0; p < kvBlockSize; p++) {
-                if (m + q + context_len < n + p) {
+                int64_t idx = context_len + m + q;
+                if (window_size_left > 0 and idx - window_size_left > n + p) {
+                  qk_data[q * kvSplitSize + p] =
+                      -std::numeric_limits<accum_t>::infinity();
+                }
+                if (window_size_right >= 0 and
+                    idx + window_size_right + 1 <= n + p) {
                   qk_data[q * kvSplitSize + p] =
                       -std::numeric_limits<accum_t>::infinity();
                 }
               }
             }
           }
+
           // Calculate max and sum of exp(val-max)
           for (int64_t q = 0; q < qBlockSize; q++) {
             accum_t tmp_max = -std::numeric_limits<accum_t>::infinity(),
@@ -1587,7 +1648,9 @@ void flash_attn_varlen_kernel(
                 tmp_max);
 
             tmp_max = qk_max_data[q] > tmp_max ? qk_max_data[q] : tmp_max;
-            tmp_sum = tmp_max;
+            tmp_sum = tmp_max != -std::numeric_limits<accum_t>::infinity()
+                ? tmp_max
+                : 0;
             _exp_reduce_sum_fusion_kernel<accum_t, scalar_t>(
                 qk_data + q * kvSplitSize,
                 kvBlockSize,
@@ -1595,7 +1658,11 @@ void flash_attn_varlen_kernel(
                     q * kvSplitSize,
                 tmp_sum);
             // exp_tmp <- exp(max[row] - max)
-            exp_tmp = std::exp(qk_max_data[q] - tmp_max);
+            if (tmp_max == -std::numeric_limits<accum_t>::infinity()) {
+              exp_tmp = std::exp(qk_max_data[q]);
+            } else {
+              exp_tmp = std::exp(qk_max_data[q] - tmp_max);
+            }
             // sum[row] <- sum + exp_tmp * sum[row]
             qk_sum_data[q] = tmp_sum + exp_tmp * qk_sum_data[q];
             // max[row] <- max
@@ -1656,6 +1723,7 @@ void single_query_cached_kv_attention_kernel_impl(
     int64_t block_size,
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -1739,6 +1807,7 @@ void single_query_cached_kv_attention_kernel_impl(
         block_size,
         max_context_len,
         alibi_slopes,
+        window_size,
         k_scale,
         v_scale,
         softcap);
@@ -1754,6 +1823,7 @@ void single_query_cached_kv_attention_kernel_impl(
         block_size,
         max_context_len,
         alibi_slopes,
+        window_size,
         k_scale,
         v_scale,
         softcap);
@@ -1769,6 +1839,7 @@ void single_query_cached_kv_attention_kernel_impl(
         block_size,
         max_context_len,
         alibi_slopes,
+        window_size,
         k_scale,
         v_scale,
         softcap);
@@ -1784,6 +1855,7 @@ void single_query_cached_kv_attention_kernel_impl(
         block_size,
         max_context_len,
         alibi_slopes,
+        window_size,
         k_scale,
         v_scale,
         softcap);
@@ -1849,6 +1921,8 @@ void flash_attn_varlen_cpu_kernel_impl(
     bool is_causal,
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size_left,
+    int64_t window_size_right,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -1858,9 +1932,6 @@ void flash_attn_varlen_cpu_kernel_impl(
   TORCH_CHECK(
       !alibi_slopes.has_value(),
       "alibi_slopes is not supported for flash_attn_varlen yet");
-  TORCH_CHECK(
-      is_causal,
-      "flash_attn_varlen_cpu_kernel_impl only supports causal attention, pls use the is_causal=True");
   TORCH_CHECK(
       query.scalar_type() == out.scalar_type(),
       "query and out should have the same data type");
@@ -1882,6 +1953,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1899,6 +1972,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1916,6 +1991,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1936,6 +2013,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1953,6 +2032,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1970,6 +2051,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -1990,6 +2073,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -2007,6 +2092,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);
@@ -2024,6 +2111,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           is_causal,
           block_table,
           alibi_slopes,
+          window_size_left,
+          window_size_right,
           k_scale,
           v_scale,
           softcap);

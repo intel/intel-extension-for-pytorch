@@ -453,6 +453,7 @@ class PagedAttention:
         slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
             The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
             can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
+        window_size (int): left size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
 
@@ -491,6 +492,7 @@ class PagedAttention:
                                                             block_size,
                                                             max_context_len,
                                                             alibi_slopes,
+                                                            window_size,
                                                             k_scale,
                                                             v_scale,
                                                             )
@@ -538,8 +540,10 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
-            key_cache,
-            val_cache,
+            window_size_left,
+            window_size_right,
+            k_scale,
+            v_scale,
         )
 
     Args:
@@ -559,6 +563,8 @@ class PagedAttention:
         block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
             to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        window_size_left (int): left size of sliding window, default is -1.
+        window_size_right (int): right size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
         softcap (float): the positive softcap value to apply on the attention weights, default is -1.
@@ -615,6 +621,7 @@ class PagedAttention:
         block_size: int,
         max_context_len: int,
         alibi_slopes: torch.Tensor,
+        window_size: int = -1,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -633,6 +640,7 @@ class PagedAttention:
             block_size,
             max_context_len,
             alibi_slopes,
+            window_size,
             k_scale,
             v_scale,
             softcap,
@@ -653,6 +661,8 @@ class PagedAttention:
         is_cusal: bool,
         block_tables: torch.Tensor,
         alibi_slopes: torch.Tensor,
+        window_size_left: int = -1,
+        window_size_right: int = -1,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -672,6 +682,8 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
+            window_size_left,
+            window_size_right,
             k_scale,
             v_scale,
             softcap,

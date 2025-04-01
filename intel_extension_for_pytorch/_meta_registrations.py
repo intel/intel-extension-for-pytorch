@@ -150,6 +150,7 @@ def meta_single_query_cached_kv_attention(
     block_size,
     max_context_len,
     alibi_slopes,
+    window_size,
     k_scale,
     v_scale,
 ):

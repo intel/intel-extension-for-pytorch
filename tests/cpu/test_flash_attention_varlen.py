@@ -4,15 +4,37 @@ import random
 from itertools import product
 from unittest import TestCase
 import unittest
+from typing import Tuple
 
 NUM_HEADS = [32]
 NUM_QUERIES_PER_KV = [1, 4]
 HEAD_SIZES = [128, 64]
 DTYPES = [torch.bfloat16, torch.float32, torch.float16]
+WINDOW_SIZES = [
+    (-1, -1),
+    (2, 2),
+    (512, 2),
+    (2, 512),
+]
 SOFTCAP = [-1, 50]
 
 
-def mha_ref(q, k, v, scale, is_causal, softcap):
+def fill_sliding_mask_(
+    mask, q_size, k_size, window_size_left, window_size_right, dtype, device
+):
+    if mask is None:
+        mask = torch.zeros(q_size, k_size, dtype=dtype, device=device)
+    for i in range(q_size):
+        idx = k_size - q_size + i  # ctx + q
+        if window_size_left > 0 and idx - window_size_left > 0:
+            mask[i][: idx - window_size_left] = -float("inf")
+        if window_size_right > 0 and idx + window_size_right + 1 < k_size:
+            mask[i][idx + window_size_right + 1 :] = -float("inf")
+
+    return mask
+
+
+def mha_ref(q, k, v, scale, is_causal, window_size, softcap):
     if is_causal:
         # bottom corner of the mask
         cur_mask = torch.full(
@@ -25,6 +47,16 @@ def mha_ref(q, k, v, scale, is_causal, softcap):
         mask = torch.cat([past_mask, cur_mask], dim=-1)
     else:
         mask = None
+    if window_size != (-1, -1):
+        mask = fill_sliding_mask_(
+            mask,
+            q.size(-2),
+            k.size(-2),
+            window_size[0],
+            window_size[1],
+            dtype=q.dtype,
+            device=q.device,
+        )
 
     kv_groups = q.size(1) // k.size(1)
     k = k.repeat_interleave(kv_groups, dim=1)
@@ -35,7 +67,7 @@ def mha_ref(q, k, v, scale, is_causal, softcap):
         attn = attn / softcap
         attn = torch.nn.functional.tanh(attn)
         attn = attn * softcap
-    if is_causal:
+    if mask is not None:
         attn = attn + mask
     attn = torch.nn.functional.softmax(attn, dim=-1)
     output1 = torch.matmul(attn, v)
@@ -50,6 +82,8 @@ class TestFlashAttnVarLen(TestCase):
         num_heads: int,
         num_queries_per_kv: int,
         head_size: int,
+        window_size: Tuple[int, int],
+        is_causal: bool,
         dtype: torch.dtype,
         softcap: float,
     ) -> None:
@@ -121,7 +155,8 @@ class TestFlashAttnVarLen(TestCase):
                 key_i.unsqueeze(0).transpose(1, 2),
                 value_i.unsqueeze(0).transpose(1, 2),
                 scale,
-                is_causal=True,
+                is_causal=is_causal,
+                window_size=window_size,
                 softcap=softcap,
             )
             output_i = output_i.squeeze(0).transpose(0, 1)
@@ -138,9 +173,11 @@ class TestFlashAttnVarLen(TestCase):
             max_seq_len_q,
             max_seq_len_kv,
             scale,
-            True,
+            is_causal,
             block_table,
             None,
+            window_size[0],
+            window_size[1],
             softcap=softcap,
         )
 
@@ -149,11 +186,31 @@ class TestFlashAttnVarLen(TestCase):
         )
 
     def test_flash_attn_varlen(self):
-        for num_heads, num_queries_per_kv, head_size, dtype, softcap in product(
-            NUM_HEADS, NUM_QUERIES_PER_KV, HEAD_SIZES, DTYPES, SOFTCAP
+        for (
+            num_heads,
+            num_queries_per_kv,
+            head_size,
+            window_size,
+            is_causal,
+            dtype,
+            softcap,
+        ) in product(
+            NUM_HEADS,
+            NUM_QUERIES_PER_KV,
+            HEAD_SIZES,
+            WINDOW_SIZES,
+            [False, True],
+            DTYPES,
+            SOFTCAP,
         ):
             self._test_flash_attn_varlen(
-                num_heads, num_queries_per_kv, head_size, dtype, softcap
+                num_heads,
+                num_queries_per_kv,
+                head_size,
+                window_size,
+                is_causal,
+                dtype,
+                softcap,
             )
 
 

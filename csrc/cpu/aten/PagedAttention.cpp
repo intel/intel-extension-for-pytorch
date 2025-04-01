@@ -25,6 +25,7 @@ void single_query_cached_kv_attention_forward_cpu(
     int64_t block_size,
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -41,6 +42,7 @@ void single_query_cached_kv_attention_forward_cpu(
       block_size,
       max_context_len,
       alibi_slopes,
+      window_size,
       k_scale,
       v_scale,
       softcap);
@@ -71,6 +73,8 @@ void flash_attn_varlen_cpu(
     bool is_causal,
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size_left,
+    int64_t window_size_right,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -88,6 +92,8 @@ void flash_attn_varlen_cpu(
       is_causal,
       block_table,
       alibi_slopes,
+      window_size_left,
+      window_size_right,
       k_scale,
       v_scale,
       softcap);

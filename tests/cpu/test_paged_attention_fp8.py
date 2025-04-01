@@ -70,6 +70,7 @@ class PagedAttentionTest(TestCase):
         context_lens: torch.Tensor,
         scale: float,
         alibi_slopes: Optional[torch.Tensor],
+        window_size: int,
     ) -> None:
         num_query_heads = query.shape[1]
         num_kv_head = value_cache.shape[1]
@@ -112,6 +113,15 @@ class PagedAttentionTest(TestCase):
                 position_ids = torch.arange(context_len, device="cpu").int()
                 alibi_bias = (position_ids - context_len + 1).float()
                 alibi_bias = alibi_slopes.view(-1, 1, 1) * alibi_bias.view(1, 1, -1)
+            if window_size > 0:
+                sliding_window_start = keys.shape[0] - window_size
+                if sliding_window_start >= 0:
+                    attn_mask = torch.zeros(num_query_heads, q.shape[0], keys.shape[0])
+                    attn_mask[:, :, :sliding_window_start] = -float("inf")
+                    if alibi_bias is None:
+                        alibi_bias = attn_mask
+                    else:
+                        alibi_bias += attn_mask
 
             out = self.ref_masked_attention(q, keys, values, scale, alibi_bias)
             out = out.view(num_query_heads, head_size)
@@ -125,6 +135,7 @@ class PagedAttentionTest(TestCase):
         use_alibi: bool,
         num_blocks: int,
         block_size: int,
+        window_size,
         dtype: torch.dtype,
         qtype: torch.dtype,
         seed: int,
@@ -202,6 +213,7 @@ class PagedAttentionTest(TestCase):
             block_size,
             max_context_len,
             alibi_slopes,
+            window_size,
             k_scale,
             v_scale,
         )
@@ -218,6 +230,7 @@ class PagedAttentionTest(TestCase):
             context_lens,
             scale,
             alibi_slopes,
+            window_size,
         )
         assert torch.allclose(output, ref_output, atol=5e-3, rtol=1e-3)
 
@@ -230,10 +243,11 @@ class PagedAttentionTest(TestCase):
             torch.float8_e5m2,
         ]
         num_gen_seqs = [7]  # Arbitrary values for testing
-        num_heads = [(40, 40), (64, 16)]  # Arbitrary values for testing
+        num_heads = [(40, 40), (64, 16), (71, 1)]  # Arbitrary values for testing
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         use_alibis = [True, False]
+        sliding_windows = [-1, 2, 512]
         seeds = [0]
         for (
             num_seqs,
@@ -241,6 +255,7 @@ class PagedAttentionTest(TestCase):
             head_size,
             use_alibi,
             block_size,
+            sliding_window,
             dtype,
             qtype,
             seed,
@@ -250,6 +265,7 @@ class PagedAttentionTest(TestCase):
             head_sizes,
             use_alibis,
             block_sizes,
+            sliding_windows,
             dtypes,
             qtypes,
             seeds,
@@ -261,6 +277,7 @@ class PagedAttentionTest(TestCase):
                 use_alibi,
                 num_blocks,
                 block_size,
+                sliding_window,
                 dtype,
                 qtype,
                 seed,
