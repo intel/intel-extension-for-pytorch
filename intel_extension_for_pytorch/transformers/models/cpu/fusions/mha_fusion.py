@@ -747,3 +747,83 @@ def gelu_mul_cpu(x, y, out=None, approximate="none"):
     if out is not None:
         out.copy_(res)
     return res
+
+
+def bgmv_shrink_cpu(
+    inputs: torch.Tensor,
+    lora_a_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    scaling: float,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of [batchsize, hidden_size].
+        lora_a_weights (torch.Tensor):  LoRA weights tensor with shape of [num_lora, max_rank, hidden_size].
+        output_tensor (torch.Tensor): The output tensor with shape of [batchsize, output_size1] which output_size1 >= max_rank
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token to
+          the lora-id related to that token with shape of [batchsize].
+        scaling (float): Scaling factor.
+    """
+    torch.ops.torch_ipex.punica_bgmv_shrink(
+        output_tensor, inputs, lora_a_weights, lora_indices_tensor, scaling
+    )
+    return
+
+
+def bgmv_expand_cpu(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    add_inputs: bool,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of
+            [batchsize, input_size1] or [1, input_size1] which input_size1  >= hidden_size.
+        lora_b_weights (torch.Tensor):  LoRA weights tensor
+            with shape of [num_lora, max_rank, hidden_size].
+        output_tensor (torch.Tensor): The output tensor with shape of
+            [batchsize, output_size1] which output_size1 >= max_rank
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token
+            to the lora-id related to that token with shape of [batchsize].
+        add_inputs (bool): Whether to add to the output tensor.
+    """
+    torch.ops.torch_ipex.punica_bgmv_expand(
+        output_tensor, inputs, lora_b_weights, lora_indices_tensor, add_inputs
+    )
+    return
+
+
+def bgmv_expand_slice_cpu(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of [batchsize, max_rank].
+        lora_b_weights (torch.Tensor):  LoRA weights tensor with shape of [num_lora, hidden_size, max_rank].
+        output_tensor (torch.Tensor): The output tensor with shape of [batchsize, output_size1]
+            which output_size1 >= slice_offset + slice_size
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token to
+            the lora-id related to that token with shape of [batchsize].
+        slice_offset (int): Slice offset start for output.
+        slice_size (int): Slice length for output.
+        add_inputs (bool): Whether to add to the output tensor.
+    """
+    torch.ops.torch_ipex.punica_bgmv_expand_slice(
+        output_tensor,
+        inputs,
+        lora_b_weights,
+        lora_indices_tensor,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )
+    return

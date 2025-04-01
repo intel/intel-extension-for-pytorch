@@ -331,3 +331,82 @@ def add_layer_norm(
     """
     f = _get_function_from_device(x.device.type, add_layer_norm)
     return f(residual, x, weight, bias, eps, add_back)
+
+
+def bgmv_shrink(
+    input: torch.Tensor,
+    lora_weights: torch.Tensor,
+    output: torch.Tensor,
+    token_lora_mapping: torch.Tensor,
+    scaling: float,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of [batchsize, hidden_size].
+        lora_a_weights (torch.Tensor):  LoRA weights tensor with shape of [num_lora, max_rank, hidden_size].
+        output_tensor (torch.Tensor): The output tensor with shape of [batchsize, output_size1] which output_size1 >= max_rank
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token to
+          the lora-id related to that token with shape of [batchsize].
+        scaling (float): Scaling factor.
+    """
+    f = _get_function_from_device(input.device.type, bgmv_shrink)
+    f(input, lora_weights, output, token_lora_mapping, scaling)
+    return
+
+
+def bgmv_expand(
+    input: torch.Tensor,
+    lora_weights: torch.Tensor,
+    output: torch.Tensor,
+    token_lora_mapping: torch.Tensor,
+    add_inputs: bool,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of
+            [batchsize, input_size1] or [1, input_size1] which input_size1  >= hidden_size.
+        lora_b_weights (torch.Tensor):  LoRA weights tensor
+            with shape of [num_lora, max_rank, hidden_size].
+        output_tensor (torch.Tensor): The output tensor with shape of
+            [batchsize, output_size1] which output_size1 >= max_rank
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token
+            to the lora-id related to that token with shape of [batchsize].
+        add_inputs (bool): Whether to add to the output tensor.
+    """
+    f = _get_function_from_device(input.device.type, bgmv_expand)
+    f(input, lora_weights, output, token_lora_mapping, add_inputs)
+    return
+
+
+def bgmv_expand_slice(
+    input: torch.Tensor,
+    lora_weights: torch.Tensor,
+    output: torch.Tensor,
+    token_lora_mapping: torch.Tensor,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool,
+):
+    r"""
+    Args:
+        inputs (torch.Tensor): The input tensor with shape of [batchsize, max_rank].
+        lora_b_weights (torch.Tensor):  LoRA weights tensor with shape of [num_lora, hidden_size, max_rank].
+        output_tensor (torch.Tensor): The output tensor with shape of [batchsize, output_size1]
+            which output_size1 >= slice_offset + slice_size
+        lora_indices_tensor (torch.Tensor): The tensor mapping each input token to
+            the lora-id related to that token with shape of [batchsize].
+        slice_offset (int): Slice offset start for output.
+        slice_size (int): Slice length for output.
+        add_inputs (bool): Whether to add to the output tensor.
+    """
+    f = _get_function_from_device(input.device.type, bgmv_expand_slice)
+    f(
+        input,
+        lora_weights,
+        output,
+        token_lora_mapping,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )
+    return
