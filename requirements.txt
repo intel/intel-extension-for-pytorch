@@ -9,5 +9,4 @@ scipy>=1.8.0
 setuptools==72.1.0
 types-dataclasses
 typing_extensions
-pydantic
 ruamel.yaml==0.18.6
