@@ -95,6 +95,7 @@ class _IPEXAttentionCPU(nn.Module):
             "Qwen2ForCausalLM",
             "JambaForCausalLM",
             "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
             "Phi4MMForCausalLM",
         ]:
             if hasattr(module, "concat_qkv"):

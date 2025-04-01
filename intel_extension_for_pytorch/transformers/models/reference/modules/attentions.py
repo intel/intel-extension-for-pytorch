@@ -2359,40 +2359,62 @@ def _DeepseekV2Attention_forward(
         compressed_kv, k_pe = torch.split(
             compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
         )
-    kv = self.kv_b_proj(self.kv_a_layernorm(compressed_kv)).view(
-        bsz, q_len, self.num_heads, self.qk_nope_head_dim + self.v_head_dim
+    kv_seq_len = (
+        past_key_value[0].shape[2] + q_len if past_key_value is not None else q_len
     )
     sin_cos, _, _ = self._IPEXROPE.embed_positions()
-    query_states, key_states, value_states = (
-        torch.ops.torch_ipex.rotary_position_embedding_deepseek(
-            q,
-            kv,
-            k_pe,
-            sin_cos,
-            position_ids,
-            self.num_attention_heads,
-            self.q_head_dim,
-            self.qk_nope_head_dim,
-            self.qk_rope_head_dim,
-        )
+    query_states, k_pe = torch.ops.torch_ipex.rotary_position_embedding_deepseek_v2(
+        q,
+        k_pe,
+        sin_cos,
+        position_ids,
+        self.num_attention_heads,
+        self.q_head_dim,
+        self.qk_nope_head_dim,
+        self.qk_rope_head_dim,
     )
+
+    kv = self.kv_a_layernorm(compressed_kv)
+    if past_key_value is None:
+        past_key_value = (
+            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+            torch.zeros([1, 1, 1, 1]).contiguous().to(kv.dtype),
+            torch.zeros(1, int(query_states.size(0)), dtype=torch.long).contiguous(),
+        )
+    kv_cache = past_key_value[1].contiguous()
+    beam_idx = past_key_value[-1].contiguous()
+    seq_info = torch.tensor(past_key_value[0].size(-2), dtype=torch.long).contiguous()
     (
         attn_output,
         attn_weights,
-        past_key_value,
-    ) = self._IPEXScaleDotProduct(
+        kv_cache,
+        beam_idx,
+    ) = torch.ops.torch_ipex.deepseekv2_mla(
         query_states,
-        key_states,
-        value_states,
+        kv,
+        k_pe,
+        kv_cache,
+        self.kv_b_proj_weight,
+        self.w_kc,
+        self.w_vc,
+        beam_idx,
+        seq_info,
         1 / self.softmax_scale,
-        past_key_value,
+        self.text_max_length,
+        self.v_head_dim,
         None,
         attention_mask,
+        self.w_scale if hasattr(self, "w_scale") else None,
+        False,
     )
-    if self.q_head_dim != self.v_head_dim:
-        attn_output = attn_output[:, :, :, : self.v_head_dim]
 
-    attn_output = attn_output.transpose(1, 2)
+    past_key_value = (
+        torch.empty(1, kv_seq_len, kv_seq_len, 1, dtype=torch.long).contiguous(),
+        kv_cache,
+        beam_idx,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
 
     attn_output = attn_output.reshape(bsz, q_len, -1)
 
@@ -3083,6 +3105,20 @@ class _IPEXAttentionRef(nn.Module):
                 self.norm_factor_value = self.norm_factor.item()
             else:
                 self.norm_factor_value = 1 / self.norm_factor
+        if self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
+            kv_b_proj_weight = self.kv_b_proj.weight.detach()
+            self.kv_b_proj_weight = kv_b_proj_weight.transpose(0, 1).contiguous()
+            w_kc, w_vc = kv_b_proj_weight.unflatten(
+                0, (-1, self.qk_nope_head_dim + self.v_head_dim)
+            ).split([self.qk_nope_head_dim, self.v_head_dim], dim=1)
+            self.w_kc = torch.ops.torch_ipex.convert_weight_packed(
+                w_kc.transpose(-1, -2).contiguous(), False
+            )
+            self.w_vc = torch.ops.torch_ipex.convert_weight_packed(
+                w_vc.contiguous(), False
+            )
+            if hasattr(self.kv_b_proj, "weight_scale") and self.w_scale is None:
+                self.w_scale = self.kv_b_proj.weight_scale
 
     def forward(
         self,
@@ -3444,6 +3480,13 @@ def _reorder_cache(
             )
             for layer_past in past_key_values
         )
+    elif hasattr(self, "config") and self.config.architectures[0] in [
+        "DeepseekV2ForCausalLM",
+        "DeepseekV3ForCausalLM",
+    ]:
+        for layer_past in past_key_values:
+            layer_past[2][layer_past[0].size(-2) - 1] = beam_idx
+        return past_key_values
     elif (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache

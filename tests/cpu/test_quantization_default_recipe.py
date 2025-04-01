@@ -31,7 +31,7 @@ from intel_extension_for_pytorch.quantization import (
 )
 from intel_extension_for_pytorch.nn.modules.weight_only_quantization import (
     WeightOnlyQuantizedLinear,
-    Int4WeightFormat,
+    WoqWeightFormat,
 )
 import os
 
@@ -2572,7 +2572,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.GPTQ_FORMAT,
+                WoqWeightFormat.GPTQ_FORMAT,
             )
             packed_weight = op_context.get_weight()
             op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
@@ -2586,7 +2586,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.PLAIN_FORMAT,
+                WoqWeightFormat.PLAIN_FORMAT,
             )
             packed_weight_ref = op_context_ref.get_weight()
 
@@ -2628,7 +2628,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.AWQ_FORMAT,
+                WoqWeightFormat.AWQ_FORMAT,
             )
             packed_weight = op_context.get_weight()
             op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
@@ -2642,7 +2642,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.PLAIN_FORMAT,
+                WoqWeightFormat.PLAIN_FORMAT,
             )
             packed_weight_ref = op_context_ref.get_weight()
 
