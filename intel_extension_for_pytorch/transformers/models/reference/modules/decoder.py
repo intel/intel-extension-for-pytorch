@@ -1956,15 +1956,7 @@ def JambaMambaDecoderLayer_forward(
 def moe_infer(self, x, topk_ids, topk_weight):
     if self.use_fused_moe or self.use_fused_moe_woq:
         if self.unify_experts:
-            pad_weights = torch.ones(x.size(0), 1)
-            pad_ids = torch.full((x.size(0), 1), self.unify_shared_expert_id - 1).to(
-                torch.int
-            )
-            topk_weight = torch.cat((topk_weight.to(torch.float), pad_weights), -1).to(
-                torch.float
-            )
-            topk_ids = torch.cat((topk_ids.to(torch.int), pad_ids), -1).to(torch.int)
-            final_out = torch.ops.torch_ipex.fused_experts(
+            final_out = torch.ops.torch_ipex.fused_experts_with_shared(
                 x,
                 self.w13_weight,
                 self.w2_weight,
