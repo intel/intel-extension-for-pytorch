@@ -62,6 +62,7 @@ std::vector<std::function<void(sycl::handler&)>> launch_split_kv_kernels(
               reinterpret_cast<T*>(fwd_args.query),
               reinterpret_cast<T*>(fwd_args.key_cache),
               reinterpret_cast<T*>(fwd_args.value_cache),
+              reinterpret_cast<float*>(fwd_args.alibi_slopes),
               reinterpret_cast<U*>(fwd_args.block_tables),
               reinterpret_cast<U*>(fwd_args.context_lens),
               fwd_args.num_queries_per_tokens,

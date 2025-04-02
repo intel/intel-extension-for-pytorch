@@ -96,10 +96,8 @@ class TestPagedAttention(TestCase):
                 values = torch.repeat_interleave(values, num_queries_per_kv, dim=1)
             alibi_bias = None
             if alibi_slopes is not None:
-                # Create the ALiBi bias used in the paged attention kernel.
-                position_ids = torch.arange(context_len, device="cpu").int()
-                alibi_bias = (position_ids - context_len + 1).float()
-                alibi_bias = alibi_slopes.view(-1, 1, 1) * alibi_bias.view(1, 1, -1)
+                distances = torch.arange(context_len).to(torch.float32)
+                alibi_bias = alibi_slopes.view(num_query_heads, 1, 1) * distances
 
             out = self.ref_masked_attention(q, keys, values, scale, alibi_bias, softcap)
             out = out.view(num_query_heads, head_size)
@@ -153,11 +151,18 @@ class TestPagedAttention(TestCase):
         return key_caches, value_caches
 
     def paged_attention(
-        self, version, dtype_, seqlens, head_size, num_heads, block_size, softcap
+        self,
+        version,
+        dtype_,
+        seqlens,
+        head_size,
+        num_heads,
+        block_size,
+        use_alibi,
+        softcap,
     ) -> None:
         num_seqs = 4
         num_heads = [16, 16]
-        use_alibi = False
         block_size = 32
         dtype = dtype_
         seed = 0
@@ -176,6 +181,12 @@ class TestPagedAttention(TestCase):
             num_queries_per_kv,
         )
         alibi_slopes = None
+        if use_alibi:
+            alibi_slopes = torch.tensor(
+                [2 ** (-1 - i) for i in range(num_query_heads)],
+                dtype=torch.float,
+                device="cpu",
+            )
 
         context_lens = [seqlens + i for i in range(num_seqs)]
 
@@ -213,7 +224,7 @@ class TestPagedAttention(TestCase):
         block_tables_xpu = block_tables.to(xpu_device)
         context_lens_xpu = context_lens.to(xpu_device)
 
-        alibi_slopes_xpu = None
+        alibi_slopes_xpu = alibi_slopes.to(xpu_device) if use_alibi else None
 
         # Call the paged attention kernel
         if version == "v1":
@@ -243,7 +254,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
                 softcap=softcap,
             )
 
@@ -258,7 +269,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
                 softcap,
             )
         elif version == "v2":
@@ -289,7 +300,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
                 softcap=softcap,
             )
             ipex.llm.modules.PagedAttention.single_query_kv_attention(
@@ -303,7 +314,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
                 softcap,
             )
             torch.xpu.paged_attention_v2(
@@ -355,11 +366,18 @@ class TestPagedAttention(TestCase):
         print(f"attention {version} {dtype} accuracy test passed")
 
     def paged_attention_fp8(
-        self, version, dtype_, seqlens, head_size, num_heads, block_size, qtype
+        self,
+        version,
+        dtype_,
+        seqlens,
+        head_size,
+        num_heads,
+        block_size,
+        use_alibi,
+        qtype,
     ) -> None:
         num_seqs = 4
         num_heads = [16, 16]
-        use_alibi = False
         block_size = 32
         dtype = dtype_
         seed = 0
@@ -378,6 +396,12 @@ class TestPagedAttention(TestCase):
             num_queries_per_kv,
         )
         alibi_slopes = None
+        if use_alibi:
+            alibi_slopes = torch.tensor(
+                [2 ** (-1 - i) for i in range(num_query_heads)],
+                dtype=torch.float,
+                device="cpu",
+            )
 
         context_lens = [seqlens + i for i in range(num_seqs)]
 
@@ -420,7 +444,7 @@ class TestPagedAttention(TestCase):
         key_cache = key_cache.to(dtype)
         value_cache = value_cache.to(dtype)
 
-        alibi_slopes_xpu = None
+        alibi_slopes_xpu = alibi_slopes.to(xpu_device) if use_alibi else None
 
         # Call the paged attention kernel
         if version == "v1":
@@ -436,7 +460,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
             )
 
             ipex.llm.modules.PagedAttention.single_query_kv_attention(
@@ -450,7 +474,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
             )
         elif version == "v2":
             num_partitions = (max_context_len + PARTITION_SIZE - 1) // PARTITION_SIZE
@@ -480,7 +504,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
             )
             ipex.llm.modules.PagedAttention.single_query_kv_attention(
                 output_xpu_clone,
@@ -493,7 +517,7 @@ class TestPagedAttention(TestCase):
                 context_lens_xpu,
                 block_size,
                 max_context_len,
-                alibi_slopes,
+                alibi_slopes_xpu,
             )
         else:
             assert False, f"Unknown version: {version}"  # noqa
@@ -525,10 +549,20 @@ class TestPagedAttention(TestCase):
     @parametrize("head_size", [128, 256])
     @parametrize("num_heads", [[16, 16], [32, 32]])
     @parametrize("block_size", [32, 49])
+    @parametrize("use_alibi", [False, True])
     @parametrize("softcap", [-1, 50.0])
-    def test_fp16(self, version, seqlens, head_size, num_heads, block_size, softcap):
+    def test_fp16(
+        self, version, seqlens, head_size, num_heads, block_size, use_alibi, softcap
+    ):
         self.paged_attention(
-            version, torch.float16, seqlens, head_size, num_heads, block_size, softcap
+            version,
+            torch.float16,
+            seqlens,
+            head_size,
+            num_heads,
+            block_size,
+            use_alibi,
+            softcap,
         )
 
     @pytest.mark.skipif(
@@ -539,20 +573,40 @@ class TestPagedAttention(TestCase):
     @parametrize("head_size", [256])
     @parametrize("num_heads", [[16, 16]])
     @parametrize("block_size", [32])
+    @parametrize("use_alibi", [False, True])
     @parametrize("softcap", [-1, 50.0])
-    def test_bf16(self, version, seqlens, head_size, num_heads, block_size, softcap):
+    def test_bf16(
+        self, version, seqlens, head_size, num_heads, block_size, use_alibi, softcap
+    ):
         self.paged_attention(
-            version, torch.bfloat16, seqlens, head_size, num_heads, block_size, softcap
+            version,
+            torch.bfloat16,
+            seqlens,
+            head_size,
+            num_heads,
+            block_size,
+            use_alibi,
+            softcap,
         )
 
     @parametrize("version, seqlens", [("v1", 128), ("v2", 512), ("v2", 877)])
     @parametrize("head_size", [128, 256])
     @parametrize("num_heads", [[16, 16], [32, 32]])
     @parametrize("block_size", [32, 49])
+    @parametrize("use_alibi", [False, True])
     @parametrize("qtype", [torch.float8_e5m2, torch.float8_e4m3fn])
-    def test_fp8(self, version, seqlens, head_size, num_heads, block_size, qtype):
+    def test_fp8(
+        self, version, seqlens, head_size, num_heads, block_size, use_alibi, qtype
+    ):
         self.paged_attention_fp8(
-            version, torch.float16, seqlens, head_size, num_heads, block_size, qtype
+            version,
+            torch.float16,
+            seqlens,
+            head_size,
+            num_heads,
+            block_size,
+            use_alibi,
+            qtype,
         )
 
 

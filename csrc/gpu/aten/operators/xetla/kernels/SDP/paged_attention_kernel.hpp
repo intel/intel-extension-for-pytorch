@@ -292,6 +292,7 @@ class paged_attention_kernel {
     scalar_t* query; // [num_seqs, num_heads, head_size]
     scalar_t* key_cache; // [num_blocks, num_kv_heads, head_size, block_size]
     scalar_t* value_cache; // [num_blocks, num_kv_heads, head_size, block_size]
+    float* alibi_slopes; // [num_heads] - alibi_slopes
 
     // Index
     index_t* block_tables; // [num_seqs, max_blocks_per_seq]
@@ -318,6 +319,7 @@ class paged_attention_kernel {
         scalar_t* query,
         scalar_t* key_cache,
         scalar_t* value_cache,
+        float* alibi_slopes,
         index_t* block_tables,
         index_t* context_lens,
         uint32_t num_queries_per_tokens,
@@ -334,6 +336,7 @@ class paged_attention_kernel {
           query(query),
           key_cache(key_cache),
           value_cache(value_cache),
+          alibi_slopes(alibi_slopes),
           block_tables(block_tables),
           context_lens(context_lens),
           num_queries_per_tokens(num_queries_per_tokens),
@@ -404,6 +407,8 @@ class paged_attention_kernel {
     int end_block_id;
     int loop_count;
 
+    float alibi_slopes;
+
     xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
 
     inline context_t() = default;
@@ -414,6 +419,10 @@ class paged_attention_kernel {
       seq_id = item.get_group(1);
       partition_id = item.get_group(2);
       max_num_partitions = item.get_group_range(2);
+
+      if (args.alibi_slopes != nullptr) {
+        alibi_slopes = args.alibi_slopes[head_id];
+      }
 
       context_len = args.context_lens[seq_id];
       block_table = args.block_tables + seq_id * args.max_blocks_per_seq;
@@ -611,6 +620,15 @@ class paged_attention_kernel {
             xetla_tanh<typename score_tile_t::dtype, block_size>(score_sub);
         score_sub *= args.softcap;
       }
+
+      if (args.alibi_slopes != nullptr) {
+        int32_t mat_real_x = bid * block_size;
+        int32_t mat_real_y = ctx.seq_id;
+        xetla_vector<float, block_size> pos_id =
+            xetla_vector_gen<float, block_size>(mat_real_x, 1);
+        score_sub += (pos_id * ctx.alibi_slopes);
+      }
+
       uint32_t remained_len = ctx.context_len - bid * block_size;
       if (remained_len < block_size) {
         xetla_mask<block_size> mask =
@@ -645,6 +663,11 @@ class paged_attention_kernel {
     }
     accum_t group_sum = wg_reduce_sum(mat_score);
     mat_score.reg /= group_sum;
+
+    if (use_partition && group_max == neg_infinity) {
+      mat_score.reg = 0.f;
+      group_sum = 0.f;
+    }
 
     if (use_partition && ctx.sg_id == 0) {
       // store the max and exp_sum

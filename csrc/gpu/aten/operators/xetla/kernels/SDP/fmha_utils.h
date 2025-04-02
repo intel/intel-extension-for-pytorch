@@ -270,8 +270,6 @@ struct tile_mask_t {
 #pragma unroll
         for (int k = 0; k < block_size_y; k++) {
           src_sub.row(k) += (blk_seq_x * alibi_slopes);
-          xetla_mask<block_size_x> mask = blk_seq_x > blk_start_y + k;
-          src_sub.row(k).xetla_merge(kNegInfinity, mask);
         }
       }
     }
@@ -296,8 +294,6 @@ struct tile_mask_t {
 #pragma unroll
         for (int k = 0; k < tail_size_y; k++) {
           src_sub.row(k) += (blk_seq_x * alibi_slopes);
-          xetla_mask<block_size_x> mask = blk_seq_x > blk_start_y + k;
-          src_sub.row(k).xetla_merge(kNegInfinity, mask);
         }
       }
     }

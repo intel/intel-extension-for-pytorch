@@ -1471,10 +1471,21 @@ void xetla_paged_attention_impl_v1(
   uint32_t num_kv_heads = key_cache.size(1);
   uint32_t max_num_blocks_per_seq = block_tables.size(1);
 
-  // TODO(zw): alibi_slopes is optional, not used currently.
-  const float* alibi_slopes_ptr = alibi_slopes
-      ? reinterpret_cast<const float*>(alibi_slopes.value().data_ptr())
-      : nullptr;
+  if (alibi_slopes.has_value()) {
+    TORCH_CHECK(alibi_slopes->is_xpu(), "alibi_slopes_ must on XPU");
+    TORCH_CHECK(
+        alibi_slopes->is_contiguous(), "alibi_slopes_ must be contiguous");
+    TORCH_CHECK(
+        alibi_slopes->scalar_type() == at::kFloat,
+        "XeTLA VarlenAttention: The datatype of alibi_slopes should be float");
+    int ndim = alibi_slopes->ndimension();
+    TORCH_CHECK(
+        ndim == 1, "XeTLA VarlenAttention: only support 1 dim alibi tensor!");
+    int last_dim = alibi_slopes->size(-1);
+    TORCH_CHECK(
+        last_dim == num_heads,
+        "XeTLA VarlenAttention: The shape of alibi tensor should equal to [num_head]");
+  }
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
 #if defined(USE_XETLA)
@@ -1490,6 +1501,8 @@ void xetla_paged_attention_impl_v1(
        reinterpret_cast<void*>(query.data_ptr()),
        reinterpret_cast<void*>(key_cache.data_ptr()),
        reinterpret_cast<void*>(value_cache.data_ptr()),
+       alibi_slopes.has_value() ? alibi_slopes.value().data_ptr()
+                                : (void*)nullptr,
        reinterpret_cast<void*>(block_tables.data_ptr()),
        reinterpret_cast<void*>(context_lens.data_ptr()),
        num_queries_per_tokens,
@@ -1560,10 +1573,21 @@ void xetla_paged_attention_impl_v2(
   uint32_t num_kv_heads = key_cache.size(1);
   uint32_t max_num_blocks_per_seq = block_tables.size(1);
 
-  // TODO(zw): alibi_slopes is optional, not used currently.
-  const float* alibi_slopes_ptr = alibi_slopes
-      ? reinterpret_cast<const float*>(alibi_slopes.value().data_ptr())
-      : nullptr;
+  if (alibi_slopes.has_value()) {
+    TORCH_CHECK(alibi_slopes->is_xpu(), "alibi_slopes_ must on XPU");
+    TORCH_CHECK(
+        alibi_slopes->is_contiguous(), "alibi_slopes_ must be contiguous");
+    TORCH_CHECK(
+        alibi_slopes->scalar_type() == at::kFloat,
+        "XeTLA VarlenAttention: The datatype of alibi_slopes should be float");
+    int ndim = alibi_slopes->ndimension();
+    TORCH_CHECK(
+        ndim == 1, "XeTLA VarlenAttention: only support 1 dim alibi tensor!");
+    int last_dim = alibi_slopes->size(-1);
+    TORCH_CHECK(
+        last_dim == num_heads,
+        "XeTLA VarlenAttention: The shape of alibi tensor should equal to [num_head]");
+  }
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
 #if defined(USE_XETLA)
@@ -1579,6 +1603,8 @@ void xetla_paged_attention_impl_v2(
        reinterpret_cast<void*>(query.data_ptr()),
        reinterpret_cast<void*>(key_cache.data_ptr()),
        reinterpret_cast<void*>(value_cache.data_ptr()),
+       alibi_slopes.has_value() ? alibi_slopes.value().data_ptr()
+                                : (void*)nullptr,
        reinterpret_cast<void*>(block_tables.data_ptr()),
        reinterpret_cast<void*>(context_lens.data_ptr()),
        num_queries_per_tokens,
