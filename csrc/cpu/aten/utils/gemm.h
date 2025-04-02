@@ -11,7 +11,7 @@ constexpr int block_size_m() {
   return 1 * TILE_M;
 }
 constexpr int block_size_n() {
-  return 8 * TILE_N;
+  return 2 * TILE_N;
 }
 
 template <typename scalar_t>

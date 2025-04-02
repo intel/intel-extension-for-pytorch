@@ -56,7 +56,7 @@ constexpr int block_size_m() {
   return 1 * TILE_M;
 }
 constexpr int block_size_n() {
-  return 8 * TILE_N;
+  return 2 * TILE_N;
 }
 // convert to vnni format
 // from [N, K] to [K/2, N, 2] for bfloat16 and float16
