@@ -1,4 +1,5 @@
-transformers==v4.48.3
+git+https://github.com/bitsandbytes-foundation/bitsandbytes.git@multi-backend-refactor
+transformers==4.48.3
 tf-keras
 accelerate==1.1.1
 peft==0.14.0
