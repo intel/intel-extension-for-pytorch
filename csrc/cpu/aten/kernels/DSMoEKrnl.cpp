@@ -888,8 +888,25 @@ void _dequant_and_store(
   for (int m = 0; m < M; ++m) {
     float a_scale = *(scale_a + m * ldsa);
     int32_t a_zp = *(zp_a + m * ldsa);
-#pragma omp simd
-    for (int n = 0; n < N; ++n) {
+    __m512 va_scale = _mm512_set1_ps(a_scale);
+    __m512i va_zp = _mm512_set1_epi32(a_zp);
+    int n = 0;
+    for (; n < N; n += 16) {
+      __m512i va = _mm512_loadu_si512(input + m * ld + n);
+      __m512i vb_comp = _mm512_loadu_si512(comp_b + n);
+      __m512i vc = _mm512_sub_epi32(va, _mm512_mullo_epi32(vb_comp, va_zp));
+      __m512 vc_f = _mm512_cvtepi32_ps(vc);
+      __m512 vc_f_mul = _mm512_mul_ps(vc_f, va_scale);
+      __m512 vb_s = _mm512_loadu_ps(scale_b + n);
+      vc_f_mul = _mm512_mul_ps(vc_f_mul, vb_s);
+      if constexpr (accum) {
+        __m512 vo = _mm512_loadu_ps(output + m * ld + n);
+        _mm512_storeu_ps(output + m * ld + n, _mm512_add_ps(vo, vc_f_mul));
+      } else {
+        _mm512_storeu_ps(output + m * ld + n, vc_f_mul);
+      }
+    }
+    for (; n < N; ++n) {
       float dq_val =
           (float)(input[m * ld + n] - a_zp * comp_b[n]) * a_scale * scale_b[n];
       if constexpr (accum) {
