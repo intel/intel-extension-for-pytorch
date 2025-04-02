@@ -24,32 +24,8 @@ set(IntelSYCL_cmake_included true)
 
 include(FindPackageHandleStandardArgs)
 
-find_package(IntelSYCL REQUIRED)
-if(NOT IntelSYCL_FOUND)
-  message(FATAL_ERROR "Cannot find IntelSYCL compiler!")
-endif()
-
-# Try to find Intel SYCL version.hpp header
-find_file(INTEL_SYCL_VERSION
-    NAMES version.hpp
-    PATHS
-        ${SYCL_INCLUDE_DIR}
-    PATH_SUFFIXES
-        sycl
-        sycl/CL
-        sycl/CL/sycl
-    NO_DEFAULT_PATH)
-
-if(NOT INTEL_SYCL_VERSION)
-  message(FATAL_ERROR "Can NOT find SYCL version file!")
-endif()
-
-set(SYCL_COMPILER_VERSION)
-file(READ ${INTEL_SYCL_VERSION} version_contents)
-string(REGEX MATCHALL "__SYCL_COMPILER_VERSION +[0-9]+" VERSION_LINE "${version_contents}")
-list(LENGTH VERSION_LINE ver_line_num)
-if (${ver_line_num} EQUAL 1)
-  string(REGEX MATCHALL "[0-9]+" SYCL_COMPILER_VERSION "${VERSION_LINE}")
+if(NOT SYCL_FOUND)
+  message(FATAL_ERROR ${SYCL_REASON_FAILURE})
 endif()
 
 set(IGC_OCLOC_VERSION)
@@ -80,13 +56,10 @@ if(LevelZero_LIBRARY)
   string(STRIP "${lz_lib_ver}" LEVEL_ZERO_VERSION)
 endif()
 
-# Find the OpenCL library from the SYCL distribution
-# XXX: Fetch OpenCL for oneDNN only
-find_library(OpenCL_LIBRARY
-        NAMES "OpenCL"
-        HINTS ${SYCL_LIBRARY_DIR}
-        NO_DEFAULT_PATH)
-set(OpenCL_INCLUDE_DIR ${SYCL_INCLUDE_DIR} CACHE STRING "")
+set(SYCL_FLAGS "-fsycl")
+if(WINDOWS)
+  list(APPEND SYCL_FLAGS "/EHsc")
+endif()
 
 # The fast-math will be enabled by default in ICPX.
 # Refer to [https://clang.llvm.org/docs/UsersManual.html#cmdoption-fno-fast-math]

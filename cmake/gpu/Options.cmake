@@ -91,9 +91,6 @@ function (print_xpu_config_summary)
     message(STATUS "  LevelZero include     : ${LevelZero_INCLUDE_DIR}")
     message(STATUS "  LevelZero library     : ${LevelZero_LIBRARY}")
 
-    message(STATUS "  OpenCL include        : ${OpenCL_INCLUDE_DIR}")
-    message(STATUS "  OpenCL library        : ${OpenCL_LIBRARY}")
-
     message(STATUS "  Torch version         : ${Torch_VERSION}")
     message(STATUS "  Torch include         : ${TORCH_INCLUDE_DIRS}")
 
