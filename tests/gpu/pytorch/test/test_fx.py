@@ -3547,7 +3547,7 @@ class TestFX(JitTestCase):
                 self.called = True
                 self.calling = True
                 return super(type(self), self).__call__(*args)
-                self.calling = False
+                #self.calling = False
 
         class M(torch.nn.Module):
             def __init__(self, a, b):
@@ -4415,11 +4415,6 @@ class TestFXAPIBackwardCompatibility(JitTestCase):
                            f'Please add support for this type and confirm with the '
                            f'FX team that your signature change is valid.')
 
-        raise RuntimeError(
-            f"Unrecognized type {t} used in BC-compatible type signature {sig_str}."
-            f"Please add support for this type and confirm with the "
-            f"FX team that your signature change is valid."
-        )
 
     def test_function_back_compat(self):
         """
