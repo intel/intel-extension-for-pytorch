@@ -9,6 +9,98 @@ namespace torch_ipex {
 namespace cpu {
 
 IPEX_DEFINE_DISPATCH(fused_experts_impl_stub);
+template <typename T>
+inline void copy_and_fill(
+    T* __restrict__ out,
+    const T* __restrict__ input,
+    int size,
+    int pad_size,
+    T fill_value) {
+  using Vec = at::vec::Vectorized<T>;
+  int d = 0;
+  if (size >= Vec::size()) {
+#pragma GCC unroll 4
+    for (; d < size; d += Vec::size()) {
+      Vec data = Vec::loadu(input + d);
+      data.store(out + d);
+    }
+  }
+  for (; d < size; ++d) {
+    out[d] = input[d];
+  }
+  // using scalar padding as pad_size is less than vec size here
+  for (; d < pad_size; ++d) {
+    out[d] = fill_value;
+  }
+}
+
+at::Tensor fused_experts_with_shared(
+    const at::Tensor& hidden_states,
+    const at::Tensor& w1,
+    const at::Tensor& w2,
+    const at::Tensor& topk_weights,
+    const at::Tensor& topk_ids,
+    bool inplace,
+    bool is_vnni,
+    bool is_distributed,
+    bool is_woq,
+    int64_t woq_weight_dtype,
+    int64_t woq_group_size,
+    int64_t woq_lowp_mode,
+    const std::optional<at::Tensor>& w1_scale,
+    const std::optional<at::Tensor>& w1_zp,
+    const std::optional<at::Tensor>& w1_compensation,
+    const std::optional<at::Tensor>& w2_scale,
+    const std::optional<at::Tensor>& w2_zp,
+    const std::optional<at::Tensor>& w2_compensation) {
+  RECORD_FUNCTION(
+      "ipex::fused_experts_with_shared", c10::ArrayRef<c10::IValue>({}));
+  int32_t num_tokens = topk_weights.size(0);
+  int32_t num_topk_experts = topk_weights.size(1);
+  int32_t num_topk_experts_pad = num_topk_experts + 1;
+  int32_t num_experts = w1.size(0);
+  auto pad_weight =
+      at::empty({num_tokens, num_topk_experts_pad}, topk_weights.options());
+  auto pad_ids =
+      at::empty({num_tokens, num_topk_experts_pad}, topk_ids.options());
+  // padding 1 shared expert to routed expert
+  // topk_id is num_experts - 1, and topk weights is 1.0
+  for (int id = 0; id < num_tokens; id++) {
+    copy_and_fill<int32_t>(
+        pad_ids.data_ptr<int32_t>() + id * num_topk_experts_pad,
+        topk_ids.data_ptr<int32_t>() + id * num_topk_experts,
+        num_topk_experts,
+        num_topk_experts_pad,
+        num_experts - 1);
+    copy_and_fill<float>(
+        pad_weight.data_ptr<float>() + id * num_topk_experts_pad,
+        topk_weights.data_ptr<float>() + id * num_topk_experts,
+        num_topk_experts,
+        num_topk_experts_pad,
+        1.0);
+  }
+  return fused_experts_impl_stub(
+      kCPU,
+      hidden_states,
+      w1,
+      w2,
+      pad_weight,
+      pad_ids,
+      inplace,
+      is_vnni,
+      is_distributed,
+      is_woq,
+      woq_weight_dtype,
+      woq_group_size,
+      woq_lowp_mode,
+      w1_scale,
+      w1_zp,
+      w1_compensation,
+      w2_scale,
+      w2_zp,
+      w2_compensation);
+}
+
 at::Tensor fused_experts(
     const at::Tensor& hidden_states,
     const at::Tensor& w1,
@@ -334,6 +426,15 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
        Tensor? w1_scale, Tensor? w1_zp, Tensor? w1_compensation, Tensor? w2_scale, Tensor? w2_zp, Tensor? w2_compensation) -> Tensor");
   m.impl(
       "fused_experts", c10::DispatchKey::CPU, torch_ipex::cpu::fused_experts);
+  m.def(
+      "fused_experts_with_shared(Tensor hidden_states, Tensor w1, Tensor w2, Tensor topk_weights, \
+         Tensor topk_ids, bool inplace, bool is_vnni, \
+         bool is_distributed, bool is_woq, int woq_weight_dtype, int woq_group_size, int woq_lowp_mode, \
+         Tensor? w1_scale, Tensor? w1_zp, Tensor? w1_compensation, Tensor? w2_scale, Tensor? w2_zp, Tensor? w2_compensation) -> Tensor");
+  m.impl(
+      "fused_experts_with_shared",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::fused_experts_with_shared);
   m.def(
       "grouped_topk(Tensor hidden_states, Tensor gating_output, \
         int topk, bool renormalize, int num_expert_group, int topk_group, Tensor e_score_correction_bias, Tensor routed_scaling_factor)  -> (Tensor, Tensor)");

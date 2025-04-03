@@ -815,6 +815,51 @@ class DeepSeekTester(TestCase):
                 w2_comp,
             )
 
+        def fuse_moe_with_sharedmoe_v2(a, w1, w2, score, topk, renormalize):
+
+            G = 1
+            topk_group = 1
+
+            B, D = a.shape
+            topk_weights = torch.empty(B, topk, dtype=torch.float32)
+            topk_ids = torch.empty(B, topk, dtype=torch.int32)
+            topk_weights, topk_ids = grouped_topk_native(
+                a, score, topk, renormalize, G, topk_group
+            )
+
+            packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
+            packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
+            w13_scale = None
+            w13_zp = None
+            w13_comp = None
+            w2_scale = None
+            w2_zp = None
+            w2_comp = None
+            inplace = False
+            group_size = -1
+            weight_dtype = WoqWeightDtype.INT8
+            lowp_mode = WoqLowpMode.BF16
+            return torch.ops.torch_ipex.fused_experts_with_shared(
+                a,
+                packed_w1,
+                packed_w2,
+                topk_weights,
+                topk_ids,
+                inplace,
+                True,
+                False,
+                False,
+                weight_dtype,
+                group_size,
+                lowp_mode,
+                w13_scale,
+                w13_zp,
+                w13_comp,
+                w2_scale,
+                w2_zp,
+                w2_comp,
+            )
+
         def run_single_test(m, n, k, e, topk, dtype, renormalize=False):
 
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 10
@@ -841,8 +886,11 @@ class DeepSeekTester(TestCase):
             fused_output = fuse_moe_with_sharedmoe(
                 a, w1_, w2_, score, topk, renormalize
             )
-
+            fused_output_v2 = fuse_moe_with_sharedmoe_v2(
+                a, w1_, w2_, score, topk, renormalize
+            )
             compare(torch_output, fused_output)
+            compare(torch_output, fused_output_v2)
 
         run_single_test(2, 2048, 2048, 4, 2, torch.bfloat16, renormalize=True)
         run_single_test(2, 128, 32, 4, 2, torch.bfloat16, renormalize=True)
