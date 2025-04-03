@@ -409,7 +409,7 @@ class MoEGate(nn.Module):
         )
         if self.topk_method == "noaux_tc":
             self.e_score_correction_bias = nn.Parameter(
-                torch.empty((self.n_routed_experts))
+                torch.rand((self.n_routed_experts))
             )
         self.reset_parameters()
 

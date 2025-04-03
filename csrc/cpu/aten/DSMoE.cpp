@@ -362,6 +362,18 @@ void grouped_topk_kernel_impl(
       e_score_correction_bias.data_ptr<float>(), \
       routed_scaling_factor.data_ptr<float>());
 
+#define LAUNCH_GROUPED_TOPK_KERNEL_FP16(NE)      \
+  grouped_topk_kernel_impl<at::Half, NE>(        \
+      topk_weights.data_ptr<float>(),            \
+      topk_ids.data_ptr<int32_t>(),              \
+      gating_output.data_ptr<at::Half>(),        \
+      num_tokens,                                \
+      topk,                                      \
+      num_expert_group,                          \
+      topk_group,                                \
+      renormalize,                               \
+      e_score_correction_bias.data_ptr<float>(), \
+      routed_scaling_factor.data_ptr<float>());
 //
 std::tuple<at::Tensor, at::Tensor> grouped_topk(
     at::Tensor& hidden_states,
@@ -380,36 +392,70 @@ std::tuple<at::Tensor, at::Tensor> grouped_topk(
   TORCH_CHECK(gating_output.size(0) == num_tokens, "Number of tokens mismatch");
   auto topk_weights = at::empty({num_tokens, topk}, at::kFloat);
   auto topk_ids = at::empty_like(topk_weights, at::kInt);
-  switch (num_experts) {
-    case 1:
-      LAUNCH_GROUPED_TOPK_KERNEL(1);
-      break;
-    case 2:
-      LAUNCH_GROUPED_TOPK_KERNEL(2);
-      break;
-    case 4:
-      LAUNCH_GROUPED_TOPK_KERNEL(4);
-      break;
-    case 8:
-      LAUNCH_GROUPED_TOPK_KERNEL(8);
-      break;
-    case 16:
-      LAUNCH_GROUPED_TOPK_KERNEL(16);
-      break;
-    case 32:
-      LAUNCH_GROUPED_TOPK_KERNEL(32);
-      break;
-    case 64:
-      LAUNCH_GROUPED_TOPK_KERNEL(64);
-      break;
-    case 128:
-      LAUNCH_GROUPED_TOPK_KERNEL(128);
-      break;
-    case 256:
-      LAUNCH_GROUPED_TOPK_KERNEL(256);
-      break;
-    default:
-      TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
+  if (st == at::kBFloat16) {
+    switch (num_experts) {
+      case 1:
+        LAUNCH_GROUPED_TOPK_KERNEL(1);
+        break;
+      case 2:
+        LAUNCH_GROUPED_TOPK_KERNEL(2);
+        break;
+      case 4:
+        LAUNCH_GROUPED_TOPK_KERNEL(4);
+        break;
+      case 8:
+        LAUNCH_GROUPED_TOPK_KERNEL(8);
+        break;
+      case 16:
+        LAUNCH_GROUPED_TOPK_KERNEL(16);
+        break;
+      case 32:
+        LAUNCH_GROUPED_TOPK_KERNEL(32);
+        break;
+      case 64:
+        LAUNCH_GROUPED_TOPK_KERNEL(64);
+        break;
+      case 128:
+        LAUNCH_GROUPED_TOPK_KERNEL(128);
+        break;
+      case 256:
+        LAUNCH_GROUPED_TOPK_KERNEL(256);
+        break;
+      default:
+        TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
+    }
+  } else if (st == at::kHalf) {
+    switch (num_experts) {
+      case 1:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(1);
+        break;
+      case 2:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(2);
+        break;
+      case 4:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(4);
+        break;
+      case 8:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(8);
+        break;
+      case 16:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(16);
+        break;
+      case 32:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(32);
+        break;
+      case 64:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(64);
+        break;
+      case 128:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(128);
+        break;
+      case 256:
+        LAUNCH_GROUPED_TOPK_KERNEL_FP16(256);
+        break;
+      default:
+        TORCH_CHECK(false, "Unexpected num_experts: ", num_experts);
+    }
   }
   return std::make_tuple(topk_ids, topk_weights);
 }
