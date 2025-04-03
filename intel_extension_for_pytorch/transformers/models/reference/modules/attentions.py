@@ -2701,11 +2701,11 @@ class _IPEXAttentionRef(nn.Module):
                 self.hidden_size = module.q_proj.linear.weight.shape[0]
         elif hasattr(module, "o_proj"):
             if hasattr(module.o_proj, "in_features"):
-                self.hidden_size = module.q_proj.in_features
+                self.hidden_size = module.o_proj.in_features
             elif hasattr(module.o_proj, "linear") and hasattr(
                 module.o_proj.linear, "in_features"
             ):
-                self.hidden_size = module.q_proj.linear.in_features
+                self.hidden_size = module.o_proj.linear.in_features
             elif hasattr(module.o_proj, "weight"):
                 self.hidden_size = module.o_proj.weight.shape[1]
             else:
