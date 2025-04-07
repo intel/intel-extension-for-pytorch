@@ -2145,7 +2145,20 @@ def ipex_disable_attn_mask_prepare(model):
 # RoPE is an additional operation inside the model level in Transformers4.48.
 # Set it to None and handle the RoPE operation within the IPEX decoderlayer flow instead.
 def ipex_disable_rotary_emb(model):
-    if hasattr(model, "rotary_emb"):
+    import transformers
+
+    model_list = {
+        transformers.models.bloom.modeling_bloom.BloomModel,
+        transformers.models.glm.modeling_glm.GlmModel,
+        transformers.models.falcon.modeling_falcon.FalconModel,
+        transformers.models.gptj.modeling_gptj.GPTJModel,
+        transformers.models.llama.modeling_llama.LlamaModel,
+        transformers.models.mistral.modeling_mistral.MistralModel,
+        transformers.models.opt.modeling_opt.OPTModel,
+        transformers.models.phi3.modeling_phi3.Phi3Model,
+        transformers.models.qwen2.modeling_qwen2.Qwen2Model,
+    }
+    if type(model) in model_list and hasattr(model, "rotary_emb"):
         model.rotary_emb = IPEXRotaryEmbedding()
 
 
