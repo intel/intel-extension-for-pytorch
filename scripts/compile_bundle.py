@@ -131,17 +131,16 @@ def _compile(directory,
 
 def process(*args):
     args_install_pytorch = args[0]
-    args_abi = args[1]
-    args_aot = args[2]
-    args_max_jobs = args[3]
-    args_ver_ipex = args[4]
-    args_disable_oneapi_integration = args[5]
-    args_with_vision = args[6]
-    args_with_audio = args[7]
-    args_with_torch_ccl = args[8]
-    args_incremental = args[9]
-    args_verbose = args[10]
-    args_oneapi_root_dir = args[11]
+    args_aot = args[1]
+    args_max_jobs = args[2]
+    args_ver_ipex = args[3]
+    args_disable_oneapi_integration = args[4]
+    args_with_vision = args[5]
+    args_with_audio = args[6]
+    args_with_torch_ccl = args[7]
+    args_incremental = args[8]
+    args_verbose = args[9]
+    args_oneapi_root_dir = args[10]
 
     global exec_cmds
     global check_system_commands
@@ -393,7 +392,7 @@ def process(*args):
         exec_cmds('python -m pip uninstall -y torch pytorch-triton-xpu torchvision torchaudio',
                   show_command = args_verbose)
     exec_cmds('''python -m pip uninstall -y intel-extension-for-pytorch intel-extension-for-pytorch-deepspeed oneccl_bind_pt
-                 python -m pip install "cmake<4" make ninja requests''',
+                 python -m pip install cmake make ninja requests''',
               shell = True,
               show_command = args_verbose)
     durations['Clean Python environment'] = get_duration(t0)
@@ -485,7 +484,6 @@ def process(*args):
         env_torch['TORCH_XPU_ARCH_LIST'] = aot
         if SYSTEM == 'Linux':
             env_torch['USE_STATIC_MKL'] = '1'
-            env_torch['_GLIBCXX_USE_CXX11_ABI'] = str(args_abi)
         elif SYSTEM == 'Windows':
             env_torch['XPU_ENABLE_KINETO'] = '1'
             env_torch['INCLUDE'] = f'{os.path.join(BASEDIR, "level_zero_sdk", "include")}{os.pathsep}{env_torch["INCLUDE"]}'
@@ -658,13 +656,6 @@ if __name__ == '__main__':
         default = 0,
     )
     parser.add_argument(
-        '--abi',
-        help = 'Set value for _GLIBCXX_USE_CXX11_ABI if PyTorch is compiled from source on Linux. Value is 1 by default.',
-        type = int,
-        choices = [0, 1],
-        default = 1,
-    )
-    parser.add_argument(
         '--install-pytorch',
         help = 'Indicate how to install PyTorch. Can be "pip" for installing the prebuilt wheel file, and "compile" for compiling from source.',
         type = str,
@@ -743,7 +734,6 @@ if __name__ == '__main__':
 
     process(
             args.install_pytorch,
-            args.abi,
             args.aot,
             args.max_jobs,
             args.ver_ipex,

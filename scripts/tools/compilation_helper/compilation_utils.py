@@ -156,7 +156,8 @@ def update_source_code(dir_name,
                       git pull''',
                   cwd = dir_target,
                   silent = True)
-        exec_cmds(f'git checkout {branch}',
+        exec_cmds(f'''git checkout {branch}
+                      git pull''',
                   cwd = dir_target,
                   show_command = show_command)
     exec_cmds('''git submodule sync

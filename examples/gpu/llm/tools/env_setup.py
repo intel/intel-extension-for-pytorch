@@ -49,13 +49,6 @@ if __name__ == '__main__':
         default = 0,
     )
     parser.add_argument(
-        '--abi',
-        help = 'Set value for _GLIBCXX_USE_CXX11_ABI if PyTorch is compiled from source on Linux. Value is 1 by default.',
-        type = int,
-        choices = [0, 1],
-        default = 1,
-    )
-    parser.add_argument(
         '--install-pytorch',
         help = 'Indicate how to install PyTorch. Can be "pip" for installing the prebuilt wheel file, and "compile" for compiling from source.',
         type = str,
@@ -127,7 +120,6 @@ if __name__ == '__main__':
             from compile_bundle import process as binary_compile
             binary_compile(
                 args.install_pytorch,
-                args.abi,
                 args.aot,
                 args.max_jobs,
                 '',
