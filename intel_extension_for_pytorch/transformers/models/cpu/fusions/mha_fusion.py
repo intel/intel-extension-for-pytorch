@@ -349,21 +349,47 @@ class _IPEXFastLayerNormCPU(nn.Module):
 class _IPEXPagedAttentionCPU:
     @classmethod
     def reshape_and_cache(
-        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+        cls,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype="auto",
+        k_scale=1.0,
+        v_scale=1.0,
     ):
+        if kv_cache_dtype == "fp8" or kv_cache_dtype == "fp8_e5m2":
+            if not (
+                key_cache.dtype == torch.float8_e5m2
+                and value_cache.dtype == torch.float8_e5m2
+            ):
+                raise TypeError("only float8_e5m2 supported")
+        elif kv_cache_dtype != "auto":
+            raise TypeError("unsupported kv_cache_dtype")
+
         torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
             value_cache,
             slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
+            kv_cache_dtype,
             k_scale,
             v_scale,
         )
 
     @classmethod
     def reshape_and_cache_flash(
-        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+        cls,
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype="auto",
+        k_scale=1.0,
+        v_scale=1.0,
     ):
         torch.ops.torch_ipex.reshape_and_cache(
             key,
@@ -371,6 +397,7 @@ class _IPEXPagedAttentionCPU:
             key_cache,
             value_cache,
             slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
+            kv_cache_dtype,
             k_scale,
             v_scale,
         )
@@ -429,10 +456,19 @@ class _IPEXPagedAttentionCPU:
         alibi_slopes=None,
         window_size_left=-1,
         window_size_right=-1,
+        kv_cache_dtype="auto",
         k_scale=1.0,
         v_scale=1.0,
         softcap=-1.0,
     ):
+        if kv_cache_dtype == "fp8" or kv_cache_dtype == "fp8_e5m2":
+            if not (
+                k_cache.dtype == torch.float8_e5m2
+                and v_cache.dtype == torch.float8_e5m2
+            ):
+                raise TypeError("only float8_e5m2 supported")
+        elif kv_cache_dtype != "auto":
+            raise TypeError("unsupported kv_cache_dtype")
         torch.ops.torch_ipex.flash_attn_varlen_func(
             output,
             query,
@@ -448,6 +484,7 @@ class _IPEXPagedAttentionCPU:
             alibi_slopes,
             window_size_left,
             window_size_right,
+            kv_cache_dtype,
             k_scale,
             v_scale,
             softcap,

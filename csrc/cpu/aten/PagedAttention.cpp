@@ -54,10 +54,19 @@ void reshape_and_cache_cpu(
     at::Tensor& key_cache,
     at::Tensor& value_cache,
     at::Tensor& slot_mapping,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale) {
   return reshape_and_cache_kernel_stub(
-      kCPU, key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
+      kCPU,
+      key,
+      value,
+      key_cache,
+      value_cache,
+      slot_mapping,
+      kv_cache_dtype,
+      k_scale,
+      v_scale);
 }
 
 void flash_attn_varlen_cpu(
@@ -75,6 +84,7 @@ void flash_attn_varlen_cpu(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -94,6 +104,7 @@ void flash_attn_varlen_cpu(
       alibi_slopes,
       window_size_left,
       window_size_right,
+      kv_cache_dtype,
       k_scale,
       v_scale,
       softcap);

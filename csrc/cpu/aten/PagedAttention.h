@@ -32,6 +32,7 @@ void reshape_and_cache(
     at::Tensor& key_cache,
     at::Tensor& value_cache,
     at::Tensor& slot_mapping,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale);
 
@@ -50,6 +51,7 @@ void flash_attn_varlen(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap);
@@ -77,6 +79,7 @@ using reshape_and_cache_fn = void (*)(
     at::Tensor& key_cache,
     at::Tensor& value_cache,
     at::Tensor& slot_mapping,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale);
 
@@ -95,6 +98,7 @@ using flash_attn_var_len_fn = void (*)(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap);

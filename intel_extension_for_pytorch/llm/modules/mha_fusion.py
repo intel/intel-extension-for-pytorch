@@ -440,7 +440,16 @@ class PagedAttention:
     The block tables are used to map the logical block of sequence into the physical block.
 
     [class method]: reshape_and_cache
-    ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
+    ipex.llm.modules.PagedAttention.reshape_and_cache(
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype,
+        k_scale,
+        v_scale,
+    )
     This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
 
     Args:
@@ -453,7 +462,7 @@ class PagedAttention:
         slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
             The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
             can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
-        window_size (int): left size of sliding window, default is -1.
+        kv_cache_dtype (str): The data type of the key and value cache.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
 
@@ -517,6 +526,7 @@ class PagedAttention:
         context_lens (torch.Tensor):  The sequence length for every sequence. The size is [num_seqs].
         block_size (int): The block size which means the number of token in every block.
         max_context_len (int): The max sequence length.
+        window_size (int): left size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
@@ -581,13 +591,21 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -598,13 +616,21 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
+        kv_cache_dtype: str = "auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache_flash(
-            key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -663,6 +689,7 @@ class PagedAttention:
         alibi_slopes: torch.Tensor,
         window_size_left: int = -1,
         window_size_right: int = -1,
+        kv_cache_dtype="auto",
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -684,6 +711,7 @@ class PagedAttention:
             alibi_slopes,
             window_size_left,
             window_size_right,
+            kv_cache_dtype,
             k_scale,
             v_scale,
             softcap,
