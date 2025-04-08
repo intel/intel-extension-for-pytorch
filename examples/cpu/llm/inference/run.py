@@ -45,9 +45,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--dtype",
         type=str,
-        choices=["float32", "bfloat16"],
+        choices=["float32", "bfloat16", "float16"],
         default="bfloat16",
-        help="bfloat16, float32",
+        help="bfloat16, float32, float16",
     )
     parser.add_argument("--ipex", action="store_true")
     parser.add_argument("--output-dir", nargs="?", default="./saved_results")
