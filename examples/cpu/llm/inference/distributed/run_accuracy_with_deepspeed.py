@@ -342,6 +342,8 @@ class HuggingFaceModel(BaseLM):
             "baichuan",
             "baichuan2",
             "gptbigcode",
+            "qwen3moe",
+            "qwen3",
             "qwen",
             "yuan",
             "jamba",

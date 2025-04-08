@@ -462,6 +462,9 @@ if re.search("phi4mm", config.architectures[0], re.IGNORECASE):
     ), "Input mode in prompt is not consistent with the input mode in the command line."
     config.batch_size = int(args.batch_size) * num_beams
     config.audio_batch_size = audio_batch_size
+
+if re.search("qwen3moe", config.architectures[0], re.IGNORECASE):
+    model_type = "qwen3moe"
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -491,6 +494,8 @@ elif world_size == 1 or model_type in [
     "gptbigcode",
     "git",
     "mllama",
+    "qwen3moe",
+    "qwen3",
     "qwen",
     "yuan",
     "whisper",

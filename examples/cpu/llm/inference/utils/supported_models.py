@@ -26,7 +26,6 @@ MODEL_CLASSES = {
     "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "git": (AutoModelForCausalLM, AutoProcessor),
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
@@ -43,8 +42,9 @@ MODEL_CLASSES = {
     "deepseekv2": (AutoModelForCausalLM, AutoTokenizer),
     "deepseekv3": (AutoModelForCausalLM, AutoTokenizer),
     "deepseekr1": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen3": (AutoModelForCausalLM, AutoTokenizer),
     "qwen3moe": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen3": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
