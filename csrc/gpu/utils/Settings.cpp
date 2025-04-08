@@ -416,14 +416,6 @@ bool Settings::is_xetla_enabled() const {
 #endif
 }
 
-bool Settings::is_pti_enabled() const {
-#ifdef USE_PTI
-  return true;
-#else
-  return false;
-#endif
-}
-
 bool Settings::is_ds_kernel_enabled() const {
 #ifdef USE_DS_KERNELS
   return true;
