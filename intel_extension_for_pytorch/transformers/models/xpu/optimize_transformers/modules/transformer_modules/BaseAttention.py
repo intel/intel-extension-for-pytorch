@@ -23,6 +23,7 @@ class IPEXTransformerAttn(nn.Module):
     batch_size = 1
     beam_size = 1
     timestamp = 0
+    num_of_layers = 0
 
     def __init__(self, config) -> None:
         super().__init__()
@@ -30,6 +31,7 @@ class IPEXTransformerAttn(nn.Module):
         self.layer_id = IPEXTransformerAttn.layer_id_static
         self.runtime_cache_size = 16
         IPEXTransformerAttn.layer_id_static += 1
+        IPEXTransformerAttn.num_of_layers += 1
 
     @staticmethod
     def release_resources():
@@ -128,9 +130,9 @@ class IPEXTransformerAttn(nn.Module):
                 if (self.layer_id + 1) % 4 == 0:
                     torch.xpu.empty_cache()
             else:
-                if self.layer_id + 1 == self.layer_id_static:
+                if self.layer_id + 1 == self.num_of_layers:
                     torch.xpu.empty_cache()
-        if self.layer_id + 1 == self.layer_id_static:
+        if self.layer_id + 1 == self.num_of_layers:
             IPEXTransformerAttn.timestamp += 1
 
     def is_beam_search(self):

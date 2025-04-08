@@ -183,12 +183,7 @@ class IPEXAttentionInt4(IPEXAttention):
         torch.xpu.synchronize()
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        if query.dim() == 2:
-            curr_len, bs, _ = hidden_states.size()
-            query = query.reshape(curr_len, bs, -1).contiguous()
-        else:
-            _, curr_len, _ = hidden_states.size()
-        if curr_len > 1 and xpu_gemm_use_xetla():
+        if self.is_1st_token() and xpu_gemm_use_xetla():
             # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
             if (
                 self.q_proj_quant.qweight is None
@@ -296,7 +291,7 @@ class IPEXAttentionInt4(IPEXAttention):
         return query, key, value
 
     def out_proj_compute(self, attn_output, residual=None):
-        if attn_output.shape[1] > 1 and xpu_gemm_use_xetla():
+        if self.is_1st_token() and xpu_gemm_use_xetla():
             # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
             attn_output = dequant_gemm_block(attn_output, self.out_proj_quant)
             if residual is not None:
