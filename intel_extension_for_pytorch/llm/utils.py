@@ -449,7 +449,7 @@ def _get_class_from_dynamic_module(
 
     if code_revision is None and pretrained_model_name_or_path == repo_id:
         code_revision = revision
-    if code_revision is not None:
+    if code_revision is not None and code_revision != "main":
         code_revision = "_" + code_revision[1:]
     # And lastly we get the class inside our newly created module
     final_module = _get_cached_module_file(
