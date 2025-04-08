@@ -9,15 +9,15 @@
   "pytorch": {
     "index-url": "https://download.pytorch.org/whl/xpu",
     "version": "2.7.0+xpu",
-    "commit": "release/2.7"
+    "commit": "v2.7.0"
   },
   "torchaudio": {
     "version": "2.7.0+xpu",
-    "commit": "release/2.7"
+    "commit": "v2.7.0"
   },
   "torchvision": {
     "version": "0.22.0+xpu",
-    "commit": "release/0.22"
+    "commit": "v0.22.0"
   },
   "torch-ccl": {
     "version": "2.7.0+xpu",
