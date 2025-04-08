@@ -256,7 +256,11 @@ def patch_state_dict(model, params_attr, mode):
             name_list = name_list[1:]
         model_or_param = model
         for attr in name_list:
-            model_or_param = getattr(model_or_param, attr)
+            model_or_param_new = getattr(model_or_param, attr, None)
+            if model_or_param_new is None:
+                if getattr(model_or_param, "quant_state", None) is not None:
+                    model_or_param_new = getattr(model_or_param.quant_state, attr, None)
+            model_or_param = model_or_param_new
         return model_or_param
 
     def to_public_fp32(model, state_dict, params_attr):
