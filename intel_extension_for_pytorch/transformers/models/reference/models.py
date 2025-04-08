@@ -6350,6 +6350,7 @@ def PhiOImageEmbedding_forward(
     if len(positions.tolist()) > 0:
         if self.use_hd_transform and img_sizes is not None and len(img_sizes):
             hd_transform = True
+            assert img_embeds is not None
             assert (
                 img_embeds.ndim == 5
             ), f"(branch 1) img_embeds size: {img_embeds.size()}, expect 5D tensor for hd transform"
@@ -8098,7 +8099,6 @@ def prepare_inputs_for_generation_phi3(
 ):
     if past_key_values is not None:
         cache_length = past_length = past_key_values[0][0].shape[2]
-        max_cache_length = None
 
         # Keep only the unprocessed tokens:
         # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
@@ -8110,15 +8110,6 @@ def prepare_inputs_for_generation_phi3(
         # input_ids based on the past_length.
         elif past_length < input_ids.shape[1]:
             input_ids = input_ids[:, past_length:]
-        # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
-
-        # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
-        if (
-            max_cache_length is not None
-            and attention_mask is not None
-            and cache_length + input_ids.shape[1] > max_cache_length
-        ):
-            attention_mask = attention_mask[:, -max_cache_length:]
 
     position_ids = kwargs.get("position_ids", None)
     if attention_mask is not None and position_ids is None:
@@ -8166,7 +8157,6 @@ def prepare_inputs_for_generation_phio(
 ):
     if past_key_values is not None:
         cache_length = past_length = past_key_values[0][0].shape[2]
-        max_cache_length = None
 
         # Keep only the unprocessed tokens:
         # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
@@ -8178,15 +8168,6 @@ def prepare_inputs_for_generation_phio(
         # input_ids based on the past_length.
         elif past_length < input_ids.shape[1]:
             input_ids = input_ids[:, past_length:]
-        # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
-
-        # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
-        if (
-            max_cache_length is not None
-            and attention_mask is not None
-            and cache_length + input_ids.shape[1] > max_cache_length
-        ):
-            attention_mask = attention_mask[:, -max_cache_length:]
 
     position_ids = kwargs.get("position_ids", None)
     if attention_mask is not None and position_ids is None:
