@@ -300,9 +300,11 @@ class PagedAttentionTest(TestCase):
 
         # E5M2 not need to support scale
         if qtype == torch.float8_e5m2:
+            kv_cache_dtype = "fp8_e5m2"
             k_scale = 1.0
             v_scale = 1.0
         else:
+            kv_cache_dtype = "auto"
             k_scale = 2.0
             v_scale = 2.0
 
@@ -331,7 +333,14 @@ class PagedAttentionTest(TestCase):
 
         # Call the reshape_and_cache kernel.
         ipex.llm.modules.PagedAttention.reshape_and_cache(
-            key, value, key_cache_fp8, value_cache_fp8, slot_mapping, k_scale, v_scale
+            key,
+            value,
+            key_cache_fp8,
+            value_cache_fp8,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
         )
 
         # Run the reference implementation.

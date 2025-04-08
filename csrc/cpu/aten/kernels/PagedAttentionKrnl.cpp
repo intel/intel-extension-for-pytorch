@@ -90,7 +90,76 @@ void scaled_convert<at::Float8_e5m2, at::BFloat16>(
 #endif
 }
 
+template <>
+void scaled_convert<at::BFloat16, at::Float8_e5m2>(
+    const at::Float8_e5m2* src_ptr,
+    at::BFloat16* dst_ptr,
+    size_t len,
+    float scale) {
+  size_t idx_offset = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::cvt_e5m2_bf16_intrinsic(src_ptr, dst_ptr, len);
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::BFloat16>(src_ptr[i]);
+  }
+#endif
+}
+
+template <>
+void scaled_convert<float, at::Float8_e5m2>(
+    const at::Float8_e5m2* src_ptr,
+    float* dst_ptr,
+    size_t len,
+    float scale) {
+  size_t idx_offset = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::cvt_e5m2_fp32_intrinsic(src_ptr, dst_ptr, len);
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<float>(src_ptr[i]);
+  }
+#endif
+}
+
 } // namespace fp8
+
+template <typename scalar_t, typename cache_t>
+scalar_t* flexible_dequantize_cache(
+    cache_t* cache,
+    scalar_t* buffers,
+    int64_t len,
+    float scale) {
+  fp8::scaled_convert<scalar_t, cache_t>(cache, buffers, len, scale);
+  return buffers;
+}
+
+template <>
+float* flexible_dequantize_cache<float, float>(
+    float* cache,
+    float* buffers,
+    int64_t head_size,
+    float scale) {
+  return cache;
+}
+
+template <>
+at::BFloat16* flexible_dequantize_cache<at::BFloat16, at::BFloat16>(
+    at::BFloat16* cache,
+    at::BFloat16* buffers,
+    int64_t head_size,
+    float scale) {
+  return cache;
+}
+
+template <>
+at::Half* flexible_dequantize_cache<at::Half, at::Half>(
+    at::Half* cache,
+    at::Half* buffers,
+    int64_t head_size,
+    float scale) {
+  return cache;
+}
 
 inline c10::SymFloat calculate_scale(
     const at::Tensor& query,
@@ -1512,6 +1581,12 @@ void flash_attn_varlen_kernel(
       /* dst    */ qSplitSize * head_size;
 
   int64_t num_thread = at::get_num_threads();
+  auto k_cache_buffers =
+      at::empty({num_thread, head_size * kvSplitSize}, query.options());
+  scalar_t* k_cache_buf_ptrs = k_cache_buffers.data_ptr<scalar_t>();
+  auto v_cache_buffers =
+      at::empty({num_thread, head_size * kvSplitSize}, query.options());
+  scalar_t* v_cache_buf_ptrs = v_cache_buffers.data_ptr<scalar_t>();
   at::Tensor buf = at::empty(
       {num_thread, size_per_thread}, query.options().dtype(accumulate_dtype));
   at::Tensor buf_reduced = at::empty(
@@ -1587,6 +1662,13 @@ void flash_attn_varlen_kernel(
               m + context_len + qBlockSize + window_size_right + 1 <= n) {
             continue;
           }
+
+          scalar_t* key_start_ptr =
+              flexible_dequantize_cache<scalar_t, cache_t>(
+                  key_page_data,
+                  &k_cache_buf_ptrs[ompIdx * head_size * kvSplitSize],
+                  head_size * kvBlockSize,
+                  k_scale);
           // Calculate the scale * query * key
           // query block[qBlockSize, head_size], key block: [kvBlockSize,
           // head_size]
@@ -1600,7 +1682,7 @@ void flash_attn_varlen_kernel(
               static_cast<accum_t>(1),
               query_ptr + (cu_seqlens_q_ptr[i] + m) * q_strideN + j * q_strideH,
               q_strideN,
-              key_page_data,
+              key_start_ptr,
               head_size,
               static_cast<accum_t>(0),
               qk_data,
@@ -1677,6 +1759,12 @@ void flash_attn_varlen_kernel(
             }
           }
 
+          scalar_t* v_start_ptr = flexible_dequantize_cache<scalar_t, cache_t>(
+              value_page_data,
+              &v_cache_buf_ptrs[ompIdx * head_size * kvSplitSize],
+              head_size * kvBlockSize,
+              v_scale);
+
           // Calculate the sum of attn_weight * value
 
           _mkl_gemm(
@@ -1689,7 +1777,7 @@ void flash_attn_varlen_kernel(
               static_cast<accum_t>(1),
               conditional_data_ptr(qk_data, qk_reduced_data),
               kvSplitSize,
-              value_page_data,
+              v_start_ptr,
               head_size,
               n == 0 ? static_cast<accum_t>(0) : static_cast<accum_t>(1),
               dst_data,
@@ -1872,6 +1960,7 @@ void reshape_and_cache_cpu_kernel_impl(
     at::Tensor& key_cache,
     at::Tensor& value_cache,
     at::Tensor& slot_mapping,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale) {
   TORCH_CHECK(
@@ -1882,6 +1971,10 @@ void reshape_and_cache_cpu_kernel_impl(
       "key_cache and value_cache should have the same data type");
   TORCH_CHECK(
       slot_mapping.is_contiguous(), "slot_mapping should be contiguous");
+  TORCH_CHECK(
+      kv_cache_dtype == "fp8" || kv_cache_dtype == "fp8_e5m2" ||
+          kv_cache_dtype == "auto",
+      "not supported kv_cahce_dtype");
   RECORD_FUNCTION(
       "ipex::reshape_and_cache_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
@@ -1923,6 +2016,7 @@ void flash_attn_varlen_cpu_kernel_impl(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
+    const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap) {
@@ -1935,10 +2029,137 @@ void flash_attn_varlen_cpu_kernel_impl(
   TORCH_CHECK(
       query.scalar_type() == out.scalar_type(),
       "query and out should have the same data type");
+  TORCH_CHECK(
+      kv_cache_dtype == "fp8" || kv_cache_dtype == "fp8_e5m2" ||
+          kv_cache_dtype == "auto",
+      "not supported kv_cahce_dtype");
   RECORD_FUNCTION(
       "ipex::flash_attn_varlen_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
-  if (query.scalar_type() == at::ScalarType::Float) {
+  if (key.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      query.scalar_type() == at::ScalarType::Float) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<float, at::Float8_e5m2, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<float, at::Float8_e5m2, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    } else {
+      flash_attn_varlen_kernel<float, at::Float8_e5m2, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    }
+
+  } else if (
+      key.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      query.scalar_type() == at::ScalarType::BFloat16) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<at::BFloat16, at::Float8_e5m2, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<at::BFloat16, at::Float8_e5m2, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    } else {
+      flash_attn_varlen_kernel<at::BFloat16, at::Float8_e5m2, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          window_size_left,
+          window_size_right,
+          k_scale,
+          v_scale,
+          softcap);
+    }
+
+  } else if (query.scalar_type() == at::ScalarType::Float) {
     if (max_seqlen_q >= 768) {
       flash_attn_varlen_kernel<float, float, 128>(
           out,
