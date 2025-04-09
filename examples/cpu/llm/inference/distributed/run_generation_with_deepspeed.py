@@ -72,8 +72,8 @@ parser.add_argument(
 parser.add_argument(
     "--dtype",
     type=str,
-    help="float16 or bfloat16",
-    choices=["bfloat16", "float32"],
+    help="float16, bfloat16, float32",
+    choices=["bfloat16", "float32", "float16"],
     default="bfloat16",
 )
 parser.add_argument(
@@ -334,6 +334,9 @@ else:
     if args.dtype == "bfloat16":
         load_dtype = torch.bfloat16
         infer_dtype = torch.bfloat16
+    elif args.dtype == "float16":
+        load_dtype = torch.float16
+        infer_dtype = torch.float16
     else:
         load_dtype = torch.float32
         infer_dtype = torch.float32
@@ -978,7 +981,7 @@ def generate():
                 get_accelerator().current_device_name()
             )
     with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-        enabled=True if infer_dtype == torch.bfloat16 else False
+        enabled=True if infer_dtype in [torch.bfloat16, torch.float16] else False
     ):
         outputs = model.generate(**input_tokens, **generate_kwargs)
     gen_ids = outputs[0] if args.token_latency else outputs

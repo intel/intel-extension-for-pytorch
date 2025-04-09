@@ -2757,6 +2757,10 @@ class _IPEXAttentionRef(nn.Module):
                     )
             else:
                 self.num_key_value_heads = self.num_attention_heads
+        if self.num_key_value_heads == 0:
+            raise ValueError(
+                f"TP number should be less than or equal to kv_heads={config.num_key_value_heads}"
+            )
         self.num_key_value_groups = self.num_attention_heads // self.num_key_value_heads
         self.num_heads = self.num_attention_heads
         self.head_dim = self.hidden_size // self.num_attention_heads
