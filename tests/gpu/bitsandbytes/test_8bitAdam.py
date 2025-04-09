@@ -89,7 +89,8 @@ def test_optimizer8bit(dim1, dim2, gtype, optim_name):
             
             num_not_close = torch.isclose(torch_optimizer.state[p1][name1], s1, atol=atol, rtol=rtol) == 0
             # assert num_not_close.sum().item() < 20
-            dequant_states.append(s1.clone())
+            if s1 is not None:
+                dequant_states.append(s1.clone())
 
         err = torch.abs(p1 - p2)
         relerr = err / (torch.abs(p1) + 1e-9)
