@@ -304,6 +304,16 @@ class BlockedParameter(torch.nn.Parameter):
         args_data = pytree.tree_map_only(BlockedParameter, lambda x: x._data, args)
         return func(*args_data, **kwargs)
 
+    @classmethod
+    def __metadata_guard__(cls, orig_data, other):
+        return (
+            orig_data[0] == other[0]
+            and orig_data[1] == other[1]
+            and orig_data[2] == other[2]
+            and orig_data[4] == other[4]
+            and orig_data[5] == other[5]
+        )
+
     def __copy__(self):
         new_param = BlockedParameter(self._data, requires_grad=self.requires_grad)
         for k, v in self.__dict__.items():
