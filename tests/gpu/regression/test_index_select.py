@@ -1,16 +1,19 @@
 import torch
-from torch.testing._internal.common_utils import TestCase, IS_WINDOWS
+from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa F401
 import pytest
 
 
+device = torch.xpu.current_device()
+total_memory = torch.xpu.get_device_properties(device).total_memory / (
+    1024 * 1024 * 1024
+)  # get GB
+
+
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
-        IS_WINDOWS, reason="Memory allocated by this case exceed Windows provide."
-    )
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Memory allocated by this case exceed ATSM provide.",
+        total_memory < 16,
+        reason="Memory allocated by this case exceed device memory size.",
     )
     def test_index_select_large_1(self, dtype=torch.float):
         torch.xpu.synchronize()
@@ -36,11 +39,8 @@ class TestTorchMethod(TestCase):
         torch.xpu.empty_cache()
 
     @pytest.mark.skipif(
-        IS_WINDOWS, reason="Memory allocated by this case exceed Windows provide."
-    )
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="Memory allocated by this case exceed ATSM provide.",
+        total_memory < 16,
+        reason="Memory allocated by this case exceed device memory size.",
     )
     def test_index_select_large_2(self, dtype=torch.float):
         torch.xpu.synchronize()
