@@ -75,9 +75,41 @@ def MllamaVisionEncoderLayer_forward(
     # Self Attention
     residual = hidden_state
     hidden_state = self.input_layernorm(hidden_state)
-    hidden_state, attn_weights = self.self_attn(
-        hidden_state, attention_mask=attention_mask
-    )
+    if output_attentions:
+        hidden_state, attn_weights = self.self_attn(
+            hidden_state, attention_mask=attention_mask
+        )
+    else:
+        query = self.self_attn.q_proj(hidden_state)
+        key = self.self_attn.k_proj(hidden_state)
+        value = self.self_attn.v_proj(hidden_state)
+
+        batch_size, q_seq_len, _ = query.shape
+        _, kv_seq_len, _ = key.shape
+
+        query = query.view(
+            batch_size, q_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+        key = key.view(
+            batch_size, kv_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+        value = value.view(
+            batch_size, kv_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+
+        query = query.transpose(1, 2)
+        key = key.transpose(1, 2)
+        value = value.transpose(1, 2)
+
+        attn_output = F.scaled_dot_product_attention(
+            query, key, value, attn_mask=attention_mask
+        )
+
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = attn_output.reshape(batch_size, q_seq_len, -1)
+
+        hidden_state = self.self_attn.o_proj(attn_output)
+        attn_weights = None
     if self.is_gated:
         hidden_state = self.gate_attn.tanh() * hidden_state
 
