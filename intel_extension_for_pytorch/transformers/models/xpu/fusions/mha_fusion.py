@@ -573,10 +573,10 @@ class _IPEXPagedAttentionXPU:
         pad_v_cache = v_cache
         block_table_s = block_table
         pad_output = output
-        do_unique = os.environ.get(
-            "ENABLE_UNIQUE_FOR_CHUNKED_PREFILL", "OFF"
+        disable_unique = os.environ.get(
+            "DISABLE_UNIQUE_FOR_CHUNKED_PREFILL", "OFF"
         ).upper() in ["1", "Y", "ON", "YES", "TRUE"]
-        if head_dim % 64 != 0 and do_unique:
+        if head_dim % 64 != 0 and not disable_unique:
             pad_size = 64 - head_dim % 64
             pad_query = torch.nn.functional.pad(query, (0, pad_size))
             block_valid, block_table_s = block_table.unique(return_inverse=True)
@@ -584,7 +584,7 @@ class _IPEXPagedAttentionXPU:
             pad_v_cache = torch.nn.functional.pad(v_cache[block_valid], (0, pad_size))
             pad_output = torch.nn.functional.pad(output, (0, pad_size))
             block_table_s = block_table_s.to(torch.int32)
-        elif head_dim % 64 != 0 and not do_unique:
+        elif head_dim % 64 != 0 and disable_unique:
             pad_size = 64 - head_dim % 64
             pad_query = torch.nn.functional.pad(query, (0, pad_size))
             pad_k_cache = torch.nn.functional.pad(k_cache, (0, pad_size))
