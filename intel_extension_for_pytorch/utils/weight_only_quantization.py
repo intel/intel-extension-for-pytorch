@@ -292,11 +292,19 @@ def _convert_woq_with_low_precision_checkpoint(
 
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules[:]
+        (
+            LinearAllreduce,
+            LinearLayer,
+            LmHeadLinearAllreduce,
+            fused_LinearLayer,
+            GateUpPack_LinearLayer,
+        ) = deepspeed_modules
         q_op_map.update(
             {
                 LinearAllreduce: IpexWoqLinearAllreduce,
                 LinearLayer: WeightOnlyQuantizedLinear,
+                fused_LinearLayer: WeightOnlyQuantizedLinear,
+                GateUpPack_LinearLayer: WeightOnlyQuantizedLinear,
             }
         )
 

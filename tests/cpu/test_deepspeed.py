@@ -197,7 +197,7 @@ class DeepspeedTester(JitTestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules[:3]
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
@@ -241,7 +241,7 @@ class DeepspeedTester(JitTestCase):
     ):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules[:3]
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
