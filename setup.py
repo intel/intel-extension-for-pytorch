@@ -721,11 +721,15 @@ class IPEXCPPLibBuild(build_clib, object):
         use_ninja = False
         # Windows uses Ninja as default generator
         if IS_WINDOWS:
+
+            def get_thread_free_suffix():
+                return "t" if sysconfig.get_config_var("Py_GIL_DISABLED") == 1 else ""
+
             use_ninja = True
             build_option_common["PYTHON_LIBRARIES"] = os.path.join(
                 sys.base_prefix,
                 "libs",
-                f"python{sys.version_info.major}{sys.version_info.minor}.lib",
+                f"python{sys.version_info.major}{sys.version_info.minor}{get_thread_free_suffix()}.lib",
             )
         sequential_build = False
 
