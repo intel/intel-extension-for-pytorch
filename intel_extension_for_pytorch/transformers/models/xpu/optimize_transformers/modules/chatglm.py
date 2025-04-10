@@ -349,9 +349,9 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         )
 
         self.port_all_parameters_to_new_module()
-        self.glm_version = 3
-        if "4" in config._name_or_path:
-            self.glm_version = 4
+        self.glm_version = 4
+        if "chatglm3" in config._name_or_path:
+            self.glm_version = 3
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group
