@@ -893,6 +893,7 @@ class T5RelativeAttentionLogitBias(nn.Module):
             relative_position = -torch.min(
                 relative_position, torch.zeros_like(relative_position)
             )
+            num_buckets = self.num_buckets
         # now relative_position is in the range [0, inf)
 
         # half of the buckets are for exact increments in positions

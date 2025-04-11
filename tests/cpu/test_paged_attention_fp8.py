@@ -40,7 +40,7 @@ class PagedAttentionTest(TestCase):
                 value_cache = torch.empty(size=value_cache_shape, dtype=dtype)
                 value_cache.uniform_(-scale, scale)
             else:
-                value_cache = torch.zeros(size=key_cache_shape, dtype=dtype)
+                value_cache = torch.zeros(size=value_cache_shape, dtype=dtype)
             value_caches.append(value_cache)
         return key_caches, value_caches
 
