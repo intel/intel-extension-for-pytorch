@@ -12,8 +12,8 @@ using fp8e4m3 = at::Float8_e4m3fn;
 
 enum Float8Format {
   NOT_VALID = 0,
-  kFloat8_E5M2 = 1,
-  kFloat8_E4M3 = 2,
+  kFloat8_E5M2 = static_cast<int>(at::kFloat8_e5m2),
+  kFloat8_E4M3 = static_cast<int>(at::kFloat8_e4m3fn),
 };
 
 // Each tensor here is shape (N, ) holding all scaling
