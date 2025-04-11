@@ -255,8 +255,9 @@ def patch_state_dict(model, params_attr, mode):
             # for DDP model, there is an extra module
             name_list = name_list[1:]
         model_or_param = model
+        # attr may not in custom param. do not convert these attr data to fp32.
         for attr in name_list:
-            model_or_param = getattr(model_or_param, attr)
+            model_or_param = getattr(model_or_param, attr, None)
         return model_or_param
 
     def to_public_fp32(model, state_dict, params_attr):
