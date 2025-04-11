@@ -1894,7 +1894,7 @@ class SiglipModel(SiglipPreTrainedModel):
                 text_outputs,
                 vision_outputs,
             )
-            return ((loss,) + output) if loss is not None else output
+            return output
 
         return SiglipOutput(
             loss=loss,
