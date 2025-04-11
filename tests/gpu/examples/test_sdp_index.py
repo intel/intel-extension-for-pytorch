@@ -37,9 +37,9 @@ t_out = 111
 t = t_in + t_out
 t_max = 2176
 beam = 4
-bs = 64
+bs = 1
 b = bs * beam
-n = 16
+n = 1
 h = 256
 
 alpha = 1.0 / math.sqrt(h)
