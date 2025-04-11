@@ -360,9 +360,9 @@ class Phi4MMImageEmbedding(nn.Module):
             img_sizes = self.img_sizes
 
         dtype = self.img_processor.embeddings.patch_embedding.weight.dtype
-        if img_embeds is not None:
-            # convert to bf16
-            img_embeds = img_embeds.to(dtype)
+        assert img_embeds is not None
+        # convert to bf16
+        img_embeds = img_embeds.to(dtype)
 
         if self.image_attention_mask is not None:
             image_attention_mask = self.image_attention_mask.clone()
