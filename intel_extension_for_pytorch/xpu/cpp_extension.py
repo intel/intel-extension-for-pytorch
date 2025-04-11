@@ -13,6 +13,7 @@ import errno
 from ..utils._logger import logger, WarningType
 
 import torch
+import torch._appdirs
 from torch.utils.file_baton import FileBaton
 from torch.utils._cpp_extension_versioner import ExtensionVersioner
 from torch.utils.hipify.hipify_python import GeneratedFileCleaner
