@@ -366,8 +366,8 @@ class fmha_forward_t {
               args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
           uint32_t seq_diff = real_T - real_F;
           local_left = args.w_left == -1
-              ? int(seq_diff)
-              : std::max(int(seq_diff), int(seq_diff + startF - args.w_left));
+              ? 0
+              : std::max(0, int(seq_diff + startF - args.w_left));
           local_right = args.w_right == -1
               ? real_T - 1
               : std::min(

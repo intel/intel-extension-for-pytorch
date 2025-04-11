@@ -359,8 +359,8 @@ class blocked_attention_kernel {
     uint32_t local_left, local_right;
     if (args.is_local) {
       local_left = args.w_left == -1
-          ? int(seqlen_diff)
-          : std::max(int(seqlen_diff), int(context_q_start - args.w_left));
+          ? 0
+          : std::max(0, int(context_q_start - args.w_left));
       local_right = args.w_right == -1
           ? seqlen_k - 1
           : std::min(
@@ -503,13 +503,7 @@ class blocked_attention_kernel {
     group_max_minus.xetla_merge(0.0f, mask_inf);
     subgroup::tile_broadcast_op<subgroup::tile_minus, score_tile_t>(
         mat_score, group_max_minus);
-    // mat_score.reg = xetla_exp<accum_t>(mat_score.reg);
-
-    score_tile_t mat_zeros(0);
-    constexpr int elems = score_tile_t::tile_desc::tile_elems;
-    xetla_mask<elems> mask = mat_score.reg < -65400.f;
-    (mat_score.reg)
-        .xetla_merge(mat_zeros.reg, xetla_exp<accum_t>(mat_score.reg), mask);
+    mat_score.reg = xetla_exp<accum_t>(mat_score.reg);
 
     if constexpr (wg_size > 1)
       ctx.nbarrier.wait();
