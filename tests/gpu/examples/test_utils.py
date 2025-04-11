@@ -83,3 +83,6 @@ class TestUtils(TestCase):
     def test_mem_get_info(self):
         self.assertGreater(ipex.xpu.mem_get_info()[0], 0)
         self.assertGreater(ipex.xpu.mem_get_info()[1], 0)
+
+    def test_get_default_build_root(self):
+        self.assertIsNotNone(ipex.xpu.get_default_build_root())
