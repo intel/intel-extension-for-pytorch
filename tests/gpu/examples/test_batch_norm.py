@@ -12,6 +12,9 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_half(self, dtype=torch.half):
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
         x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
@@ -22,6 +25,9 @@ class TestNNMethod(TestCase):
         y_dpcpp = bn(x_dpcpp_i)
         self.assertEqual(y_cpu, y_dpcpp.cpu().float(), atol=1e-2, rtol=0)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_half_bakcward(self, dtype=torch.float16):
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
         grad_i = torch.randn([2, 2, 3, 3], device=cpu_device)
@@ -47,6 +53,9 @@ class TestNNMethod(TestCase):
             x_cpu.grad, x_dpcpp.grad.to(cpu_device).float(), rtol=10e-4, atol=10e-2
         )
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_bfloat16(self, dtype=torch.bfloat16):
         x_i = torch.randn([2, 2, 3, 3], dtype=dtype, device=cpu_device)
         grad_i = torch.randn([2, 2, 3, 3], dtype=dtype, device=cpu_device)
@@ -70,6 +79,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device), rtol=1e-3, atol=1e-1)
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=1e-3, atol=1e-1)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm(self, dtype=torch.float):
         shapes = [
             (1, 2, 3, 3),
@@ -120,6 +132,9 @@ class TestNNMethod(TestCase):
             self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
             self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_bwd(self, dtype=torch.float):
         conv = nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
         bn = nn.BatchNorm2d(2)
@@ -151,6 +166,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x = torch.randn(1, 2, 3, 3, dtype=torch.float)
         conv = torch.nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False)
@@ -171,6 +189,9 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(real, ref)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_channels_last_simple_bwd(self, dtype=torch.float):
         bn = nn.BatchNorm2d(2)
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
@@ -306,6 +327,9 @@ class TestNNMethod(TestCase):
                     x_cpu.grad, x_dpcpp.grad.to(cpu_device), rtol=rtol, atol=atol
                 )
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_gather_stats(self):
         input = torch.randn(1, 3, 3, 3, device="xpu").to(
             memory_format=torch.channels_last
@@ -345,6 +369,9 @@ class TestNNMethod(TestCase):
 
     """
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_gather_stats_comprehensive(self):
         input = torch.randn(1, 3, 3, 3, device="xpu").to(
             memory_format=torch.channels_last
@@ -415,6 +442,9 @@ class TestNNMethod(TestCase):
             self.assertTrue(torch.allclose(mean_out, mean_correct))
             self.assertTrue(torch.allclose(invstd_out, invstd_correct, atol=1e-4))
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_gather_stats_running_mean_and_running_var(self):
         input = torch.randn(1, 3, 3, 3, device="xpu").to(
             memory_format=torch.channels_last
@@ -474,6 +504,9 @@ class TestNNMethod(TestCase):
             (0, 2, 3, 4),
         )
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_update_stats_simple(self):
         input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
         n_input = input_cpu.size(1)
@@ -495,6 +528,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
         self.assertEqual(save_var_cpu, save_var_dpcpp.to(cpu_device))
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_batch_norm_legit_simple(self):
         input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
         n_input = input_cpu.size(1)
@@ -571,6 +607,9 @@ class TestNNMethod(TestCase):
         _batch_norm_legit_simple(track_stats=True)
         _batch_norm_legit_simple(track_stats=False)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_sync_batch_norm_elemt(self):
         input = torch.ones(1, 4, 2, 2, device=dpcpp_device)
         weight = torch.ones(4, device=dpcpp_device)
@@ -601,6 +640,9 @@ class TestNNMethod(TestCase):
             )
             self.assertEqual(result.to(cpu_device), cuda_result)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_sync_batch_norm_backward_elemt(self):
         grad_output = torch.ones(1, 4, 2, 2, device=dpcpp_device)
         input = torch.ones(1, 4, 2, 2, device=dpcpp_device)
