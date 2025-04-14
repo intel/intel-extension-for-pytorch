@@ -292,22 +292,23 @@ def _convert_woq_with_low_precision_checkpoint(
 
     deepspeed_modules = may_import_deepspeed_modules()
     if deepspeed_modules is not None:
-        (
-            LinearAllreduce,
-            LinearLayer,
-            LmHeadLinearAllreduce,
-            fused_LinearLayer,
-            GateUpPack_LinearLayer,
-        ) = deepspeed_modules
+        LinearAllreduce, LinearLayer, LmHeadLinearAllreduce, *extra_linear_modules = (
+            deepspeed_modules
+        )
+
         q_op_map.update(
             {
                 LinearAllreduce: IpexWoqLinearAllreduce,
                 LinearLayer: WeightOnlyQuantizedLinear,
-                fused_LinearLayer: WeightOnlyQuantizedLinear,
-                GateUpPack_LinearLayer: WeightOnlyQuantizedLinear,
             }
         )
 
+        if extra_linear_modules:
+            for module in extra_linear_modules:
+                if issubclass(module, LinearAllreduce):
+                    q_op_map[module] = IpexWoqLinearAllreduce
+                elif issubclass(module, LinearLayer):
+                    q_op_map[module] = WeightOnlyQuantizedLinear
     linear_modules = tuple(q_op_map.keys())
 
     def _convert(mod, attr_name):

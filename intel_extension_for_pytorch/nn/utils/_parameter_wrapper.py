@@ -46,6 +46,15 @@ def IPEX_WEIGHT_PREPACK_MODULE_CPU():
             deepspeed_modules_mapping.update(
                 {LmHeadLinearAllreduce: _IPEXLmHeadLinearAllreduce}
             )
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if module not in deepspeed_modules_mapping:
+                    if issubclass(module, LinearAllreduce):
+                        deepspeed_modules_mapping[module] = _IPEXLinearAllreduce
+                    elif issubclass(module, LinearLayer):
+                        deepspeed_modules_mapping[module] = _IPEXLinear
+                    else:
+                        raise ValueError(f"Unrecognized module type: {module}")
         torch_modules.update(deepspeed_modules_mapping)
 
     return torch_modules
@@ -190,7 +199,9 @@ def get_shared_parameter_status(module, shared_p):
     if deepspeed_modules is not None:
         LinearAllreduce, LinearLayer = deepspeed_modules[:2]
 
-        if isinstance(module, (LinearLayer, LinearAllreduce)):
+        if isinstance(module, (LinearLayer, LinearAllreduce)) or issubclass(
+            type(module), (LinearLayer, LinearAllreduce)
+        ):
             module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
             if module.bias is not None:
                 module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
