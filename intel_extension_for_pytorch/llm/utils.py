@@ -1266,7 +1266,7 @@ def shard_low_precision_checkpoint(
                     q_head_end = local_rank + 1
                 low_precision_checkpoint_dict[key] = data[
                     :, q_head_start * dim : q_head_end * dim
-                ].contiguous()
+                ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mlp_layers_split_by_K):
@@ -1419,7 +1419,7 @@ def shard_low_precision_checkpoint(
                 )
                 low_precision_checkpoint_dict[key] = data[
                     :, grains_start * dim : grains_end * dim
-                ].contiguous()
+                ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in lm_head_layers):

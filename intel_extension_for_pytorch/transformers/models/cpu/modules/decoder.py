@@ -411,10 +411,6 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             if len(w2_shared_compensation_list) > 0
                             else None
                         )
-
-                        print(
-                            "[INFO] Using fused shared MOE WOQ INT8 lowbit weights path..."
-                        )
                     else:
                         if (
                             (self.use_fused_moe or self.use_fused_moe_woq)
