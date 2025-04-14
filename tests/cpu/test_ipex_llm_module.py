@@ -517,7 +517,7 @@ class Deepseekv3MoE(torch.nn.Module):
                 .reshape(num_tokens, -1)
             )  # [n, e]
             tmp_scores = scores_for_choice.masked_fill(
-                ~score_mask.bool(), 0.0
+                ~score_mask.bool(), float("-inf")
             )  # [n, e]
             _, selected_experts = torch.topk(
                 tmp_scores, k=self.top_k, dim=-1, sorted=False
