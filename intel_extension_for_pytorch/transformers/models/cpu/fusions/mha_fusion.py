@@ -368,7 +368,7 @@ class _IPEXPagedAttentionCPU:
         elif kv_cache_dtype != "auto":
             raise TypeError("unsupported kv_cache_dtype")
 
-        torch.ops.torch_ipex.reshape_and_cache(
+        return torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
@@ -391,7 +391,7 @@ class _IPEXPagedAttentionCPU:
         k_scale=1.0,
         v_scale=1.0,
     ):
-        torch.ops.torch_ipex.reshape_and_cache(
+        return torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
@@ -421,7 +421,7 @@ class _IPEXPagedAttentionCPU:
         v_scale=1.0,
         softcap=-1.0,
     ):
-        torch.ops.torch_ipex.single_query_cached_kv_attention(
+        return torch.ops.torch_ipex.single_query_cached_kv_attention(
             output,
             query,
             key_cache,
@@ -469,7 +469,7 @@ class _IPEXPagedAttentionCPU:
                 raise TypeError("only float8_e5m2 supported")
         elif kv_cache_dtype != "auto":
             raise TypeError("unsupported kv_cache_dtype")
-        torch.ops.torch_ipex.flash_attn_varlen_func(
+        return torch.ops.torch_ipex.flash_attn_varlen_func(
             output,
             query,
             k_cache,

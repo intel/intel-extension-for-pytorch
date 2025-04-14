@@ -8,7 +8,7 @@ namespace cpu {
 
 namespace {
 
-void single_query_cached_kv_attention(
+at::Tensor single_query_cached_kv_attention_forward_cpu(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
@@ -24,9 +24,8 @@ void single_query_cached_kv_attention(
     const double k_scale,
     const double v_scale,
     const double softcap);
-}
 
-void reshape_and_cache(
+std::tuple<at::Tensor, at::Tensor> reshape_and_cache_cpu(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
@@ -36,7 +35,7 @@ void reshape_and_cache(
     const double k_scale,
     const double v_scale);
 
-void flash_attn_varlen(
+at::Tensor flash_attn_varlen_cpu(
     at::Tensor& out,
     at::Tensor& query,
     at::Tensor& key,
@@ -51,10 +50,12 @@ void flash_attn_varlen(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
-    const std::string& kv_cache_dtype,
+    const std::string_view& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap);
+
+} // namespace
 
 using single_query_cached_kv_attention_fn = void (*)(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
@@ -98,7 +99,7 @@ using flash_attn_var_len_fn = void (*)(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
-    const std::string& kv_cache_dtype,
+    const std::string_view& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap);
