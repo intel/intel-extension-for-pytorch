@@ -2536,9 +2536,6 @@ first_token_deepseekv2_mla(
         add_casual_mask,
         attention_mask,
         1. / scale_attn));
-    if (v_head_size != head_size) {
-      attn_outputs = attn_outputs.slice(-1, 0, v_head_size);
-    }
   } else {
     if (origin_type == at::kHalf) {
       key = key.to(at::kFloat);
@@ -2558,6 +2555,9 @@ first_token_deepseekv2_mla(
       attn_weights = attn_weights.to(origin_type);
       attn_outputs = attn_outputs.to(origin_type);
     }
+  }
+  if (v_head_size != head_size) {
+    attn_outputs = attn_outputs.slice(-1, 0, v_head_size);
   }
   return std::make_tuple(attn_outputs, attn_weights, kv_cache, beam_idx);
 }
