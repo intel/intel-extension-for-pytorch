@@ -485,6 +485,7 @@ class _IPEXPagedAttentionXPU:
         max_context_len,
         alibi_slopes,
         ky_dtype="auto",
+        window_size=-1,
         k_scale=1.0,
         v_scale=1.0,
         softcap=-1.0,

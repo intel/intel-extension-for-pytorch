@@ -42,9 +42,9 @@ parser.add_argument(
 parser.add_argument(
     "--dtype",
     type=str,
-    choices=["float32", "bfloat16"],
+    choices=["float32", "bfloat16", "float16"],
     default="bfloat16",
-    help="bfloat16, float32",
+    help="bfloat16, float32, float16",
 )
 parser.add_argument(
     "--input-tokens",
@@ -146,7 +146,7 @@ model_type = next(
 )
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
-if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
     model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 if args.config_file is None:
@@ -171,6 +171,10 @@ else:
         trust_remote_code=True,
         torch_dtype=amp_dtype,
     )
+# For DeepSeek models
+if args.ipex and args.dtype == "bfloat16":
+    config.use_fused_moe = True
+    config.use_fused_moe_woq = False
 
 if args.kv_cache_dtype == "auto":
     kv_cache_dtype = None
@@ -247,11 +251,16 @@ else:
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
 num_beams = 1 if args.greedy else 4
-# generate args
+streamer = None
 if args.streaming:
-    streamer = TextStreamer(tokenizer)
-else:
-    streamer = None
+    if num_beams != 1 or args.batch_size != 1:
+        logger.warning(
+            "--streaming only supported in greedy search mode (--greedy) with --batch-size 1. Disabling streaming output."
+        )
+    else:
+        streamer = TextStreamer(tokenizer)
+
+# generate args
 generate_kwargs = dict(
     do_sample=False,
     temperature=0.9,
@@ -356,6 +365,7 @@ if args.ipex:
         deployment_mode=args.deployment_mode,
         cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
+
 if args.torch_compile:
     if args.deployment_mode:
         raise SystemExit(

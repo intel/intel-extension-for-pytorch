@@ -502,8 +502,54 @@ class PagedAttention:
     The block tables are used to map the logical block of sequence into the physical block.
 
     [class method]: reshape_and_cache
-    ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
+    ipex.llm.modules.PagedAttention.reshape_and_cache(
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        kv_cache_dtype,
+        k_scale,
+        v_scale,
+    )
     This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+
+    Args:
+        key (torch.Tensor): The keytensor. The shape should be [num_seqs, num_heads, head_size].
+        value (torch.Tensor): The value tensor. The shape should be [num_seqs, num_heads, head_size].
+        key_cache (torch.Tensor):  The pre-allocated buffer to store the key cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        value_cache (torch.Tensor): The pre-allocated buffer to store the value cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
+            The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
+            can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
+        kv_cache_dtype (str): The data type of the key and value cache.
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
+
+    [class method]: reshape_and_cache_flash
+    ipex.llm.modules.PagedAttention.reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
+    This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+    This method implementation is the same as reshape_and_cache but we need this to align with XPU.
+
+    Args:
+        key (torch.Tensor): The keytensor. The shape should be [num_seqs, num_heads, head_size].
+        value (torch.Tensor): The value tensor. The shape should be [num_seqs, num_heads, head_size].
+        key_cache (torch.Tensor):  The pre-allocated buffer to store the key cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        value_cache (torch.Tensor): The pre-allocated buffer to store the value cache.
+            The shape should be [num_blocks, block_size, num_heads, head_size].
+        slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.
+            The shape should be the number of sequences. For sequence ``i``, the ``slot_mapping[i] // block_number``
+            can get the block index, and the ``slot_mapping % block_size`` can get the offset of this block.
+        k_scale (float): The scale used by the fp8 key cache.
+        v_scale (float): The scale used by the fp8 value cache.
+
+    [class method]: reshape_and_cache_flash
+    ipex.llm.modules.PagedAttention.reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
+    This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+    This method implementation is the same as reshape_and_cache but we need this to align with XPU.
 
     Args:
         key (torch.Tensor): The keytensor. The shape should be [num_seqs, num_heads, head_size].
@@ -535,6 +581,7 @@ class PagedAttention:
                                                             block_size,
                                                             max_context_len,
                                                             alibi_slopes,
+                                                            window_size,
                                                             k_scale,
                                                             v_scale,
                                                             softcap,
@@ -560,6 +607,7 @@ class PagedAttention:
         context_lens (torch.Tensor):  The sequence length for every sequence. The size is [num_seqs].
         block_size (int): The block size which means the number of token in every block.
         max_context_len (int): The max sequence length.
+        window_size (int): left size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
@@ -626,8 +674,10 @@ class PagedAttention:
             is_cusal,
             block_tables,
             alibi_slopes,
-            key_cache,
-            val_cache,
+            window_size_left,
+            window_size_right,
+            k_scale,
+            v_scale,
             softcap,
         )
 
@@ -648,6 +698,8 @@ class PagedAttention:
         block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
             to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        window_size_left (int): left size of sliding window, default is -1.
+        window_size_right (int): right size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
         softcap (float): the positive softcap value to apply on the attention weights, default is -1.
@@ -693,7 +745,7 @@ class PagedAttention:
         k_scale: float = 1.0,
         v_scale: float = 1.0,
     ):
-        cls.runtime_ops.get_module_from_device(
+        return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache_flash(
             key,
@@ -733,6 +785,7 @@ class PagedAttention:
         max_context_len: int,
         alibi_slopes: torch.Tensor,
         kv_cache_dtype: str = "auto",
+        window_size: int = -1,
         k_scale: float = 1.0,
         v_scale: float = 1.0,
         softcap: float = -1.0,
@@ -752,6 +805,7 @@ class PagedAttention:
             max_context_len,
             alibi_slopes,
             kv_cache_dtype,
+            window_size,
             k_scale,
             v_scale,
             softcap,
@@ -929,7 +983,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_causal_mask: Optional[bool] = True,
+        add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
         text_max_length: Optional[int] = 0,
     ):
@@ -944,7 +998,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
             head_mask,
             attention_mask,
             alibi,
-            add_causal_mask,
+            add_casual_mask,
             seq_info,
             text_max_length,
         )
@@ -959,7 +1013,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_causal_mask: Optional[bool] = True,
+        add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
     ):
         # query: Tensor [batch, seq_len, num_head, head_dim]
@@ -993,6 +1047,184 @@ class IndirectAccessKVCacheAttention(nn.Module):
             head_mask,
             attention_mask,
             alibi,
-            add_causal_mask,
+            add_casual_mask,
             seq_info,
+        )
+
+
+class MambaMixer:
+    r"""
+    This module provides four class methods to apply the custom operators for Mamba/Jamba models (https://arxiv.org/pdf/2312.00752).
+
+    [class method]: causal_conv1d_fn
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.causal_conv1d_fn(
+            x,
+            weight,
+            bias=None,
+            initial_states=None,
+            return_final_states=False,
+            final_states_out=None,
+            activation="silu")
+
+    Args:
+        x (torch.Tensor): x tensor, shape: [batch, dim, seqlen].
+        weight (torch.Tensor): weight tensor of conv1d, shape: [dim, width].
+        bias (torch.Tensor): bias tensor of conv1d, shape: [dim].
+        initial_states (torch.Tensor): initial states tensor, shape: [batch, dim, width - 1].
+        return_final_states (bool): whether to return the final states.
+        final_states_out (torch.Tensor): buffer to store the final states, shape: [batch, dim, width - 1].
+        activation (str): activation function to be used, default is "silu".
+
+    [class method]: causal_conv1d_update
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.causal_conv1d_update(
+            x,
+            conv_state,
+            weight,
+            bias=None,
+            activation=None,
+            cache_seqlens=None)
+
+    Args:
+        x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, dim, seqlen].
+        conv_state (torch.Tensor): convolution state tensor, shape: [batch, dim, state_len], where state_len >= width - 1.
+        weight (torch.Tensor): weight tensor of conv1d, shape: [dim, width].
+        bias (torch.Tensor): bias tensor of conv1d, shape: [dim].
+        activation (str): activation function to be used.
+        cache_seqlens (torch.Tensor): shape: [batch]. dtype: torch.int32.
+            If not None, the conv_state is treated as a circular buffer.
+            The conv_state will be updated by copying x to the conv_state starting at the index
+            @cache_seqlens % state_len.
+
+    [class method]: selective_state_update
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.selective_state_update(
+            state,
+            x,
+            dt,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            dt_bias=None,
+            dt_softplus=False)
+
+    Args:
+        state (torch.Tensor): state tensor, shape: [batch, dim, dstate] or [batch, nheads, dim, dstate].
+        x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, nheads, dim].
+        dt (torch.Tensor): delta time tensor, shape: [batch, dim] or [batch, nheads, dim].
+        A (torch.Tensor): A tensor, shape: [dim, dstate] or [nheads, dim, dstate].
+        B (torch.Tensor): B tensor, shape: [batch, dstate] or [batch, ngroups, dstate].
+        C (torch.Tensor): C tensor, shape: [batch, dstate] or [batch, ngroups, dstate].
+        D (torch.Tensor): D tensor, shape: [dim] or [nheads, dim].
+        z (torch.Tensor): z tensor, shape: [batch, dim] or [nheads, dim].
+        dt_bias (torch.Tensor): delta time bias tensor, shape: [dim] or [nheads, dim].
+        dt_softplus (bool): whether to apply softplus to delta time.
+
+    [class method]: selective_scan_fn
+
+    .. highlight:: python
+    .. code-block:: python
+        ipex.llm.modules.MambaMixer.selective_scan_fn(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D=None,
+            z=None,
+            delta_bias=None,
+            delta_softplus=False,
+            return_last_state=False)
+
+    Args:
+        u (torch.Tensor): u tensor, shape: [batch, dim, seqlen].
+        delta (torch.Tensor): delta tensor, shape: [batch, dim, seqlen].
+        A (torch.Tensor): A tensor, shape: [dim, dstate].
+        B (torch.Tensor): B tensor, shape: [dim, dstate] or [dim, dstate, seqlen] or [batch, ngroups, dstate, seqlen].
+        C (torch.Tensor): C tensor, shape: [dim, dstate] or [dim, dstate, seqlen] or [batch, ngroups, dstate, seqlen].
+        D (torch.Tensor): D tensor, shape: [dim].
+        z (torch.Tensor): z tensor, shape: [batch, dim, seqlen].
+        delta_bias (torch.Tensor): delta bias tensor, shape: [dim], dtype: fp32.
+        delta_softplus (bool): whether to apply softplus to delta.
+        return_last_state (bool): whether to return the last state.
+
+    """
+
+    runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
+
+    @classmethod
+    def causal_conv1d_fn(
+        cls,
+        x: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        initial_states: Optional[torch.Tensor] = None,
+        return_final_states: bool = False,
+        final_states_out: Optional[torch.Tensor] = None,
+        activation: Optional[str] = "silu",
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).causal_conv1d_fn(
+            x,
+            weight,
+            bias,
+            initial_states,
+            return_final_states,
+            final_states_out,
+            activation,
+        )
+
+    @classmethod
+    def causal_conv1d_update(
+        cls, x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).causal_conv1d_update(x, conv_state, weight, bias, activation, cache_seqlens)
+
+    @classmethod
+    def selective_state_update(
+        cls, state, x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus=False
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            x.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).selective_state_update(state, x, dt, A, B, C, D, z, dt_bias, dt_softplus)
+
+    @classmethod
+    def selective_scan_fn(
+        cls,
+        u,
+        delta,
+        A,
+        B,
+        C,
+        D=None,
+        z=None,
+        delta_bias=None,
+        delta_softplus=False,
+        return_last_state=False,
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            u.device.type, IPEXCustomOpType.MAMBA_MIXER, False
+        ).selective_scan_fn(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D,
+            z,
+            delta_bias,
+            delta_softplus,
+            return_last_state,
         )

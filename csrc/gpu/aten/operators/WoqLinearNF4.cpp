@@ -221,9 +221,9 @@ at::Tensor woq_linear(
     const at::Tensor& qweight,
     const c10::string_view& weight_dtype,
     const std::vector<int64_t>& weight_shape,
-    const at::Tensor& weight_scales,
-    const c10::optional<at::Tensor>& weight_zeros,
-    const c10::optional<at::Tensor>& bias,
+    const std::vector<at::Tensor>& weight_scales,
+    const c10::optional<std::vector<at::Tensor>>& weight_zeros,
+    const c10::optional<std::vector<at::Tensor>>& bias,
     const c10::optional<at::Tensor>& g_idx,
     int64_t group_size,
     int64_t lowp_mode,
@@ -234,6 +234,8 @@ at::Tensor woq_linear(
       {"int4", WOQ_DTYPE_INT4},
       {"nf4", WOQ_DTYPE_NF4},
   };
+
+  at::Tensor _weight_scales = weight_scales[0];
 
   TORCH_CHECK(
       WOQ_DTYPE_MAP.find(weight_dtype) != WOQ_DTYPE_MAP.end(),
@@ -255,13 +257,13 @@ at::Tensor woq_linear(
 
 #define DEQUANTIZE_BLOCKWISE(absmax_type, dq_output_type)                  \
   do {                                                                     \
-    absmax_type* absmax_ptr = (absmax_type*)weight_scales.data_ptr();      \
+    absmax_type* absmax_ptr = (absmax_type*)_weight_scales.data_ptr();     \
     dq_output_type* dq_output_ptr = (dq_output_type*)dq_output.data_ptr(); \
     dequantizeBlockwise<absmax_type, dq_output_type, WOQ_DTYPE_NF4>(       \
         NULL, qweight_ptr, absmax_ptr, dq_output_ptr, group_size, n);      \
   } while (0)
 
-  if (weight_scales.scalar_type() == at::ScalarType::Float) {
+  if (_weight_scales.scalar_type() == at::ScalarType::Float) {
     if (dq_output.scalar_type() == at::ScalarType::Float) {
       DEQUANTIZE_BLOCKWISE(float, float);
     } else if (dq_output.scalar_type() == at::ScalarType::Half) {
@@ -269,7 +271,7 @@ at::Tensor woq_linear(
     } else if (dq_output.scalar_type() == at::ScalarType::BFloat16) {
       DEQUANTIZE_BLOCKWISE(float, at::BFloat16);
     }
-  } else if (weight_scales.scalar_type() == at::ScalarType::Half) {
+  } else if (_weight_scales.scalar_type() == at::ScalarType::Half) {
     if (dq_output.scalar_type() == at::ScalarType::Float) {
       DEQUANTIZE_BLOCKWISE(at::Half, float);
     } else if (dq_output.scalar_type() == at::ScalarType::Half) {
@@ -277,7 +279,7 @@ at::Tensor woq_linear(
     } else if (dq_output.scalar_type() == at::ScalarType::BFloat16) {
       DEQUANTIZE_BLOCKWISE(at::Half, at::BFloat16);
     }
-  } else if (weight_scales.scalar_type() == at::ScalarType::BFloat16) {
+  } else if (_weight_scales.scalar_type() == at::ScalarType::BFloat16) {
     if (dq_output.scalar_type() == at::ScalarType::Float) {
       DEQUANTIZE_BLOCKWISE(at::BFloat16, float);
     } else if (dq_output.scalar_type() == at::ScalarType::Half) {
@@ -306,7 +308,7 @@ IPEX_LIBRARY_FRAGMENT() {
       AtenIpexTypeXPU::dequantize_4bit,
       c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
-      "woq_linear.xpu", at::AtenIpexTypeXPU::woq_linear, c10::DispatchKey::XPU);
+      "woq_linear", at::AtenIpexTypeXPU::woq_linear, c10::DispatchKey::XPU);
 }
 
 } // namespace

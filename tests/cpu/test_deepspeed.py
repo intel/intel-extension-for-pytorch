@@ -473,12 +473,13 @@ class DeepspeedTester(JitTestCase):
             quantization_method = "awq"
             sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
                 low_precision_checkpoint,
-                config,
+                config.to_dict(),
                 local_rank,
                 ds_world_size,
                 quantization_method,
                 group_size,
-                False,
+                desc_act=False,
+                bits=4,
             )
             sharded_low_precision_checkpoint = (
                 sharded_low_precision_checkpoint,
@@ -586,12 +587,13 @@ class DeepspeedTester(JitTestCase):
                 group_size = quant_config["group_size"]
                 sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
                     low_precision_checkpoint,
-                    config,
+                    config.to_dict(),
                     local_rank,
                     ds_world_size,
                     quantization_method,
                     group_size,
                     desc_act,
+                    bits=4,
                 )
                 sharded_low_precision_checkpoint = (
                     sharded_low_precision_checkpoint,

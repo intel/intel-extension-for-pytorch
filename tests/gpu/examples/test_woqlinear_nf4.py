@@ -216,8 +216,10 @@ class Test4bitDequant(TestCase):
                         quant_weight.reshape([weight.shape[0], weight.shape[1] // 2]),
                         "nf4",
                         weight.shape,
-                        state["absmax"].view(
-                            weight.shape[0], weight.shape[1] // blocksize
+                        list(
+                            state["absmax"].view(
+                                weight.shape[0], weight.shape[1] // blocksize
+                            )
                         ),
                         None,
                         None,

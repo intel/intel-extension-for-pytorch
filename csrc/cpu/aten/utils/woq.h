@@ -876,7 +876,7 @@ struct GemmMicroKernel<
           } else if constexpr (qw_type == WOQ_DTYPE_FP8) {
             vb[cbidx] =
                 load_dequant_cvt_only_fp8<N_GROUP_SIZE>::template call<VArrayT>(
-                    ADDRESS(B, k, col * V::VLEN / 2, ldb / 2));
+                    ADDRESS(B, k, col * V::VLEN, ldb));
           } else {
             vb[cbidx] =
                 load_dequant_zp_only_int8<N_GROUP_SIZE, sym_quant_w>::call(

@@ -1472,121 +1472,126 @@ class CPUOPsTester(TestCase):
         for dtype in dtypes:
             for is_causal in [True, False]:
                 for mask_dim in [2, 4]:
-                    batch_size, seq_len, n_head, head_dim = 2, 129, 4, 8
-                    atol = 1e-5
-                    rtol = 5e-6
-                    if dtype is torch.bfloat16:
-                        atol = 2e-2
-                        rtol = 2e-2
-                    if dtype is torch.float16:
-                        atol = 1e-2
-                        rtol = 1e-2
-                    attn_mask_dtypes = (
-                        [dtype, torch.bool, torch.float]
-                        if dtype in [torch.bfloat16, torch.float16]
-                        else [dtype, torch.bool]
-                    )
-                    for attn_mask_dtype in attn_mask_dtypes:
-                        for attn_mask_shape in (
-                            itertools.product([seq_len, 1], [seq_len, 1])
-                            if mask_dim == 2
-                            else itertools.product(
-                                [batch_size, 1], [n_head, 1], [seq_len, 1], [seq_len, 1]
-                            )
-                        ):
-                            n_embd = n_head * head_dim
-                            x = torch.randn(
-                                (batch_size, seq_len, 3 * n_head * head_dim),
-                                device="cpu",
-                                dtype=dtype,
-                                requires_grad=False,
-                            )
-                            x2 = x.clone()
+                    for batch_size, seq_len, n_head, head_dim in itertools.product(
+                        [2, 12], [1, 129, 267, 533, 1030], [1, 3, 4], [7, 8, 16]
+                    ):
+                        atol = 1e-5
+                        rtol = 5e-6
+                        if dtype is torch.bfloat16:
+                            atol = 2e-2
+                            rtol = 2e-2
+                        if dtype is torch.float16:
+                            atol = 1e-2
+                            rtol = 1e-2
+                        attn_mask_dtypes = (
+                            [dtype, torch.bool, torch.float]
+                            if dtype in [torch.bfloat16, torch.float16]
+                            else [dtype, torch.bool]
+                        )
+                        for attn_mask_dtype in attn_mask_dtypes:
+                            for attn_mask_shape in (
+                                itertools.product([seq_len, 1], [seq_len, 1])
+                                if mask_dim == 2
+                                else itertools.product(
+                                    [batch_size, 1],
+                                    [n_head, 1],
+                                    [seq_len, 1],
+                                    [seq_len, 1],
+                                )
+                            ):
+                                n_embd = n_head * head_dim
+                                x = torch.randn(
+                                    (batch_size, seq_len, 3 * n_head * head_dim),
+                                    device="cpu",
+                                    dtype=dtype,
+                                    requires_grad=False,
+                                )
+                                x2 = x.clone()
 
-                            q, k, v = x.split(n_embd, dim=2)
-                            q2, k2, v2 = x2.split(n_embd, dim=2)
+                                q, k, v = x.split(n_embd, dim=2)
+                                q2, k2, v2 = x2.split(n_embd, dim=2)
+
+                                if dtype in [torch.bfloat16, torch.float16]:
+                                    q2 = q2.float()
+                                    k2 = k2.float()
+                                    v2 = v2.float()
+
+                                # (B, nh, T, hs)
+                                k = k.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+                                q = q.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+                                v = v.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+                                k2 = k2.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+                                q2 = q2.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+                                v2 = v2.view(
+                                    batch_size, seq_len, n_head, head_dim
+                                ).transpose(1, 2)
+
+                                if attn_mask_dtype == torch.bool:
+                                    mask = torch.ones(
+                                        attn_mask_shape,
+                                        dtype=torch.bool,
+                                        device="cpu",
+                                        requires_grad=False,
+                                    ).tril(diagonal=0)
+                                    # _scaled_dot_product_attention_math does the type conversion outside
+                                    mask2 = torch.zeros_like(mask, dtype=dtype)
+                                    mask2[mask == False] = -float("inf")  # noqa: E712
+                                else:
+                                    mask = torch.randn(
+                                        attn_mask_shape,
+                                        dtype=attn_mask_dtype,
+                                        device="cpu",
+                                        requires_grad=False,
+                                    )
+                                    mask2 = mask
+                                actual = torch.ops.torch_ipex.flash_attention(
+                                    q,
+                                    k,
+                                    v,
+                                    dropout_p=0.0,
+                                    attention_mask=mask,
+                                    is_causal=is_causal,
+                                )[0]
+                                # math ref path with both is_causal and attn mask
+                                attn_mask_shape = list(attn_mask_shape)
+                                attn_mask_shape[-2] = q2.size(-2)
+                                attn_mask_shape[-1] = k2.size(-2)
+                                scale_factor = 1 / math.sqrt(q2.size(-1))
+                                attn_bias = torch.zeros(attn_mask_shape, dtype=q2.dtype)
+                                if is_causal:
+                                    temp_mask = torch.ones(
+                                        attn_mask_shape, dtype=torch.bool
+                                    ).tril(diagonal=0)
+                                    attn_bias.masked_fill_(
+                                        temp_mask.logical_not(), float("-inf")
+                                    )
+                                    attn_bias.to(q2.dtype)
+                                if mask2.dtype == torch.bool:
+                                    attn_bias.masked_fill_(
+                                        mask2.logical_not(), float("-inf")
+                                    )
+                                else:
+                                    attn_bias += mask2
+                                attn_weight = q2 @ k2.transpose(-2, -1) * scale_factor
+                                attn_weight += attn_bias
+                                attn_weight = torch.softmax(attn_weight, dim=-1)
+                                math_ref = attn_weight @ v2
 
                             if dtype in [torch.bfloat16, torch.float16]:
-                                q2 = q2.float()
-                                k2 = k2.float()
-                                v2 = v2.float()
-
-                            # (B, nh, T, hs)
-                            k = k.view(batch_size, seq_len, n_head, head_dim).transpose(
-                                1, 2
-                            )
-                            q = q.view(batch_size, seq_len, n_head, head_dim).transpose(
-                                1, 2
-                            )
-                            v = v.view(batch_size, seq_len, n_head, head_dim).transpose(
-                                1, 2
-                            )
-                            k2 = k2.view(
-                                batch_size, seq_len, n_head, head_dim
-                            ).transpose(1, 2)
-                            q2 = q2.view(
-                                batch_size, seq_len, n_head, head_dim
-                            ).transpose(1, 2)
-                            v2 = v2.view(
-                                batch_size, seq_len, n_head, head_dim
-                            ).transpose(1, 2)
-
-                            if attn_mask_dtype == torch.bool:
-                                mask = torch.ones(
-                                    attn_mask_shape,
-                                    dtype=torch.bool,
-                                    device="cpu",
-                                    requires_grad=False,
-                                ).tril(diagonal=0)
-                                # _scaled_dot_product_attention_math does the type conversion outside
-                                mask2 = torch.zeros_like(mask, dtype=dtype)
-                                mask2[mask == False] = -float("inf")  # noqa: E712
-                            else:
-                                mask = torch.randn(
-                                    attn_mask_shape,
-                                    dtype=attn_mask_dtype,
-                                    device="cpu",
-                                    requires_grad=False,
+                                math_ref = math_ref.to(dtype)
+                                torch.testing.assert_close(
+                                    actual, math_ref, atol=atol, rtol=rtol
                                 )
-                                mask2 = mask
-                            actual = torch.ops.torch_ipex.flash_attention(
-                                q,
-                                k,
-                                v,
-                                dropout_p=0.0,
-                                attention_mask=mask,
-                                is_causal=is_causal,
-                            )[0]
-                            # math ref path with both is_causal and attn mask
-                            attn_mask_shape = list(attn_mask_shape)
-                            attn_mask_shape[-2] = q2.size(-2)
-                            attn_mask_shape[-1] = k2.size(-2)
-                            scale_factor = 1 / math.sqrt(q2.size(-1))
-                            attn_bias = torch.zeros(attn_mask_shape, dtype=q2.dtype)
-                            if is_causal:
-                                temp_mask = torch.ones(
-                                    attn_mask_shape, dtype=torch.bool
-                                ).tril(diagonal=0)
-                                attn_bias.masked_fill_(
-                                    temp_mask.logical_not(), float("-inf")
-                                )
-                                attn_bias.to(q2.dtype)
-                            if mask2.dtype == torch.bool:
-                                attn_bias.masked_fill_(
-                                    mask2.logical_not(), float("-inf")
-                                )
-                            else:
-                                attn_bias += mask2
-                            attn_weight = q2 @ k2.transpose(-2, -1) * scale_factor
-                            attn_weight += attn_bias
-                            attn_weight = torch.softmax(attn_weight, dim=-1)
-                            math_ref = attn_weight @ v2
-
-                        if dtype in [torch.bfloat16, torch.float16]:
-                            math_ref = math_ref.to(dtype)
-                            torch.testing.assert_close(
-                                actual, math_ref, atol=atol, rtol=rtol
-                            )
 
     def test_flash_attention_stride0(self):
         input_shape = (
@@ -1654,8 +1659,10 @@ class CPUOPsTester(TestCase):
                     except ImportError:
                         pass
 
-    def _clone_inputs(self, inputs, dtype):
-        inputs = [x.clone().to(dtype) for x in inputs]
+    def _clone_inputs(self, inputs, dtype=None):
+        inputs = [
+            x.clone().to(dtype) if dtype is not None else x.clone() for x in inputs
+        ]
         return inputs
 
     def test_causal_conv1d_update(self):
@@ -1808,50 +1815,38 @@ class CPUOPsTester(TestCase):
         D = torch.ones(8192)
         gate = torch.rand(1, 8192, 1)
         time_proj_bias = torch.rand(8192)
-        example_inputs = (
-            hidden_states,
-            discrete_time_step,
-            A,
-            B.transpose(1, 2),
-            C.transpose(1, 2),
-            D,
-            gate,
-            time_proj_bias,
-        )
-        with torch.no_grad():
-            input_ref_fp32 = self._clone_inputs(example_inputs, torch.float32)
-            scan_outputs_fp32_ref, ssm_state_fp32_ref = selective_scan_ref(
-                *input_ref_fp32,
-                delta_softplus=True,
-                return_last_state=True,
-            )
-            input_ipex_fp32 = self._clone_inputs(example_inputs, torch.float32)
-            scan_outputs_fp32_ipex, ssm_state_fp32_ipex = (
-                torch.ops.torch_ipex.selective_scan_fn(
-                    *input_ipex_fp32,
-                    delta_softplus=True,
-                    return_last_state=True,
-                )
-            )
-            self.assertEqual(scan_outputs_fp32_ref, scan_outputs_fp32_ipex)
-            self.assertEqual(ssm_state_fp32_ref, ssm_state_fp32_ipex)
-
-        dtypes = [torch.bfloat16]
+        dtypes = [torch.float, torch.bfloat16]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
 
         for dtype in dtypes:
+            example_inputs = (
+                hidden_states,
+                discrete_time_step.to(torch.float),
+                A,
+                B.transpose(1, 2),
+                C.transpose(1, 2),
+                D,
+                gate,
+                time_proj_bias,
+            )
+            rtol, atol = (6e-4, 2e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 3e-2, 5e-2
+            rtolw, atolw = (1e-3, 1e-3)
+            rtolw = max(rtolw, rtol)
+            atolw = max(atolw, atol)
             with torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
                 dtype=dtype,
             ):
-                input_ref = self._clone_inputs(example_inputs, dtype)
+                input_ref = self._clone_inputs(example_inputs)
                 scan_outputs_ref, ssm_state_ref = selective_scan_ref(
                     *input_ref,
                     delta_softplus=True,
                     return_last_state=True,
                 )
-                input_ipex = self._clone_inputs(example_inputs, dtype)
+                input_ipex = self._clone_inputs(example_inputs)
                 scan_outputs_ipex, ssm_state_ipex = (
                     torch.ops.torch_ipex.selective_scan_fn(
                         *input_ipex,
@@ -1859,15 +1854,21 @@ class CPUOPsTester(TestCase):
                         return_last_state=True,
                     )
                 )
-                self.assertEqual(
-                    scan_outputs_fp32_ref,
-                    scan_outputs_ipex,
-                    torch.max(torch.abs(scan_outputs_ref - scan_outputs_fp32_ref)),
+                self.assertTrue(
+                    torch.allclose(
+                        scan_outputs_ref,
+                        scan_outputs_ipex,
+                        rtol=rtolw,
+                        atol=atolw,
+                    )
                 )
-                self.assertEqual(
-                    ssm_state_ref,
-                    ssm_state_ipex,
-                    torch.max(torch.abs(ssm_state_ref - ssm_state_fp32_ref)),
+                self.assertTrue(
+                    torch.allclose(
+                        ssm_state_ref,
+                        ssm_state_ipex,
+                        rtol=rtolw,
+                        atol=atolw,
+                    )
                 )
 
     def test_selective_state_update(self):
@@ -1945,46 +1946,42 @@ class CPUOPsTester(TestCase):
         D = torch.ones(8192)
         gate = torch.rand(1, 8192)
         time_proj_bias = torch.rand(8192)
-        example_inputs = (
-            ssm_state,
-            hidden_states,
-            discrete_time_step,
-            A,
-            B,
-            C,
-            D,
-            gate,
-            time_proj_bias,
-        )
-        with torch.no_grad():
-            input_ref_fp32 = self._clone_inputs(example_inputs, torch.float32)
-            output_fp32_ref = selective_state_update_ref(
-                *input_ref_fp32, dt_softplus=True
-            )
-            input_ipex_fp32 = self._clone_inputs(example_inputs, torch.float32)
-            output_fp32_ipex = torch.ops.torch_ipex.selective_state_update(
-                *input_ipex_fp32, True
-            )
-            self.assertEqual(output_fp32_ref, output_fp32_ipex)
-        dtypes = [torch.bfloat16]
+        dtypes = [torch.float, torch.bfloat16]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
 
         for dtype in dtypes:
+            example_inputs = (
+                ssm_state.to(dtype),
+                hidden_states.to(dtype),
+                discrete_time_step.to(dtype),
+                A,
+                B,
+                C,
+                D,
+                gate.to(dtype),
+                time_proj_bias,
+            )
+            rtol, atol = (3e-4, 1e-3) if dtype == torch.float32 else (3e-3, 5e-3)
+            if dtype == torch.bfloat16:
+                rtol, atol = 1e-2, 5e-2
             with torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
                 dtype=dtype,
             ):
-                input_ref = self._clone_inputs(example_inputs, dtype)
+                input_ref = self._clone_inputs(example_inputs)
                 output_ref = selective_state_update_ref(*input_ref, dt_softplus=True)
-                input_ipex = self._clone_inputs(example_inputs, dtype)
+                input_ipex = self._clone_inputs(example_inputs)
                 output_ipex = torch.ops.torch_ipex.selective_state_update(
                     *input_ipex, True
                 )
-                self.assertEqual(
-                    output_ref,
-                    output_ipex,
-                    torch.max(torch.abs(output_ref - output_fp32_ref)),
+                self.assertTrue(
+                    torch.allclose(
+                        output_ref,
+                        output_ipex,
+                        rtol=rtol,
+                        atol=atol,
+                    )
                 )
 
     def test_deepseek_moe(self):

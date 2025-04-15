@@ -283,6 +283,7 @@ class TestPrepackCases(TestCase):
                 y2 = ipex_model1(x2)
                 # ipex path with inplace=True
                 y3 = ipex_model2(x3)
+
             if is_train:
                 grad_x = (
                     torch.randn(y1.shape, dtype=torch.float32).to(dtype=dtype).float()

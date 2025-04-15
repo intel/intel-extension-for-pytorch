@@ -5705,39 +5705,39 @@ def JambaMambaMixer_forward(
     C = self.c_layernorm(C)
     orig_bias = self.dt_proj.bias
     if self.dt_proj.weight.dtype in [torch.qint8, torch.int8, torch.uint8]:
-        time_proj_bias = self.dt_proj._op_context.get_bias().data.to(B.dtype)
+        time_proj_bias = self.dt_proj._op_context.get_bias().data
     else:
         time_proj_bias = orig_bias
     self.dt_proj.bias = None
     discrete_time_step = self.dt_proj(time_step)
     self.dt_proj.bias = orig_bias
 
-    A = -torch.exp(self.A_log.to(dtype))  # [intermediate_size, ssm_state_size]
+    A = -torch.exp(self.A_log)  # [intermediate_size, ssm_state_size]
     # 3.c perform the recurrence y ← SSM(A, B, C)(x)
     if use_precomputed_states:
         discrete_time_step = discrete_time_step.transpose(1, 2)
         scan_outputs = torch.ops.torch_ipex.selective_state_update(
-            cache_params[0],
+            cache_params[0].to(dtype),
             hidden_states[..., 0],
             discrete_time_step[..., 0],
             A,
-            B[:, 0],
-            C[:, 0],
-            self.D.to(dtype),
+            B[:, 0].to(torch.float),
+            C[:, 0].to(torch.float),
+            self.D.to(torch.float),
             gate[..., 0],
-            time_proj_bias,
+            time_proj_bias.to(torch.float),
             dt_softplus=True,
         ).unsqueeze(-1)
     else:
         scan_outputs, ssm_state = torch.ops.torch_ipex.selective_scan_fn(
             hidden_states2,
-            discrete_time_step,
+            discrete_time_step.to(torch.float),
             A,
             B.transpose(1, 2).contiguous(),
             C.transpose(1, 2).contiguous(),
-            self.D.to(dtype),
+            self.D.to(torch.float),
             gate,
-            time_proj_bias,
+            time_proj_bias.to(torch.float),
             delta_softplus=True,
             return_last_state=True,
         )
@@ -5838,60 +5838,102 @@ def JambaForCausalLM_forward(
     return (loss,) + output if loss is not None else output
 
 
-def Deepseek_MoEGate_forward(self, hidden_states):
-    # compute gating score
-    logits = torch.nn.functional.linear(
-        hidden_states.type(torch.float32), self.weight.type(torch.float32), None
-    )
-
-    if self.scoring_func == "softmax":
-        scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
-    elif self.scoring_func == "sigmoid":
-        scores = logits.sigmoid()
-    else:
-        raise NotImplementedError(
-            f"insupportable scoring function for MoE gating: {self.scoring_func}"
+class _IPEXDeepSeekV3MoEGate(torch.nn.Module):
+    def __init__(self, module, config, distributed=False):
+        super().__init__()
+        self.config = config
+        self.top_k = config.num_experts_per_tok
+        self.n_routed_experts = config.n_routed_experts
+        self.routed_scaling_factor = config.routed_scaling_factor
+        self.routed_scaling_factor_r1 = torch.tensor(config.routed_scaling_factor).to(
+            torch.float32
         )
+        self.scoring_func = config.scoring_func
+        self.seq_aux = config.seq_aux
+        self.topk_method = config.topk_method
+        self.n_group = config.n_group
+        self.topk_group = config.topk_group
 
-    # select top-k experts
-    if self.topk_method == "greedy":
-        topk_weight, topk_idx = torch.topk(scores, k=self.top_k, dim=-1, sorted=False)
-    elif self.topk_method == "group_limited_greedy":
-        routed_scaling_factor = self.routed_scaling_factor
-        if self.top_k > 1 and self.norm_topk_prob:
-            routed_scaling_factor = 1.0
-        topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
+        # topk selection algorithm
+        self.norm_topk_prob = config.norm_topk_prob
+        self.gating_dim = config.hidden_size
+        self.weight = torch.ops.torch_ipex.convert_weight_packed(
+            module.weight.unsqueeze(0).detach(), True
+        )
+        self.fp8_fake_scale = torch.tensor(0).to(module.weight.dtype)
+        if self.topk_method == "noaux_tc":
+            self.e_score_correction_bias_2 = torch.tensor(
+                module.e_score_correction_bias.unsqueeze(0), dtype=torch.float32
+            )
+            # self.e_score_correction_bias = module.e_score_correction_bias
+            self.e_score_correction_bias = torch.tensor(
+                module.e_score_correction_bias, dtype=torch.float32
+            )
+
+    def forward(self, hidden_states):
+        # compute gating score
+        logits = torch.ops.torch_ipex.moe_gate_bmm_forward(
             hidden_states,
-            scores,
-            torch.tensor(routed_scaling_factor),
-            self.n_group,
-            self.topk_group,
-            self.n_routed_experts,
-            self.top_k,
+            self.weight,
+            True,
+            torch.tensor(self.n_routed_experts),
+            self.fp8_fake_scale,
         )
-    elif self.topk_method == "noaux_tc":
-        topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
-            hidden_states,
-            scores,
-            torch.tensor(self.routed_scaling_factor),
-            self.n_group,
-            self.topk_group,
-            self.n_routed_experts,
-            self.top_k,
-            torch.tensor(self.e_score_correction_bias, dtype=torch.float32),
-        )
+        # logits = torch.nn.functional.linear(hidden_states, self.weight, None)
+        if self.scoring_func == "softmax":
+            scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
+        elif self.scoring_func == "sigmoid":
+            if self.topk_method == "noaux_tc":
+                scores = logits
+            else:
+                scores = logits.sigmoid()
+        else:
+            raise NotImplementedError(
+                f"insupportable scoring function for MoE gating: {self.scoring_func}"
+            )
 
-    # norm gate to sum 1
-    if self.top_k > 1 and self.norm_topk_prob:
-        denominator = topk_weight.sum(dim=-1, keepdim=True) + 1e-20
-        topk_weight = topk_weight / denominator
-    elif self.topk_method == "greedy":
-        topk_weight = topk_weight * self.routed_scaling_factor
-    if self.topk_method == "noaux_tc":
-        topk_weight = topk_weight * self.routed_scaling_factor
+        # select top-k experts
+        if self.topk_method == "greedy":
+            topk_weight, topk_idx = torch.topk(
+                scores, k=self.top_k, dim=-1, sorted=False
+            )
+        elif self.topk_method == "group_limited_greedy":
+            routed_scaling_factor = self.routed_scaling_factor
+            if self.top_k > 1 and self.norm_topk_prob:
+                routed_scaling_factor = 1.0
+            topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
+                hidden_states,
+                scores,
+                torch.tensor(routed_scaling_factor),
+                self.n_group,
+                self.topk_group,
+                self.n_routed_experts,
+                self.top_k,
+            )
+        elif self.topk_method == "noaux_tc":
+            topk_idx, topk_weight = torch.ops.torch_ipex.grouped_topk(
+                hidden_states,
+                scores,
+                self.top_k,
+                True,
+                self.n_group,
+                self.topk_group,
+                self.e_score_correction_bias_2,
+                self.routed_scaling_factor_r1,
+            )
+        # norm gate to sum 1
+        if (
+            self.top_k > 1
+            and self.norm_topk_prob
+            and not self.topk_method == "noaux_tc"
+        ):
+            denominator = topk_weight.sum(dim=-1, keepdim=True) + 1e-20
+            topk_weight = topk_weight / denominator
+        elif self.topk_method == "greedy":
+            topk_weight = topk_weight * self.routed_scaling_factor
 
-    aux_loss = None
-    return topk_idx, topk_weight, aux_loss
+        aux_loss = None
+        return topk_idx, topk_weight, aux_loss
 
 
 def DeepseekV2Model_forward(

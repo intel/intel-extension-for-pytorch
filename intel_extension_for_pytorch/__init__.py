@@ -174,6 +174,8 @@ if has_cpu():
 
 from . import _C
 
+from .utils._logger import set_logging_level
+
 # Path to folder containing CMake definitions for torch ipex package
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), "share", "cmake")
 

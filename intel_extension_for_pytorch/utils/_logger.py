@@ -94,3 +94,13 @@ def warning_once(self, *args, **kwargs):
 
 
 logging.Logger.warning_once = warning_once
+
+
+def set_logging_level(level=logging.WARNING):
+    """
+    Set the logging level for IPEX logger
+    Args:
+        level: logging level, e.g., logging.INFO, logging.WARNING
+    """
+    global logger
+    logger.setLevel(level)

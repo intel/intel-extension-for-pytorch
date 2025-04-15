@@ -2,6 +2,7 @@
 #include <immintrin.h>
 #include <cstdlib>
 #include "utils/SysUtil.h"
+#include "vec512_bfloat16.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -294,6 +295,44 @@ static IPEX_FORCE_INLINE void cvt_e5m2_fp16_intrinsic(
   }
   for (; i < len; i++) {
     out[i] = static_cast<at::Half>(in[i]);
+  }
+}
+
+static IPEX_FORCE_INLINE void cvt_e5m2_bf16_intrinsic(
+    const at::Float8_e5m2* __restrict__ in,
+    at::BFloat16* out,
+    size_t len) {
+  int64_t i = 0;
+  for (; i < len - 31; i += 32) {
+    __m512i a = _mm512_cvte5m2_fp16(_mm256_loadu_epi8(&in[i]));
+    __m256i ah = _mm512_extracti64x4_epi64(a, 0);
+    __m256i bh = _mm512_extracti64x4_epi64(a, 1);
+    __m256i a_ = cvt_fp32_to_bf16(_mm512_cvtph_ps(ah));
+    __m256i b_ = cvt_fp32_to_bf16(_mm512_cvtph_ps(bh));
+    _mm256_storeu_si256((__m256i*)(out + i), a_);
+    _mm256_storeu_si256((__m256i*)(out + i + 16), b_);
+  }
+  for (; i < len; i++) {
+    out[i] = static_cast<at::BFloat16>(in[i]);
+  }
+}
+
+static IPEX_FORCE_INLINE void cvt_e5m2_fp32_intrinsic(
+    const at::Float8_e5m2* __restrict__ in,
+    float* out,
+    size_t len) {
+  int64_t i = 0;
+  for (; i < len - 31; i += 32) {
+    __m512i a = _mm512_cvte5m2_fp16(_mm256_loadu_epi8(&in[i]));
+    __m256i ah = _mm512_extracti64x4_epi64(a, 0);
+    __m256i bh = _mm512_extracti64x4_epi64(a, 1);
+    __m512 a_ = _mm512_cvtph_ps(ah);
+    __m512 b_ = _mm512_cvtph_ps(bh);
+    _mm512_storeu_ps((out + i), a_);
+    _mm512_storeu_ps((out + i + 16), b_);
+  }
+  for (; i < len; i++) {
+    out[i] = static_cast<float>(in[i]);
   }
 }
 

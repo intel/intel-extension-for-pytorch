@@ -13,5 +13,5 @@ if has_cpu():
 from .weight_only_quantization import (
     WeightOnlyQuantizedLinear,
     IpexWoqLinearAllreduce,
-    Int4WeightFormat,
+    WoqWeightFormat,
 )

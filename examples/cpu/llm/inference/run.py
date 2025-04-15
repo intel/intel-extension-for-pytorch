@@ -45,9 +45,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--dtype",
         type=str,
-        choices=["float32", "bfloat16"],
+        choices=["float32", "bfloat16", "float16"],
         default="bfloat16",
-        help="bfloat16, float32",
+        help="bfloat16, float32, float16",
     )
     parser.add_argument("--ipex", action="store_true")
     parser.add_argument("--output-dir", nargs="?", default="./saved_results")
@@ -317,6 +317,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="auto",
         help='Data type for kv cache storage. If "auto", will use model '
         "data type. fp8 type now supports e5m2.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print verbose information for debugging",
     )
     args = parser.parse_args(args_in)
 
@@ -607,6 +612,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "jamba": ("/jamba_local_shard"),
                 "deepseek-v2": ("/deepseekv2_local_shard"),
                 "deepseek-v3": ("/deepseekv3_local_shard"),
+                "deepseek-r1": ("/deepseekr1_local_shard"),
             }
             model_type = next(
                 (
@@ -689,6 +695,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(
                 ["--low-precision-checkpoint", str(args.low_precision_checkpoint)]
             )
+        if args.verbose:
+            infer_cmd.extend(["--verbose"])
 
         if args.ipex_weight_only_quantization:
             infer_cmd.extend(["--ipex-weight-only-quantization"])
