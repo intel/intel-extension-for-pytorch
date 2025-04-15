@@ -156,9 +156,12 @@ def update_source_code(dir_name,
                       git pull''',
                   cwd = dir_target,
                   silent = True)
-        exec_cmds(f'''git checkout {branch}
-                      git pull''',
+        exec_cmds(f'git checkout {branch}',
                   cwd = dir_target,
+                  show_command = show_command)
+        exec_cmds('git pull',
+                  cwd = dir_target,
+                  exit_on_failure = False,
                   show_command = show_command)
     exec_cmds('''git submodule sync
                  git submodule update --init --recursive''',
