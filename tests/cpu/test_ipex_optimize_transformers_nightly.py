@@ -256,6 +256,10 @@ class OptimizeTransformersNightlyTester(TestCase):
     def model_replacement_check(
         self, m, dtype, deployment_mode, torchcompile=False, return_dict=False
     ):
+        # Small differences lead to different experts being selected
+        # Fixed seed to avoid this issue on jamba
+        if m.name == "jamba":
+            torch.manual_seed(128)
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/{m.name}",
             return_dict=return_dict,
