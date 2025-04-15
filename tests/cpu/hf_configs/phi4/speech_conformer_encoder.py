@@ -885,6 +885,7 @@ class T5RelativeAttentionLogitBias(nn.Module):
         # this is a placeholder (isn't tested, likely buggy) using HuggingFace implem as a reference
         # this also needs to be extended to support asymmetric +/- ve positions
         relative_buckets = 0
+        num_buckets = self.num_buckets
         if not self.causal:
             num_buckets //= 2
             relative_buckets += (relative_position > 0).to(torch.long) * num_buckets
@@ -893,7 +894,6 @@ class T5RelativeAttentionLogitBias(nn.Module):
             relative_position = -torch.min(
                 relative_position, torch.zeros_like(relative_position)
             )
-            num_buckets = self.num_buckets
         # now relative_position is in the range [0, inf)
 
         # half of the buckets are for exact increments in positions
