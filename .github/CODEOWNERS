@@ -53,5 +53,8 @@ csrc/gpu/aten/operators/xetla @rogerxfeng8 @airMeng
 
 # IPEX CPU code base
 /csrc/cpu @xuhancn @zejun-chen
+/cmake/cpu @xuhancn @zejun-chen 
 /intel_extension_for_pytorch/cpu @xuhancn @zejun-chen
 /intel_extension_for_pytorch/csrc/cpu @xuhancn @zejun-chen
+/tests/cpu @xuhancn @zejun-chen
+/examples/cpu @xuhancn @zejun-chen
