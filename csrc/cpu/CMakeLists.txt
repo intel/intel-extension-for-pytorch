@@ -209,7 +209,7 @@ if(USE_LIBXSMM)
       )
     set(LIBXSMM_INCLUDE_DIRS ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
     target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
-  endif(BUILD_LIBXSMM_VIA_CMAKE)
+  endif()
 endif(USE_LIBXSMM)
 
 if(USE_SYSTEM_SLEEF)
