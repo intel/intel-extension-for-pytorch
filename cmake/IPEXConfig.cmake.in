@@ -47,11 +47,6 @@ if(@BUILD_WITH_XPU@)
   list(APPEND IPEX_LIBRARIES intel-ext-pt-gpu)
 endif()
 
-# When we build ipex with the old GCC ABI, dependent libraries must too.
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  list(APPEND IPEX_CXX_FLAGS "-D_GLIBCXX_USE_CXX11_ABI=@GLIBCXX_USE_CXX11_ABI@")
-endif()
-
 if(@BUILD_WITH_CPU@)
   add_library(intel-ext-pt-cpu INTERFACE IMPORTED)
   set_target_properties(intel-ext-pt-cpu PROPERTIES

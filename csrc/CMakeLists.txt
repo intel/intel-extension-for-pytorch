@@ -58,9 +58,6 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
   endif()
 
   set(CPACK_PACKAGE_NAME "${IPEX_PROJ_NAME}")
-  if(GLIBCXX_USE_CXX11_ABI)
-    set(CPACK_PACKAGE_NAME "${IPEX_PROJ_NAME}-cxx11-abi")
-  endif()
   set(LIBIPEX_PACK_PREFIX "${CPACK_OUTPUT_DIR}/${CPACK_PACKAGE_NAME}")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -84,9 +81,6 @@ if(BUILD_MODULE_TYPE STREQUAL "CPPSDK")
   include(CPack)
 
   set(INSTALL_SCRIPT "libintel-ext-pt-${LIBIPEX_VERSION}.run")
-  if(GLIBCXX_USE_CXX11_ABI)
-    set(INSTALL_SCRIPT "libintel-ext-pt-cxx11-abi-${LIBIPEX_VERSION}.run")
-  endif()
   configure_package_config_file(
     ${IPEX_ROOT_DIR}/cmake/cppsdk/libintel-ext-pt.installer.sh.in
     ${PROJECT_BINARY_DIR}/${INSTALL_SCRIPT}
