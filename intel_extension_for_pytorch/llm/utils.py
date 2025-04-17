@@ -912,8 +912,9 @@ def shard_low_precision_checkpoint(
     """
     assert tp_grain_size % 8 == 0, "tp_grain_size must be a multiple of 8"
     num_heads = model_config["num_attention_heads"]
+    num_kv_heads = num_heads
     if "num_key_value_heads" in model_config:
-        num_heads = model_config["num_key_value_heads"]
+        num_kv_heads = model_config["num_key_value_heads"]
     local_rank = rank
 
     mha_layers_split_by_N = [
@@ -922,6 +923,9 @@ def shard_low_precision_checkpoint(
         "v_proj",
         "q_b_proj",
         "kv_b_proj",
+    ]
+    qkv_proj_layers = [
+        "qkv_proj",
     ]
     # mlp is split with grain size = tp_grain_size
     mlp_layers_split_by_N = [
@@ -932,6 +936,9 @@ def shard_low_precision_checkpoint(
         "query_key_value",
         "w1",
         "w3",
+    ]
+    gate_up_proj_layers = [
+        "gate_up_proj",
     ]
     mha_layers_split_by_K = [
         "o_proj",
@@ -947,12 +954,20 @@ def shard_low_precision_checkpoint(
         "w2",
     ]
     lm_head_layers = ["lm_head"]  # split by K but not quantized
+
+    def _key_belongs_to(key, layer_group):
+        key_split = key.split(".")
+        for layer in layer_group:
+            if layer in key_split:
+                return True
+        return False
+
     low_precision_checkpoint_dict = low_precision_checkpoint.copy()
     head_range = [0]
-    head_per_rank = num_heads // world_size
+    head_per_rank = num_kv_heads // world_size
     for i in range(0, world_size):
         head_this_rank = head_per_rank
-        if i < num_heads % world_size:
+        if i < num_kv_heads % world_size:
             head_this_rank += 1
         head_range.append(head_range[-1] + head_this_rank)
     for key in low_precision_checkpoint.keys():
@@ -960,7 +975,7 @@ def shard_low_precision_checkpoint(
         q_head_end = q_head_start + (head_range[rank + 1] - head_range[rank])
         if "bias" in key:
             continue
-        if any(substring in key for substring in mha_layers_split_by_N):
+        if _key_belongs_to(key, mha_layers_split_by_N):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
                 # qweight shape: [K, N // 8]
@@ -1041,7 +1056,91 @@ def shard_low_precision_checkpoint(
                 ].contiguous()
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
-        elif any(substring in key for substring in mlp_layers_split_by_N):
+        elif _key_belongs_to(key, qkv_proj_layers):
+            # need to split q, k and v proj then shard them separately
+            # finally concat them together
+            # mha layer split by N
+            data = low_precision_checkpoint_dict[key]
+            hidden_size = model_config["hidden_size"]
+            head_dim = hidden_size // num_heads
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                N_pack_factor = 1 if "scales" in key else 8
+                N = data.shape[-1] * N_pack_factor
+                q_pos = N - 2 * num_kv_heads * head_dim
+                k_pos = q_pos + num_kv_heads * head_dim
+                v_pos = k_pos + num_kv_heads * head_dim
+                q_pos //= N_pack_factor
+                k_pos //= N_pack_factor
+                v_pos //= N_pack_factor
+                data_list = [
+                    data[:, :q_pos],
+                    data[:, q_pos:k_pos],
+                    data[:, k_pos:v_pos],
+                ]
+                for i in range(len(data_list)):
+                    data = data_list[i].contiguous()
+                    if data.shape[-1] % head_range[-1] == 0:
+                        dim = data.shape[-1] // head_range[-1]
+                    else:
+                        assert data.shape[-1] % world_size == 0
+                        dim = data.shape[-1] // world_size
+                        q_head_start = local_rank
+                        q_head_end = local_rank + 1
+                    data_list[i] = data[
+                        :, q_head_start * dim : q_head_end * dim
+                    ].contiguous()
+                low_precision_checkpoint_dict[key] = torch.cat(
+                    data_list, dim=-1
+                ).contiguous()
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                data_list = []
+                if "g_idx" not in key:
+                    N_pack_factor = 8 if "qzeros" in key else 1
+                    N = data.shape[-1] * N_pack_factor
+                    q_pos = N - 2 * num_kv_heads * head_dim
+                    k_pos = q_pos + num_kv_heads * head_dim
+                    v_pos = k_pos + num_kv_heads * head_dim
+                    q_pos //= N_pack_factor
+                    k_pos //= N_pack_factor
+                    v_pos //= N_pack_factor
+                    data_list = [
+                        data[:, :q_pos],
+                        data[:, q_pos:k_pos],
+                        data[:, k_pos:v_pos],
+                    ]
+                for i in range(len(data_list)):
+                    if "g_idx" in key:
+                        continue
+                    data = data_list[i]
+                    if data.shape[-1] % head_range[-1] == 0:
+                        dim = data.shape[-1] // head_range[-1]
+                    else:
+                        assert data.shape[-1] % world_size == 0
+                        dim = data.shape[-1] // world_size
+                        q_head_start = local_rank
+                        q_head_end = local_rank + 1
+                    data_list[i] = data[
+                        :, q_head_start * dim : q_head_end * dim
+                    ].contiguous()
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = torch.cat(
+                        data_list, dim=-1
+                    ).contiguous()
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif _key_belongs_to(key, mlp_layers_split_by_N):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
                 # qweight shape: [K, N // 8]
@@ -1178,7 +1277,95 @@ def shard_low_precision_checkpoint(
                 ].contiguous()
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
-        elif any(substring in key for substring in mha_layers_split_by_K):
+        elif _key_belongs_to(key, gate_up_proj_layers):
+            # need to split gate and up proj then shard them separately
+            # finally concat them together
+            # mlp layer split by N
+            data = low_precision_checkpoint_dict[key]
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                data_list = list(data.chunk(2, dim=-1))
+                for i in range(len(data_list)):
+                    data = data_list[i].contiguous()
+                    if "scales" in key:
+                        assert (
+                            data.shape[1] % tp_grain_size == 0
+                        ), "N must be divisible by tp_grain_size"
+                        grains = data.shape[1] // tp_grain_size
+                        dim = tp_grain_size
+                    else:
+                        assert (
+                            data.shape[1] * 8
+                        ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                        grains = data.shape[1] // (tp_grain_size // 8)
+                        dim = tp_grain_size // 8
+                    grains_per_rank = grains // world_size
+                    grains_rem = grains % world_size
+                    grains_start = grains_per_rank * local_rank + min(
+                        local_rank, grains_rem
+                    )
+                    grains_end = (
+                        grains_start
+                        + grains_per_rank
+                        + (1 if local_rank < grains_rem else 0)
+                    )
+                    data_list[i] = data[
+                        :, grains_start * dim : grains_end * dim
+                    ].contiguous()
+                low_precision_checkpoint_dict[key] = torch.cat(
+                    data_list, dim=-1
+                ).contiguous()
+            elif quantization_method == "gptq" or (
+                quantization_method == "rtn" and bits == 4
+            ):
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                data_list = list(data.chunk(2, dim=-1))
+                for i in range(len(data_list)):
+                    if "g_idx" in key:
+                        continue
+                    data = data_list[i]
+                    if "qzeros" in key:
+                        assert (
+                            data.shape[-1] * 8
+                        ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                        grains = data.shape[-1] // (tp_grain_size // 8)
+                        dim = tp_grain_size // 8
+                    elif "g_idx" not in key:  # qweight, scales
+                        assert (
+                            data.shape[-1] % tp_grain_size == 0
+                        ), "N must be divisible by tp_grain_size"
+                        grains = data.shape[-1] // tp_grain_size
+                        dim = tp_grain_size
+                    grains_per_rank = grains // world_size
+                    grains_rem = grains % world_size
+                    grains_start = grains_per_rank * local_rank + min(
+                        local_rank, grains_rem
+                    )
+                    grains_end = (
+                        grains_start
+                        + grains_per_rank
+                        + (1 if local_rank < grains_rem else 0)
+                    )
+                    data_list[i] = data[
+                        :, grains_start * dim : grains_end * dim
+                    ].contiguous()
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = torch.cat(
+                        data_list, dim=-1
+                    ).contiguous()
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif _key_belongs_to(key, mha_layers_split_by_K):
+            if "bias" in key:
+                continue
             data = low_precision_checkpoint_dict[key]
             if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
                 continue
@@ -1269,7 +1456,7 @@ def shard_low_precision_checkpoint(
                 ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
-        elif any(substring in key for substring in mlp_layers_split_by_K):
+        elif _key_belongs_to(key, mlp_layers_split_by_K):
             data = low_precision_checkpoint_dict[key]
             if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
                 continue
@@ -1422,7 +1609,7 @@ def shard_low_precision_checkpoint(
                 ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
-        elif any(substring in key for substring in lm_head_layers):
+        elif _key_belongs_to(key, lm_head_layers):
             # lm_head: [N, K] (not quantized)
             # Same for all quantization methods
             data = low_precision_checkpoint_dict[key]
