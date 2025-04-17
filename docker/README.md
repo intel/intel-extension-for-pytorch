@@ -33,7 +33,7 @@ Alternatively, `./build.sh` script has docker build command to install prebuilt 
 To pull docker images use the following command:
 
 ```bash
-docker pull intel/intel-extension-for-pytorch:2.6.10-xpu
+docker pull intel/intel-extension-for-pytorch:2.7.10-xpu
 ```
 
 ### Running container:
@@ -44,7 +44,7 @@ access to a local directory in the container. Pass the video and render groups t
 docker container so that the GPU is accessible.
 
 ```bash
-IMAGE_NAME=intel/intel-extension-for-pytorch:2.6.10-xpu
+IMAGE_NAME=intel/intel-extension-for-pytorch:2.7.10-xpu
 ```
 
 ```bash
@@ -104,8 +104,8 @@ python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch
 Sample output looks like below:
 
 ```bash
-2.6.0+xpu
-2.6.10+xpu
+2.7.0+xpu
+2.7.10+xpu
 [0]: _XpuDeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', type='gpu', driver_version='1.3.30049', total_memory=65536MB, max_compute_units=448, gpu_eu_count=448, gpu_subslice_count=56, max_work_group_size=1024, max_num_sub_groups=64, sub_group_sizes=[16 32], has_fp16=1, has_fp64=1, has_atomic64=1)
 [1]: _XpuDeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', type='gpu', driver_version='1.3.30049', total_memory=65536MB, max_compute_units=448, gpu_eu_count=448, gpu_subslice_count=56, max_work_group_size=1024, max_num_sub_groups=64, sub_group_sizes=[16 32], has_fp16=1, has_fp64=1, has_atomic64=1)
 ```
