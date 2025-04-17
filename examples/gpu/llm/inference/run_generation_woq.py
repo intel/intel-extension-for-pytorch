@@ -79,6 +79,7 @@ parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
 parser.add_argument("--jit", action="store_true")
 parser.add_argument("--profile", action="store_true")
+parser.add_argument("--profile_name", type=str, default="", help="custom the profiling filename")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--lambada", action="store_true")
 parser.add_argument("--dataset", default="lambada", type=str)
@@ -285,11 +286,11 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                 if args.device == "xpu":
                     torch.xpu.synchronize()
             if do_profiling:
-                torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), "./profile.pt")
+                torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), f"./{args.profile_name}profile.pt")
                 # Cannot sort by id when using kineto
                 # torch.save(prof.table(sort_by="id", row_limit=-1),'./profile_id.pt')
-                torch.save(prof.key_averages(group_by_input_shape=True).table(), "./profile_detail.pt")
-                prof.export_chrome_trace("./trace.json")
+                torch.save(prof.key_averages(group_by_input_shape=True).table(), f"./{args.profile_name}profile_detail.pt")
+                prof.export_chrome_trace(f"./{args.profile_name}trace.json")
             toc = time.time()
             print("")
             input_tokens_lengths = [x.shape[0] for x in input_ids]
