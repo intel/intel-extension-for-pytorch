@@ -14,6 +14,7 @@ static inline gpu_arch get_device_gpu_arch() {
   at::DeviceIndex device_id = at::xpu::current_device();
   sycl::device& device = at::xpu::get_raw_device(device_id);
 
+#if __INTEL_LLVM_COMPILER < 20250100
   if (device.has(sycl::aspect::ext_intel_device_id)) {
     auto ext_intel_device_id =
         device.get_info<intel::info::device::device_id>();
@@ -23,6 +24,7 @@ static inline gpu_arch get_device_gpu_arch() {
       }
     }
   }
+#endif
 
   auto deviceArch = device.get_info<experimental::info::device::architecture>();
   switch (deviceArch) {
@@ -34,6 +36,11 @@ static inline gpu_arch get_device_gpu_arch() {
     case experimental::architecture::intel_gpu_lnl_m:
       return gpu_arch::XeHpc;
       // return gpu_arch::Xe2Lpg;  //will diff with XeHpc as need
+#if __INTEL_LLVM_COMPILER >= 20250100
+    case experimental::architecture::intel_gpu_ptl_h:
+    case experimental::architecture::intel_gpu_ptl_u:
+      return gpu_arch::XeHpc;
+#endif
 #if __INTEL_LLVM_COMPILER >= 20240200
     case experimental::architecture::intel_gpu_pvc_vg:
       return gpu_arch::XeHpc_vg;
