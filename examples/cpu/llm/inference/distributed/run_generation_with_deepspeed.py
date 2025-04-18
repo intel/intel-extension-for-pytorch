@@ -405,6 +405,8 @@ elif args.kv_cache_dtype == "fp8_e5m2":
     kv_cache_dtype = torch.float8_e5m2
 config.kv_cache_dtype = kv_cache_dtype
 
+config.use_cache = True  # For inference, it should always be True
+
 # For DeepSeek models
 if not args.ipex_weight_only_quantization and args.ipex and args.dtype == "bfloat16":
     config.use_fused_moe = True
@@ -419,8 +421,6 @@ if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
-if model_type == "llava":
-    config.use_cache = True
 if model_type == "jamba":
     config.use_mamba_kernels = False
 if not hasattr(config, "lm_head_generation"):

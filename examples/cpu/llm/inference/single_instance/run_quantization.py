@@ -344,6 +344,8 @@ else:
         args.config_file, torchscript=True, trust_remote_code=True
     )
 
+config.use_cache = True  # For inference, it should always be True
+
 # For DeepSeek models
 if args.ipex_weight_only_quantization and args.weight_dtype == "INT8":
     config.use_fused_moe = True
