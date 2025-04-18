@@ -67,7 +67,7 @@ parser.add_argument(
 parser.add_argument(
     "--vision-text-model",
     action="store_true",
-    help="whether or not it is vision-text multi-model structure",
+    help="[deprecated] whether it is vision-text multi-model structure",
 )
 parser.add_argument(
     "--dtype",
@@ -239,6 +239,12 @@ args = parser.parse_args()
 if args.verbose:
     logger.setLevel(logging.DEBUG)
 
+if args.vision_text_model:
+    logger.warning(
+        "'--vision-text-model' flag is deprecated. Please set '--input-mode 1' instead."
+    )
+    args.input_mode = "1"
+
 num_tokens = args.max_new_tokens
 use_ipex = args.ipex or args.ipex_weight_only_quantization
 
@@ -347,7 +353,7 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
-if model_type == "llama" and args.vision_text_model:
+if model_type == "llama" and args.input_mode == "1":
     model_type = "mllama"
 if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
     model_type = model_type.replace("-", "")
@@ -814,7 +820,7 @@ elif model_type == "mllama":
         if image_file.startswith("http://") or image_file.startswith("https://"):
             import requests
 
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            raw_image = Image.open(requests.get(image_file, stream=True).raw)
         else:
             raw_image = Image.open(image_file)
         return raw_image
@@ -854,7 +860,7 @@ elif model_type == "phi4mm":
         if image_file.startswith("http://") or image_file.startswith("https://"):
             import requests
 
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            raw_image = Image.open(requests.get(image_file, stream=True).raw)
         else:
             raw_image = Image.open(image_file)
         return raw_image

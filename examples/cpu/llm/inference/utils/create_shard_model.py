@@ -43,15 +43,24 @@ parser.add_argument(
 parser.add_argument(
     "--vision-text-model",
     action="store_true",
-    help="whether or not it is vision-text multi-model structure",
+    help="[deprecated] whether it is vision-text multi-model structure",
+)
+parser.add_argument(
+    "--input-mode",
+    default="0",
+    choices=["0", "1", "2", "3"],
+    type=str,
+    help="Input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision_speech",
 )
 args = parser.parse_args()
 print(args)
+if args.vision_text_model:
+    args.input_mode = "1"
 if args.local_rank == 0:
     model_type = next(
         (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
     )
-    if model_type == "llama" and args.vision_text_model:
+    if model_type == "llama" and args.input_mode == "1":
         model_type = "mllama"
     if model_type in ["maira-2", "deepseek-v2", "deepseek-v3", "deepseek-r1"]:
         model_type = model_type.replace("-", "")
