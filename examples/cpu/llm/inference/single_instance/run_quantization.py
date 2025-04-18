@@ -62,7 +62,7 @@ parser.add_argument(
 parser.add_argument(
     "--vision-text-model",
     action="store_true",
-    help="whether or not it is vision-text multi-model structure",
+    help="[deprecated] whether it is vision-text multi-model structure",
 )
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
@@ -302,6 +302,11 @@ if args.verbose:
     logger.setLevel(logging.DEBUG)
     ipex.set_logging_level(logging.DEBUG)
 
+if args.vision_text_model:
+    logger.warning(
+        "'--vision-text-model' flag is deprecated. Please set '--input-mode 1' instead."
+    )
+    args.input_mode = "1"
 
 # disable
 try:
@@ -354,7 +359,7 @@ elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.searc
     "llava", config.architectures[0], re.IGNORECASE
 ):
 
-    if args.vision_text_model:
+    if args.input_mode == "1":
         model = MLLAMAConfig(args.model_id)
         from PIL import Image
 
@@ -362,7 +367,7 @@ elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.searc
             if image_file.startswith("http://") or image_file.startswith("https://"):
                 import requests
 
-                raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+                raw_image = Image.open(requests.get(image_file, stream=True).raw)
             else:
                 raw_image = Image.open(image_file)
             return raw_image
@@ -455,7 +460,7 @@ elif re.search("phi4mm", config.architectures[0], re.IGNORECASE):
         if image_file.startswith("http://") or image_file.startswith("https://"):
             import requests
 
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            raw_image = Image.open(requests.get(image_file, stream=True).raw)
         else:
             raw_image = Image.open(image_file)
         return raw_image

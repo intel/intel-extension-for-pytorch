@@ -110,8 +110,6 @@ python run.py --help # for more detailed usages
 |---|---|
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
 | input tokens or prompt | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 32768, 130944]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
-| input images | default: None, use "--image-url" to choose the image link address for vision-text tasks |
-| vision text tasks | default: False, use "--vision-text-model" to choose if your model (like llama3.2 11B model) is running for vision-text generation tasks, default False meaning text generation tasks only|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
@@ -119,7 +117,8 @@ python run.py --help # for more detailed usages
 | streaming mode output | greedy search only (work with "--greedy"), use "--streaming" to enable the streaming generation output |
 | KV Cache dtype |   default: auto, use "--kv-cache-dtype=fp8_e5m2" to enable e5m2 KV Cache. More information refer to [vLLM FP8 E5M2 KV Cache](https://docs.vllm.ai/en/v0.6.6/quantization/fp8_e5m2_kvcache.html) |
 | input mode | default: 0, use "--input-mode" to choose input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision and speech |
-| input audios | default: None, use "--audio" to choose the audio link address for speech tasks |
+| input images | default: None, use "--image-url" to choose the image file address for vision-text tasks |
+| input audios | default: None, use "--audio" to choose the audio file address for speech tasks |
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
@@ -522,19 +521,118 @@ There are some model-specific requirements to be aware of, as follows:
 
 - For Llava models from remote hub, additional setup is required, i.e., `bash ./tools/prepare_llava.sh`.
 
-## 2.3 Instructions for Running LLM with Intel® Xeon® CPU Max Series
+## 2.3 Instructions for Running Multimodal LLMs
+
+Multimodal LLMs are large language models capable of processing multiple types of inputs,
+like images and audios, in addition to text prompts.
+We have optimized the performance of some popular multimodal LLMs like `microsoft/Phi-4-multimodal-instruct`
+and `meta-llama/Llama-3.2-11B-Vision-Instruct`, which can be showcased with the provided `run.py` script.
+In the commands, the additional arguments need to be specified are highlighted here:
+
+| Special args for multimodal | Notes |
+|---|---|
+| input mode | Use "--input-mode" to choose input mode for multimodal models. 0: language; 1: vision; 2: speech; 3: vision and speech |
+| input image | Use "--image-url" to specify the image link address or local path for vision-text tasks |
+| input audio | Use "--audio" to specify the audio file local path for speech tasks |
+
+Meanwhile, for multimodal tasks we need to set the text prompt and bind it with the input image/audio.
+The binding is realized with the special tokens, like the image tag `<|image|>` and the audio tag `<|audio|>`.
+We provide the following example commands to showcase the argument settings in detail.
+
+### 2.3.1 Phi-4-multimodal-instruct
+
+You can download the sample image and audio to your local folder beforehand.
+Also, `peft` package is required for running the model.
+
+```bash
+wget https://www.ilankelman.org/stopsigns/australia.jpg
+wget https://voiceage.com/wbsamples/in_mono/Trailer.wav
+pip install peft
+```
+
+- BF16, single instance
+
+We provide example commands running in BF16 precision for all the input modes.
+The OMP thread num and `numactl` setup parts are omitted.
+
+Example command for pure text input
+
+```bash
+python run.py --input-mode 0 --benchmark -m microsoft/Phi-4-multimodal-instruct --ipex --token-latency --greedy --dtype bfloat16 --max-new-tokens 128 --prompt "<|system|>You are a helpful assistant.<|end|><|user|>How to explain Internet for a medieval knight?<|end|><|assistant|>"
+```
+
+Example command for image comprehension
+
+```bash
+python run.py --input-mode 1 --benchmark -m microsoft/Phi-4-multimodal-instruct --ipex --token-latency --greedy --dtype bfloat16 --max-new-tokens 128 --prompt "<|user|><|image_1|>What is shown in this image?<|end|><|assistant|>" --image-url australia.jpg
+```
+
+Example command for speech comprehension
+
+```bash
+python run.py --input-mode 2 --benchmark -m microsoft/Phi-4-multimodal-instruct --ipex --token-latency --greedy --dtype bfloat16 --max-new-tokens 128 --prompt "<|user|><|audio_1|>Transcribe the audio to text, and then translate the audio to French. Use <sep> as a separator between the original transcript and the translation.<|end|><|assistant|>" --audio Trailer.wav
+```
+
+Example command for image and speech comprehension
+
+```bash
+python run.py --input-mode 3 --benchmark -m microsoft/Phi-4-multimodal-instruct --ipex --token-latency --greedy --dtype bfloat16 --max-new-tokens 128 --prompt "<|user|><|image_1|><|audio_1|><|end|><|assistant|>" --audio Trailer.wav --image-url australia.jpg
+```
+
+- Weight-only quantization INT8, single instance
+
+For WoQ INT8 precision, we need to replace the arguments `--ipex` and `--dtype bfloat16`
+`--ipex-weight-only-quantization`, `--weight-dtype INT8` and `--quant-with-amp`.
+In addition, `--group-size 128` is needed as group-wise quantization should be applied.
+
+Example command for image and speech comprehension
+
+```bash
+python run.py --input-mode 3 --benchmark -m microsoft/Phi-4-multimodal-instruct --token-latency --greedy --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --group-size 128 --max-new-tokens 128 --prompt "<|user|><|image_1|><|audio_1|><|end|><|assistant|>" --audio Trailer.wav --image-url australia.jpg
+```
+
+### 2.3.2 meta-llama/Llama-3.2-11B-Vision-Instruct
+
+`Llama-3.2-11B-Vision-Instruct` model supports image comprehension tasks.
+`--input-mode 1` should always be specified for this model.
+
+- BF16, single instance
+
+```bash
+python run.py --input-mode 1 --benchmark -m meta-llama/Llama-3.2-11B-Vision-Instruct --ipex --dtype bfloat16 --prompt "<|image|>Describe the contents of this image." --image-url australia.jpg
+```
+
+- Weight-only quantization INT8, single instance
+
+```bash
+python run.py --input-mode 1 --benchmark -m meta-llama/Llama-3.2-11B-Vision-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --prompt "<|image|>Describe the contents of this image." --image-url australia.jpg
+```
+
+- BF16, distributed inference
+
+```bash
+deepspeed --bind_cores_to_rank run.py --input-mode 1 --benchmark -m meta-llama/Llama-3.2-11B-Vision-Instruct --ipex --dtype bfloat16 --prompt "<|image|>Describe the contents of this image." --image-url australia.jpg --autotp --shard-model
+```
+
+- Weight-only quantization INT8, distributed inference
+
+```bash
+deepspeed --bind_cores_to_rank run.py --input-mode 1 --benchmark -m meta-llama/Llama-3.2-11B-Vision-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --prompt "<|image|>Describe the contents of this image." --image-url australia.jpg --autotp --shard-model
+```
+
+## 2.4 Instructions for Running LLM with Intel® Xeon® CPU Max Series
 
 Intel® Xeon® CPU Max Series are equipped with high bandwidth memory (HBM), which further accelerates LLM inference. For the common case that HBM and DDR are both installed in a Xeon® CPU Max Series server, the memory mode can be configured to Flat Mode or Cache Mode.
 Details about memory modes can be found at Section 3.1 in [the Xeon® CPU Max Series Configuration Guide](https://cdrdv2-public.intel.com/769060/354227-intel-xeon-cpu-max-series-configuration-and-tuning-guide.pdf).
 
-### 2.3.1 Single Instance Inference with Xeon® CPU Max Series
+### 2.4.1 Single Instance Inference with Xeon® CPU Max Series
 
-#### 2.3.1.1 Cache Mode HBM
+#### 2.4.1.1 Cache Mode HBM
 
 In cache mode, only DDR address space is visible to software and HBM functions as a transparent memory-side cache for DDR.
 Therefore the usage is the same with [the common usage](#221-run-generation-with-one-instance).
 
-#### 2.3.1.2 Flat Mode HBM
+#### 2.4.1.2 Flat Mode HBM
 
 In flat mode, HBM and DDR are exposed to software as separate address spaces.
 Therefore we need to check the `HBM_NODE_INDEX` of interest with commands like `lscpu`, then the LLM inference invoking command would be like:
@@ -561,7 +659,7 @@ OMP_NUM_THREADS=<HBM node cores num> numactl -p <HBM_NODE_INDEX> -C <HBM cores l
 OMP_NUM_THREADS=56 numactl -p 2 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
-### 2.3.2 Distributed Inference with Xeon® CPU Max Series
+### 2.4.2 Distributed Inference with Xeon® CPU Max Series
 
 As HBM has memory capacity limitations, we need to shard the model in advance with DDR memory.
 Please follow [the example](#31-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp).

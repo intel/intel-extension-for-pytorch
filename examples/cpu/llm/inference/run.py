@@ -629,8 +629,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 model_path = Path(str(args.output_dir) + str(MODEL_CLASSES[model_type]))
                 if not model_path.exists():
                     Path.mkdir(model_path)
-            if args.vision_text_model:
-                shard_cmd.extend(["--vision-text-model"])
+            if args.vision_text_model or args.input_mode == "1":
+                shard_cmd.extend(["--input-mode", "1"])
             shard_cmd.extend(
                 ["--save-path", str(args.output_dir) + str(MODEL_CLASSES[model_type])]
             )
