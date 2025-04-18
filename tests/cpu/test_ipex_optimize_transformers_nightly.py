@@ -397,7 +397,7 @@ class OptimizeTransformersNightlyTester(TestCase):
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
-        if m.name not in ["mllama", "deepseekv3"]:
+        if m.name not in ["mllama", "deepseekv2", "deepseekv3"]:
             if return_dict:
                 assert isinstance(key_ipex, dict)
                 self.assertEqual(

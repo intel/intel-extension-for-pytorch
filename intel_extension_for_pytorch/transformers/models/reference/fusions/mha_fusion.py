@@ -680,7 +680,7 @@ class _IPEXScaleDotProductRef(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_causal_mask: Optional[bool] = True,
+        add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,

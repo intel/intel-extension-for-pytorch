@@ -151,7 +151,7 @@ def indirect_access_kv_cache_attention(
     head_mask: Optional[Tuple[torch.Tensor]] = None,
     attention_mask: Optional[Tuple[torch.Tensor]] = None,
     alibi: Optional[torch.Tensor] = None,
-    add_causal_mask: Optional[bool] = True,
+    add_casual_mask: Optional[bool] = True,
     seq_info: Optional[torch.Tensor] = None,
     text_max_length: Optional[int] = 0,
 ):
@@ -228,7 +228,7 @@ def indirect_access_kv_cache_attention(
         head_mask,
         attention_mask,
         alibi,
-        add_causal_mask,
+        add_casual_mask,
         seq_info,
         text_max_length,
     )
