@@ -1,54 +1,61 @@
 # 1. ipex.llm Optimized Model List for Inference
 
+We have supported a long list of LLMs, including the most notable open-source models
+like Llama series, Qwen series, Phi-3/Phi-4 series,
+and the phenomenal high-quality reasoning model DeepSeek-R1.
+
 ## 1.1 Verified for single instance mode
 
-| MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ |   | ✅ | ✅ |
-|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|FALCON| tiiuae/falcon-7b  | ✅ | ✅ | ✅ | ✅ | ✅ |
-|FALCON| tiiuae/falcon-11b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|OPT| facebook/opt-30b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Bloom| bigscience/bloom-1b7 | ✅ | ✅ | ✅ | ✅ | ✅ |
-|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|ChatGLM| THUDM/chatglm2-6b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ✅ | ✅ | ✅ |
-|T5| google/flan-t5-xl | ✅ | ✅ | ✅ | ✅ | ✅ |
-|MPT| mosaicml/mpt-7b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
-|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ | ✅ |
-|LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ |   | ✅ | ✅ |
-|GIT| microsoft/git-base | ✅ | ✅ |   | ✅ | ✅ |
-|Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ |   | ✅ |   |
-|Phi| microsoft/phi-2 | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ |   | ✅ | ✅ |
-|Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ |   | ✅ | ✅ |
-|Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ | ✅ |
-|Maira| microsoft/maira-2 | ✅ | ✅ |   | ✅ | ✅ |
-|Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ |   | ✅ | ✅ |
-|DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |   | ✅ | ✅ |
+| MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Weight only quantization INT8 | Weight only quantization INT4 |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+|LLAMA| meta-llama/Llama-2-7b-hf | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-13b-hf | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-2-70b-hf | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-8B | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3-70B | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | ✅ | ✅ | ✅ | ✅ |
+|GPT-J| EleutherAI/gpt-j-6b | ✅ | ✅ | ✅ | ✅ |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | ✅ | ✅ | ✅ | ✅ |
+|DOLLY| databricks/dolly-v2-12b | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-7b  | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-11b | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/falcon-40b | ✅ | ✅ | ✅ | ✅ |
+|FALCON| tiiuae/Falcon3-7B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-30b | ✅ | ✅ | ✅ | ✅ |
+|OPT| facebook/opt-1.3b | ✅ | ✅ | ✅ | ✅ |
+|Bloom| bigscience/bloom-1b7 | ✅ | ✅ | ✅ | ✅ |
+|CodeGen| Salesforce/codegen-2B-multi | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | ✅ | ✅ | ✅ | ✅ |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm3-6b | ✅ | ✅ | ✅ | ✅ |
+|ChatGLM| THUDM/chatglm2-6b | ✅ | ✅ | ✅ | ✅ |
+|GPTBigCode| bigcode/starcoder | ✅ | ✅ | ✅ | ✅ |
+|T5| google/flan-t5-xl | ✅ | ✅ | ✅ | ✅ |
+|MPT| mosaicml/mpt-7b | ✅ | ✅ | ✅ | ✅ |
+|Mistral| mistralai/Mistral-7B-v0.1 | ✅ | ✅ | ✅ | ✅ |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | ✅ | ✅ | ✅ | ✅ |
+|Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ | ✅ | ✅ |
+|GIT| microsoft/git-base | ✅ | ✅ | ✅ | ✅ |
+|Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ | ✅ |   |
+|Phi| microsoft/phi-2 | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-mini-128k-instruct | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ | ✅ | ✅ |
+|Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ | ✅ |   |
+|Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ | ✅ |   |
+|Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ |
+|Maira| microsoft/maira-2 | ✅ | ✅ | ✅ | ✅ |
+|Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ | ✅ | ✅ |
+|DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ | ✅ | ✅ |
+|DeepSeek| meituan/DeepSeek-R1-Channel-INT8 |   |   | ✅ |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
@@ -67,6 +74,7 @@
 |DOLLY| databricks/dolly-v2-12b | ✅ | ✅ |
 |FALCON| tiiuae/falcon-11b | ✅ | ✅ |
 |FALCON| tiiuae/falcon-40b | ✅ | ✅ |
+|FALCON| tiiuae/Falcon3-7B-Instruct | ✅ | ✅ |
 |OPT| facebook/opt-30b | ✅ | ✅ |
 |OPT| facebook/opt-1.3b | ✅ | ✅ |
 |Bloom| bigscience/bloom-1b7 | ✅ | ✅ |
@@ -82,6 +90,7 @@
 |Stablelm| stabilityai/stablelm-2-1_6b | ✅ | ✅ |
 |Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ |
 |Qwen| Qwen/Qwen2-7B | ✅ | ✅ |
+|Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ |
 |GIT| microsoft/git-base | ✅ | ✅ |
 |Phi| microsoft/phi-2 | ✅ | ✅ |
 |Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ |
@@ -90,6 +99,7 @@
 |Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ |
 |DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |
+|DeepSeek| meituan/DeepSeek-R1-Channel-INT8 |   | ✅ |
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family)
 are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels.
@@ -152,39 +162,32 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
-#### 2.1.1.4 Run in static quantization INT8 with ipex.llm
-
-```bash
-wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-smooth-quant --qconfig-summary-file llama3-1-8b_qconfig.json --output-dir "saved_results"
-```
-
-#### 2.1.1.5 Run in weight-only quantization INT8 with ipex.llm
+#### 2.1.1.4 Run in weight-only quantization INT8 with ipex.llm
 
 ```bash
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"
 ```
 
-#### 2.1.1.6 Run in weight-only quantization INT4 with ipex.llm
+#### 2.1.1.5 Run in weight-only quantization INT4 with ipex.llm
 
 ```bash
 huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m ./Llama-3.1-8B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --output-dir "saved_results"
 ```
 
-#### 2.1.1.7 Run in BF16 with ipex.llm in distributed way
+#### 2.1.1.6 Run in BF16 with ipex.llm in distributed way
 
 ```bash
 deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex  --autotp --shard-model
 ```
 
-#### 2.1.1.8 Run in weight-only quantization INT8 with ipex.llm in distributed way
+#### 2.1.1.7 Run in weight-only quantization INT8 with ipex.llm in distributed way
 
 ```bash
 deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --autotp --shard-model --output-dir "saved_results"
 ```
 
-#### 2.1.1.9 Run in weight-only quantization INT4 with ipex.llm in distributed way
+#### 2.1.1.8 Run in weight-only quantization INT4 with ipex.llm in distributed way
 
 ```bash
 huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
@@ -255,7 +258,7 @@ The docker image built in [the environment setup tutorial](../README.md#2-enviro
 Use the command below on all machines to launch the docker containers. This command uses the host network interfaces inside the docker container. Thus, you need to put the host ip addresses into the `hostfile.txt`. Do NOT launch multiple docker containers on one single machine from the same docker image. These docker containers listen on the same machine on the same port, will result in unpredicable ssh connections.
 
 ```bash
-docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:main bash
+docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:2.7.0 bash
 ```
 
 **Note:** For models on HuggingFace require access privileges, you need to run the `huggingface-cli login` command in each docker container to config a HuggingFace access token.
@@ -288,49 +291,7 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --dtype bfloat16 --ipex
 ```
 
-#### 2.2.1.3 Static quantization (INT8):
-
-We use the SmoothQuant algorithm to get good accuracy of static quantization, which is a popular method for LLM models.
-Besides, by default, we enable quantization mixed fp32 inference (non-quantized OPs run with fp32 dtype).
-To get better performance, you may add "--quant-with-amp" to enable quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference (non-quantized OPs run with bf16 dtype).
-Please note that static quantization with AMP is still experimental and it may lead to accuracy drop and other issues.
-
-- Command:
-```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py  --benchmark -m <MODEL_ID> --ipex-smooth-quant --qconfig-summary-file <path to the qconfig of the model_id> --output-dir "saved_results" 
-```
-
-- An example of Llama-3.1-8B model:
-```bash
-wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/Meta-Llama-3.1-8B-Instruct --ipex-smooth-quant --qconfig-summary-file llama3-1-8b_qconfig.json --output-dir "saved_results"
-```
-
-We provide the following qconfig summary files with good quality (calibration on "NeelNanda/pile-10k" dataset and evaluate accuracy on "lambada_openai" dataset):
-
-| Model ID | Download links |
-|---|:---:|
-| meta-llama/Llama-2-13b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-13b_qconfig.json) |
-| meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
-| meta-llama/Meta-Llama-3.1-8B-Instruct | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama3-1-8b_qconfig.json) |
-| EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
-| tiiuae/falcon-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-7b_qconfig.json) |
-| tiiuae/falcon-11b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-11b_qconfig.json) |
-| tiiuae/falcon-40b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-40b_qconfig.json) |
-| facebook/opt-30b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-30b_qconfig.json) |
-| facebook/opt-1.3b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-1b3_qconfig.json) |
-| baichuan-inc/Baichuan2-7B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-7b_qconfig.json) |
-| baichuan-inc/Baichuan-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan-13b_qconfig.json) |
-| THUDM/chatglm2-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/chatglm2_qconfig.json) |
-| bigscience/bloom-1b7 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/bloom-1b7_qconfig.json) |
-| Salesforce/codegen-2B-multi | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/codegen-2b_qconfig.json) |
-| mosaicml/mpt-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/mpt-7b_qconfig.json) |
-| microsoft/phi-2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/phi-2_qconfig.json) |
-| openai/whisper-large-v2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/whisper_qconfig.json) |
-
-If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), please follow the [tuning examples](https://github.com/intel/neural-compressor/tree/master/examples/pytorch/nlp/huggingface_models/language-modeling/quantization/llm) provided by Intel® Neural Compressor.
-
-#### 2.2.1.4 Weight-only quantization INT8:
+#### 2.2.1.3 Weight-only quantization INT8:
 
 Weights are quantized by round-to-nearest (RTN).
 
@@ -368,7 +329,7 @@ Notes:
 | stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
 | meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
-#### 2.2.1.5 Weight-only quantization INT4:
+#### 2.2.1.4 Weight-only quantization INT4:
 
 For Weight-only Quantization (WoQ) INT4, weights are quantized into int4 by different quantization algorithms. Among them, we support RTN, GPTQ, AWQ and [intel/auto-round](https://github.com/intel/auto-round).
 
@@ -419,7 +380,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m ./llama_3_1
 
 If your INT4 checkpoints are not from HuggingFace or INC, please make sure the directory has the same structure as those on HuggingFace.
 
-#### 2.2.1.6 Notes:
+#### 2.2.1.5 Notes:
 
 (1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node (e.g., 0-56 from the first numa node). You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
 
@@ -464,7 +425,7 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8
 
 #### 2.2.2.4 Weight-only quantization INT8:
 
-More details about WoQ INT8 can be found in [the section above](#2214-weight-only-quantization-int8).
+More details about WoQ INT8 can be found in [the section above](#2213-weight-only-quantization-int8).
 
 For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won't be saved.
 
@@ -498,7 +459,7 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m meta-llama/Meta-Llama-3.1-8
 We can either download a quantized weight checkpoint from Huggingface Models,
 or quantize the model using INC with GPTQ/AWQ/AutoRound algorithms,
 or quantize the model with RTN algorithm within IPEX. Please refer
-[the instructions](#2215-weight-only-quantization-int4) for details.
+[the instructions](#2214-weight-only-quantization-int4) for details.
 
 - Command:
 ```bash
@@ -759,7 +720,7 @@ We provided a `run_accuracy_with_deepspeed.py` script for testing accuracy
 for the models benchmarked in distributed way via `deepspeed`.
 
 Prior to the accuracy testing, we need to have the sharded model. The sharded model should have been generated
-following [the instruction for performance benchmarking with deepspeed](#2221-prepare) where `--shard-model`
+following [the instruction for performance benchmarking with deepspeed](#2221-prologue) where `--shard-model`
 flag is set. The generated model shards will be placed in the folder specified by `--output-dir` argument.
 Alternatively, the model sharding process can also be accomplished [in a standalone way](#31-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp).
 

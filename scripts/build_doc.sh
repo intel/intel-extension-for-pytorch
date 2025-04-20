@@ -173,7 +173,6 @@ parse_example() {
 
 cp ${MDEXAMPLE} tutorials/examples.md.bk
 if [[ ${DEVICE} == "cpu" ]]; then
-    parse_example "../examples/cpu/training/python-scripts/distributed_data_parallel_training.py" ${MDEXAMPLE} "(marker_train_ddp_complete)" "python"
     parse_example "../examples/cpu/inference/python/python-scripts/resnet50_eager_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_rn50_imp_fp32)" "python"
     parse_example "../examples/cpu/inference/python/python-scripts/bert_eager_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_bert_imp_fp32)" "python"
     parse_example "../examples/cpu/inference/python/python-scripts/resnet50_torchscript_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_rn50_ts_fp32)" "python"
@@ -191,7 +190,6 @@ if [[ ${DEVICE} == "cpu" ]]; then
     parse_example "../examples/cpu/inference/python/python-scripts/int8_quantization_dynamic.py" ${MDEXAMPLE} "(marker_int8_dynamic)" "python"
     parse_example "../examples/cpu/inference/python/python-scripts/int8_deployment.py" ${MDEXAMPLE} "(marker_int8_deploy)" "python"
     parse_example "../examples/cpu/features/llm/llm_optimize.py" ${MDEXAMPLE} "(marker_llm_optimize)" "python"
-    parse_example "../examples/cpu/features/llm/llm_optimize_smoothquant.py" ${MDEXAMPLE} "(marker_llm_optimize_sq)" "python"
     parse_example "../examples/cpu/features/llm/llm_optimize_woq.py" ${MDEXAMPLE} "(marker_llm_optimize_woq)" "python"
     parse_example "../examples/cpu/inference/cpp/example-app.cpp" ${MDEXAMPLE} "(marker_cppsdk_sample)" "cpp"
     parse_example "../examples/cpu/inference/cpp/CMakeLists.txt" ${MDEXAMPLE} "(marker_cppsdk_cmake)" "cmake"

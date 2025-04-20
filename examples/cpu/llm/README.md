@@ -1,7 +1,7 @@
 # 1. LLM Optimization Overview
 
 `ipex.llm` provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc.
-And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
+And a set of data types are supported for various scenarios, including FP32, BF16, Weight Only Quantization INT8/INT4 (prototype).
 
 <br>
 

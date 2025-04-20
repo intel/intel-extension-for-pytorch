@@ -440,16 +440,21 @@ class PagedAttention:
     The block tables are used to map the logical block of sequence into the physical block.
 
     [class method]: reshape_and_cache
-    ipex.llm.modules.PagedAttention.reshape_and_cache(
-        key,
-        value,
-        key_cache,
-        value_cache,
-        slot_mapping,
-        kv_cache_dtype,
-        k_scale,
-        v_scale,
-    )
+
+    .. highlight:: python
+    .. code-block:: python
+
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+            v_scale,
+        )
+
     This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
 
     Args:
@@ -508,21 +513,21 @@ class PagedAttention:
     .. code-block:: python
 
         ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
-                                                            out,
-                                                            query,
-                                                            key_cache,
-                                                            value_cache,
-                                                            head_mapping,
-                                                            scale,
-                                                            block_tables,
-                                                            context_lens,
-                                                            block_size,
-                                                            max_context_len,
-                                                            alibi_slopes,
-                                                            window_size,
-                                                            k_scale,
-                                                            v_scale,
-                                                            )
+            out,
+            query,
+            key_cache,
+            value_cache,
+            head_mapping,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes,
+            window_size,
+            k_scale,
+            v_scale,
+        )
 
     This operator is used to be calculated the scale-dot-product based on the paged attention.
 
@@ -906,6 +911,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.causal_conv1d_fn(
             x,
             weight,
@@ -913,7 +919,8 @@ class MambaMixer:
             initial_states=None,
             return_final_states=False,
             final_states_out=None,
-            activation="silu")
+            activation="silu"
+        )
 
     Args:
         x (torch.Tensor): x tensor, shape: [batch, dim, seqlen].
@@ -928,13 +935,15 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.causal_conv1d_update(
             x,
             conv_state,
             weight,
             bias=None,
             activation=None,
-            cache_seqlens=None)
+            cache_seqlens=None
+        )
 
     Args:
         x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, dim, seqlen].
@@ -951,6 +960,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.selective_state_update(
             state,
             x,
@@ -961,7 +971,8 @@ class MambaMixer:
             D=None,
             z=None,
             dt_bias=None,
-            dt_softplus=False)
+            dt_softplus=False
+        )
 
     Args:
         state (torch.Tensor): state tensor, shape: [batch, dim, dstate] or [batch, nheads, dim, dstate].
@@ -979,6 +990,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.selective_scan_fn(
             u,
             delta,
@@ -989,7 +1001,8 @@ class MambaMixer:
             z=None,
             delta_bias=None,
             delta_softplus=False,
-            return_last_state=False)
+            return_last_state=False
+        )
 
     Args:
         u (torch.Tensor): u tensor, shape: [batch, dim, seqlen].

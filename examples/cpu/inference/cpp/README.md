@@ -9,6 +9,7 @@ During compilation, Intel optimizations will be activated automatically once C++
 # Clone the repository and access to the c++ inference example folder
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch/examples/cpu/inference/cpp
+git checkout v2.7.0+cpu
 ```
 
 We can have `libtorch` and `libintel-ext-pt` installed via the following commands.
@@ -16,19 +17,16 @@ We can have `libtorch` and `libintel-ext-pt` installed via the following command
 Download zip file of `libtorch` and decompress it:
 
 ```bash
-wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.6.0%2Bcpu.zip
-unzip libtorch-cxx11-abi-shared-with-deps-2.6.0+cpu.zip
+wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-2.7.0%2Bcpu.zip
+unzip libtorch-cxx11-abi-shared-with-deps-2.7.0+cpu.zip
 ```
 
 Download and execute `libintel-ext-pt` installation script:
 
 ```bash
-wget https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-cxx11-abi-2.6.0%2Bcpu.run
-bash libintel-ext-pt-cxx11-abi-2.6.0+cpu.run install ./libtorch
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-cxx11-abi-2.7.0%2Bcpu.run
+bash libintel-ext-pt-cxx11-abi-2.7.0+cpu.run install ./libtorch
 ```
-
-*Note:* If your C++ project has pre-C\+\+11 library dependencies,
-you need to download and install the pre-C\+\+11 ABI version library files.
 
 Please view the `cppsdk` part in [the installation guide](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=cpu) 
 for more details about command usage.
