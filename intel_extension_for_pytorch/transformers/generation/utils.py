@@ -126,14 +126,47 @@ def _pad_to_max_length(
     current_segments,
     pad_token_id,
     device,
-    padding="right",
+    padding_side="right",
+    padding="longest",
     bos_token_tensor=None,
     cut_off_length=None,
+    return_token_timestamps=False,
+    force_unique_generate_call=False,
 ):
     max_total_length = 0
     sequences = []
-    if padding not in ["right", "left"]:
-        raise ValueError(f"`padding` must be either 'right' or 'left', not {padding}")
+    token_timestamps_list = []
+
+    if padding_side not in ["right", "left"]:
+        raise ValueError(
+            f"`padding_side` must be either 'right' or 'left', not {padding_side}"
+        )
+
+    if padding not in ["longest", "max_length"]:
+        raise ValueError(
+            f"`padding` must be either 'longest' or 'max_length', not {padding}"
+        )
+    elif padding == "max_length" and cut_off_length is None:
+        raise ValueError(
+            "`cut_off_length` must be specified when `padding='max_length'`"
+        )
+
+    if force_unique_generate_call:
+        sequences_list = []
+        timestamps_list = []
+        for segments in current_segments:
+            result = segments[0]["result"]
+            sequences_list.append(
+                result if isinstance(result, torch.Tensor) else result["sequences"]
+            )
+            if return_token_timestamps:
+                timestamps_list.append(result["token_timestamps"])
+
+        sequences = torch.stack(sequences_list, dim=0)
+        if return_token_timestamps:
+            token_timestamps = torch.stack(timestamps_list, dim=0)
+            return sequences, token_timestamps
+        return sequences
 
     for current_segment_list in current_segments:
         if (
@@ -141,27 +174,70 @@ def _pad_to_max_length(
             and len([d["tokens"] for d in current_segment_list]) > 0
         ):
             sequence = torch.cat([d["tokens"] for d in current_segment_list], dim=-1)
+            if return_token_timestamps:
+                token_timestamps = torch.cat(
+                    [
+                        d["result"]["token_timestamps"][d["idxs"][0] : d["idxs"][1]]
+                        for d in current_segment_list
+                    ],
+                    dim=-1,
+                )
 
             if cut_off_length is not None:
                 sequence = sequence[-cut_off_length:]
+                if return_token_timestamps:
+                    token_timestamps = token_timestamps[-cut_off_length:]
 
             if bos_token_tensor is not None:
                 sequence = torch.cat([bos_token_tensor, sequence])
-
+                if return_token_timestamps:
+                    token_timestamps = torch.cat(
+                        [
+                            torch.ones_like(bos_token_tensor, device=device) * 0.0,
+                            token_timestamps,
+                        ]
+                    )
             sequences.append(sequence)
+            if return_token_timestamps:
+                token_timestamps_list.append(token_timestamps)
             max_total_length = max(max_total_length, len(sequences[-1]))
         elif bos_token_tensor is not None:
             sequences.append(bos_token_tensor)
+            if return_token_timestamps:
+                token_timestamps_list.append(
+                    torch.ones_like(bos_token_tensor, device=device) * 0.0
+                )
         else:
             sequences.append(torch.tensor([], device=device))
+            if return_token_timestamps:
+                token_timestamps_list.append(torch.tensor([], device=device))
 
+    max_total_length = (
+        cut_off_length + 1 if padding == "max_length" else max_total_length
+    )
     for i in range(len(current_segments)):
         pad_length = max_total_length - len(sequences[i])
-        pad = (0, pad_length) if padding == "right" else (pad_length, 0)
+        pad = (0, pad_length) if padding_side == "right" else (pad_length, 0)
+
         sequences[i] = F.pad(sequences[i], pad=pad, value=pad_token_id)
+        if return_token_timestamps:
+            token_timestamps_list[i] = F.pad(
+                token_timestamps_list[i],
+                pad=pad,
+                value=(
+                    token_timestamps_list[i][-1]
+                    if len(token_timestamps_list[i]) > 0
+                    else 0.0
+                ),
+            )
 
     sequences = torch.stack(sequences, dim=0)
-    return sequences
+
+    if return_token_timestamps:
+        token_timestamps = torch.stack(token_timestamps_list, dim=0)
+        return sequences, token_timestamps
+    else:
+        return sequences
 
 
 def whisper_generate(
@@ -186,9 +262,11 @@ def whisper_generate(
     num_segment_frames: Optional[int] = None,
     attention_mask: Optional[torch.Tensor] = None,
     time_precision: float = 0.02,
+    time_precision_features: float = 0.01,
     return_token_timestamps: Optional[bool] = None,
     return_segments: bool = False,
     return_dict_in_generate: Optional[bool] = None,
+    force_unique_generate_call: Optional[bool] = None,
     **kwargs,
 ):
     # 0. deprecate old inputs
@@ -270,11 +348,23 @@ def whisper_generate(
         else input_features.device
     )
     begin_index = init_tokens.shape[1]
+    num_beams = kwargs.get(
+        "num_beams",
+        (
+            generation_config.num_beams
+            if hasattr(generation_config, "num_beams")
+            and generation_config.num_beams is not None
+            else 1
+        ),
+    )
+    if "assistant_model" in kwargs:
+        # speculative decoding: the model should be able to return eos token
+        generation_config.begin_suppress_tokens = None
     logits_processor = self._retrieve_logit_processors(
         generation_config=generation_config,
         logits_processor=logits_processor,
         begin_index=begin_index,  # begin index is index of first generated decoder token
-        num_beams=kwargs.get("num_beams", 1),
+        num_beams=num_beams,
         device=device,
     )
 
@@ -321,7 +411,23 @@ def whisper_generate(
         batch_size=cur_bsz,
         generation_config=generation_config,
     )
+    # 5bis speculative decoding: ensure the assistant model does only one call to generate
+    # and therefore returns decoder input token ids and eos token id
+    # we set a flag in the generation config to force the model to make only one call to generate
+    # and return the decoder input token ids and eos token id
+    if "assistant_model" in kwargs:
+        assistant_model = kwargs["assistant_model"]
+        assistant_model.generation_config.force_unique_generate_call = True
 
+    if force_unique_generate_call is None:
+        if hasattr(generation_config, "force_unique_generate_call"):
+            force_unique_generate_call = generation_config.force_unique_generate_call
+        elif hasattr(self.generation_config, "force_unique_generate_call"):
+            force_unique_generate_call = (
+                self.generation_config.force_unique_generate_call
+            )
+        else:
+            force_unique_generate_call = False
     # 6 Transcribe audio until we reach the end of all input audios
     while (seek < max_frames).any():
         # 6.1 NOTE: When in longform transcription mode and batch size > 1 we need to dynamically
@@ -336,7 +442,11 @@ def whisper_generate(
             cur_bsz=cur_bsz,
             batch_idx_map=batch_idx_map,
         )
-        time_offset = seek * time_precision / input_stride
+        time_offset = (
+            seek.to(torch.float32 if device.type == "mps" else torch.float64)
+            * time_precision
+            / input_stride
+        )
         seek_num_frames = (max_frames - seek).clamp(max=num_segment_frames)
 
         # 6.2 cut out next 30s segment from input features
@@ -355,6 +465,9 @@ def whisper_generate(
             transformers.generation.logits_process.SuppressTokensLogitsProcessor,
             "suppress_tokens",
         )
+        extra_kwargs = {}
+        if version.parse(transformers.__version__) >= version.parse("4.47.0"):
+            extra_kwargs["timestamp_begin"] = timestamp_begin
 
         decoder_input_ids, kwargs = self._prepare_decoder_input_ids(
             cur_bsz=cur_bsz,
@@ -367,6 +480,7 @@ def whisper_generate(
             config=self.config,
             device=init_tokens.device,
             suppress_tokens=suppress_tokens,
+            **extra_kwargs,
             kwargs=kwargs,
         )
 
@@ -419,7 +533,11 @@ def whisper_generate(
             if should_skip[i]:
                 seek[prev_i] += seek_num_frames[prev_i]
                 continue
-
+            extra_kwargs = {}
+            if version.parse(transformers.__version__) >= version.parse("4.48.0"):
+                extra_kwargs["decoder_input_ids"] = decoder_input_ids
+            if version.parse(transformers.__version__) >= version.parse("4.47.0"):
+                extra_kwargs["time_precision_features"] = time_precision_features
             segments, segment_offset = self._retrieve_segment(
                 seek_sequence=seek_sequence,
                 seek_outputs=seek_outputs,
@@ -431,14 +549,13 @@ def whisper_generate(
                 prev_idx=prev_i,
                 idx=i,
                 return_token_timestamps=return_token_timestamps,
+                **extra_kwargs,
             )
-
+            seek[prev_i] += segment_offset
             current_segments[prev_i] += segments
 
-            if is_shortform:
-                seek[prev_i] += max_frames[i]
-            else:
-                seek[prev_i] += segment_offset
+        if force_unique_generate_call:
+            break
 
     # 7. Once all segments are added to the list of all segments, called `current_segments`, we extract the predicted
     # output tokens from the list of dicts. If we use batch size > 1, we make sure to pad the output
@@ -451,65 +568,69 @@ def whisper_generate(
         else current_segments
     )
 
-    sequences = _pad_to_max_length(
-        final_segments,
-        generation_config.pad_token_id,
-        device=self.device,
-        padding="right",
-    )
-
-    # 8. If we return all segments, the predicted output sequences are put under `"sequences"`.
-    if return_segments:
-        return {"sequences": sequences, "segments": final_segments}
-
-    if is_shortform:
-        # add eos token:
-        if (
-            generation_config.max_new_tokens is None
-            and generation_config.max_length is None
-        ):
-            eos_tokens = torch.full(
-                (sequences.shape[0], 1), generation_config.eos_token_id
-            )
-            sequences = torch.cat([sequences, eos_tokens], dim=-1)
-
-        if return_token_timestamps:
-            outputs = {}
-            outputs["sequences"] = sequences
-            outputs["token_timestamps"] = torch.stack(
-                [d["token_timestamps"] for d in seek_outputs], dim=0
-            )
-        elif hasattr(self.config, "token_latency") and self.config.token_latency:
-            outputs = (sequences, seek_outputs[0])
-        else:
-            outputs = sequences
-
-        if return_dict_in_generate and generation_config.return_dict_in_generate:
-            dict_outputs = self._stack_split_outputs(
-                seek_outputs, model_output_type, sequences.device, kwargs
-            )
-
-            if num_return_sequences > 1:
-                if (
-                    hasattr(dict_outputs, "encoder_attentions")
-                    and dict_outputs.encoder_attentions is not None
-                ):
-                    dict_outputs.encoder_attentions = tuple(
-                        dict_outputs.encoder_attentions[i][::num_return_sequences]
-                        for i in range(len(dict_outputs.encoder_attentions))
-                    )
-                if (
-                    hasattr(dict_outputs, "encoder_hidden_states")
-                    and dict_outputs.encoder_hidden_states is not None
-                ):
-                    dict_outputs.encoder_hidden_states = tuple(
-                        dict_outputs.encoder_hidden_states[i][::num_return_sequences]
-                        for i in range(len(dict_outputs.encoder_hidden_states))
-                    )
-            if return_token_timestamps:
-                dict_outputs["token_timestamps"] = outputs["token_timestamps"]
-            return dict_outputs
-
+    # if return_dict_in_generate=True and we forced a unique call to generate or return_timestamps=False,
+    # meaning we are sure only one call to generate has been made,
+    # -> we can return a ModelOutput
+    # otherwise, return_dict_in_generate is applied in the 'result' of each segment in final_segments
+    if (
+        return_dict_in_generate
+        and generation_config.return_dict_in_generate
+        and (force_unique_generate_call or not return_timestamps)
+    ):
+        # only one call to generate_with_fallback, we can return a ModelOutput
+        outputs = self._stack_split_outputs(
+            seek_outputs, model_output_type, self.device, kwargs
+        )
+        if num_return_sequences > 1:
+            if (
+                hasattr(outputs, "encoder_attentions")
+                and outputs.encoder_attentions is not None
+            ):
+                outputs.encoder_attentions = tuple(
+                    outputs.encoder_attentions[i][::num_return_sequences]
+                    for i in range(len(outputs.encoder_attentions))
+                )
+            if (
+                hasattr(outputs, "encoder_hidden_states")
+                and outputs.encoder_hidden_states is not None
+            ):
+                outputs.encoder_hidden_states = tuple(
+                    outputs.encoder_hidden_states[i][::num_return_sequences]
+                    for i in range(len(outputs.encoder_hidden_states))
+                )
         return outputs
 
-    return sequences
+    padded_outputs = _pad_to_max_length(
+        current_segments=final_segments,
+        pad_token_id=generation_config.pad_token_id,
+        device=self.device,
+        padding_side="right",
+        return_token_timestamps=return_token_timestamps,
+        force_unique_generate_call=force_unique_generate_call,
+    )
+
+    if return_dict_in_generate and generation_config.return_dict_in_generate:
+        return_segments = True
+    elif not return_segments and not return_token_timestamps:
+        if hasattr(self.config, "token_latency") and self.config.token_latency:
+            return (padded_outputs, seek_outputs[0])
+        return padded_outputs
+
+    if return_token_timestamps:
+        sequences, token_timestamps = padded_outputs
+        outputs = {
+            "sequences": sequences,
+            "token_timestamps": token_timestamps,
+        }
+    elif hasattr(self.config, "token_latency") and self.config.token_latency:
+        outputs = (sequences, seek_outputs[0])
+    else:
+        sequences = padded_outputs
+        outputs = {
+            "sequences": sequences,
+        }
+
+    if return_segments:
+        outputs["segments"] = final_segments
+
+    return outputs
