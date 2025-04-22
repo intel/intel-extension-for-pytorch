@@ -32,50 +32,6 @@ model = ipex.llm.optimize(model, dtype=dtype)
 ...
 ```
 
-### SmoothQuant
-
-Supports INT8.
-
-``` python
-import torch
-#################### code changes ####################  # noqa F401
-import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.quantization import prepare
-######################################################  # noqa F401
-import transformers
-# load model
-model = transformers.AutoModelForCausalLM.from_pretrained(...).eval()
-#################### code changes ####################  # noqa F401
-qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-# stage 1: calibration
-# prepare your calibration dataset samples
-calib_dataset = DataLoader(your_calibration_dataset)
-example_inputs = ... # get one sample input from calib_samples
-calibration_model = ipex.llm.optimize(
-  model.eval(),
-  quantization_config=qconfig,
-)
-prepared_model = prepare(
-  calibration_model.eval(), qconfig, example_inputs=example_inputs
-)
-with torch.no_grad():
-  for calib_samples in enumerate(calib_dataset):
-    prepared_model(calib_samples)
-prepared_model.save_qconf_summary(qconf_summary=qconfig_summary_file_path)
-
-# stage 2: quantization
-model = ipex.llm.optimize(
-  model.eval(),
-  quantization_config=qconfig,
-  qconfig_summary_file=qconfig_summary_file_path,
-)
-######################################################  # noqa F401
-
-# generation inference loop
-with torch.inference_mode():
-    model.generate({your generate parameters})
-```
-
 ### Weight Only Quantization (WOQ)
 
 Supports INT8 and INT4.

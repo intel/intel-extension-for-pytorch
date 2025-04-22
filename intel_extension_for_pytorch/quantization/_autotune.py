@@ -17,7 +17,6 @@ def autotune(
     calib_func=None,
     eval_func=None,
     op_type_dict=None,
-    smoothquant_args=None,
     sampling_sizes=None,
     accuracy_criterion=None,
     tuning_time=0,
@@ -35,8 +34,6 @@ def autotune(
             which is a scalar number. The higher the better.
         op_type_dict (dict): Tuning constraints on optype-wise for advance user to reduce tuning space.
             User can specify the quantization config by op type:
-        smoothquant_args (dict): smoothquant recipes for automatic global alpha tuning, and automatic
-            layer-by-layer alpha tuning for the best INT8 accuracy.
         sampling_sizes (list): a list of sample sizes used in calibration, where the tuning algorithm would explore from.
             The default value is ``[100]``.
         accuracy_criterion ({accuracy_criterion_type(str, 'relative' or 'absolute') : accuracy_criterion_value(float)}):
@@ -52,8 +49,7 @@ def autotune(
         accuracy_criterion = {"relative": 0.01}
     if op_type_dict is None:
         op_type_dict = {}
-    if smoothquant_args is None:
-        smoothquant_args = {}
+    smoothquant_args = {}
 
     neural_compressor_version = "2.4.1"
     try:

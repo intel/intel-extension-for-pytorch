@@ -7,83 +7,66 @@ You can also refer to the [Features](./features.rst) section to get the examples
 
 The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the [examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu) directory.
 
-- [Python](#python) examples demonstrate usage of Python APIs:
+- [Python](#python) examples demonstrate usage of Python APIs for model inference in various data types.
 
-  - [Training](#training)
-  - [Inference](#inference)
-
-- [C++](#c) examples demonstrate usage of C++ APIs
-- [Intel® AI Reference Models](#intel-ai-reference-models) provide out-of-the-box use cases, demonstrating the performance benefits achievable with Intel Extension for PyTorch\*
+- [C++](#c) examples demonstrate usage of C++ APIs.
 
 **Prerequisites**:
+
 Before running these examples, please note the following:
 
 - Examples using the BFloat16 data type require machines with the  Intel® Advanced Vector Extensions 512 (Intel® AVX-512) BF16 and Intel® Advanced Matrix Extensions (Intel® AMX) BF16 instruction sets.
 
-
 ## Python
-
-### Training
-
-#### Distributed Training
-
-Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch\* (oneCCL Bindings for Pytorch\*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the [Github repo](https://github.com/intel/torch-ccl).
-
-**Note:** You need to install `torchvision` Python package to run the following example.
-
-[//]: # (marker_train_ddp_complete)
-[//]: # (marker_train_ddp_complete)
-
-### Inference
 
 The `optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the `optimize` function against the model object.
 
-#### Float32
+### Float32
 
-##### Eager Mode
+#### Eager Mode
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_imp_fp32)
 [//]: # (marker_inf_rn50_imp_fp32)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_imp_fp32)
 [//]: # (marker_inf_bert_imp_fp32)
 
-##### TorchScript Mode
+#### TorchScript Mode
 
 We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_ts_fp32)
 [//]: # (marker_inf_rn50_ts_fp32)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_ts_fp32)
 [//]: # (marker_inf_bert_ts_fp32)
 
-##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
+#### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_dynamo_fp32)
 [//]: # (marker_inf_rn50_dynamo_fp32)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
@@ -92,75 +75,75 @@ We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://py
 
 **Note:** In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
 
-#### BFloat16
+### BFloat16
 
 The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
 We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
-##### Eager Mode
+#### Eager Mode
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_imp_bf16)
 [//]: # (marker_inf_rn50_imp_bf16)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_imp_bf16)
 [//]: # (marker_inf_bert_imp_bf16)
 
-##### TorchScript Mode
+#### TorchScript Mode
 
 We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_ts_bf16)
 [//]: # (marker_inf_rn50_ts_bf16)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_ts_bf16)
 [//]: # (marker_inf_bert_ts_bf16)
 
-##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
+#### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
-###### Resnet50
+##### Resnet50
 
 **Note:** You need to install `torchvision` Python package to run the following example.
 
 [//]: # (marker_inf_rn50_dynamo_bf16)
 [//]: # (marker_inf_rn50_dynamo_bf16)
 
-###### BERT
+##### BERT
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_inf_bert_dynamo_bf16)
 [//]: # (marker_inf_bert_dynamo_bf16)
 
-#### Fast Bert (*Prototype*)
+### Fast Bert (*Prototype*)
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
 [//]: # (marker_feature_fastbert_bf16)
 [//]: # (marker_feature_fastbert_bf16)
 
-#### INT8
+### INT8
 
 Starting from Intel® Extension for PyTorch\* 1.12.0, quantization feature supports both static and dynamic modes.
 
-##### Static Quantization
+#### Static Quantization
 
-###### Calibration
+##### Calibration
 
 Please follow the steps below to perform calibration for static quantization:
 
@@ -177,7 +160,7 @@ Please follow the steps below to perform calibration for static quantization:
 [//]: # (marker_int8_static)
 [//]: # (marker_int8_static)
 
-###### Deployment
+##### Deployment
 
 For deployment, the INT8 model is loaded from the local file and can be used directly for sample inference.
 
@@ -190,7 +173,7 @@ Follow the steps below:
 [//]: # (marker_int8_deploy)
 [//]: # (marker_int8_deploy)
 
-##### Dynamic Quantization
+#### Dynamic Quantization
 
 Please follow the steps below to perform dynamic quantization:
 
@@ -207,7 +190,7 @@ Please follow the steps below to perform dynamic quantization:
 [//]: # (marker_int8_dynamic)
 [//]: # (marker_int8_dynamic)
 
-### Large Language Model (LLM)
+## Large Language Model (LLM)
 
 Intel® Extension for PyTorch\* provides dedicated optimization for running Large Language Models (LLM) faster.
 A set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
@@ -216,26 +199,12 @@ A set of data types are supported for various scenarios, including FP32, BF16, S
 In addition, you may need to log in your HuggingFace account to access the pretrained model files. 
 Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
-#### FP32/BF16
+### FP32/BF16
 
 [//]: # (marker_llm_optimize)
 [//]: # (marker_llm_optimize)
 
-#### Smooth Quantization INT8
-
-The typical steps shown in the example are:
-
-1. Calibration process: Run the example script specifying `--calibration`, along with other related arguments.
-When the calibration process is completed, the quantization summary files would be generated.
-
-2. Model inference process: Run the example script without specifying `--calibration`. In this process the quantized model 
-will be generated via the original model and the quantization config and summary files, and will
-generate results for the input prompt.
-
-[//]: # (marker_llm_optimize_sq)
-[//]: # (marker_llm_optimize_sq)
-
-#### Weight Only Quantization INT8/INT4
+### Weight Only Quantization INT8/INT4
 
 [//]: # (marker_llm_optimize_woq)
 [//]: # (marker_llm_optimize_woq)
@@ -311,9 +280,3 @@ $ ldd example-app
         libdnnl_graph.so.0 => /workspace/libtorch/lib/libdnnl_graph.so.0 (0x00007f3cde954000)
         ...
 ```
-
-## Intel® AI Reference Models
-
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/intel/ai-reference-models/tree/pytorch-r2.6-models) (former Model Zoo).
-The lists of PyTorch use cases with links to sample codes are available in the [use case tables](https://github.com/intel/ai-reference-models/tree/pytorch-r2.6-models?tab=readme-ov-file#use-cases).
-You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
