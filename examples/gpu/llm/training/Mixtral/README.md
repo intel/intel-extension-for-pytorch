@@ -23,7 +23,6 @@ We provide examples for `wikitext-2-raw-v1` dataset from Hugging Face.
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model='mistralai/Mistral-7B-v0.1'

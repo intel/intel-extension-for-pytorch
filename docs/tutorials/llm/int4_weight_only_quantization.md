@@ -129,9 +129,9 @@ Intel® Extension for PyTorch\* implements Weight-Only Quantization for Intel® 
 
 ### Environment Setup
 
-Please refer to the [env setup](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.10%2Bxpu/examples/gpu/llm/inference/README.md).
+Please refer to the [env setup](https://github.com/intel/intel-extension-for-pytorch/blob/v2.7.10%2Bxpu/examples/gpu/llm/inference/README.md).
 
-Example can be found at [Learn WOQ](https://github.com/intel/intel-extension-for-pytorch/tree/v2.6.10%2Bxpu/examples/gpu/llm/inference#learn-to-quantize-llm-and-run-inference).
+Example can be found at [Learn WOQ](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.10%2Bxpu/examples/gpu/llm/inference#learn-to-quantize-llm-and-run-inference).
 
 ### Run Weight-Only Quantization LLM on Intel® GPU
 
@@ -182,7 +182,7 @@ output = loaded_model.generate(inputs)
 ```
 
 
-#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/v2.6.10%2Bxpu/examples/gpu/llm/inference/run_benchmark_woq.sh)
+#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/v2.7.10%2Bxpu/examples/gpu/llm/inference/run_benchmark_woq.sh)
 
 ```python
 bash run_benchmark_woq.sh

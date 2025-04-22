@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: Usage message
-set "MSG_USAGE=Usage: call %~nx0 [inference|fine-tuning|bitsandbytes|training]"
+set "MSG_USAGE=Usage: call %~nx0 [inference|fine-tuning|bitsandbytes]"
 
 :: Check if an argument is provided
 if "%~1"=="" (

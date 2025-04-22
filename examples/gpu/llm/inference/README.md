@@ -1,6 +1,6 @@
 # LLM Inference Overview
 
-Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
+Here you can find the inference examples for large language models (LLM) text generation. These scripts:
 
 - Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as GLM4-9B, Baichuan2-13B and Phi3-mini. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
@@ -9,7 +9,7 @@ Here you can find the inference benchmarking scripts for large language models (
 
 ## Validated Models
 
-Currently, only support Transformers 4.44.2. Support for newer versions of Transformers and more models will be available in the future.
+Currently, only support Transformers 4.48.3. Support for newer versions of Transformers and more models will be available in the future.
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) | 
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
