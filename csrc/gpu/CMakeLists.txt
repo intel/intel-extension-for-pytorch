@@ -40,6 +40,9 @@ add_subdirectory(${IPEX_GPU_ROOT_DIR}/utils)
 set(IPEX_DISTRIBUTED_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
 
+set(IPEX_MAMBA_SRCS)
+add_subdirectory(${IPEX_GPU_ROOT_DIR}/mamba)
+
 if(USE_XETLA)
   set(IPEX_GPU_XETLA_DIR "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla")
   add_subdirectory(${IPEX_GPU_XETLA_DIR})
@@ -77,7 +80,8 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
-        ${IPEX_UTILS_SRCS})
+        ${IPEX_UTILS_SRCS}
+        ${IPEX_MAMBA_SRCS})
 
 # This workaround enables some definitions in PyTorch header file protected by USE_XPU macro.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_XPU")

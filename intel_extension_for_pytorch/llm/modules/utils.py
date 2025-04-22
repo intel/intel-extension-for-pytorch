@@ -35,6 +35,7 @@ from intel_extension_for_pytorch.transformers.models.xpu.fusions.mha_fusion impo
     _IPEXRMSNormXPU,
     _IPEXPagedAttentionXPU,
     _IPEXVarlenScaledDotProductXPU,
+    _IPEXMambaMixerXPU,
 )
 
 
@@ -55,6 +56,7 @@ class IPEXCustomOpType(Enum):
     VARLEN_ATTENTION: int = 13
     INDIRECTACCESS_KVCACHE_ATTENTION: int = 14
     LINEAR_MOE: int = 15
+    MAMBA_MIXER: int = 16
 
 
 CPU_fusion_modules = {
@@ -88,6 +90,7 @@ XPU_fusion_modules = {
     IPEXCustomOpType.LINEAR_GELU: _IPEXlinearGeluXPU,
     IPEXCustomOpType.LINEAR2_SILU_MUL: _IPEXlinearSiluMulXPU,
     IPEXCustomOpType.LINEAR_MOE: _IPEXGatedMLPMOEXPU,
+    IPEXCustomOpType.MAMBA_MIXER: _IPEXMambaMixerXPU,
 }
 
 

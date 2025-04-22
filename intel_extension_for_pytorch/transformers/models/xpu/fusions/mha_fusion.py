@@ -650,3 +650,147 @@ class _IPEXPagedAttentionXPU:
                 block_mapping_tensor, device="xpu", dtype=torch.int64
             )
         return torch.ops.torch_ipex.copy_blocks(key_caches, value_caches, block_mapping)
+
+
+class _IPEXMambaMixerXPU:
+    @classmethod
+    def causal_conv1d_fn(
+        cls,
+        x: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        initial_states: Optional[torch.Tensor] = None,
+        return_final_states: bool = False,
+        final_states_out: Optional[torch.Tensor] = None,
+        activation: Optional[str] = "silu",
+    ):
+        """
+        x: (batch, dim, seqlen)
+        weight: (dim, width)
+        bias: (dim,)
+        initial_states: (batch, dim, width - 1)
+        final_states_out: (batch, dim, width - 1)
+
+        out: (batch, dim, seqlen)
+        """
+        if activation not in [None, "silu", "swish"]:
+            raise NotImplementedError("activation must be None, silu, or swish")
+        if x.stride(-1) != 1:
+            x = x.contiguous()
+        bias = bias.contiguous() if bias is not None else None
+        torch.ops.torch_ipex.causal_conv1d_fn(
+            x,
+            weight,
+            bias,
+            initial_states,
+            None,
+            None,
+            None,
+            activation in ["silu", "swish"],
+            -1,
+        )
+        return (x, None) if not return_final_states else (x, initial_states)
+
+    @classmethod
+    def causal_conv1d_update(
+        cls, x, conv_state, weight, bias=None, activation=None, cache_seqlens=None
+    ):
+        """
+        x: (batch, dim) or (batch, dim, seqlen)
+        conv_state: (batch, dim, state_len), where state_len >= width - 1
+        weight: (dim, width)
+        bias: (dim,)
+        activation: None, "silu", or "swish"
+        cache_seqlens: (batch,), dtype int32.
+            If not None, the conv_state is treated as a circular buffer.
+            The conv_state will be updated by copying x to the
+            conv_state starting at the index
+            @cache_seqlens % state_len before performing the convolution.
+
+        out: (batch, dim) or (batch, dim, seqlen)
+        """
+        if activation not in [None, "silu", "swish"]:
+            raise NotImplementedError("activation must be None, silu, or swish")
+        activation_val = activation in ["silu", "swish"]
+        unsqueeze = x.dim() == 2
+        if unsqueeze:
+            x = x.unsqueeze(-1)
+        torch.ops.torch_ipex.causal_conv1d_update(
+            x, conv_state, weight, bias, activation_val, cache_seqlens, None, -1
+        )
+        if unsqueeze:
+            x = x.squeeze(-1)
+        return x
+
+    @classmethod
+    def selective_scan_fn(
+        cls,
+        u,
+        delta,
+        A,
+        B,
+        C,
+        D=None,
+        z=None,
+        delta_bias=None,
+        delta_softplus=False,
+        return_last_state=False,
+    ):
+        """
+        u: (B D L) or (B L D)
+        delta: same shape as u
+        A: (D N) or (N D)
+        B: (B N L) or (B N 2L) or (B G N L)
+        C: (B N L) or (B N 2L) or (B G N L)
+        D: (D) or None
+        z: (B D L) or None
+        delta_bias: (D) or None, fp32
+
+        out: (B D L)
+        last_state (optional): (B D dstate)
+        """
+        if u.stride(-1) != 1:
+            u = u.contiguous()
+        if delta.stride(-1) != 1:
+            delta = delta.contiguous()
+        if D is not None:
+            D = D.contiguous()
+        if B.stride(-1) != 1:
+            B = B.contiguous()
+        if C.stride(-1) != 1:
+            C = C.contiguous()
+        if z is not None and z.stride(-1) != 1:
+            z = z.contiguous()
+        if B.dim() == 3:
+            B = B.unsqueeze(1)
+        if C.dim() == 3:
+            C = C.unsqueeze(1)
+
+        batch = u.shape[0]
+        dim = u.shape[1]
+        dstate = A.shape[1]
+        ssm_state = torch.empty((batch, dim, dstate), dtype=u.dtype, device=u.device)
+        torch.ops.torch_ipex.selective_scan_fn(
+            u,
+            delta,
+            A,
+            B,
+            C,
+            D,
+            z,
+            delta_bias,
+            delta_softplus,
+            None,
+            None,
+            None,
+            ssm_state,
+            -1,
+        )
+        if z is None:
+            return (
+                delta if not return_last_state else (delta, ssm_state)
+            )  # output written inplace to delta
+        else:
+            return (
+                z if not return_last_state else (z, ssm_state)
+            )  # output written inplace to z
