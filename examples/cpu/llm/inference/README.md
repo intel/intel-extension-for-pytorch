@@ -2,7 +2,7 @@
 
 We have supported a long list of LLMs, including the most notable open-source models
 like Llama series, Qwen series, Phi-3/Phi-4 series,
-and the phenomenal high-quality reasoning model DeepSeek-R1.
+and the phenomenal high-quality reasoning model [DeepSeek-R1](#223-deepseek-r1-671b).
 
 ## 1.1 Verified for single instance mode
 
@@ -472,7 +472,59 @@ huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --l
 deepspeed --bind_cores_to_rank run.py --benchmark -m ./Llama-3.1-8B-GPTQ --ipex --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --autotp --output-dir "saved_results"
 ```
 
-### 2.2.3 Additional configuration for specific models
+### 2.2.3 DeepSeek-R1 671B
+
+IPEX applies dedicated optimizations on the full version of `DeepSeek-R1` model
+and it can be showcased with `run.py` script now!
+
+- Currently, weight only quantization INT8 precision is supported.
+Please download the INT8 quantized version from [HuggingFace Models](https://huggingface.co/meituan/DeepSeek-R1-Channel-INT8).
+
+```bash
+huggingface-cli download --resume meituan/DeepSeek-R1-Channel-INT8 --local-dir <DEEPSEEK_INT8_CKPT_SAVE_PATH>
+```
+
+- A change is required in the `config.json` file of the downloaded checkpoint path in order to apply the optimizations.
+Please add the `quantization_config` field to the end of the file as below.
+
+```diff
+   "transformers_version": "4.46.3",
+   "use_cache": true,
+   "v_head_dim": 128,
+-  "vocab_size": 129280
++  "vocab_size": 129280,
++  "quantization_config": {
++    "quant_method": "int8",
++    "bits": 8,
++    "group_size": -1
++  }
+ }
+```
+
+- Use the following command to run the test.
+
+```bash
+# at examples/cpu/llm/inference
+deepspeed --bind_cores_to_rank run.py -m <DEEPSEEK_INT8_CKPT_SAVE_PATH> --benchmark --input-tokens 1024 --max-new-tokens 1024 --ipex-weight-only-quantization --weight-dtype INT8 --ipex --batch-size 1 --autotp --greedy --quant-with-amp --token-latency
+```
+
+- Notes
+
+(1) Since the hugeness of the model size as well as the cache based optimizations, it is recommended to use a server with 1.5TB
+or larger memory amount. The memory comsumption optimizations are in progress.
+
+(2) Please add `--num_accelerators` and `--bind_core_list` arguments for `deepspeed` command based on your SNC configurations.
+For example, for a server having 2 sockets, 128 physical cores per socket with a total number of 6 sub-numa clusters,
+it is recommended to set `--num_accelerators 6 --bind_core_list 0-41,43-84,86-127,128-169,171-212,214-255`.
+
+(3) The provided script is mainly for showcasing performance with the default input prompts.
+We can replace the prompts in `prompt.json` under `deepseekr1` key with your own inputs.
+Also, we can change the script, applying [the chat template](https://huggingface.co/docs/transformers/chat_templating)
+to get outputs with higher quality.
+
+(4) We can enlarge `--max-new-tokens` setting for longer outputs and add `--streaming` to get streaming outputs in the console.
+
+### 2.2.4 Additional configuration for specific models
 
 There are some model-specific requirements to be aware of, as follows:
 
