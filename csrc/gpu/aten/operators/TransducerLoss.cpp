@@ -9,7 +9,6 @@
 #include "Reduce.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <ATen/record_function.h>
 #include <torch/library.h>

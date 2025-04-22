@@ -15,7 +15,6 @@
 #else
 #include <unistd.h>
 #endif
-#include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
@@ -611,7 +610,7 @@ Tensor softplus_tanh(
     const Tensor& self,
     const Scalar& beta,
     const Scalar& threshold) {
-  Tensor softplus_out = at::AtenIpexTypeXPU::softplus(self, beta, threshold);
+  Tensor softplus_out = at::softplus(self, beta, threshold);
   return at::tanh(softplus_out);
 }
 

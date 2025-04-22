@@ -8,12 +8,10 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
-#include "comm/ApplyUtils.h"
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <oneDNN/oneDNN.h>
 #include "DistributionTemplates.h"

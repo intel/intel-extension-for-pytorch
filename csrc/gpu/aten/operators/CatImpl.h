@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
-#include "comm/RegistrationDeclarations.h"
+
 namespace at {
 namespace AtenIpexTypeXPU {
 // Onednn does not support double, long, complex etc.

@@ -7,13 +7,9 @@
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
-#include "comm/Pointwise.h"
-#include "comm/RegistrationDeclarations.h"
-#include "comm/ScalarOps.h"
-
-#include "EltwiseNaiveKer.h"
 #include "Loops.h"
 #include "LoopsTemplates.h"
+#include "comm/ScalarOps.h"
 
 #include <utils/ComputeEngine.h>
 

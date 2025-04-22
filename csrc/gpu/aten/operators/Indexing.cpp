@@ -21,10 +21,8 @@
 #include "ParttenScan.h"
 #include "SortingDeviceRadixSort.h"
 #include "comm/ATDispatch.h"
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
+
 #include "comm/Atomics.h"
-#include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 
 using namespace torch_ipex::xpu::dpcpp;

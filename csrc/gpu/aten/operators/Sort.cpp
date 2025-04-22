@@ -13,16 +13,6 @@ using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
-std::tuple<Tensor&, Tensor&> sort_out(
-    const Tensor& input,
-    int64_t dim,
-    bool order,
-    Tensor& sorted,
-    Tensor& indices) {
-  return sort_out_stable(input, false, dim, order, sorted, indices);
-}
-
 std::tuple<at::Tensor, at::Tensor> sort(
     const at::Tensor& self,
     int64_t dim,
@@ -31,23 +21,5 @@ std::tuple<at::Tensor, at::Tensor> sort(
   return sort_out_stable(self, false, dim, descending, sorted, indices);
 }
 
-std::tuple<Tensor, Tensor> sort(
-    const Tensor& self,
-    c10::optional<bool> stable,
-    int64_t dim,
-    bool descending) {
-  Tensor sorted, indices;
-  return sort_out_stable(self, stable, dim, descending, sorted, indices);
-}
-
-std::tuple<Tensor&, Tensor&> sort_out(
-    const Tensor& self,
-    c10::optional<bool> stable,
-    int64_t dim,
-    bool descending,
-    Tensor& values,
-    Tensor& indices) {
-  return sort_out_stable(self, stable, dim, descending, values, indices);
-}
 } // namespace AtenIpexTypeXPU
 } // namespace at

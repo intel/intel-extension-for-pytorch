@@ -1021,13 +1021,6 @@ void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
       iter, f);
 }
 
-template <typename func_t>
-void dpcpp_fast_mode_kernel_with_scalars(
-    TensorIteratorBase& iter,
-    const func_t& f) {
-  return dpcpp_kernel_with_scalars<func_t, true>(iter, f);
-}
-
 template <
     typename scalar_t,
     typename return_t = scalar_t,

@@ -6,7 +6,6 @@
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 #include "xetla/GEMM_INT4.h"
 
 using namespace torch_ipex::xpu::xetla;

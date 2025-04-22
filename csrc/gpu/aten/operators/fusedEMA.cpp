@@ -8,17 +8,12 @@
 #include <tensor/Tensor.h>
 #include <torch/library.h>
 #include <utils/DPCPP.h>
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
 
 #include <ATen/native/ForeachUtils.h>
 #include <aten/operators/MemoryAccess.h>
 #include "ATen/OpMathType.h"
 #include "Loops.h"
-#include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
-#include "comm/Numerics.h"
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {

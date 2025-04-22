@@ -6,20 +6,15 @@
 #include <ATen/record_function.h>
 #include <core/detail/ListUtils.h>
 #include <torch/library.h>
-#include "Loops.h"
-#include "LoopsTemplates.h"
 #include "PSTLFunctions.h"
 #include "SparseTensorUtils.h"
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 
 #include <aten/operators/MemoryAccess.h>
 #include "utils/CustomOperatorRegistration.h"
 
-using namespace torch_ipex::xpu::dpcpp;
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 using namespace at::sparse;
 

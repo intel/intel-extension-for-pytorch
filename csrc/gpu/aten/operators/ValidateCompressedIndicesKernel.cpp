@@ -1,4 +1,3 @@
-#include "comm/RegistrationDeclarations.h"
 #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
 #include "ValidateCompressedIndicesCommon.h"
 

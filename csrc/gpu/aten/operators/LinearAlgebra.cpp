@@ -6,14 +6,6 @@
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <tensor/TensorMeta.h>
-#include <iostream>
-#include "Loops.h"
-#include "Resize.h"
-#include "comm/ATDispatch.h"
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
 

@@ -2,7 +2,6 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 
 template <typename T>

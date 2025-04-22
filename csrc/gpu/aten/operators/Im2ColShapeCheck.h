@@ -16,7 +16,6 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
-#include "comm/ApplyUtils.h"
 
 using namespace at;
 using namespace torch_ipex::xpu::dpcpp;

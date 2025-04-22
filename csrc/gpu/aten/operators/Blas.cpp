@@ -4,6 +4,7 @@
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include "BlasImpl.h"
+#include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #ifdef USE_OVERRIDE_OP

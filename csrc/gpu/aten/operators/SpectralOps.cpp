@@ -19,7 +19,6 @@
 #endif
 
 using namespace torch_ipex::xpu::dpcpp;
-using namespace torch_ipex::xpu::dpcpp::detail;
 
 #ifdef USE_ONEMKL
 using namespace oneapi::mkl::dft;

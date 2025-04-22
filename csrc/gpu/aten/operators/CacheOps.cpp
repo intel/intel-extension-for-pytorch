@@ -9,11 +9,8 @@
 #include <runtime/Utils.h>
 #include <torch/library.h>
 #include <utils/DPCPP.h>
-#include <map>
 #include "comm/ATDispatch.h"
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
+
 #include "utils/CustomOperatorRegistration.h"
 
 #include <aten/operators/MemoryAccess.h> // clang-format off

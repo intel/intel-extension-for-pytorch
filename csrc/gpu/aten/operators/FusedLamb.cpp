@@ -10,9 +10,6 @@
 #include <utils/DPCPP.h>
 #include <algorithm>
 #include "Loops.h"
-#include "LoopsTemplates.h"
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 
 #include <aten/operators/MemoryAccess.h>

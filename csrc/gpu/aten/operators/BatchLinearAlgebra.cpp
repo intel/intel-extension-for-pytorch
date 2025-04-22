@@ -10,9 +10,6 @@
 #include <xpu/ATen/ops/_linalg_slogdet_native.h>
 
 #include "comm/ATDispatch.h"
-#include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
 #ifdef USE_OVERRIDE_OP
 #include <ATen/DeviceGuard.h>
 #include <ATen/core/op_registration/adaption.h>
@@ -22,7 +19,6 @@
 #include "Resize.h"
 
 #include <torch/custom_class.h>
-#include "comm/ParamUtils.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 

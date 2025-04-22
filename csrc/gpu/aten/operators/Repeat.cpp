@@ -2,7 +2,6 @@
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {

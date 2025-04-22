@@ -4,10 +4,17 @@
 
 #include "Reduce.h"
 #include "comm/ATDispatch.h"
-#include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 #include "comm/XPUPair.h"
+
+#include <core/Memory.h>
+#include <runtime/Utils.h>
+#include <utils/DPCPP.h>
+#include <cmath>
+
+using namespace at::native;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

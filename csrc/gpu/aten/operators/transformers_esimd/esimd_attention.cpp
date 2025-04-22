@@ -13,7 +13,6 @@
 #include "../esimd/api.hpp"
 #include "utils/CustomOperatorRegistration.h"
 
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
 

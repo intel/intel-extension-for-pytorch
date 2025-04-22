@@ -4,7 +4,6 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 #include "xetla/DEQUANTIZE_INT4.h"
 
 using namespace torch_ipex::xpu::xetla;

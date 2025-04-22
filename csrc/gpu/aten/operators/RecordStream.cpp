@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 #include <core/DeviceAllocator.h>
-#include "comm/RegistrationDeclarations.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 

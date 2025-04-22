@@ -1,7 +1,6 @@
 #include <ATen/ATen.h>
 
 #include <tensor/Tensor.h>
-#include "comm/RegistrationDeclarations.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 

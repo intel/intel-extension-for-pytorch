@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <c10/util/typeid.h>
 

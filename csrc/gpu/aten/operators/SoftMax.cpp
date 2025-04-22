@@ -7,14 +7,12 @@
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "Loops.h"
-#include "comm/RegistrationDeclarations.h"
+#include "core/detail/IndexUtils.h"
 
 //#include <aten/operators/MemoryAccess.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
-#include "comm/SimpleReduce.h"
 #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 /*

@@ -3,16 +3,13 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
-#include "DistributionTemplates.h"
 #include "comm/ATDispatch.h"
-#include "comm/ApplyUtils.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <aten/operators/MemoryAccess.h>
 #include <torch/library.h>
 #include "comm/AccumulateType.h"
+#include "comm/Numerics.h"
 using namespace at;
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {

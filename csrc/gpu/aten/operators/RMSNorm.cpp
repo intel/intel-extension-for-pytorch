@@ -3,15 +3,16 @@
 #include <ATen/NativeFunctions.h>
 
 #include <ATen/record_function.h>
+#include <core/detail/TensorInfo.h>
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include "Norm.h"
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch::autograd;
 using namespace at::AtenIpexTypeXPU::normalization;
 

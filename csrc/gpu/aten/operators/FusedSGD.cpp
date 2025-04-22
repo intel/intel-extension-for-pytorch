@@ -11,17 +11,12 @@
 #include <utils/DPCPP.h>
 #include "Converter.h"
 #include "Loops.h"
-#include "LoopsTemplates.h"
 #include "comm/ATDispatch.h"
-#include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
-#include "comm/Numerics.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #include <aten/operators/MemoryAccess.h>
 
 using namespace torch_ipex::xpu::dpcpp;
-using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {

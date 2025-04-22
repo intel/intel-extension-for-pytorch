@@ -22,43 +22,6 @@ template <typename scalar_t>
 inline scalar_t max(scalar_t a, scalar_t b) {
   return a > b ? a : b;
 }
-
-static inline void upsample_2d_shape_check(
-    const Tensor& input,
-    const Tensor& grad_output,
-    int64_t nbatch,
-    int64_t nchannels,
-    int64_t input_height,
-    int64_t input_width,
-    int64_t output_height,
-    int64_t output_width) {
-  TORCH_CHECK(
-      input_height > 0 && input_width > 0 && output_height > 0 &&
-          output_width > 0,
-      "Input and output sizes should be greater than 0,"
-      " but got input (H: ",
-      input_height,
-      ", W: ",
-      input_width,
-      ") output (H: ",
-      output_height,
-      ", W: ",
-      output_width,
-      ")");
-
-  if (input.defined()) {
-    TORCH_CHECK(
-        input.numel() != 0 && input.dim() == 4,
-        "Non-empty 4D data tensor expected but got a tensor with sizes ",
-        input.sizes());
-  } else if (grad_output.defined()) {
-    check_dim_size(grad_output, 4, 0, nbatch);
-    check_dim_size(grad_output, 4, 1, nchannels);
-    check_dim_size(grad_output, 4, 2, output_height);
-    check_dim_size(grad_output, 4, 3, output_width);
-  }
-}
-
 template <typename scalar_t>
 static inline scalar_t area_pixel_compute_scale(
     int input_size,
@@ -83,7 +46,6 @@ static inline scalar_t area_pixel_compute_scale(
     return scalar_t(0);
   }
 }
-
 template <typename accscalar_t>
 static inline accscalar_t nearest_compute_scales_value(
     const c10::optional<double> scale,
@@ -91,16 +53,6 @@ static inline accscalar_t nearest_compute_scales_value(
     int64_t dst_size) {
   return (scale.has_value() && scale.value() > 0.)
       ? (accscalar_t)(1.0 / scale.value())
-      : (accscalar_t)src_size / dst_size;
-}
-
-template <typename accscalar_t>
-static accscalar_t compute_scales_value_backwards(
-    const c10::optional<double> scale,
-    int64_t src_size,
-    int64_t dst_size) {
-  return (scale.has_value() && scale.value() > 0.)
-      ? (accscalar_t)scale.value()
       : (accscalar_t)src_size / dst_size;
 }
 
@@ -137,106 +89,6 @@ static inline accscalar_t area_pixel_compute_source_index(
         ? static_cast<accscalar_t>(0)
         : src_idx;
   }
-}
-
-/* Used by UpSampleBicubic2d.cpp */
-template <typename scalar_t>
-static scalar_t upsample_get_value_bounded(
-    const PackedTensorAccessor64<scalar_t, 4>& data,
-    int batch,
-    int channel,
-    int width,
-    int height,
-    int x,
-    int y) {
-  int access_x = max(min(x, width - 1), static_cast<int>(0));
-  int access_y = max(min(y, height - 1), static_cast<int>(0));
-  return data[batch][channel][access_y][access_x];
-}
-
-/* Used by UpSampleBicubic2d.cpp */
-template <typename scalar_t>
-static void upsample_increment_value_bounded(
-    PackedTensorAccessor64<scalar_t, 4>& data,
-    int batch,
-    int channel,
-    int width,
-    int height,
-    int x,
-    int y,
-    scalar_t value) {
-  int64_t access_x = max(min(x, width - 1), static_cast<int>(0));
-  int64_t access_y = max(min(y, height - 1), static_cast<int>(0));
-  atomicAdd(
-      (dpcpp_global_ptr_pt<scalar_t>)&data[batch][channel][access_y][access_x],
-      value);
-}
-
-template <typename scalar_t>
-static inline scalar_t cubic_convolution1(scalar_t x, scalar_t A) {
-  return ((A + 2) * x - (A + 3)) * x * x + 1;
-}
-
-template <typename scalar_t>
-static inline scalar_t cubic_convolution2(scalar_t x, scalar_t A) {
-  return ((A * x - 5 * A) * x + 8 * A) * x - 4 * A;
-}
-
-template <typename scalar_t>
-static inline void get_cubic_upsample_coefficients(
-    scalar_t coeffs[4],
-    scalar_t t) {
-  scalar_t A = -0.75f;
-
-  scalar_t x1 = t;
-  coeffs[0] = cubic_convolution2<scalar_t>(x1 + 1.0f, A);
-  coeffs[1] = cubic_convolution1<scalar_t>(x1, A);
-
-  scalar_t x2 = 1.0f - t;
-  coeffs[2] = cubic_convolution1<scalar_t>(x2, A);
-  coeffs[3] = cubic_convolution2<scalar_t>(x2 + 1.0f, A);
-}
-
-template <typename accscalar_t>
-static inline void get_cubic_upsampling_coefficients(
-    accscalar_t coeffs[4],
-    accscalar_t t) {
-  accscalar_t A = -0.75;
-
-  accscalar_t x1 = t;
-  coeffs[0] = cubic_convolution2<accscalar_t>(x1 + 1.0, A);
-  coeffs[1] = cubic_convolution1<accscalar_t>(x1, A);
-
-  // opposite coefficients
-  accscalar_t x2 = 1.0 - t;
-  coeffs[2] = cubic_convolution1<accscalar_t>(x2, A);
-  coeffs[3] = cubic_convolution2<accscalar_t>(x2 + 1.0, A);
-}
-
-template <typename scalar_t>
-static inline scalar_t cubic_interp1d(
-    scalar_t x0,
-    scalar_t x1,
-    scalar_t x2,
-    scalar_t x3,
-    scalar_t t) {
-  scalar_t coeffs[4];
-  get_cubic_upsample_coefficients<scalar_t>(coeffs, t);
-
-  return x0 * coeffs[0] + x1 * coeffs[1] + x2 * coeffs[2] + x3 * coeffs[3];
-}
-
-template <typename scalar_t, typename accscalar_t>
-static inline accscalar_t cubic_interp1d(
-    scalar_t x0,
-    scalar_t x1,
-    scalar_t x2,
-    scalar_t x3,
-    accscalar_t t) {
-  accscalar_t coeffs[4];
-  get_cubic_upsampling_coefficients<accscalar_t>(coeffs, t);
-
-  return x0 * coeffs[0] + x1 * coeffs[1] + x2 * coeffs[2] + x3 * coeffs[3];
 }
 
 } // namespace AtenIpexTypeXPU

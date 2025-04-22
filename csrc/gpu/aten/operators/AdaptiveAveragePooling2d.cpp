@@ -9,7 +9,6 @@
 #include <quantized/QUtils.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <ATen/Context.h>
 #include <runtime/Utils.h>
@@ -19,8 +18,6 @@
 #include <ATen/DeviceGuard.h>
 #include <ATen/core/op_registration/adaption.h>
 #include "utils/CustomOperatorRegistration.h"
-
-#include "Resize.h"
 
 #include <torch/custom_class.h>
 #include "comm/ParamUtils.h"

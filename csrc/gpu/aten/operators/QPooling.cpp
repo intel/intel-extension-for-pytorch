@@ -4,7 +4,6 @@
 
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
-
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
 
@@ -14,7 +13,6 @@ using namespace at::native;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
-
 at::Tensor quantized_max_pool2d(
     const Tensor& qx,
     IntArrayRef kernel_size,

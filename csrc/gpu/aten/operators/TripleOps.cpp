@@ -18,12 +18,11 @@
 #include "comm/Numerics.h"
 
 #include "Loops.h"
+#include "MemoryAccess.h"
 #include "PSTLFunctions.h"
 #include "SparseTensorUtils.h"
 #include "comm/AccumulateType.h"
-#include "comm/Pointwise.h"
 #include "comm/RegistrationDeclarations.h"
-
 #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
@@ -94,17 +93,17 @@ struct op_and_mul_functor {
     func_t fn;
     int64_t bound = dim / N;
     for (int64_t i = offset; i < bound; i += step) {
-      auto unary_val =
-          reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
-              input_ptr)[token_id * bound * 2 + i];
-      auto mul_val =
-          reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
-              input_ptr)[token_id * bound * 2 + i + bound];
+      auto unary_val = reinterpret_cast<
+          at::native::Memory::aligned_vector_loop<scalar_t, N>*>(
+          input_ptr)[token_id * bound * 2 + i];
+      auto mul_val = reinterpret_cast<
+          at::native::Memory::aligned_vector_loop<scalar_t, N>*>(
+          input_ptr)[token_id * bound * 2 + i + bound];
 #pragma unroll
       for (int i = 0; i < N; ++i) {
         unary_val[i] = fn(unary_val[i], mul_val[i]);
       }
-      reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
+      reinterpret_cast<at::native::Memory::aligned_vector_loop<scalar_t, N>*>(
           output_ptr)[token_id * bound + i] = unary_val;
     }
   }

@@ -2,7 +2,6 @@
 #include <tensor/Tensor.h>
 
 #include "UpSample.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <core/MemoryFormat.h>
 #include <oneDNN/oneDNN.h>

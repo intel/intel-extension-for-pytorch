@@ -1,17 +1,10 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <utils/DPCPP.h>
-#include "comm/LoopsMeta.h"
-#include "comm/Numerics.h"
-#include "comm/Pairwise.h"
-#include "comm/Pointwise.h"
-#include "comm/RegistrationDeclarations.h"
-
 #include <oneDNN/oneDNN.h>
+#include <utils/DPCPP.h>
 #include "Loops.h"
-#include "LoopsTemplates.h"
-
+#include "comm/Numerics.h"
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {

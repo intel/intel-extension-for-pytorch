@@ -6,11 +6,7 @@
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
-#include "comm/LoopsMeta.h"
 #include "comm/Numerics.h"
-#include "comm/Pairwise.h"
-#include "comm/Pointwise.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include "Loops.h"
 

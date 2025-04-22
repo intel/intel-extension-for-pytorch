@@ -3,12 +3,9 @@
 #include <ATen/record_function.h>
 #include <utils/DPCPP.h>
 #include "BitonicMergeSort.h"
-#include "Scan.h"
 #include "SortingFastGroupSort.h"
 #include "comm/Atomics.h"
 #include "comm/KeyTraits.h"
-#include "comm/MathReduce.h"
-#include "comm/SimpleReduce.h"
 
 using namespace at::AtenIpexTypeXPU;
 namespace torch_ipex::xpu {

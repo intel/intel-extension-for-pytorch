@@ -10,7 +10,6 @@
 #include <aten/operators/MemoryAccess.h>
 
 using namespace at;
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 
 const int UNROLL = 4;

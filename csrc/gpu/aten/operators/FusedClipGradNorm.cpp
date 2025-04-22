@@ -8,11 +8,8 @@
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
 #include <utils/DPCPP.h>
-#include <algorithm>
-#include <utility>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "utils/CustomOperatorRegistration.h"
 

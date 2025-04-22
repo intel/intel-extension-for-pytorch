@@ -11,7 +11,6 @@
 
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
-#include "comm/RegistrationDeclarations.h"
 #include "comm/SYCLGroupAlgorithm.h"
 
 #include "Loops.h"

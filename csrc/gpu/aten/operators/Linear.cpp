@@ -1,7 +1,7 @@
 #include "Linear.h"
 #include "FusionUtils.h"
+#include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
-
 namespace at {
 namespace AtenIpexTypeXPU {
 

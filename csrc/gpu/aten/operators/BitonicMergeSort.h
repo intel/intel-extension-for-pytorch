@@ -13,7 +13,6 @@
 #include "comm/TensorOptions.h"
 
 using namespace at;
-using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {

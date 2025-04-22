@@ -4,11 +4,12 @@
 #include <ATen/autocast_mode.h>
 #include <oneDNN/oneDNN.h>
 #include "Norm.h"
-#include "comm/RegistrationDeclarations.h"
+#include "core/detail/IndexUtils.h"
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU::normalization;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {

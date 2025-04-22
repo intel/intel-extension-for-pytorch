@@ -6,18 +6,12 @@
 #include <ATen/native/TensorIterator.h>
 #include "Loops.h"
 #include "comm/ATDispatch.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
-#include "comm/ScalarOps.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
-Scalar _local_scalar_dense(const Tensor& self);
-Tensor min(const Tensor& self);
 
 namespace impl {
 
@@ -62,8 +56,8 @@ bool equal(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty_like(self, self.options().dtype(kBool));
 
   at::AtenIpexTypeXPU::eq_out(self, other, result);
-  Tensor min = at::AtenIpexTypeXPU::min(result);
-  Scalar min_ = at::AtenIpexTypeXPU::_local_scalar_dense(min);
+  Tensor min = at::min(result);
+  Scalar min_ = at::_local_scalar_dense(min);
   return min_.to<bool>() != 0;
 }
 

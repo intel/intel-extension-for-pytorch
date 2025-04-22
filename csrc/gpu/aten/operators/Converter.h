@@ -10,7 +10,6 @@
 #include <torch/library.h>
 #include <utils/DPCPP.h>
 #include "comm/AccumulateType.h"
-#include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 
 #include "comm/ATDispatch.h"
@@ -23,8 +22,6 @@
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace torch_ipex::xpu::dpcpp;
-using namespace torch_ipex::xpu::dpcpp::detail;
-
 namespace at {
 namespace AtenIpexTypeXPU {
 

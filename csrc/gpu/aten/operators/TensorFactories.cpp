@@ -16,7 +16,6 @@
 #include "PSTLFunctions.h"
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-#include "comm/RegistrationDeclarations.h"
 
 using namespace at::native;
 using namespace torch_ipex::xpu::dpcpp;
@@ -119,6 +118,7 @@ Tensor empty_strided_dpcpp(
 }
 
 } // namespace impl
+
 Tensor empty(
     IntArrayRef size,
     const TensorOptions& options,
@@ -139,7 +139,6 @@ Tensor empty_strided(
           pin_memory);
   return AtenIpexTypeXPU::impl::empty_strided_dpcpp(size, stride, options);
 }
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

@@ -3,13 +3,8 @@
 
 #include <utils/DPCPP.h>
 #include "Loops.h"
-#include "comm/AccumulateType.h"
-#include "comm/LoopsMeta.h"
+#include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
-#include "comm/Pairwise.h"
-#include "comm/Pointwise.h"
-#include "comm/RegistrationDeclarations.h"
-#include "comm/zmath.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 

@@ -7,6 +7,7 @@
 #include "Blas.h"
 #include "Linear.h"
 #include "comm/ATDispatch.h"
+#include "comm/RegistrationDeclarations.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC) // XeGemm only supports PVC

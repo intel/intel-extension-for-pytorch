@@ -10,7 +10,6 @@
 #include <torch/custom_class.h>
 #include <utils/Settings.h>
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 
 #include <ATen/DeviceGuard.h>
 #include <ATen/core/op_registration/adaption.h>

@@ -10,7 +10,6 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
-//#include "comm/RegistrationDeclarations.h"
 
 #ifdef USE_OVERRIDE_OP
 #include <ATen/DeviceGuard.h>

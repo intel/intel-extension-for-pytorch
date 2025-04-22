@@ -5,7 +5,6 @@
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
-#include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 
 namespace at {
