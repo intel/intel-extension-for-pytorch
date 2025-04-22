@@ -71,7 +71,6 @@ class blocked_attention_kernel {
     uint32_t num_kv_heads;
     uint32_t max_queries;
     uint32_t max_keys;
-    uint32_t head_groups;
     uint32_t head_size;
     uint32_t max_blocks_per_seq;
     uint32_t max_num_partitions;
@@ -136,7 +135,6 @@ class blocked_attention_kernel {
           is_local(is_local),
           softcap(softcap) {
       // atoms = atoms_; // reinterpret_cast<AttentionAtom*>(atoms_);
-      head_groups = num_heads / num_kv_heads;
     }
   };
   using tanh_t = typename subgroup::tanh_op_t;
@@ -183,6 +181,7 @@ class blocked_attention_kernel {
     uint32_t wg_id;
     uint32_t batch_id;
     uint32_t head_id;
+    uint32_t head_id_kv;
     uint32_t group_id;
     uint32_t partition_id;
     uint32_t num_partitions;
@@ -212,6 +211,8 @@ class blocked_attention_kernel {
       group_id = item.get_group(1);
       partition_id = item.get_group(2);
       num_partitions = item.get_group_range(2);
+
+      head_id_kv = head_id / (args.num_heads / args.num_kv_heads);
 
       seq_q_start = args.cu_seqlen_q[batch_id];
       seq_q_end = args.cu_seqlen_q[batch_id + 1];
@@ -268,18 +269,23 @@ class blocked_attention_kernel {
     int32_t limit_y = ctx.seq_q_end;
     end_y = end_y < limit_y ? end_y : limit_y;
     int32_t pitch = args.q_row_stride;
-    auto query_ptr = args.query + ctx.head_id * args.head_size;
-    global_ld_payload_t ld_payload(
-        query_ptr, end_x, end_y, pitch, start_x, start_y);
 
-    local_st_payload_t st_payload(
-        slm_offset_query, end_x, block_size_y, max_head_size, start_x_local, 0);
-    tile_t mat_query;
+    if (start_x < args.head_size) {
+      auto query_ptr = args.query + ctx.head_id * args.head_size;
+      global_ld_payload_t ld_payload(
+          query_ptr, end_x, end_y, pitch, start_x, start_y);
+      local_st_payload_t st_payload(
+          slm_offset_query,
+          end_x,
+          block_size_y,
+          max_head_size,
+          start_x_local,
+          0);
 
-    subgroup::tile_load(mat_query, ld_payload);
-
-    subgroup::tile_store(mat_query, st_payload);
-
+      tile_t mat_query;
+      subgroup::tile_load(mat_query, ld_payload);
+      subgroup::tile_store(mat_query, st_payload);
+    }
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive_wait();
@@ -396,7 +402,7 @@ class blocked_attention_kernel {
 
       // load [block_size, head_size] for each sg, but will fill it within
       // loop_count times actually get transposed [head_size, block_size]
-      int32_t start_x = ctx.head_id / args.head_groups * args.head_size;
+      int32_t start_x = ctx.head_id_kv * args.head_size;
       int32_t end_x = start_x + args.head_size;
       int32_t start_y = block_id * block_size;
       int32_t end_y = start_y + block_size;
@@ -521,7 +527,7 @@ class blocked_attention_kernel {
     // ctx.num_partitions); int num_pars = ctx.num_partitions; if the kv is too
     // larget, we adopt split kv to maximize the occupancy, and save the max
     // value and exp value to global mem for another reduction.
-    if (args.max_num_partitions > 1) {
+    if (args.max_num_partitions > 1 && ctx.sg_id_x == 0) {
       /* The shape of max_logits and exp_sums are
           [num_tokens, num_heads, max_num_partitions]
       */
@@ -529,19 +535,18 @@ class blocked_attention_kernel {
       global_st_softmax_tile_t exp_sums_tile(0.0f);
       max_logits_tile.reg = group_max;
       exp_sums_tile.reg = group_sum;
-      int32_t start_x = ctx.partition_id;
+      int32_t start_x =
+          ctx.head_id * args.max_num_partitions + ctx.partition_id;
       int32_t start_y = ctx.seq_q_start + ctx.group_id * block_size_y;
       int32_t end_x = start_x + 1;
-      end_x = end_x > args.max_num_partitions ? args.max_num_partitions : end_x;
+      int32_t boundry_x = (ctx.head_id + 1) * args.max_num_partitions;
+      end_x = end_x > boundry_x ? boundry_x : end_x;
       int32_t end_y = start_y + block_size_y;
       int32_t boundary_y = ctx.seq_q_end;
       end_y = end_y < boundary_y ? end_y : boundary_y;
 
-      int32_t ptr_offset = ctx.head_id * args.max_num_partitions;
-      auto max_logits_ptr = args.max_logits + ptr_offset;
-      auto exp_sums_ptr = args.exp_sums + ptr_offset;
       global_st_softmax_payload_t softmax_st_payload(
-          max_logits_ptr,
+          args.max_logits,
           end_x,
           end_y,
           args.max_num_partitions * args.num_heads,
@@ -549,7 +554,7 @@ class blocked_attention_kernel {
           start_y);
       subgroup::tile_store(max_logits_tile, softmax_st_payload);
       global_st_softmax_payload_t exp_sums_st_payload(
-          exp_sums_ptr,
+          args.exp_sums,
           end_x,
           end_y,
           args.max_num_partitions * args.num_heads,
@@ -624,7 +629,7 @@ class blocked_attention_kernel {
       }
 
       // load [block_size, head_size]
-      int32_t start_x = ctx.head_id / args.head_groups * args.head_size;
+      int32_t start_x = ctx.head_id_kv * args.head_size;
       int32_t end_x = start_x + args.head_size;
       int32_t start_y = block_id * block_size;
       int32_t remained_y = ctx.seq_k_end - cu_seqlen;
@@ -984,7 +989,9 @@ class chunked_prefill_reduce {
         arch_tag>;
     static constexpr tdesc_update_dir update_dir = tdesc_update_dir::x_dir;
 
-    int32_t start_x = ctx.sg_id * partition_stride;
+    int32_t start_x =
+        ctx.head_id * args.max_num_partitions + ctx.sg_id * partition_stride;
+    int32_t end_x = ctx.head_id * args.max_num_partitions + ctx.num_partitions;
     int32_t start_y = args.cu_seqlen_q[ctx.seq_id] + ctx.group_id * block_m;
     int32_t end_y = start_y + block_m;
     int32_t boundary_y = args.cu_seqlen_q[ctx.seq_id + 1];
@@ -992,22 +999,21 @@ class chunked_prefill_reduce {
 
     // offset the head id first, and load alone num_tokens as y,
     // max_num_partitions as x
-    auto p_ptr = p + ctx.head_id * args.max_num_partitions;
     ld_tile_t ld_tile;
     ld_payload_t ld_payload(
-        p_ptr,
-        ctx.num_partitions,
+        p,
+        end_x,
         end_y,
         args.max_num_partitions * args.num_heads,
         start_x,
         start_y);
 
-    for (int i = start_x, row_i = 0; i < ctx.num_partitions;
+    for (int i = start_x, row_i = 0; i < end_x;
          i += ctx.wg_partition_stride, row_i++) {
       subgroup::tile_load(ld_tile, ld_payload);
 
       ld_payload.template update_tdesc<update_dir>(ctx.wg_partition_stride);
-      int32_t remain = ctx.num_partitions - i;
+      int32_t remain = end_x - i;
 #pragma unroll
       for (int block_idx = 0; block_idx < block_m; ++block_idx) {
         int32_t token_pos = start_y + block_idx;
