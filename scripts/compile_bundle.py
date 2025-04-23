@@ -594,7 +594,7 @@ def process(*args):
         env_torchccl['COMPUTE_BACKEND'] = 'dpcpp'
         _compile('torch-ccl',
                  env_torchccl,
-                 pkg_patchelf = 'oneccl_bindings_for_pytorch',
+                 pkg_name = 'oneccl_bindings_for_pytorch',
                  disable_oneapi_integration = args_disable_oneapi_integration,
                  show_command = args_verbose)
         durations['Compile Torch-CCL'] = get_duration(t0)
