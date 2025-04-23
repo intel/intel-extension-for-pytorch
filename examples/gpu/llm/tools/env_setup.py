@@ -109,11 +109,16 @@ if __name__ == '__main__':
             cont_aux.append('@echo off')
         else:
             pass
+        VER_TORCH = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
         if len(args.oneapi_root_dir) == 0:
             torchccl = ''
             if SYSTEM == 'Linux':
-                torchccl = f'oneccl-bind-pt=={INFO_TORCHCCL["version"]}'
-            cont_aux.append(f'python -m pip install torch=={INFO_TORCH["version"]} --index-url {INFO_TORCH["index-url"]}')
+                VER_TORCHCCL = INFO_TORCHCCL["version"]
+                if VER_TORCHCCL != 'N/A':
+                    if VER_TORCHCCL != '':
+                        VER_TORCHCCL = f'=={VER_TORCHCCL}'
+                    torchccl = f'oneccl-bind-pt{VER_TORCHCCL}'
+            cont_aux.append(f'python -m pip install torch=={VER_TORCH} --index-url {INFO_TORCH["index-url"]}')
             cont_aux.append(f'python -m pip install intel-extension-for-pytorch=={VER_IPEX} {torchccl} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/')
         else:
             sys.path.append(os.path.join(SRCDIR, 'scripts'))
@@ -153,7 +158,7 @@ if __name__ == '__main__':
                 cmd_triton = f'python -m pip install pytorch-triton-xpu{ver_triton} --index-url {INFO_TORCH["index-url"]}'
                 remove_directory(pytorch_dir)
             else:
-                cont_aux.append(f'python -m pip install torch=={INFO_TORCH["version"]} --index-url {INFO_TORCH["index-url"]}')
+                cont_aux.append(f'python -m pip install torch=={VER_TORCH} --index-url {INFO_TORCH["index-url"]}')
             if SYSTEM == 'Windows':
                 cont_aux.append(f'for %%f in ({os.path.join(".", "wheels", "*.whl")}) do python -m pip install "%%f"')
             else:

@@ -324,9 +324,11 @@ def process(*args):
                 install_mode['audio'] = 'compile'
         else:
             install_mode['torch'] = 'pip'
-            if INFO_TORCHVISION['version'] == 'N/A':
+            VER_TORCHVISION = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
+            VER_TORCHAUDIO = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
+            if VER_TORCHVISION == 'N/A':
                 args_with_vision = False
-            if INFO_TORCHAUDIO['version'] == 'N/A':
+            if VER_TORCHAUDIO == 'N/A':
                 args_with_audio = False
             if args_with_vision:
                 install_mode['vision'] = 'pip'
@@ -334,9 +336,11 @@ def process(*args):
                 install_mode['audio'] = 'pip'
     elif args_install_pytorch == 'pip':
         install_mode['torch'] = 'pip'
-        if INFO_TORCHVISION['version'] == 'N/A':
+        VER_TORCHVISION = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
+        VER_TORCHAUDIO = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
+        if VER_TORCHVISION == 'N/A':
             args_with_vision = False
-        if INFO_TORCHAUDIO['version'] == 'N/A':
+        if VER_TORCHAUDIO == 'N/A':
             args_with_audio = False
         if args_with_vision:
             install_mode['vision'] = 'pip'
@@ -457,7 +461,7 @@ def process(*args):
         else:
             pass
         env_torch = env.copy()
-        # env_torch['PYTORCH_BUILD_VERSION'] = INFO_TORCH['version']
+        # env_torch['PYTORCH_BUILD_VERSION'] = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
         # env_torch['PYTORCH_BUILD_NUMBER'] = '0'
         if 'CONDA_PREFIX' in env_torch:
             if 'CMAKE_PREFIX_PATH' in env_torch:
@@ -512,11 +516,18 @@ def process(*args):
         durations['Compile PyTorch'] = get_duration(t0)
     elif install_mode['torch'] == 'pip':
         t0 = int(time.time() * 1000)
-        command = f'python -m pip install torch=={INFO_TORCH["version"]}'
+        VER_TORCH = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
+        command = f'python -m pip install torch=={VER_TORCH}'
         if args_with_vision:
-            command += f' torchvision=={INFO_TORCHVISION["version"]}'
+            VER_TORCHVISION = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
+            if VER_TORCHVISION != '':
+                VER_TORCHVISION = f'=={VER_TORCHVISION}'
+            command += f' torchvision{VER_TORCHVISION}'
         if args_with_audio:
-            command += f' torchaudio=={INFO_TORCHAUDIO["version"]}'
+            VER_TORCHAUDIO = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
+            if VER_TORCHAUDIO != '':
+                VER_TORCHAUDIO = f'=={VER_TORCHAUDIO}'
+            command += f' torchaudio{VER_TORCHAUDIO}'
         command += f' --index-url {INFO_TORCH["index-url"]}'
         exec_cmds(command,
                   show_command = args_verbose)

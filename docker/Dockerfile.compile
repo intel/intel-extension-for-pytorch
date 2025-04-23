@@ -56,10 +56,21 @@ RUN . ./miniforge3/bin/activate && \
     echo 'cd ${BASEFOLDER}\n' >> ./wheels/pytorch_install.sh; \
     INDEX_URL=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:index-url); \
     if [ ! -d pytorch ]; then \
-        VERSION_TORCH=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:version); \
-        VERSION_TORCHVISION=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchvision:version); \
-        VERSION_TORCHAUDIO=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchaudio:version); \
-        echo "python -m pip install torch==${VERSION_TORCH} torchvision==${VERSION_TORCHVISION} torchaudio==${VERSION_TORCHAUDIO} --index-url ${INDEX_URL}\n" >> ./wheels/pytorch_install.sh; \
+        VERSION_TORCH=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:version:linux) 2>/dev/null; \
+        if [ $? -gt 0 ]; then \
+            VERSION_TORCH=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k pytorch:version); \
+        fi; \
+        VERSION_TORCHVISION=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchvision:version:linux) 2>/dev/null; \
+        if [ $? -gt 0 ]; then \
+            VERSION_TORCHVISION=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchvision:version); \
+        fi; \
+        VERSION_TORCHAUDIO=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchaudio:version:linux) 2>/dev/null; \
+        if [ $? -gt 0 ]; then \
+            VERSION_TORCHAUDIO=$(python ./intel-extension-for-pytorch/scripts/tools/compilation_helper/dep_ver_utils.py -f ./intel-extension-for-pytorch/dependency_version.json -k torchaudio:version); \
+        fi; \
+        if [ ! -z ${VERSION_TORCHVISION} ]; then VERSION_TORCHVISION="==${VERSION_TORCHVISION}"; fi; \
+        if [ ! -z ${VERSION_TORCHAUDIO} ]; then VERSION_TORCHAUDIO="==${VERSION_TORCHAUDIO}"; fi; \
+        echo "python -m pip install torch==${VERSION_TORCH} torchvision${VERSION_TORCHVISION} torchaudio${VERSION_TORCHAUDIO} --index-url ${INDEX_URL}\n" >> ./wheels/pytorch_install.sh; \
     fi; \
     echo "python -m pip install *.whl" >> ./wheels/pytorch_install.sh; \
     if [ -d pytorch ]; then \
