@@ -106,7 +106,7 @@ timm
 tokenizers==0.19.1
 tomli==2.0.1
 tqdm==4.66.4
-transformers==4.44.0
+transformers==4.48.0
 triton==3.0.0
 typeguard==4.3.0
 types-dataclasses==0.6.6
