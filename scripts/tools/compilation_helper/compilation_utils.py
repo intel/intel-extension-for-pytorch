@@ -3,6 +3,7 @@
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import stat
@@ -19,6 +20,7 @@ def _exec_cmd_single(command,
                      exit_on_failure = True,
                      show_command = False,
                      silent = False,
+                     strip_output = True,
                      redirect_file = '',
                      redirect_append = False):
     if command == '':
@@ -48,11 +50,12 @@ def _exec_cmd_single(command,
                          shell = shell,
                          text = True)
     for line in iter(p.stdout.readline, ''):
-        lines_stdout.append(line.strip())
+        line = line.replace('\r', '').replace('\n', '')
+        lines_stdout.append(line.strip() if strip_output else line)
         if not silent:
-            print(line, end = '')
+            print(line)
         if not file is None:
-            file.write(line)
+            file.write(f'{line}\n')
     p.stdout.close()
     return_code = p.wait()
     if file is not None:
@@ -69,6 +72,7 @@ def exec_cmds(commands,
               stop_on_failure = True,
               show_command = False,
               silent = False,
+              strip_output = True,
               redirect_file = '',
               redirect_append = False):
     if show_command:
@@ -92,6 +96,7 @@ def exec_cmds(commands,
                                            show_command = show_command,
                                            exit_on_failure = exit_on_failure,
                                            silent = silent,
+                                           strip_output = strip_output,
                                            redirect_file = redirect_file,
                                            redirect_append = redirect_append)
         ret_code = r
@@ -189,14 +194,26 @@ def source_env(script,
     _, lines_stdout = exec_cmds(command,
                                  env = env,
                                  shell = True,
-                                 silent = True)
+                                 silent = True,
+                                 strip_output = False)
+    env_tmp = []
+    remove_last = False
     parse_start = False
     for line in lines_stdout:
         if parse_start:
-            key, value = line.strip().split('=', 1)
-            env[key] = value
+            #line = line.rstrip()
+            if re.match('^[^=\s\\n\\r][^=\\n\\r]*=[^=\\n\\r]*', line):
+                env_tmp.append(line)
+                remove_last = True
+            else:
+                if remove_last:
+                    env_tmp.pop()
+                    remove_last = False
         if line.strip() == separator:
             parse_start = True
+    for line in env_tmp:
+        key, value = line.split('=', 1)
+        env[key] = value
     return env
 
 def get_duration(t0):

@@ -27,6 +27,8 @@ VER_MKL_U=${VER_MKL_C}-14
 VER_CCL_U=${VER_CCL_C}-505
 VER_PTI_U=${VER_PTI_C}-284
 
+LST_RHEL="rhel centos almalinux"
+
 if [ $# -eq 0 ]; then
     echo "Usage: bash $0 <MODE>"
     echo "MODE: \"driver\" for installing required driver packages."
@@ -69,7 +71,7 @@ if [ "${OS_ID}" = "ubuntu" ]; then
         echo "Ubuntu version ${OS_VERSION} not supported"
         exit 3
     fi
-elif [[ " rhel centos " =~ " ${OS_ID} " ]] && [ "${DEVICE}" = "unified" ]; then
+elif [[ " ${LST_RHEL} " =~ " ${OS_ID} " ]] && [ "${DEVICE}" = "unified" ]; then
     OS_VERSION=${VERSION_ID}
     if [ "${OS_VERSION}" = "8" ]; then
         OS_VERSION="8.10"
@@ -105,7 +107,7 @@ function add-repo-driver() {
         echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu ${OS_VERSION} ${DEVICE}" | ${SUDO} tee /etc/apt/sources.list.d/intel-gpu-${OS_VERSION}.list
         ${SUDO} apt update
     fi
-    if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
+    if [[ " ${LST_RHEL} " =~ " ${OS_ID} " ]]; then
         ${SUDO} dnf install -y 'dnf-command(config-manager)'
         ${SUDO} dnf config-manager --add-repo https://repositories.intel.com/gpu/rhel/${OS_VERSION}/unified/intel-gpu-${OS_VERSION}.repo
     fi
@@ -128,7 +130,7 @@ function add-repo-basekit() {
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | ${SUDO} tee /etc/apt/sources.list.d/oneAPI.list
         ${SUDO} apt update
     fi
-    if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
+    if [[ " ${LST_RHEL} " =~ " ${OS_ID} " ]]; then
         tee > /tmp/oneAPI.repo << EOF
 [oneAPI]
 name=Intel® oneAPI repository
@@ -179,7 +181,7 @@ function install-driver() {
         intel-ocloc \
         xpu-smi
     fi
-    if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
+    if [[ " ${LST_RHEL} " =~ " ${OS_ID} " ]]; then
         #${SUDO} dnf install -y intel-opencl-${VER_ICD_C} \
         #level-zero-${VER_LIBZE_C} \
         #level-zero-devel-${VER_LIBZE_C} \
@@ -236,7 +238,7 @@ function install-dev() {
         intel-oneapi-ccl-devel=${VER_CCL_U} \
         intel-pti-dev=${VER_PTI_U}
     fi
-    if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
+    if [[ " ${LST_RHEL} " =~ " ${OS_ID} " ]]; then
         ${SUDO} dnf install -y intel-oneapi-dpcpp-cpp-${VER_ONEAPI}-${VER_DPCPP_C} \
         intel-oneapi-mkl-devel-${VER_MKL_C} \
         intel-oneapi-ccl-devel-${VER_CCL_C} \
