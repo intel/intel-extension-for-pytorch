@@ -36,13 +36,13 @@ LLM Inference
      - ✅
      - ✅
    * - Llama3
-     - meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B-Instruct
+     - meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B-Instruct, meta-llama/Llama-3.2-1B, meta-llama/Llama-3.2-3B,meta-llama/Llama-3.3-70B-Instruct
      - ✅
      - ✅
      - ✅
      - ✅
    * - Phi-3 mini
-     - microsoft/Phi-3-mini-4k-instruct, microsoft/Phi-3-mini-128k-instruct
+     - microsoft/Phi-3-mini-4k-instruct, microsoft/Phi-3-mini-128k-instruct, microsoft/Phi-3.5-mini-instruct
      - ✅
      - ✅
      - ✅
@@ -54,7 +54,7 @@ LLM Inference
      - ✅
      - ✅
    * - Qwen 
-     - Qwen/Qwen2-VL-7B-Instruct
+     - Qwen/Qwen2-VL-7B-Instruct, Qwen/Qwen2.5-7B-Instruct
      - ✅
      - ✅
      - ✅
@@ -77,18 +77,18 @@ LLM Inference
      - ✅
      - ✅
      - 
-   * - Falcon
-     - tiiuae/falcon-40b-instruct
-     - ✅
-     - 
-     - ✅
-     - 
    * - OPT 
      - facebook/opt-6.7b, facebook/opt-30b
      - ✅
      - 
      - ✅
      - 
+   * - Mixtral
+     - mistralai/Mistral-7B-Instruct-v0.2
+     - ✅
+     - ✅
+     - ✅
+     - ✅
 
 Platforms
 ~~~~~~~~~~~~~
@@ -135,7 +135,8 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
      - ✅
      - ✅
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.5.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
+
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.7.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------

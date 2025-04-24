@@ -259,7 +259,7 @@ Run_benchmark_Llava1.5-7b(){
 	model=llava-hf/llava-1.5-7b-hf
 	sub_model_name=llava
 	dir=perf/${model}/beam${beam}_bs${bs}
-	python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams 1  --num-iter ${iter} --device xpu --ipex --dtype float16 --batch-size ${bs} --vision-text-model
+	python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams 1  --num-iter ${iter} --device xpu --ipex --dtype float16 --batch-size ${bs} --vision-text-model 2>&1 | tee log_e2e
 	mv log_e2e ${dir}
 	PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams 1  --num-iter ${iter} --device xpu --ipex --dtype float16 --batch-size ${bs} --vision-text-model
 	mv profile*pt ${dir}

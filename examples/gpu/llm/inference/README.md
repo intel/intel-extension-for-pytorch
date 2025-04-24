@@ -14,11 +14,11 @@ Currently, only support Transformers 4.48.3. Support for newer versions of Trans
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) | 
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 |Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |✅| ✅|✅|✅|$✅^1$|
-|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |✅| ✅|✅|✅|$✅^2$|
-|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |✅| ✅|✅|✅|$✅^3$|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B", "meta-llama/Llama-3.2-1B", "meta-llama/Llama-3.2-3B", "meta-llama/Llama-3.3-70B-Instruct" |✅| ✅|✅|✅|$✅^2$|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct", "microsoft/Phi-3.5-mini-instruct" |✅| ✅|✅|✅|$✅^3$|
+|Mistral | "mistralai/Mistral-7B-Instruct-v0.2" | ✅| ✅| ✅ |✅ | |
 |GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅| |
-|Qwen|"Qwen/Qwen2-7B"|✅ | ✅ |✅ | ✅| |
-|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | | ✅ |
+|Qwen|"Qwen/Qwen2-7B", "Qwen/Qwen2-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct" |✅ | ✅ |✅ | ✅| |
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ |  |✅ |  |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ |  |✅ | |
 |GLM4-9B|"THUDM/glm-4-9b"| ✅ |  |✅ |  |
