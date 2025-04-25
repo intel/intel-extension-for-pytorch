@@ -1,6 +1,35 @@
 Releases
 ========
 
+## 2.7.0
+
+We are excited to announce the release of Intel® Extension for PyTorch* 2.7.0+cpu which accompanies PyTorch 2.7. This release mainly brings you new LLM model optimization including DeepSeek-R1-671B and Phi-4, new APIs for LLM serving frameworks including sliding window and softcap support in PagedAttention APIs, MambaMixer API for Jamba and Mamba model and API for multi-LoRA inference kernels. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+
+### Highlights
+
+* DeepSeek-R1 support
+
+Intel® Extension for PyTorch* provides optimization for the hot [DeepSeek-R1-671B](https://github.com/deepseek-ai/DeepSeek-R1) model. A few optimizations including Multi-Head Latent Attention (MLA), fused MoE, fused-shared-expert and MoEGate, brings you well-performing experience with INT8 precision on Intel® Xeon®.
+
+* Phi-4 support
+
+Microsoft has recently released [Phi-4](https://aka.ms/phi4-feb2025), including [Phi-4-mini](https://ai.azure.com/explore/models/Phi-4-mini-instruct/version/1/registry/azureml) (3.8B dense decoder-only transformer model) and [Phi-4-multimodal](https://ai.azure.com/explore/models/Phi-4-multimodal-instruct/version/1/registry/azureml) (5.6B multimodal model). Intel® Extension for PyTorch* provides [support of Phi-4](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-microsoft-phi-4-small-language-models.html) since its launch date with early release version, and the related optimizations are included in this official release.
+
+* General Large Language Model (LLM) optimizations
+
+Intel® Extension for PyTorch* provides sliding window and softcap support in PagedAttention APIs, MambaMixer API for Jamba and Mamba model and API for multi-LoRA inference kernels for LLM serving frameworks. For user experience improvements, Intel® Extension for PyTorch* supports running INT4 workloads with only INT4 weights, removing the need of downloading the original high precision weights. A full list of optimized models can be found at [LLM optimization](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.0+cpu/examples/cpu/llm/inference).
+
+* Bug fixing and other optimization
+
+    - Optimized the performance of LLM [#3537](https://github.com/intel/intel-extension-for-pytorch/commit/30ecffa4db675594670be94e40167543729641a6) [#3611](https://github.com/intel/intel-extension-for-pytorch/commit/e11294db8fe76330965dbce3d94a7666811a6415) [#3549](https://github.com/intel/intel-extension-for-pytorch/commit/f20e0a251fefd55dad36ca21f3f027cfd2d50a44)
+    - Handled new linear modules in DeepSpeed v0.16.5 [#3622](https://github.com/intel/intel-extension-for-pytorch/commit/78694e40c66747cc9ec34f9d043cb522188916ff) [#3638](https://github.com/intel/intel-extension-for-pytorch/commit/ec282f6d5e36b5904197cf7de22e421d0db61a61)
+    - Fixed PagedAttention kernel to avoid the graph break when using `torch.compile` [#3641](https://github.com/intel/intel-extension-for-pytorch/commit/c12230bd8c6a0223d7cbd27ef19549cc3bcd87df)
+    - Added user guide for running DeepSeek-R1[#3660](https://github.com/intel/intel-extension-for-pytorch/commit/94f887994846ae1fd4be691fd26f6308574a9ca9) and multimodal models [#3649](https://github.com/intel/intel-extension-for-pytorch/commit/c2ccab24217858592029f70b5b3db9ff8f2287d0)
+    - Upgraded oneDNN to v3.7.2 [#3582](https://github.com/intel/intel-extension-for-pytorch/commit/68ce64fa1cc28ec7119c163e1a29077f0bda3f43)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.6.0+cpu...v2.7.0+cpu
+
+
 ## 2.6.0
 
 We are excited to announce the release of Intel® Extension for PyTorch* 2.6.0+cpu which accompanies PyTorch 2.6. This release mainly brings you full optimization on latest Intel® Xeon® 6 P-core platform, new LLM model support including Falcon3/Jamba/DeepSeek V2.5, and latest LLM optimization including FP8 KV cache, GPTQ/AWQ support under Tensor Parallel mode, and INT8 computation for WOQ. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
