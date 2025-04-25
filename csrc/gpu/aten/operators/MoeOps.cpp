@@ -234,6 +234,351 @@ void fused_topk_softmax(
 };
 }; // namespace TopKSoftmaxImpl
 
+namespace GroupedTopKImpl {
+template <typename T, bool addbias, bool renorm, int topk_group, int topk>
+struct FusedGroupedTopK {
+  static constexpr float kPosInfinity = INFINITY;
+  static constexpr float kNegInfinity = (-1) * kPosInfinity;
+  static constexpr int SgSize = 16;
+  using VECBIT = sycl::vec<uint8_t, MaxNumExperts / 8>;
+  FusedGroupedTopK(
+      const T* gating_output,
+      const T* bias,
+      float* topk_weights,
+      int* topk_indices,
+      float* score_buf,
+      float* max_buf,
+      const int num_tokens,
+      const int num_experts,
+      const int num_expert_group)
+      : gating_output(gating_output),
+        bias(bias),
+        topk_weights(topk_weights),
+        topk_indices(topk_indices),
+        score_buf(score_buf),
+        max_buf(max_buf),
+        num_tokens(num_tokens),
+        num_experts(num_experts),
+        num_expert_group(num_expert_group),
+        chk_per_group(num_experts / num_expert_group) {}
+
+  static inline sycl::nd_range<1> get_nd_range(const int num_tokens) {
+    int total_sg = divup(num_tokens, SgSize) * SgSize;
+    int local_sg = SgSize;
+    sycl::range<1> local(local_sg);
+    sycl::range<1> global(total_sg);
+    return sycl::nd_range<1>(global, local);
+  }
+
+  inline static void bit_set(uint8_t& c, int b) {
+    c |= (1 << b);
+  }
+
+  inline static void bit_clear(uint8_t& c, int b) {
+    c &= (~(1 << b));
+  }
+
+  inline static int bit_test(uint8_t& c, int b) {
+    return (c & (1 << b)) ? 1 : 0;
+  }
+
+  inline static int bit_wordaddr(int b) {
+    return b >> 3;
+  }
+
+  inline static int bit_bitaddr(int b) {
+    return b & 7;
+  }
+
+  inline static void vec_set(VECBIT& mask, int i) {
+    bit_set(mask[bit_wordaddr(i)], bit_bitaddr(i));
+  }
+  inline static void vec_clear(VECBIT& mask, int i) {
+    bit_clear(mask[bit_wordaddr(i)], bit_bitaddr(i));
+  }
+
+  inline static int vec_test(VECBIT& mask, int i) {
+    return bit_test(mask[bit_wordaddr(i)], bit_bitaddr(i));
+  }
+
+  template <int n>
+  inline void get_topk_sort(
+      sycl::vec<float, n>& val,
+      sycl::vec<int, n>& idx,
+      float* src,
+      int dim) const {
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < dim; ++j) {
+        if (val[i] < src[j]) {
+          idx[i] = j;
+          val[i] = src[j];
+        }
+      }
+      src[idx[i]] = kNegInfinity;
+    }
+  }
+
+  template <int n>
+  inline int argmin(sycl::vec<float, n>& val) const {
+    float min_val = kPosInfinity;
+    int idx = -1;
+    for (int i = 0; i < n; ++i) {
+      if (min_val > val[i]) {
+        min_val = val[i];
+        idx = i;
+      }
+    }
+    return idx;
+  }
+
+  template <int n>
+  inline void get_topk_nosort(
+      sycl::vec<float, n>& val,
+      sycl::vec<int, n>& idx,
+      float* src,
+      int dim) const {
+    float min_val = kPosInfinity;
+    int min_idx = -1;
+    for (int i = 0; i < n; ++i) {
+      val[i] = src[i];
+      idx[i] = i;
+      if (src[i] < min_val) {
+        min_val = src[i];
+        min_idx = i;
+      }
+    }
+    for (int i = n; i < dim; ++i) {
+      if (src[i] > min_val) {
+        val[min_idx] = src[i];
+        idx[min_idx] = i;
+        int j = argmin(val);
+        min_idx = j;
+        min_val = val[j];
+      }
+    }
+  }
+
+  void grouped_topk_kern(
+      const T* src,
+      float* topk_wgts,
+      int* topk_ids,
+      const T* bias,
+      float* max_buf,
+      float* score_buf,
+      const int64_t num_token,
+      const int64_t inner_dim,
+      const int64_t chk_per_group,
+      const int64_t num_expert_group) const {
+    // src num_token, inner_dim
+    // dst num_token, num_expert_group
+    // no support softmax
+    float one = 1.0f;
+    float max_val;
+    // sigmoid, addbias and max
+    for (int64_t i = 0; i < num_expert_group; ++i) {
+      max_val = kNegInfinity;
+      for (int64_t j = 0; j < chk_per_group; ++j) {
+        int64_t k = i * chk_per_group + j;
+        float t;
+        if constexpr (addbias) {
+          t = one / (one + sycl::native::exp(-src[k])) + bias[k];
+        } else {
+          t = one / (one + sycl::native::exp(-src[k]));
+        }
+        score_buf[k] = t;
+        max_val = std::max(t, max_val);
+      }
+      max_buf[i] = max_val; // num_token, num_expert_group
+    }
+    // topk index only
+    sycl::vec<float, topk_group> topk_group_data(kNegInfinity);
+    sycl::vec<int, topk_group> topk_group_idx(-1);
+    get_topk_nosort(topk_group_data, topk_group_idx, max_buf, num_expert_group);
+    // reverse mask
+    VECBIT mask(0xff); // 32 max_expert_group, 8 for each uchar
+    for (int i = 0; i < topk_group; ++i) {
+      vec_clear(mask, topk_group_idx[i]);
+    }
+    // fill with 0
+    for (int i = 0; i < num_expert_group; ++i) {
+      if (vec_test(mask, i)) {
+        int s = i * chk_per_group;
+        for (int j = s; j < s + chk_per_group; ++j) {
+          score_buf[j] = 0.0f;
+        }
+      }
+    }
+    // final topk
+    sycl::vec<float, topk> topk_data(kNegInfinity);
+    sycl::vec<int, topk> topk_idx(-1);
+    get_topk_nosort(topk_data, topk_idx, score_buf, inner_dim);
+
+    float row_sum = 0.0f;
+    for (int i = 0; i < topk; ++i) {
+      row_sum += topk_data[i];
+    }
+    for (int i = 0; i < topk; ++i) {
+      if constexpr (renorm) {
+        topk_wgts[i] = topk_data[i] / row_sum;
+      } else {
+        topk_wgts[i] = topk_data[i];
+      }
+      topk_ids[i] = topk_idx[i];
+    }
+  }
+
+  void operator()(sycl::nd_item<1> it) const {
+    int64_t token_id = it.get_global_id()[0];
+    int64_t i = token_id * num_experts;
+    int64_t j = token_id * num_expert_group;
+    int64_t k = token_id * topk;
+    if (token_id < num_tokens) {
+      grouped_topk_kern(
+          &gating_output[i],
+          &topk_weights[k],
+          &topk_indices[k],
+          bias,
+          &max_buf[j],
+          &score_buf[i],
+          num_tokens,
+          num_experts,
+          chk_per_group,
+          num_expert_group);
+    }
+  }
+
+  const T* gating_output;
+  const T* bias;
+  float* topk_weights;
+  int* topk_indices;
+  float* score_buf;
+  float* max_buf;
+  const int num_tokens;
+  const int num_experts;
+  const int num_expert_group;
+  const int64_t chk_per_group;
+};
+
+template <typename T, int topk, int topk_group>
+void launch_fused_grouped_topk_sigmoid(
+    sycl::queue& queue,
+    const T* gating_output,
+    const T* bias,
+    float* topk_weights,
+    int* topk_indices,
+    float* score_buf,
+    float* max_buf,
+    const int num_tokens,
+    const int num_experts,
+    const int num_expert_group) {
+  // addbias and renorm are set to true by default
+  using Kernel = FusedGroupedTopK<T, true, true, topk_group, topk>;
+  // int slm_size = Kernel::get_slm_size(num_tokens, num_experts);
+  auto range = Kernel::get_nd_range(num_tokens);
+  auto cgf = DPCPP_Q_CGF(cgh) {
+    // sycl::local_accessor<T, 1> accessor(slm_size / sizeof(T), cgh);
+    Kernel task(
+        // accessor,
+        gating_output,
+        bias,
+        topk_weights,
+        topk_indices,
+        score_buf,
+        max_buf,
+        num_tokens,
+        num_experts,
+        num_expert_group);
+    cgh.parallel_for(range, task);
+  };
+  DPCPP_Q_SUBMIT(queue, cgf);
+}
+
+template <typename T>
+using LAUNCH_FUNC = void (*)(
+    sycl::queue&,
+    const T*,
+    const T*,
+    float*,
+    int*,
+    float*,
+    float*,
+    const int,
+    const int,
+    const int);
+
+#define DEFINE_GROUPED_TOPK_FUNC(T, a, b) \
+  &launch_fused_grouped_topk_sigmoid<T, a, b>
+
+template <typename T>
+void fused_grouped_topk_sigmoid(
+    const T* gating_output,
+    const T* bias,
+    float* topk_weights,
+    int* topk_indices,
+    float* score_buf,
+    float* max_buf,
+    const int num_tokens,
+    const int num_experts,
+    const int num_expert_group,
+    const int topk,
+    const int topk_group) {
+  auto& queue = dpcppGetCurrentQueue();
+
+  TORCH_CHECK(
+      num_expert_group <= MaxNumExperts,
+      "num_experts must be less than or equal to 32");
+  TORCH_CHECK(
+      topk_group <= num_expert_group,
+      "topk_group must be less than or equal to num_expert_group");
+  constexpr std::array<int, 5> allowed_k = {1, 2, 4, 8, 16};
+  int topk_idx = -1;
+  int topk_g_idx = -1;
+  for (int i = 0; i < allowed_k.size(); ++i) {
+    if (allowed_k[i] == topk) {
+      topk_idx = i;
+    }
+    if (allowed_k[i] == topk_group) {
+      topk_g_idx = i;
+    }
+  }
+  TORCH_CHECK(
+      topk_idx >= 0 && topk_g_idx >= 0,
+      "wrong values for topk (%d) and topk_group (%d) up to %d\n",
+      topk,
+      topk_group,
+      16);
+  int funcIndex = topk_idx * allowed_k.size() + topk_g_idx;
+  static constexpr std::array<LAUNCH_FUNC<T>, 25> launch_funcs = {
+      DEFINE_GROUPED_TOPK_FUNC(T, 1, 1),   DEFINE_GROUPED_TOPK_FUNC(T, 1, 2),
+      DEFINE_GROUPED_TOPK_FUNC(T, 1, 4),   DEFINE_GROUPED_TOPK_FUNC(T, 1, 8),
+      DEFINE_GROUPED_TOPK_FUNC(T, 1, 16),  DEFINE_GROUPED_TOPK_FUNC(T, 2, 1),
+      DEFINE_GROUPED_TOPK_FUNC(T, 2, 2),   DEFINE_GROUPED_TOPK_FUNC(T, 2, 4),
+      DEFINE_GROUPED_TOPK_FUNC(T, 2, 8),   DEFINE_GROUPED_TOPK_FUNC(T, 2, 16),
+      DEFINE_GROUPED_TOPK_FUNC(T, 4, 1),   DEFINE_GROUPED_TOPK_FUNC(T, 4, 2),
+      DEFINE_GROUPED_TOPK_FUNC(T, 4, 4),   DEFINE_GROUPED_TOPK_FUNC(T, 4, 8),
+      DEFINE_GROUPED_TOPK_FUNC(T, 4, 16),  DEFINE_GROUPED_TOPK_FUNC(T, 8, 1),
+      DEFINE_GROUPED_TOPK_FUNC(T, 8, 2),   DEFINE_GROUPED_TOPK_FUNC(T, 8, 4),
+      DEFINE_GROUPED_TOPK_FUNC(T, 8, 8),   DEFINE_GROUPED_TOPK_FUNC(T, 8, 16),
+      DEFINE_GROUPED_TOPK_FUNC(T, 16, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 16, 2),
+      DEFINE_GROUPED_TOPK_FUNC(T, 16, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 16, 8),
+      DEFINE_GROUPED_TOPK_FUNC(T, 16, 16),
+  };
+
+  launch_funcs[funcIndex](
+      queue,
+      gating_output,
+      bias,
+      topk_weights,
+      topk_indices,
+      score_buf,
+      max_buf,
+      num_tokens,
+      num_experts,
+      num_expert_group);
+}
+
+}; // namespace GroupedTopKImpl
+
 namespace MoEScatterImpl {
 
 /**
@@ -1093,6 +1438,95 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
 }
 
 /**
+ * @brief Perform grouped topk after sigmoid/addbias on gating_output.
+ * @param gating_output The gating output tensor of shape [n_tokens, n_experts].
+ * @param n_topk The number of top experts to select.
+ * @param n_topk_group The number of top experts to select in the group.
+ * @return A tuple of tensors (topk_weights, topk_indices, rows_for_experts,
+ * offsets).
+ */
+static std::tuple<at::Tensor, at::Tensor> grouped_topk_sigmoid(
+    const Tensor& hidden_states,
+    const Tensor& gating_output,
+    const int64_t n_topk,
+    const bool renormalize,
+    const int64_t n_expert_group,
+    const int64_t n_topk_group,
+    const c10::string_view scoring_func,
+    const Tensor& bias) {
+  auto shape = gating_output.sizes().vec();
+  TORCH_CHECK(
+      hidden_states.sizes()[0] == gating_output.sizes()[0],
+      "Number of tokens mismatch")
+  TORCH_CHECK(
+      shape.size() == 2,
+      "gating_output must be 2D tensor, but got ",
+      shape.size(),
+      "D");
+  auto shape_bias = bias.sizes().vec();
+  TORCH_CHECK(
+      shape_bias[0] == shape[1],
+      "gating_output and bias must has same innermost dimension, but got ",
+      shape,
+      " and ",
+      shape_bias);
+  int n_tokens = shape[0];
+  int n_experts = shape[1];
+
+  auto topk_weights =
+      at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
+  auto topk_indices =
+      at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
+  auto score_buf = at::empty_like(gating_output, at::dtype(at::kFloat));
+  auto max_buf = at::empty(
+      {n_tokens, n_expert_group}, at::dtype(at::kFloat).device(at::kXPU));
+  if (gating_output.scalar_type() == at::kBFloat16) {
+    using scalar_t = sycl::ext::oneapi::bfloat16;
+    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+        reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
+        reinterpret_cast<scalar_t*>(bias.data_ptr()),
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<float*>(score_buf.data_ptr()),
+        reinterpret_cast<float*>(max_buf.data_ptr()),
+        n_tokens,
+        n_experts,
+        n_expert_group,
+        n_topk,
+        n_topk_group);
+  } else if (gating_output.scalar_type() == at::kHalf) {
+    using scalar_t = sycl::half;
+    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+        reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
+        reinterpret_cast<scalar_t*>(bias.data_ptr()),
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<float*>(score_buf.data_ptr()),
+        reinterpret_cast<float*>(max_buf.data_ptr()),
+        n_tokens,
+        n_experts,
+        n_expert_group,
+        n_topk,
+        n_topk_group);
+  } else {
+    using scalar_t = float;
+    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+        reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
+        reinterpret_cast<scalar_t*>(bias.data_ptr()),
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<float*>(score_buf.data_ptr()),
+        reinterpret_cast<float*>(max_buf.data_ptr()),
+        n_tokens,
+        n_experts,
+        n_expert_group,
+        n_topk,
+        n_topk_group);
+  }
+  return std::make_tuple(topk_weights, topk_indices);
+}
+
+/**
  * @brief moe_scatter is a reordering kernel for moe that reorders the
  * activations based on the topk_indices and offsets.
  *
@@ -1269,6 +1703,8 @@ static void moe_sum(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("topk_softmax.moe", at::AtenIpexTypeXPU::topk_softmax);
+  IPEX_OP_REGISTER(
+      "grouped_topk_sigmoid.moe", at::AtenIpexTypeXPU::grouped_topk_sigmoid);
   IPEX_OP_REGISTER("moe_scatter.moe", at::AtenIpexTypeXPU::moe_scatter);
   IPEX_OP_REGISTER("moe_gather.moe", at::AtenIpexTypeXPU::moe_gather);
   IPEX_OP_REGISTER("moe_sum.moe", at::AtenIpexTypeXPU::moe_sum)
