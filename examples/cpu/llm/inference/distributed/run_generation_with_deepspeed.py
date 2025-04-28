@@ -513,14 +513,13 @@ elif (
         "gptbigcode",
         "git",
         "mllama",
-        "qwen3",
         "qwen",
         "yuan",
         "whisper",
         "jamba",
         "phi4mm",
     ]
-    or (model_type == "qwen3moe" and not args.ipex_weight_only_quantization)
+    or (model_type in ["qwen3moe", "qwen3"] and not args.ipex_weight_only_quantization)
 ):
     model = model_class[0].from_pretrained(
         model_name,
