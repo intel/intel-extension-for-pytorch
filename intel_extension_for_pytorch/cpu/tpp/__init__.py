@@ -1,4 +1,3 @@
-import pkg_resources
 from . import fused_bert
 from . import utils
 from . import optim

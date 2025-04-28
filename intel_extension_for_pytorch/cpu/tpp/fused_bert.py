@@ -6,7 +6,7 @@ from .utils.blocked_layout import (
     BlockedTensor,
     get_blocking_signature,
 )
-import pkg_resources
+from importlib.metadata import distributions
 from .optim import AdamW, SGD
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 import copy
@@ -1248,7 +1248,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
 
     """
     # tpp bert optimization depends on the transformers repo to implementate the related module
-    installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+    installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
     min_version = "4.6.0"
     max_version = "4.48.0"
     if "transformers" not in installed_pkg:
