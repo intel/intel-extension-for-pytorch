@@ -302,7 +302,7 @@ class OptimizeTransformersNightlyTester(TestCase):
         elif m.name == "jamba":
             model.config.dtype = dtype
         model.eval()
-        ref_m = copy.deepcopy(model)
+        ref_m = model
         ipex_m = copy.deepcopy(model)
         ipex_m = ipex.llm.optimize(
             ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
@@ -427,6 +427,11 @@ class OptimizeTransformersNightlyTester(TestCase):
             supported_models, enable_torchcompile, dtypes, deployment_mode, return_dict
         ):
             if torchcompile and deployment_mode:
+                continue
+            if (
+                m.name in ["deepseekv2", "deepseekv3"]
+                and not core.isa_has_avx512_bf16_support()
+            ):
                 continue
             self.model_replacement_check(m, dtype, jit, torchcompile, ret_dict)
         _disable_tpp()
