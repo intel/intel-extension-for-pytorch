@@ -137,6 +137,12 @@ def _may_insert_deepspeed_modules(
                     LmHeadLinearAllreduce: q_lm_head_linear_all_reduce_module,
                 }
             )
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if issubclass(module, LinearLayer):
+                    deepspeed_modules_dict[module] = q_linear_layer_module
+                elif issubclass(module, LinearAllreduce):
+                    deepspeed_modules_dict[module] = q_linear_all_reduce_module
         torch_modules.update(deepspeed_modules_dict)
     return torch_modules
 
@@ -231,6 +237,12 @@ class DynamicQuantizedLinearLayer(_IPEXDynamicQuantizedLinear):
         if deepspeed_modules is not None:
             LinearLayer = deepspeed_modules[1]
             _FLOAT_MODULE.extend([LinearLayer])
+
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if issubclass(module, LinearLayer):
+                    _FLOAT_MODULE.extend([module])
+
         return _FLOAT_MODULE
 
     def __repr__(self):
@@ -260,6 +272,10 @@ class DynamicQuantizedLinearAllreduce(_IPEXDynamicQuantizedLinear):
         ), "DynamicQuantizedLinearAllreduce requires deepspeed to be installed"
         LinearAllreduce = deepspeed_modules[0]
         _FLOAT_MODULE = [LinearAllreduce]
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if issubclass(module, LinearAllreduce):
+                    _FLOAT_MODULE.extend([module])
         return _FLOAT_MODULE
 
     def __init__(
@@ -361,6 +377,7 @@ def may_quantize_deepspeed_modules(
     IPEX_QUANTIZATION_MODULE, q_config, module_mappings, qconfig_spec
 ):
     deepspeed_modules = may_import_deepspeed_modules()
+
     if deepspeed_modules is not None:
         LinearAllreduce, LinearLayer = deepspeed_modules[:2]
         module_mappings.update(IPEX_QUANTIZATION_MODULE)
@@ -375,6 +392,13 @@ def may_quantize_deepspeed_modules(
                     LmHeadLinearAllreduce: q_config,
                 }
             )
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                deepspeed_qconfig_spec.update(
+                    {
+                        module: q_config,
+                    }
+                )
 
         qconfig_spec.update(deepspeed_qconfig_spec)
     return module_mappings, qconfig_spec
