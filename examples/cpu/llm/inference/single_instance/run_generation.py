@@ -30,6 +30,14 @@ try:
 except ImportError:
     pass
 
+
+def str_to_kwargs(s):
+    return dict(
+        (k, float(v) if "." in v else int(v))
+        for k, v in (item.split("=") for item in s.split(","))
+    )
+
+
 # args
 parser = argparse.ArgumentParser("Generation script (fp32/bf16 path)", add_help=False)
 parser.add_argument(
@@ -79,8 +87,10 @@ parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
 )
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--sample", action="store_true")
 parser.add_argument("--ipex", action="store_true")
 parser.add_argument("--deployment-mode", action="store_true")
+parser.add_argument("--enable-thinking", action="store_true")
 parser.add_argument("--torch-compile", action="store_true")
 parser.add_argument(
     "--backend", default="ipex", type=str, help="backend of torch.compile"
@@ -92,6 +102,12 @@ parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument(
     "--token-latency", action="store_true", help="get token latency breakdown"
+)
+parser.add_argument(
+    "--generation-config",
+    type=str_to_kwargs,
+    default="temperature=0.9",
+    help="generation config",
 )
 parser.add_argument(
     "--cache-weight-for-large-batch",
@@ -257,12 +273,12 @@ if args.streaming:
 else:
     streamer = None
 generate_kwargs = dict(
-    do_sample=False,
-    temperature=0.9,
+    do_sample=True if args.sample else False,
     num_beams=num_beams,
     max_new_tokens=args.max_new_tokens,
     min_new_tokens=args.max_new_tokens,
     streamer=streamer,
+    **args.generation_config,
 )
 
 if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
@@ -379,72 +395,92 @@ if args.benchmark:
     if args.token_latency:
         if not hasattr(model.config, "token_latency"):
             model.config.token_latency = True
-    if model_type == "git":
-        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
-        generate_kwargs.pop("min_new_tokens", None)
-    elif model_type == "llava":
-        if args.prompt is not None:
+    for test_bs in [args.batch_size]:
+        if model_type == "git":
+            prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+            generate_kwargs.pop("min_new_tokens", None)
+        elif model_type == "llava":
+            if args.prompt is not None:
+                prompt = args.prompt
+            image = load_image(args.image_url)
+            image = [image] * test_bs
+            if model.config.mm_use_im_start_end:
+                prompt = (
+                    DEFAULT_IM_START_TOKEN
+                    + DEFAULT_IMAGE_TOKEN
+                    + DEFAULT_IM_END_TOKEN
+                    + "\n"
+                    + prompt
+                )
+            else:
+                prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
+            conv.append_message(conv.roles[0], prompt)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt()
+        elif model_type == "whisper":
+            prompt = sample[0]
+            generate_kwargs.pop("min_new_tokens", None)
+        elif model_type == "maira2":
             prompt = args.prompt
-        image = load_image(args.image_url)
-        image = [image] * args.batch_size
-        if model.config.mm_use_im_start_end:
-            prompt = (
-                DEFAULT_IM_START_TOKEN
-                + DEFAULT_IMAGE_TOKEN
-                + DEFAULT_IM_END_TOKEN
-                + "\n"
-                + prompt
+            sample = download_and_open(args.image_url)
+            process_input_func = (
+                tokenizer.process_reporting_input
+                if hasattr(tokenizer, "process_reporting_input")
+                else tokenizer.format_and_preprocess_reporting_input
             )
-        else:
-            prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
-        conv.append_message(conv.roles[0], prompt)
-        conv.append_message(conv.roles[1], None)
-        prompt = conv.get_prompt()
-    elif model_type == "whisper":
-        prompt = sample[0]
-        generate_kwargs.pop("min_new_tokens", None)
-    elif model_type == "maira2":
-        prompt = args.prompt
-        sample = download_and_open(args.image_url)
-        process_input_func = (
-            tokenizer.process_reporting_input
-            if hasattr(tokenizer, "process_reporting_input")
-            else tokenizer.format_and_preprocess_reporting_input
-        )
-    elif model_type == "phi4mm":
-        prompt = args.prompt
-    else:
-        # input prompt
-        current_path = pathlib.Path(__file__).parent.resolve()
-        with open(str(current_path) + "/prompt.json") as f:
-            prompt_pool = json.load(f)
-        if args.prompt is not None:
+        elif model_type == "phi4mm":
             prompt = args.prompt
-        elif model_type == "auto":
-            raise SystemExit(
-                "[ERROR] model prompt is not supported, please use --prompt for this model: "
-                + args.model_id
-            )
-        # elif int(args.input_tokens) > 8192:
-        #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-        elif args.input_tokens in prompt_pool[model_type]:
-            prompt = prompt_pool[model_type][args.input_tokens]
         else:
-            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
-        if model_type == "mllama":
-            raw_image = load_image(args.image_url)
-            raw_image = [raw_image] * args.batch_size
-            inputs = tokenizer(raw_image, prompt, return_tensors="pt")
-            input_size = inputs["input_ids"].size(dim=1)
-        else:
-            input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
-        print("---- Prompt size:", input_size)
+            # input prompt
+            current_path = pathlib.Path(__file__).parent.resolve()
+            with open(str(current_path) + "/prompt.json") as f:
+                prompt_pool = json.load(f)
+            if args.prompt is not None:
+                prompt = args.prompt
+            elif model_type == "auto":
+                raise SystemExit(
+                    "[ERROR] model prompt is not supported, please use --prompt for this model: "
+                    + args.model_id
+                )
+            # elif int(args.input_tokens) > 8192:
+            #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+            elif args.input_tokens in prompt_pool[model_type]:
+                if model_type == "qwen3moe":
+                    prompt_list = []
+                    for i in range(test_bs):
+                        prompt = prompt_pool[model_type][args.input_tokens][str(i)]
+                        messages = [{"role": "user", "content": prompt}]
+                        prompt = tokenizer.apply_chat_template(
+                            messages,
+                            tokenize=False,
+                            add_generation_prompt=True,
+                            enable_thinking=args.enable_thinking,
+                        )
+                        prompt_list.append(prompt)
+                    prompt = prompt_list
+                else:
+                    prompt = prompt_pool[model_type][args.input_tokens]
+            else:
+                raise SystemExit(
+                    "[ERROR] Plese use --prompt if want to use custom input."
+                )
+            if model_type == "mllama":
+                raw_image = load_image(args.image_url)
+                raw_image = [raw_image] * test_bs
+                inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+                input_size = inputs["input_ids"].size(dim=1)
+            else:
+                input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(
+                    dim=1
+                )
+            print("---- Prompt size:", input_size)
 
     # start
     total_time = 0.0
     num_iter = args.num_iter
     num_warmup = args.num_warmup
-    prompt = [prompt] * args.batch_size
+    if model_type != "qwen3moe":
+        prompt = [prompt] * args.batch_size
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled

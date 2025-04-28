@@ -55,6 +55,14 @@ tp_presharded_models = [
 
 t_start = time.time()
 
+
+def str_to_kwargs(s):
+    return dict(
+        (k, float(v) if "." in v else int(v))
+        for k, v in (item.split("=") for item in s.split(","))
+    )
+
+
 parser = ArgumentParser()
 
 parser.add_argument(
@@ -85,6 +93,14 @@ parser.add_argument(
     "--benchmark", action="store_true", help="additionally run benchmark"
 )
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--sample", action="store_true")
+parser.add_argument("--enable-thinking", action="store_true")
+parser.add_argument(
+    "--generation-config",
+    type=str_to_kwargs,
+    default="temperature=0.9",
+    help="generation config",
+)
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--deployment-mode", action="store_true")
 parser.add_argument("--ki", action="store_true")
@@ -487,21 +503,25 @@ if model_type in ["llava"]:
         args.model_id
     )
     model.config = config
-elif world_size == 1 or model_type in [
-    "falcon",
-    "baichuan",
-    "baichuan2",
-    "gptbigcode",
-    "git",
-    "mllama",
-    "qwen3moe",
-    "qwen3",
-    "qwen",
-    "yuan",
-    "whisper",
-    "jamba",
-    "phi4mm",
-]:
+elif (
+    world_size == 1
+    or model_type
+    in [
+        "falcon",
+        "baichuan",
+        "baichuan2",
+        "gptbigcode",
+        "git",
+        "mllama",
+        "qwen3",
+        "qwen",
+        "yuan",
+        "whisper",
+        "jamba",
+        "phi4mm",
+    ]
+    or (model_type == "qwen3moe" and not args.ipex_weight_only_quantization)
+):
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -723,11 +743,12 @@ if args.streaming:
 else:
     streamer = None
 generate_kwargs = dict(
-    do_sample=False,
+    do_sample=True if args.sample else False,
     num_beams=num_beams,
     max_new_tokens=args.max_new_tokens,
     min_new_tokens=args.max_new_tokens,
     streamer=streamer,
+    **args.generation_config,
 )
 
 
@@ -745,172 +766,185 @@ if re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs.pop("max_new_tokens")
 print_rank0(f"Generate args {generate_kwargs}")
 
-if model_type == "git":
-    from PIL import Image
-    import requests
+for test_bs in [args.batch_size]:
+    if model_type == "git":
+        from PIL import Image
+        import requests
 
-    prompt = Image.open(requests.get(args.image_url, stream=True).raw)
-    inputs = [prompt] * args.batch_size
-    generate_kwargs.pop("min_new_tokens", None)
-elif model_type == "llava":
-    from PIL import Image
-    import requests
-    from io import BytesIO
+        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+        inputs = [prompt] * test_bs
+        generate_kwargs.pop("min_new_tokens", None)
+    elif model_type == "llava":
+        from PIL import Image
+        import requests
+        from io import BytesIO
 
-    def load_image(image_file):
-        if image_file.startswith("http://") or image_file.startswith("https://"):
-            response = requests.get(image_file)
-            image = Image.open(BytesIO(response.content)).convert("RGB")
+        def load_image(image_file):
+            if image_file.startswith("http://") or image_file.startswith("https://"):
+                response = requests.get(image_file)
+                image = Image.open(BytesIO(response.content)).convert("RGB")
+            else:
+                image = Image.open(image_file).convert("RGB")
+            return image
+
+        model_name = get_model_name_from_path(args.model_id)
+        if "llama-2" in model_name.lower():
+            conv_mode = "llava_llama_2"
+        elif "v1" in model_name.lower():
+            conv_mode = "llava_v1"
+        elif "mpt" in model_name.lower():
+            conv_mode = "mpt"
         else:
-            image = Image.open(image_file).convert("RGB")
-        return image
+            conv_mode = "llava_v0"
+        conv = conv_templates[conv_mode].copy()
+        if "mpt" in model_name.lower():
+            roles = ("user", "assistant")
+        else:
+            roles = conv.roles
+        if args.prompt is not None:
+            prompt = args.prompt
+        image = load_image(args.image_url)
+        image = [image] * test_bs
+        if model.config.mm_use_im_start_end:
+            prompt = (
+                DEFAULT_IM_START_TOKEN
+                + DEFAULT_IMAGE_TOKEN
+                + DEFAULT_IM_END_TOKEN
+                + "\n"
+                + prompt
+            )
+        else:
+            prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
+        conv.append_message(conv.roles[0], prompt)
+        conv.append_message(conv.roles[1], None)
+        prompt = conv.get_prompt()
+        inputs = [prompt] * test_bs
+    elif model_type == "whisper":
+        import librosa
 
-    model_name = get_model_name_from_path(args.model_id)
-    if "llama-2" in model_name.lower():
-        conv_mode = "llava_llama_2"
-    elif "v1" in model_name.lower():
-        conv_mode = "llava_v1"
-    elif "mpt" in model_name.lower():
-        conv_mode = "mpt"
-    else:
-        conv_mode = "llava_v0"
-    conv = conv_templates[conv_mode].copy()
-    if "mpt" in model_name.lower():
-        roles = ("user", "assistant")
-    else:
-        roles = conv.roles
-    if args.prompt is not None:
+        sample = librosa.load(args.audio, sr=16000)
+        prompt = sample[0]
+        inputs = [prompt] * test_bs
+        generate_kwargs.pop("min_new_tokens", None)
+    elif model_type == "mllama":
+        from PIL import Image
+
+        def load_image(image_file):
+            if image_file.startswith("http://") or image_file.startswith("https://"):
+                import requests
+
+                raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            else:
+                raw_image = Image.open(image_file)
+            return raw_image
+
+        current_path = pathlib.Path(__file__).parent.resolve()
+        with open(str(current_path) + "/prompt.json") as f:
+            prompt_pool = json.load(f)
+        if args.prompt is not None:
+            prompt = args.prompt
+        elif model_type == "auto":
+            raise SystemExit(
+                "[ERROR] model prompt is not supported, please use --prompt for this model: "
+                + args.model_id
+            )
+        # elif int(args.input_tokens) > 8192:
+        #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+        elif args.input_tokens in prompt_pool[model_type]:
+            current_prompt = [prompt_pool[model_type][args.input_tokens][0]]
+            for i in range(1, test_bs):
+                current_prompt = current_prompt + [
+                    prompt_pool[model_type][args.input_tokens][i]
+                ]
+            prompt = current_prompt
+        else:
+            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+
+        raw_image = load_image(args.image_url)
+        raw_image = [raw_image] * test_bs
+        inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+        input_size = inputs["input_ids"].size(dim=1)
+        print("---- Prompt size:", input_size)
+        inputs = [prompt] * test_bs
+    elif model_type == "phi4mm":
+        from PIL import Image
+
+        def load_image(image_file):
+            if image_file.startswith("http://") or image_file.startswith("https://"):
+                import requests
+
+                raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            else:
+                raw_image = Image.open(image_file)
+            return raw_image
+
+        import soundfile
+
+        sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
         prompt = args.prompt
-    image = load_image(args.image_url)
-    image = [image] * args.batch_size
-    if model.config.mm_use_im_start_end:
-        prompt = (
-            DEFAULT_IM_START_TOKEN
-            + DEFAULT_IMAGE_TOKEN
-            + DEFAULT_IM_END_TOKEN
-            + "\n"
-            + prompt
-        )
-    else:
-        prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
-    conv.append_message(conv.roles[0], prompt)
-    conv.append_message(conv.roles[1], None)
-    prompt = conv.get_prompt()
-    inputs = [prompt] * args.batch_size
-elif model_type == "whisper":
-    import librosa
+        inputs = [prompt] * test_bs
+    elif model_type == "maira2":
+        from PIL import Image
+        import requests
 
-    sample = librosa.load(args.audio, sr=16000)
-    prompt = sample[0]
-    inputs = [prompt] * args.batch_size
-    generate_kwargs.pop("min_new_tokens", None)
-elif model_type == "mllama":
-    from PIL import Image
+        def download_and_open(url: str) -> Image.Image:
+            response = requests.get(url, headers={"User-Agent": "MAIRA-2"}, stream=True)
+            return Image.open(response.raw)
 
-    def load_image(image_file):
-        if image_file.startswith("http://") or image_file.startswith("https://"):
-            import requests
-
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
-        else:
-            raw_image = Image.open(image_file)
-        return raw_image
-
-    current_path = pathlib.Path(__file__).parent.resolve()
-    with open(str(current_path) + "/prompt.json") as f:
-        prompt_pool = json.load(f)
-    if args.prompt is not None:
         prompt = args.prompt
-    elif model_type == "auto":
-        raise SystemExit(
-            "[ERROR] model prompt is not supported, please use --prompt for this model: "
-            + args.model_id
+        sample = download_and_open(args.image_url)
+        process_input_func = (
+            tokenizer.process_reporting_input
+            if hasattr(tokenizer, "process_reporting_input")
+            else tokenizer.format_and_preprocess_reporting_input
         )
-    # elif int(args.input_tokens) > 8192:
-    #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-    elif args.input_tokens in prompt_pool[model_type]:
-        current_prompt = [prompt_pool[model_type][args.input_tokens][0]]
-        for i in range(1, args.batch_size):
-            current_prompt = current_prompt + [
-                prompt_pool[model_type][args.input_tokens][i]
-            ]
-        prompt = current_prompt
+        inputs = [prompt] * test_bs
     else:
-        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
-
-    raw_image = load_image(args.image_url)
-    raw_image = [raw_image] * args.batch_size
-    inputs = tokenizer(raw_image, prompt, return_tensors="pt")
-    input_size = inputs["input_ids"].size(dim=1)
-    print("---- Prompt size:", input_size)
-    inputs = [prompt] * args.batch_size
-elif model_type == "phi4mm":
-    from PIL import Image
-
-    def load_image(image_file):
-        if image_file.startswith("http://") or image_file.startswith("https://"):
-            import requests
-
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        # input tokens
+        input_sentences = []
+        current_path = pathlib.Path(__file__).parent.resolve()
+        with open(str(current_path) + "/prompt.json") as f:
+            prompt_pool = json.load(f)
+        if model_type == "gptj":
+            model_type = "gpt-j"
+        if model_type == "gptneox":
+            model_type = "gpt-neox"
+        if args.prompt is not None:
+            input_sentences.append(args.prompt)
+        elif model_type == "auto":
+            raise SystemExit(
+                "[ERROR] model prompt is not supported, please use --prompt for this model: "
+                + args.model_id
+            )
+        # elif int(args.input_tokens) > 8192:
+        #     input_sentences.append(
+        #         prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+        #     )
+        elif args.input_tokens in prompt_pool[model_type]:
+            if model_type in ["qwen3moe"]:
+                for i in range(0, test_bs):
+                    prompt = prompt_pool[model_type][args.input_tokens][str(i)]
+                    messages = [{"role": "user", "content": prompt}]
+                    prompt = tokenizer.apply_chat_template(
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                        enable_thinking=args.enable_thinking,  # Switches between thinking and non-thinking modes. Default is True.
+                    )
+                    input_sentences.append(prompt)
+            else:
+                input_sentences.append(prompt_pool[model_type][args.input_tokens])
         else:
-            raw_image = Image.open(image_file)
-        return raw_image
+            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+        if test_bs > len(input_sentences):
+            # dynamically extend to support larger bs by repetition
+            input_sentences *= math.ceil(test_bs / len(input_sentences))
 
-    import soundfile
-
-    sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
-    prompt = args.prompt
-    inputs = [prompt] * args.batch_size
-elif model_type == "maira2":
-    from PIL import Image
-    import requests
-
-    def download_and_open(url: str) -> Image.Image:
-        response = requests.get(url, headers={"User-Agent": "MAIRA-2"}, stream=True)
-        return Image.open(response.raw)
-
-    prompt = args.prompt
-    sample = download_and_open(args.image_url)
-    process_input_func = (
-        tokenizer.process_reporting_input
-        if hasattr(tokenizer, "process_reporting_input")
-        else tokenizer.format_and_preprocess_reporting_input
-    )
-    inputs = [prompt] * args.batch_size
-else:
-    # input tokens
-    input_sentences = []
-    current_path = pathlib.Path(__file__).parent.resolve()
-    with open(str(current_path) + "/prompt.json") as f:
-        prompt_pool = json.load(f)
-    if model_type == "gptj":
-        model_type = "gpt-j"
-    if model_type == "gptneox":
-        model_type = "gpt-neox"
-    if args.prompt is not None:
-        input_sentences.append(args.prompt)
-    elif model_type == "auto":
-        raise SystemExit(
-            "[ERROR] model prompt is not supported, please use --prompt for this model: "
-            + args.model_id
-        )
-    # elif int(args.input_tokens) > 8192:
-    #     input_sentences.append(
-    #         prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-    #     )
-    elif args.input_tokens in prompt_pool[model_type]:
-        input_sentences.append(prompt_pool[model_type][args.input_tokens])
-    else:
-        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
-    if args.batch_size > len(input_sentences):
-        # dynamically extend to support larger bs by repetition
-        input_sentences *= math.ceil(args.batch_size / len(input_sentences))
-
-    inputs = input_sentences[: args.batch_size]
-    input_size = tokenizer.batch_encode_plus(
-        inputs, return_tensors="pt"
-    ).input_ids.size(dim=1)
-    print("*** Prompt size: ", input_size)
+        inputs = input_sentences[:test_bs]
+        input_size = tokenizer.batch_encode_plus(
+            inputs, return_tensors="pt"
+        ).input_ids.size(dim=1)
+        print("*** Prompt size: ", input_size)
 
 
 def generate():
@@ -1037,7 +1071,7 @@ else:
         gen_ids, outputs = generate()
         t1 = time.time()
         gen_ids = list(gen_ids)
-        print_rank0(gen_ids[0][1:])
+        print_rank0(gen_ids)
         print_rank0("Iteration: %d, Time: %.6f sec" % (i, t1 - t0))
         if i >= warmup:
             total_time += t1 - t0
