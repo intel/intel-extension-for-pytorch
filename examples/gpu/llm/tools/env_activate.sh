@@ -1,12 +1,12 @@
 #!/bin/bash
 
-MSG_USAGE="Usage: source $0 [inference|fine-tuning|bitsandbytes|training]"
+MSG_USAGE="Usage: source $0 [inference|fine-tuning|bitsandbytes]"
 if [ $# -eq 0 ]; then
     echo ${MSG_USAGE}
     return 1
 fi
 MODE=$1
-if [ ${MODE} != "inference" ] && [ ${MODE} != "fine-tuning" ] && [ ${MODE} != "bitsandbytes" ] && [ ${MODE} != "training" ]; then
+if [ ${MODE} != "inference" ] && [ ${MODE} != "fine-tuning" ] && [ ${MODE} != "bitsandbytes" ]; then
     echo ${MSG_USAGE}
     return 2
 fi

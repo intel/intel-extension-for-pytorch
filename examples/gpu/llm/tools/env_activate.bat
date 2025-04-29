@@ -14,7 +14,7 @@ if "%~1"=="" (
 set MODE=%1
 
 :: Validate MODE
-if not "%MODE%"=="inference" if not "%MODE%"=="fine-tuning" if not "%MODE%"=="bitsandbytes" if not "%MODE%"=="training" (
+if not "%MODE%"=="inference" if not "%MODE%"=="fine-tuning" if not "%MODE%"=="bitsandbytes" (
     echo !MSG_USAGE!
     exit /b 2
 )
