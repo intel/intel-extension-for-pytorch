@@ -5,7 +5,7 @@ Here you can find examples for large language models (LLM) text generation. Thes
 > [!NOTE]  
 > New Llama models like Llama3.2-1B, Llama3.2-3B and Llama3.3-7B are also supported from release v2.7.10+xpu.
 
-- Include both inference/finetuning(lora)/bitsandbytes(qlora-finetuning)/training.
+- Include both inference/finetuning(lora)/bitsandbytes(qlora-finetuning).
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as Baichuan2-13B and Phi3-mini. 
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
@@ -32,7 +32,7 @@ docker run -it --rm --privileged -v /dev/dri/by-path:/dev/dri/by-path ipex-llm:x
 cd llm
 
 # Activate environment variables
-source ./tools/env_activate.sh  [inference|fine-tuning|bitsandbytes|training]
+source ./tools/env_activate.sh  [inference|fine-tuning|bitsandbytes]
 # on Windows, use env_activate.bat instead
 call .\tools\env_activate.bat [inference|fine-tuning|bitsandbytes]
 ```
@@ -59,7 +59,7 @@ cd examples/gpu/llm
 python ./tools/env_setup.py --setup --deploy
 conda deactivate
 conda activate llm
-source ./tools/env_activate.sh  [inference|fine-tuning|bitsandbytes|training]
+source ./tools/env_activate.sh  [inference|fine-tuning|bitsandbytes]
 # on Windows, use env_activate.bat instead
 call .\tools\env_activate.bat [inference|fine-tuning|bitsandbytes]
 ```
@@ -84,7 +84,7 @@ docker run -it --rm --privileged -v /dev/dri/by-path:/dev/dri/by-path ipex-llm:x
 cd llm
 
 # Activate environment variables
-source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes|training]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 # on Windows, use env_activate.bat instead
 call .\tools\env_activate.bat [inference|fine-tuning|bitsandbytes]
 ```
@@ -114,7 +114,7 @@ python ./tools/env_setup.py --setup --install-pytorch compile --aot <AOT> --onea
 
 conda deactivate
 conda activate llm
-source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes|training]
+source ./tools/env_activate.sh [inference|fine-tuning|bitsandbytes]
 # on Windows, use env_activate.bat instead
 call .\tools\env_activate.bat [inference|fine-tuning|bitsandbytes]
 ```
@@ -135,4 +135,3 @@ For fine-tuning example scripts, visit the [fine-tuning](./fine-tuning/) directo
 
 For fine-tuning with quantized model, visit the [bitsandbytes](./bitsandbytes/) directory.
 
-For fine-tuning with quantized model, visit the [training](./training/) directory.

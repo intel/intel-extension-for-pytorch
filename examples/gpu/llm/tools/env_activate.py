@@ -23,7 +23,7 @@ if __name__ == '__main__':
         'directory',
         help = 'Directory of examples to run.',
         type = str,
-        choices = ['inference', 'fine-tuning', 'bitsandbytes', 'training'],
+        choices = ['inference', 'fine-tuning', 'bitsandbytes'],
     )
 
     # Parse arguments
