@@ -3,7 +3,7 @@ import copy
 import re
 import warnings
 from ..utils._logger import logger, WarningType
-import pkg_resources
+from importlib.metadata import distributions
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
     _disable_tpp,
@@ -94,7 +94,7 @@ def _set_optimized_model_for_generation(
 
 
 def check_transformers_for_llm_support():
-    installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+    installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
     min_version = "4.28.1"
     validated_version = "4.48.0"
     if "transformers" not in installed_pkg:
@@ -2382,7 +2382,7 @@ def optimize(
     validate_device_avaliable(device)
 
     try:
-        installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+        installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
         min_version = "4.28.1"
         validated_version = "4.48.3"
         if "transformers" not in installed_pkg:

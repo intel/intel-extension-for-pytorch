@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
-import pkg_resources
+from importlib.metadata import distributions
 from intel_extension_for_pytorch import optim
 from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
     BlockedParameter,
@@ -116,7 +116,7 @@ def may_import_deepspeed_modules():
         return None
 
 
-installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
 if "deepspeed" in installed_pkg:
     from deepspeed import comm
 
