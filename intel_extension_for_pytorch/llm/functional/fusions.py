@@ -13,7 +13,7 @@ from .utils import _get_function_from_device
 
 def rotary_embedding(
     query: torch.Tensor,
-    key: torch.Tensor,
+    key: Optional[torch.Tensor],
     sin: torch.Tensor,
     cos: torch.Tensor,
     rotary_dim: int,
@@ -25,9 +25,10 @@ def rotary_embedding(
     on the `query ` or `key` before their multi-head attention computation.
 
     Args:
-        query, key (torch.Tensor) : inputs to be applied with position embeddings,
+        query (torch.Tensor), key (Optional[torch.Tensor]): inputs to be applied with position embeddings,
             taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
             or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).
+            `key` may be `None`, e.g. in case of cross-layer KV sharing.
         sin/cos (torch.Tensor): [num_tokens, rotary_dim] the sin/cos value tensor
             generated to be applied on query/key.
         rotary_ndims (int): the rotary dimension. e.g., 64 for GPTJ. head size for LLama.
@@ -42,7 +43,7 @@ def rotary_embedding(
             The according position_ids for the input. The shape should be [batch size, sequence length].
 
     Return
-        query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
+        query (torch.Tensor), key (Optional[torch.Tensor]): [batch size, sequence length, num_head/num_kv_head, head_dim]
         or [num_tokens, num_head/num_kv_head, head_dim].
 
     """

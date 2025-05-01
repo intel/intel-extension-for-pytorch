@@ -65,23 +65,28 @@ class _IPEXRopeCPU(nn.Module):
     def rotary_embedding(
         cls, query, key, sin, cos, rotary_dim, rotary_half, position_ids=None
     ):
-        # query, key (in/out shape) torch.Tensor :
+        # query: torch.Tensor with in/out shape:
+        #    4D: [bs, seqlen, num_head/num_kv_head, head_dim]
+        #    3D: [num_tokens, num_head/num_kv_head, head_dim]
+        # key (optional) None or torch.Tensor with in/out shape:
         #    4D: [bs, seqlen, num_head/num_kv_head, head_dim]
         #    3D: [num_tokens, num_head/num_kv_head, head_dim]
         # sin, cos: torch.Tensor [num_tokens, rotary_dim]
         # position_ids (optional): torch.Tensor [bs, seqlen]
         head_dim = query.size(-1)
         num_head = query.size(-2)
-        num_kv_head = key.size(-2)
+        num_kv_head = key.size(-2) if key is not None else 0
         input_3d = False
         assert (
-            key.dim() == query.dim() and query.dim() == 3 or query.dim() == 4
+            (key is None or key.dim() == query.dim())
+            and query.dim() == 3
+            or query.dim() == 4
         ), "rotary embedding query/key dim == 3 or 4"
 
         if query.dim() == 3:
             input_3d = True
             query_ = query.unsqueeze(0)
-            key_ = key.unsqueeze(0)
+            key_ = key.unsqueeze(0) if key is not None else None
         else:
             query_ = query
             key_ = key
@@ -124,21 +129,26 @@ class _IPEXRopeCPU(nn.Module):
             rotary_dim,
         )
 
-        key_, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
-            key_,
-            sin_cos,
-            position_ids,
-            num_kv_head,
-            head_dim,
-            offset,
-            rotary_dim,
-        )
+        if key is not None:
+            key_, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
+                key_,
+                sin_cos,
+                position_ids,
+                num_kv_head,
+                head_dim,
+                offset,
+                rotary_dim,
+            )
         if input_3d:
             query_ = query_.view([-1, num_head, head_dim])
-            key_ = key_.view([-1, num_kv_head, head_dim])
+            if key_ is not None:
+                key_ = key_.view([-1, num_kv_head, head_dim])
         # keep the inplace context as used in TGI
         query.copy_(query_)
-        key.copy_(key_)
+
+        if key is not None:
+            key.copy_(key_)
+
         return query, key
 
 
