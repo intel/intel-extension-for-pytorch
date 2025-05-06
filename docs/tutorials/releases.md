@@ -1,6 +1,41 @@
 Releases
 =============
 
+## 2.7.10+xpu
+
+Intel® Extension for PyTorch\* v2.7.10+xpu is the new release which supports Intel® GPU platforms (Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 Mobile Processors and Intel® Data Center GPU Max Series) based on PyTorch\* 2.7.0.
+
+### Highlights
+
+- Intel® oneDNN v3.7.1 integration
+  
+- Large Language Model (LLM) optimization
+
+  Intel® Extension for PyTorch* optimizes typical LLM models like Llama 2, Llama 3, Phi-3-mini, Qwen2, and GLM-4 on the Intel® Arc™ Graphics family. Moreover, new LLM inference models such as Llama 3.3, Phi-3.5-mini, Qwen2.5, and Mistral-7B are also optimized on Intel® Data Center GPU Max Series platforms compared to the previous release. A full list of optimized models can be found in the [LLM Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html), with supported transformer version updates to [4.48.3](https://github.com/huggingface/transformers/releases/tag/v4.48.3).
+
+- Serving framework support
+
+  Intel® Extension for PyTorch\* offers extensive support for various ecosystems, including [vLLM](https://github.com/vllm-project/vllm) and [TGI](https://github.com/huggingface/text-generation-inference), with the goal of enhancing performance and flexibility for LLM workloads on Intel® GPU platforms (intensively verified on Intel® Data Center GPU Max Series and Intel® Arc™ B-Series graphics on Linux). The vLLM/TGI features, such as chunked prefill and MoE (Mixture of Experts), are supported by the backend kernels provided in Intel® Extension for PyTorch*. In this release, Intel® Extension for PyTorch\* adds sliding windows support in `ipex.llm.modules.PagedAttention.flash_attn_varlen_func` to meet the need of models like Phi3, and Mistral, which enable sliding window support by default.
+
+- [Prototype] QLoRA/LoRA finetuning using BitsAndBytes
+
+  Intel® Extension for PyTorch* supports QLoRA/LoRA finetuning with [BitsAndBytes](https://github.com/bitsandbytes-foundation/bitsandbytes) on Intel® GPU platforms. This release includes several enhancements for better performance and functionality:
+  - The performance of the NF4 dequantize kernel has been improved by approximately 4.4× to 5.6× across different shapes compared to the previous release.
+  - `_int_mm` support in INT8 has been added to enable INT8 LoRA finetuning in PEFT (with float optimizers like `adamw_torch`).
+
+- Codegen support removal
+  
+  Removes codegen support from Intel® Extension for PyTorch\* and reuses the codegen capability from [Torch XPU Operators](https://github.com/intel/torch-xpu-ops), to ensure interoperability of code change in codegen with usages in Intel® Extension for PyTorch\*.
+
+- [Prototype] Python 3.13t support
+
+  Adds prototype support for Python 3.13t and provides prebuilt binaries on the [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/us/).
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
+
 ## 2.6.10+xpu
 
 Intel® Extension for PyTorch\* v2.6.10+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Max Series, Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 Mobile Processors and Intel® Data Center GPU Flex Series) based on PyTorch* 2.6.0.

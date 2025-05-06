@@ -9,7 +9,7 @@ API documentation is available at [API Docs page](../api_doc.html#ipex.llm.optim
 
 ## Pseudocode of Common Usage Scenarios
 
-The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLMs. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.6.10%2Bxpu/examples/gpu/llm/inference).
+The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLMs. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.10%2Bxpu/examples/gpu/llm/inference).
 
 ### FP16
 
@@ -117,7 +117,7 @@ print(modelJit.graph_for(inference_dta))
 
 Distributed inference can be performed with `DeepSpeed`. Based on original Intel® Extension for PyTorch\* scripts, the following code changes are required.
 
-Check Distributed Examples in [LLM example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.6.10%2Bxpu/examples/gpu/llm/inference) for complete codes.
+Check Distributed Examples in [LLM example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.10%2Bxpu/examples/gpu/llm/inference) for complete codes.
 
 
 
