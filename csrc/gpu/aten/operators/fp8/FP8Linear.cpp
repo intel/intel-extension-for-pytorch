@@ -20,6 +20,7 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
+#include <oneDNN/DnnlMatmulQuant.h>
 #include <oneDNN/FP8_Matmul.h>
 #include <quantized/QUtils.h>
 #include <runtime/Utils.h>
@@ -104,8 +105,16 @@ Tensor fp8_gemm_v2(
         "D will be supported with post-op which is working in progress\n");
     // TODO: Support post-ops for fp8_gemm.
   }
-  torch_ipex::xpu::oneDNN::fp8_matmul(
-      result, A, B, bias, A_scale_inv, B_scale_inv);
+  if (A.scalar_type() == at::ScalarType::Half ||
+      A.scalar_type() == at::ScalarType::BFloat16) {
+    printf("fp8 gemm with primitive cache\n");
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
+        result, A, B, trans_B, bias, B_scale_inv);
+  } else {
+    printf("fp8 gemm without primitive cache\n");
+    torch_ipex::xpu::oneDNN::fp8_matmul(
+        result, A, B, bias, A_scale_inv, B_scale_inv);
+  }
   return result;
 }
 

@@ -13,13 +13,6 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <cstdint>
 
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <tuple>
-#include <vector>
-
 using namespace dnnl;
 using namespace torch_ipex::xpu::oneDNN;
 
@@ -27,105 +20,6 @@ using namespace torch_ipex::xpu::oneDNN;
 
 namespace torch_ipex::xpu {
 namespace oneDNN {
-
-class TimeLogger {
- public:
-  // Static inline member, can be defined and initialized inside the class
-  static inline std::vector<long long> starts;
-  static inline std::vector<long long> phase0;
-  static inline std::vector<long long> phase1;
-  static inline std::vector<long long> phase2;
-
-  // Static method to access the singleton instance
-  static TimeLogger& get_instance() {
-    static TimeLogger
-        instance; // Static local variable to ensure single instance
-    return instance;
-  }
-
-  void record_start() {
-    // Get the current timestamp in nanoseconds
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration = now.time_since_epoch();
-    auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-
-    // Store m, n, k, and timestamp in the static log_data
-    starts.push_back(nanoseconds);
-  }
-
-  void record_phase0() {
-    // Get the current timestamp in nanoseconds
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration = now.time_since_epoch();
-    auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-
-    // Store m, n, k, and timestamp in the static log_data
-    phase0.push_back(nanoseconds);
-  }
-
-  void record_phase1() {
-    // Get the current timestamp in nanoseconds
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration = now.time_since_epoch();
-    auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-
-    // Store m, n, k, and timestamp in the static log_data
-    phase1.push_back(nanoseconds);
-  }
-
-  void record_phase2() {
-    // Get the current timestamp in nanoseconds
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration = now.time_since_epoch();
-    auto nanoseconds =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-
-    // Store m, n, k, and timestamp in the static log_data
-    phase2.push_back(nanoseconds);
-  }
-
-  // Destructor to write the log data to the file only once when the program
-  // exits
-  ~TimeLogger() {
-    std::ofstream file("host_time_log.txt", std::ios::app);
-
-    if (!file) {
-      std::cerr << "Error opening file!" << std::endl;
-      return;
-    }
-
-    // Write all stored logs to the file
-    for (size_t i = 0; i < starts.size(); i++) {
-      auto s = starts[i];
-      auto p0 = phase0[i];
-      auto p1 = phase1[i];
-      auto p2 = phase2[i];
-
-      // Write the log to the file
-      file << "host time: " << p0 - s << "," << p1 - p0 << "," << p2 - p1
-           << "\n";
-    }
-  }
-
- private:
-  // Private constructor to prevent direct instantiation (Singleton pattern)
-  TimeLogger() {}
-
-  // Prevent copying and assignment
-  TimeLogger(const TimeLogger&) = delete;
-  TimeLogger& operator=(const TimeLogger&) = delete;
-};
-
-inline Tensor resize_as_onednn_mat1(const Tensor& mat1, const Tensor& output) {
-  auto output_ = output.flatten(0, -2);
-  int n = output_.sizes()[1];
-  auto sizes = mat1.sym_sizes().vec();
-  sizes[sizes.size() - 1] = n;
-  return output.view_symint(sizes);
-}
 
 static inline void set_quant_primitive_attr(
     primitive_attr& pattr,
@@ -164,7 +58,7 @@ static at::Tensor dnnl_matmul_w4a16_common(
     Tensor& result, // dst, [b, m, n]
     const Tensor& mat1_, // src, [b, m, k]
     const Tensor& mat2, // quantized weight, [K/8, N] transpose
-    const c10::optional<Tensor>& bias,
+    const std::optional<Tensor>& bias,
     const Tensor& scale, // [k/group_size, n]
     const Tensor& zp, // [k/group_size, n/8]
     int64_t group_size,
@@ -174,8 +68,6 @@ static at::Tensor dnnl_matmul_w4a16_common(
     Tensor res_flat,
     Tensor res1_flat) {
   // For GPTQ with desc_act=True scenario
-  TimeLogger& cpu_obj = TimeLogger::get_instance();
-  cpu_obj.record_start();
   auto mat1 = g_idx.has_value() ? mat1_.index_select(-1, g_idx.value()) : mat1_;
 
   auto src_sz = mat1.sizes();
@@ -194,34 +86,33 @@ static at::Tensor dnnl_matmul_w4a16_common(
   at::Device curDevice = at::Device(at::kXPU, device_id);
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
-  dnnl::joint_dtypes jd;
+  dnnl::joint_dtypes_t jd;
   if (mat1.scalar_type() == at::ScalarType::Half) {
-    jd = dnnl::joint_dtypes::_f16_int4;
+    jd = dnnl::joint_dtypes_t::_f16_int4;
   } else if (mat1.scalar_type() == at::ScalarType::BFloat16) {
-    jd = dnnl::joint_dtypes::_bf16_int4;
+    jd = dnnl::joint_dtypes_t::_bf16_int4;
   } else {
     TORCH_INTERNAL_ASSERT(
         false, "Unsupported data type for int4 matmul: ", mat1.scalar_type());
   }
 
-  // TODO: add bias datatype according to onednn requirement
-  bias_type b_type;
+  bias_type_t b_type;
   if (bias.has_value()) {
     auto& b = bias.value();
     const auto nuelm = b.numel();
     if (nuelm == 1) {
-      b_type = bias_type::_scalar;
+      b_type = bias_type_t::_scalar;
     } else if (nuelm == m * n) {
-      b_type = bias_type::_mn;
+      b_type = bias_type_t::_mn;
     } else if (b.size(b.dim() - 1) == n && nuelm == n) {
-      b_type = bias_type::_n;
+      b_type = bias_type_t::_n;
     } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
-      b_type = bias_type::_m;
+      b_type = bias_type_t::_m;
     } else {
       TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
     }
   } else {
-    b_type = bias_type::_none;
+    b_type = bias_type_t::_none;
   }
 
   const int64_t ldb = mat2.strides()[mat2.dim() - 1] * 8; // for int4 matmul
@@ -229,10 +120,9 @@ static at::Tensor dnnl_matmul_w4a16_common(
   const int64_t ldc = result.strides()[result.dim() - 2];
 
   // only support nt for int4 matmul
-  trans_type tt = trans_type::_nt;
+  trans_type_t tt = trans_type_t::_nt;
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
       jd, tt, b_type, m, n, k, lda, ldb, ldc, device_id, pattr);
-  cpu_obj.record_phase0();
 
   int arg_off = 0;
   // set scale and zero point for matmul args
@@ -314,11 +204,9 @@ static at::Tensor dnnl_matmul_w4a16_common(
 
   auto strm = GpuStreamManager::Instance().get_stream();
   /* matmul_ext.execute(strm, engine, std::move(arg_handles), arg_off); */
-  cpu_obj.record_phase1();
   DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
       matmul_ext, strm, engine, arg_handles, arg_off);
 
-  cpu_obj.record_phase2();
   return result;
 }
 
@@ -676,6 +564,124 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
       at::Tensor());
 
   return result;
+}
+
+static inline void dnnl_matmul_w8a16_fp8(
+    Tensor& result,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    bool trans_b,
+    const std::optional<Tensor>& bias,
+    const Tensor& m2_sc) {
+  TORCH_CHECK(
+      mat2.scalar_type() == at::ScalarType::Float8_e5m2,
+      "weight must be f8_e5m2");
+  auto src_sz = mat1.sizes();
+  auto o_sz = mat1.sizes().vec();
+  auto b_sz = mat2.sizes();
+
+  *(o_sz.end() - 1) = *(b_sz.end() - 1);
+
+  const int m = std::reduce(
+      src_sz.begin(), src_sz.end() - 1, 1, std::multiplies<int64_t>());
+  const int n = b_sz[1]; // presume channel last format
+  const int k = *(src_sz.end() - 1);
+
+  // get device, engine, stream
+  const int device_id = at::xpu::current_device();
+  at::Device curDevice = at::Device(at::kXPU, device_id);
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+
+  // get joint dtypes
+  dnnl::joint_dtypes_t jd;
+  if (mat1.scalar_type() == at::ScalarType::Half) {
+    jd = dnnl::joint_dtypes_t::_f16_f8_e5m2;
+  } else if (mat1.scalar_type() == at::ScalarType::BFloat16) {
+    jd = dnnl::joint_dtypes_t::_bf16_f8_e5m2;
+  } else {
+    TORCH_INTERNAL_ASSERT(
+        false, "Unsupported data type for fp8 matmul: ", mat1.scalar_type());
+  }
+
+  // get bias type
+  bias_type_t b_type;
+  if (bias.has_value()) {
+    auto& b = bias.value();
+    const auto nuelm = b.numel();
+    if (nuelm == 1) {
+      b_type = bias_type_t::_scalar;
+    } else if (nuelm == m * n) {
+      b_type = bias_type_t::_mn;
+    } else if (b.size(b.dim() - 1) == n && nuelm == n) {
+      b_type = bias_type_t::_n;
+    } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
+      b_type = bias_type_t::_m;
+    } else {
+      TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
+    }
+  } else {
+    b_type = bias_type_t::_none;
+  }
+
+  dnnl::trans_type_t tt = dnnl::trans_type_t::_nn;
+  if (trans_b) {
+    // transpose mat2
+    tt = dnnl::trans_type_t::_nt;
+  }
+
+  int64_t lda = mat1.strides()[mat1.dim() - 2];
+  int64_t ldb =
+      trans_b ? mat2.strides()[mat2.dim() - 1] : mat2.strides()[mat2.dim() - 2];
+  int64_t ldc = result.strides()[result.dim() - 2];
+
+  auto f_attr = [&](primitive_attr& pattr) {
+#ifdef USE_SCRATCHPAD_MODE
+    pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+    // pattr.set_scales_mask(DNNL_ARG_SRC, 0);
+    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
+
+    if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {
+      pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+    } else if (jd == dnnl::joint_dtypes_t::_bf16_f8_e5m2) {
+      pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
+    }
+  };
+
+  auto& matmul_ext = dnnlMatmulCreatePrimitive(
+      jd, tt, b_type, m, n, k, lda, ldb, ldc, device_id, f_attr);
+
+  int arg_off = 0;
+
+  matmul_ext.set_attribute(
+      arg_off++,
+      DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS,
+      m2_sc.data_ptr(),
+      [&]() {
+        return dpcpp_onednn_memory(
+            get_onednn_md(m2_sc), engine, m2_sc.data_ptr());
+      });
+
+  std::vector<std::pair<int, void*>> arg_handles;
+  arg_handles.reserve(8);
+
+  arg_handles.emplace_back(DNNL_ARG_SRC, mat1.data_ptr());
+  arg_handles.emplace_back(DNNL_ARG_WEIGHTS, mat2.data_ptr());
+  arg_handles.emplace_back(DNNL_ARG_DST, result.data_ptr());
+  if (bias.has_value()) {
+    arg_handles.emplace_back(DNNL_ARG_BIAS, bias.value().data_ptr());
+  }
+
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = matmul_ext.get_scratchpad_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, mat1.options().dtype(at::kByte), c10::nullopt);
+  arg_handles.emplace_back(DNNL_ARG_SCRATCHPAD, scratchpad_tensor.data_ptr());
+#endif
+
+  auto strm = GpuStreamManager::Instance().get_stream();
+  DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
+      matmul_ext, strm, engine, arg_handles, arg_off);
 }
 
 } // namespace oneDNN

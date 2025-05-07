@@ -137,7 +137,7 @@ class TestFP8GEMMV2(TestCase):
         )
 
         output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+            input,
             False,
             weight_fp8,
             True,
@@ -228,7 +228,7 @@ class TestFP8GEMMV2(TestCase):
         )
 
         output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+            input,
             False,
             weight_fp8,
             True,
