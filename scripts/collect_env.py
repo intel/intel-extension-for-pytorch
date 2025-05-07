@@ -388,19 +388,23 @@ def get_libc_version():
     return "-".join(platform.libc_ver())
 
 
-def get_python_packages(run_lambda):
-    conda = os.environ.get("CONDA_EXE", "conda")
-    pyenv = "conda"
-    out = run_and_read_all(run_lambda, f"{conda} list")
-    if out is None:
-        pyenv = "pip"
-        out = run_and_read_all(
-            run_lambda, f"{sys.executable} -mpip list --format=freeze"
-        )
-
-    return pyenv, "\n".join(
+def filter_python_packages(data):
+    predefined_list = {
+        "torch",
+        "numpy",
+        "intel",
+        "mkl",
+        "dpcpp",
+        "ccl",
+        "mpi",
+        "pti",
+        "transformers",
+        "deepspeed",
+        "libuv",
+    }
+    return [
         line
-        for line in out.splitlines()
+        for line in data.splitlines()
         if not line.startswith("#")
         and any(
             name in line
@@ -418,7 +422,26 @@ def get_python_packages(run_lambda):
                 "libuv",
             }
         )
-    )
+    ]
+
+
+def get_python_packages(run_lambda):
+    conda = os.environ.get("CONDA_EXE", "conda")
+    pyenv = "conda"
+    out = run_and_read_all(run_lambda, f"{conda} list")
+    pkgs_filtered = []
+    try:
+        pkgs_filtered = filter_python_packages(out)
+    except Exception:
+        pass
+    if len(pkgs_filtered) == 0:
+        pyenv = "pip"
+        out = run_and_read_all(
+            run_lambda, f"{sys.executable} -mpip list --format=freeze"
+        )
+        pkgs_filtered = filter_python_packages(out)
+
+    return pyenv, "\n".join(pkgs_filtered)
 
 
 def get_env_info():
