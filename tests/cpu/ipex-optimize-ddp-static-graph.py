@@ -54,4 +54,4 @@ for i in range(10):
     loss.backward()
     opt.step()
     if i == 9:
-        print(f"Resume training successfully, final lose = {loss.item()}")
+        print(f"Resume training successfully, final lose = {loss.detach().item()}")
