@@ -9,21 +9,21 @@
   "pytorch": {
     "index-url": "https://download.pytorch.org/whl/nightly/xpu",
     "version": {
-      "linux": "2.8.0.dev20250509+xpu",
+      "linux": "2.8.0.dev20250510+xpu",
       "windows": "2.8.0.dev20250507+xpu"
     },
     "commit": "main"
   },
   "torchaudio": {
     "version": {
-      "linux": "2.6.0.dev20250509+xpu",
+      "linux": "2.6.0.dev20250510+xpu",
       "windows": "2.6.0.dev20250508+xpu"
     },
     "commit": "main"
   },
   "torchvision": {
     "version": {
-      "linux": "0.22.0.dev20250509+xpu",
+      "linux": "0.22.0.dev20250510+xpu",
       "windows": "0.22.0.dev20250508+xpu"
     },
     "commit": "main"
