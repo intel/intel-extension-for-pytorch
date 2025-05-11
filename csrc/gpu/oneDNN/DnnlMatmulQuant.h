@@ -121,8 +121,21 @@ static at::Tensor dnnl_matmul_w4a16_common(
 
   // only support nt for int4 matmul
   trans_type_t tt = trans_type_t::_nt;
+  int64_t zp_group_size = zp.dim() == 1 ? 1 : group_size;
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      jd, tt, b_type, m, n, k, lda, ldb, ldc, device_id, pattr);
+      jd,
+      tt,
+      b_type,
+      m,
+      n,
+      k,
+      lda,
+      ldb,
+      ldc,
+      device_id,
+      pattr,
+      group_size,
+      zp_group_size);
 
   int arg_off = 0;
   // set scale and zero point for matmul args
@@ -572,7 +585,8 @@ static inline void dnnl_matmul_w8a16_fp8(
     const Tensor& mat2,
     bool trans_b,
     const std::optional<Tensor>& bias,
-    const Tensor& m2_sc) {
+    const Tensor& m2_sc,
+    const int64_t group_size = 0) {
   TORCH_CHECK(
       mat2.scalar_type() == at::ScalarType::Float8_e5m2,
       "weight must be f8_e5m2");
@@ -639,7 +653,22 @@ static inline void dnnl_matmul_w8a16_fp8(
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
     // pattr.set_scales_mask(DNNL_ARG_SRC, 0);
-    pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
+    // pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
+    //
+    // TODO: set scales for multiple scales
+    if (m2_sc.numel() == 1) {
+      pattr.set_scales(
+          DNNL_ARG_WEIGHTS,
+          /* mask */ 0,
+          {},
+          get_onednn_dtype(m2_sc));
+    } else {
+      pattr.set_scales(
+          DNNL_ARG_WEIGHTS,
+          /* mask */ (1 << 1),
+          {1, group_size},
+          get_onednn_dtype(m2_sc));
+    }
 
     if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {
       pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
@@ -649,7 +678,7 @@ static inline void dnnl_matmul_w8a16_fp8(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      jd, tt, b_type, m, n, k, lda, ldb, ldc, device_id, f_attr);
+      jd, tt, b_type, m, n, k, lda, ldb, ldc, device_id, f_attr, group_size);
 
   int arg_off = 0;
 

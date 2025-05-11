@@ -54,7 +54,8 @@ Tensor fp8_gemm_v2(
     const c10::optional<Tensor>& A_scale_inv_,
     const c10::optional<Tensor>& B_scale_inv_,
     const c10::optional<Tensor>& bias_,
-    bool accumulate) {
+    bool accumulate,
+    const int64_t group_size) {
   std::vector<int64_t> result_shape;
   if (A.dim() == 2) {
     if (trans_A) {
@@ -109,7 +110,7 @@ Tensor fp8_gemm_v2(
       A.scalar_type() == at::ScalarType::BFloat16) {
     printf("fp8 gemm with primitive cache\n");
     torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
-        result, A, B, trans_B, bias, B_scale_inv);
+        result, A, B, trans_B, bias, B_scale_inv, group_size);
   } else {
     printf("fp8 gemm without primitive cache\n");
     torch_ipex::xpu::oneDNN::fp8_matmul(

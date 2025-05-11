@@ -477,12 +477,21 @@ struct create_matmul {
       const bias_type_t
           b_dims, // for shapeless bias, not put it into template parameter
       const int device_id,
-      F f_attr) {
+      F f_attr,
+      const int scale_group_size,
+      const int zp_group_size) {
     auto& cached = get_cache(device_id);
     memory::dims src_strides, wei_strides, dst_strides;
     get_strides<Tt>(src_strides, wei_strides, dst_strides, lda, ldb, ldc);
     auto pri_key = torch_ipex::xpu::oneDNN::concat(
-        src_strides, wei_strides, m, n, k, int(b_dims));
+        src_strides,
+        wei_strides,
+        m,
+        n,
+        k,
+        int(b_dims),
+        scale_group_size,
+        zp_group_size);
     auto iter = cached.find(pri_key);
     if (iter == cached.end()) {
       auto [src_dt, wei_dt] = onednn_types_mapper<Ts>::get();
@@ -545,14 +554,36 @@ static inline primitive_ext& dnnlMatmulCreatePrimitive(
     const int64_t ldb,
     const int64_t ldc,
     const int device_id,
-    F attr) {
+    F attr,
+    const int scale_group_size,
+    const int zp_group_size) {
   switch (Tt) {
     case trans_type_t::_nt:
       return create_matmul<trans_type_t::_nt, Ts, F>::get(
-          m, n, k, lda, ldb, ldc, b_dims, device_id, attr);
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          b_dims,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     case trans_type_t::_nn:
       return create_matmul<trans_type_t::_nn, Ts, F>::get(
-          m, n, k, lda, ldb, ldc, b_dims, device_id, attr);
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          b_dims,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     default:
       throw std::runtime_error("unsupported trans type ...");
   }
@@ -570,20 +601,66 @@ static inline primitive_ext& dnnlMatmulCreatePrimitive(
     const int64_t ldb, // is weight ldb necessary?
     const int64_t ldc,
     const int device_id,
-    F attr) {
+    F attr,
+    const int scale_group_size = 1,
+    const int zp_group_size = 1) {
   switch (Ts) {
     case joint_dtypes_t::_f16_int4:
       return dnnlMatmulCreatePrimitive<joint_dtypes_t::_f16_int4, F>(
-          Tt, b_dims, m, n, k, lda, ldb, ldc, device_id, attr);
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     case joint_dtypes_t::_bf16_int4:
       return dnnlMatmulCreatePrimitive<joint_dtypes_t::_bf16_int4, F>(
-          Tt, b_dims, m, n, k, lda, ldb, ldc, device_id, attr);
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     case joint_dtypes_t::_f16_f8_e5m2:
       return dnnlMatmulCreatePrimitive<joint_dtypes_t::_f16_f8_e5m2, F>(
-          Tt, b_dims, m, n, k, lda, ldb, ldc, device_id, attr);
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     case joint_dtypes_t::_bf16_f8_e5m2:
       return dnnlMatmulCreatePrimitive<joint_dtypes_t::_bf16_f8_e5m2, F>(
-          Tt, b_dims, m, n, k, lda, ldb, ldc, device_id, attr);
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
     default:
       throw std::runtime_error("Only support int4 and fp8 gemm ...");
   }
