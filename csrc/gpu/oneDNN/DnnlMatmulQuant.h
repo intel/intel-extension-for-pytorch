@@ -652,10 +652,6 @@ static inline void dnnl_matmul_w8a16_fp8(
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-    // pattr.set_scales_mask(DNNL_ARG_SRC, 0);
-    // pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
-    //
-    // TODO: set scales for multiple scales
     if (m2_sc.numel() == 1) {
       pattr.set_scales(
           DNNL_ARG_WEIGHTS,
@@ -663,11 +659,13 @@ static inline void dnnl_matmul_w8a16_fp8(
           {},
           get_onednn_dtype(m2_sc));
     } else {
-      pattr.set_scales(
-          DNNL_ARG_WEIGHTS,
-          /* mask */ (1 << 1),
-          {1, group_size},
-          get_onednn_dtype(m2_sc));
+      // Only support N dimension group
+      pattr.set_scales_mask(DNNL_ARG_WEIGHTS, /* mask */ (1 << 1));
+      // pattr.set_scales(
+      //     DNNL_ARG_WEIGHTS,
+      //     /* mask */ (1 << 1),
+      //     {1, group_size},
+      //     get_onednn_dtype(m2_sc));
     }
 
     if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {

@@ -106,16 +106,22 @@ Tensor fp8_gemm_v2(
         "D will be supported with post-op which is working in progress\n");
     // TODO: Support post-ops for fp8_gemm.
   }
-  if (A.scalar_type() == at::ScalarType::Half ||
-      A.scalar_type() == at::ScalarType::BFloat16) {
-    printf("fp8 gemm with primitive cache\n");
+
+#ifdef USE_PRIMITIVE_CACHE
+  if ((A.scalar_type() == at::ScalarType::Half ||
+       A.scalar_type() == at::ScalarType::BFloat16) &&
+      B.scalar_type() == at::ScalarType::Float8_e5m2) {
     torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
         result, A, B, trans_B, bias, B_scale_inv, group_size);
   } else {
-    printf("fp8 gemm without primitive cache\n");
     torch_ipex::xpu::oneDNN::fp8_matmul(
         result, A, B, bias, A_scale_inv, B_scale_inv);
   }
+#else
+  torch_ipex::xpu::oneDNN::fp8_matmul(
+      result, A, B, bias, A_scale_inv, B_scale_inv);
+#endif // USE_PRIMITIVE_CACHE
+
   return result;
 }
 
