@@ -97,7 +97,7 @@ static at::Tensor dnnl_matmul_w4a16_common(
   }
 
   bias_type_t b_type;
-  if (bias.has_value()) {
+  if (bias.has_value() && bias.value().defined()) {
     auto& b = bias.value();
     const auto nuelm = b.numel();
     if (nuelm == 1) {
@@ -108,6 +108,8 @@ static at::Tensor dnnl_matmul_w4a16_common(
       b_type = bias_type_t::_n;
     } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
       b_type = bias_type_t::_m;
+    } else if (nuelm == 0) {
+      b_type = bias_type_t::_none;
     } else {
       TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
     }
@@ -619,7 +621,7 @@ static inline void dnnl_matmul_w8a16_fp8(
 
   // get bias type
   bias_type_t b_type;
-  if (bias.has_value()) {
+  if (bias.has_value() && bias.value().defined()) {
     auto& b = bias.value();
     const auto nuelm = b.numel();
     if (nuelm == 1) {
@@ -630,6 +632,8 @@ static inline void dnnl_matmul_w8a16_fp8(
       b_type = bias_type_t::_n;
     } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
       b_type = bias_type_t::_m;
+    } else if (nuelm == 0) {
+      b_type = bias_type_t::_none;
     } else {
       TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
     }
@@ -695,7 +699,7 @@ static inline void dnnl_matmul_w8a16_fp8(
   arg_handles.emplace_back(DNNL_ARG_SRC, mat1.data_ptr());
   arg_handles.emplace_back(DNNL_ARG_WEIGHTS, mat2.data_ptr());
   arg_handles.emplace_back(DNNL_ARG_DST, result.data_ptr());
-  if (bias.has_value()) {
+  if (b_type != bias_type_t::_none) {
     arg_handles.emplace_back(DNNL_ARG_BIAS, bias.value().data_ptr());
   }
 
