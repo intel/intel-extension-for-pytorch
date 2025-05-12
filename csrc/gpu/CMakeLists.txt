@@ -37,9 +37,6 @@ add_subdirectory(${IPEX_GPU_ROOT_DIR}/jit)
 set(IPEX_UTILS_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/utils)
 
-set(IPEX_DISTRIBUTED_SRCS)
-add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
-
 set(IPEX_MAMBA_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/mamba)
 
@@ -76,7 +73,6 @@ set(IPEX_INCLUDE_DIRS
 
 set(IPEX_GPU_CORE_SRC
         ${IPEX_JIT_SRCS}
-        ${IPEX_DISTRIBUTED_SRCS}
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
