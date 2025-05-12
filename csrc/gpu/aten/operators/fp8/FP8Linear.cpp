@@ -54,8 +54,7 @@ Tensor fp8_gemm_v2(
     const c10::optional<Tensor>& A_scale_inv_,
     const c10::optional<Tensor>& B_scale_inv_,
     const c10::optional<Tensor>& bias_,
-    bool accumulate,
-    const int64_t group_size) {
+    bool accumulate) {
   std::vector<int64_t> result_shape;
   if (A.dim() == 2) {
     if (trans_A) {
@@ -112,7 +111,7 @@ Tensor fp8_gemm_v2(
        A.scalar_type() == at::ScalarType::BFloat16) &&
       B.scalar_type() == at::ScalarType::Float8_e5m2) {
     torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
-        result, A, B, trans_B, bias, B_scale_inv, group_size);
+        result, A, B, trans_B, bias, B_scale_inv);
   } else {
     torch_ipex::xpu::oneDNN::fp8_matmul(
         result, A, B, bias, A_scale_inv, B_scale_inv);
