@@ -5,6 +5,7 @@
 #include "include/common/core/arch_config.hpp"
 
 static const std::array ptl_device_list = {0xB0B0, 0xB082};
+static const std::array bmg_device_list = {0xE221};
 
 namespace gpu::xetla {
 static inline gpu_arch get_device_gpu_arch() {
@@ -14,17 +15,22 @@ static inline gpu_arch get_device_gpu_arch() {
   at::DeviceIndex device_id = at::xpu::current_device();
   sycl::device& device = at::xpu::get_raw_device(device_id);
 
-#if __INTEL_LLVM_COMPILER < 20250100
   if (device.has(sycl::aspect::ext_intel_device_id)) {
     auto ext_intel_device_id =
         device.get_info<intel::info::device::device_id>();
+#if __INTEL_LLVM_COMPILER < 20250100
     for (uint32_t ptl_device_id : ptl_device_list) {
       if (ext_intel_device_id == ptl_device_id) {
         return gpu_arch::XeHpc;
       }
     }
-  }
 #endif
+    for (uint32_t bmg_device_id : bmg_device_list) {
+      if (ext_intel_device_id == bmg_device_id) {
+        return gpu_arch::XeHpc;
+      }
+    }
+  }
 
   auto deviceArch = device.get_info<experimental::info::device::architecture>();
   switch (deviceArch) {
