@@ -80,9 +80,5 @@ class TestUtils(TestCase):
         assert "max_num_sub_groups" in capability, "key max_num_sub_groups not found"
         assert "sub_group_sizes" in capability, "key sub_group_sizes not found"
 
-    def test_mem_get_info(self):
-        self.assertGreater(ipex.xpu.mem_get_info()[0], 0)
-        self.assertGreater(ipex.xpu.mem_get_info()[1], 0)
-
     def test_get_default_build_root(self):
         self.assertIsNotNone(ipex.xpu.get_default_build_root())

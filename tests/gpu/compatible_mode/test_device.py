@@ -49,10 +49,6 @@ class TestTorchMethod(TestCase):
     def test_empty_cache(self):
         torch.cuda.empty_cache()
 
-    def test_memory_snapshot(self):
-        torch.cuda.memory_snapshot()
-
-
     def test_device(self):
         cuda_device = torch.device("cuda")
         self.assertEqual(cuda_device.type, "xpu")

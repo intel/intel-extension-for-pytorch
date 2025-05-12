@@ -128,8 +128,6 @@ CachingDeviceAllocator* DeviceAllocator::alloc() {
 
 static DeviceAllocator myInstance;
 
-REGISTER_ALLOCATOR(kXPU, &myInstance);
-
 DeviceAllocator* DeviceAllocator::Instance() {
   return &myInstance;
 }

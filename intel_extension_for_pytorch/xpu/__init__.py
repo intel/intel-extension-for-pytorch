@@ -29,14 +29,6 @@ from .overrides import (
     override_assert_equal,
 )
 
-from .graphs import (
-    XPUGraph,
-    graph,
-    graph_pool_handle,
-    is_current_stream_capturing,
-    make_graphed_callables,
-)
-
 import intel_extension_for_pytorch.optim as optim
 from intel_extension_for_pytorch._version import (
     __version__,
@@ -133,17 +125,7 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
-_register_submodule_white_list = {
-    "empty_cache",
-    "max_memory_allocated",
-    "max_memory_reserved",
-    "memory_allocated",
-    "memory_reserved",
-    "memory_stats",
-    "memory_stats_as_nested_dict",
-    "reset_accumulated_memory_stats",
-    "reset_peak_memory_stats",
-}
+_register_submodule_white_list = {}
 _register_submodule_black_list = {"mem_get_info"}
 
 
