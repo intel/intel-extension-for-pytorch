@@ -103,7 +103,9 @@ static inline void fp8_matmul(
   }
 
   auto m1_usr_dt = get_onednn_dtype(m1);
+  auto m1_sc_dt = get_onednn_dtype(m1_sc);
   auto m2_usr_dt = get_onednn_dtype(m2);
+  auto m2_sc_dt = get_onednn_dtype(m2_sc);
   auto dst_usr_dt = get_onednn_dtype(dst);
 
   auto m1_dt = m1_usr_dt;
@@ -148,13 +150,16 @@ static inline void fp8_matmul(
   dst_md = memory::desc(dst_dims, dst_dt, dst_strides);
 
   primitive_attr pattr;
-  memory m1_sc_m =
-      dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, m1_sc.data_ptr<float>());
-  memory m2_sc_m =
-      dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, m2_sc.data_ptr<float>());
+  memory::desc m1_sc_md = memory::desc({1}, m1_sc_dt, memory::format_tag::x);
+  memory::desc m2_sc_md = memory::desc({1}, m2_sc_dt, memory::format_tag::x);
+  memory m1_sc_m = dpcpp_onednn_memory(m1_sc_md, engine, m1_sc.data_ptr());
+  memory m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, m2_sc.data_ptr());
 
-  pattr.set_scales_mask(DNNL_ARG_SRC, 0);
-  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
+  const int mask = 0;
+  pattr.set_scales_mask(DNNL_ARG_SRC, mask);
+  pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask);
+  pattr.set_scales(DNNL_ARG_SRC, mask, {}, m1_sc_dt);
+  pattr.set_scales(DNNL_ARG_WEIGHTS, mask, {}, m2_sc_dt);
 
   dnnl::matmul matmul_p;
   dnnl::matmul::primitive_desc matmul_pd;
