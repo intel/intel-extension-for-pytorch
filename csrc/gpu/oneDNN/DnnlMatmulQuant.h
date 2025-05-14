@@ -656,7 +656,7 @@ static inline void dnnl_matmul_w8a16_fp8(
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-    if (m2_sc.numel() == 1) {
+    if (1) {
       pattr.set_scales(
           DNNL_ARG_WEIGHTS,
           /* mask */ 0,
@@ -672,11 +672,11 @@ static inline void dnnl_matmul_w8a16_fp8(
       //     get_onednn_dtype(m2_sc));
     }
 
-    if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {
-      pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
-    } else if (jd == dnnl::joint_dtypes_t::_bf16_f8_e5m2) {
-      pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
-    }
+    // if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {
+    //   pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+    // } else if (jd == dnnl::joint_dtypes_t::_bf16_f8_e5m2) {
+    //   pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
+    // }
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
