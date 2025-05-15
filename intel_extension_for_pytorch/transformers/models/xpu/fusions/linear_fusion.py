@@ -171,6 +171,19 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             torch.ops.torch_ipex.topk_softmax(router_logits, top_k)
         )
 
+        if custom_routing_function is not None:
+            # Ipex doesn't have op that can calculate rows_for_experts, expert_offsets.
+            # Different funcs should have same TopK and different softmax methods,
+            # so here uses softmax weights from custom_routing_function
+            # and selected_experts, rows_for_experts, expert_offsets from routine topk
+            routing_weights, _ = custom_routing_function(
+                hidden_states=hidden_states,
+                gating_output=router_logits,
+                topk=top_k,
+                renormalize=renormalize,
+            )
+            routing_weights = routing_weights.to(torch.float)
+
         # --------- fusion: scatter + moegemm + gather -------------------
         # scatter hidden_states such that the token stride for each expert's input is contiguous
         reordered_hidden_states, mapped_slot = torch.ops.torch_ipex.moe_scatter(
