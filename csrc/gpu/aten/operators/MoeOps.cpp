@@ -10,7 +10,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#define MaxTopK 2
 #define MaxNumExperts 32
 
 namespace TopKSoftmaxImpl {
@@ -200,37 +199,27 @@ void fused_topk_softmax(
     const int topk) {
   auto& queue = dpcppGetCurrentQueue();
 
-  TORCH_CHECK(
-      num_experts <= MaxNumExperts && MaxNumExperts % num_experts == 0,
-      "num_experts must be less than or equal to 32 and 32 must be divisible by num_experts");
-
+#define CASE_TOPK(K)                 \
+  case K:                            \
+    launch_fused_topk_softmax<K, T>( \
+        queue,                       \
+        gating_output,               \
+        topk_weights,                \
+        topk_indices,                \
+        rows_for_experts,            \
+        offsets,                     \
+        num_tokens,                  \
+        num_experts);                \
+    break;
   switch (topk) {
-    case 1:
-      launch_fused_topk_softmax<1, T>(
-          queue,
-          gating_output,
-          topk_weights,
-          topk_indices,
-          rows_for_experts,
-          offsets,
-          num_tokens,
-          num_experts);
-      break;
-    case 2:
-      launch_fused_topk_softmax<2, T>(
-          queue,
-          gating_output,
-          topk_weights,
-          topk_indices,
-          rows_for_experts,
-          offsets,
-          num_tokens,
-          num_experts);
-      break;
+    CASE_TOPK(1)
+    CASE_TOPK(2)
+    CASE_TOPK(4)
+    CASE_TOPK(8)
     default:
-      TORCH_CHECK(
-          false, "error: not support topk=%d, up to topk=%d\n", topk, MaxTopK);
-  };
+      TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
+  }
+#undef CASE_TOPK
 };
 }; // namespace TopKSoftmaxImpl
 
@@ -939,38 +928,28 @@ void moe_scatter(
     const int n_experts,
     const int n_channels,
     const int n_topk) {
+#define CASE_TOPK(K)          \
+  case K:                     \
+    launch_moe_scatter<K, T>( \
+        activations,          \
+        rows_for_experts,     \
+        topk_indices,         \
+        offsets,              \
+        reordered_activation, \
+        mapped_slot,          \
+        n_tokens,             \
+        n_experts,            \
+        n_channels);          \
+    break;
   switch (n_topk) {
-    case 1:
-      launch_moe_scatter<1, T>(
-          activations,
-          rows_for_experts,
-          topk_indices,
-          offsets,
-          reordered_activation,
-          mapped_slot,
-          n_tokens,
-          n_experts,
-          n_channels);
-      break;
-    case 2:
-      launch_moe_scatter<2, T>(
-          activations,
-          rows_for_experts,
-          topk_indices,
-          offsets,
-          reordered_activation,
-          mapped_slot,
-          n_tokens,
-          n_experts,
-          n_channels);
-      break;
+    CASE_TOPK(1)
+    CASE_TOPK(2)
+    CASE_TOPK(4)
+    CASE_TOPK(8)
     default:
-      TORCH_CHECK(
-          false,
-          "error: not support topk=%d, up to topk=%d\n",
-          n_topk,
-          MaxTopK);
-  };
+      TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
+  }
+#undef CASE_TOPK
 };
 }; // namespace MoEScatterImpl
 
@@ -1274,38 +1253,28 @@ void moe_gather(
     const int32_t n_tokens,
     const int32_t n_top_k,
     const bool normalize_scales) {
+#define CASE_TOPK(K)         \
+  case K:                    \
+    launch_moe_gather<K, T>( \
+        layer_output,        \
+        moe_output,          \
+        scores,              \
+        mapped_slots,        \
+        rows_for_experts,    \
+        n_channels,          \
+        n_experts,           \
+        n_tokens,            \
+        normalize_scales);   \
+    break;
   switch (n_top_k) {
-    case 1:
-      launch_moe_gather<1, T>(
-          layer_output,
-          moe_output,
-          scores,
-          mapped_slots,
-          rows_for_experts,
-          n_channels,
-          n_experts,
-          n_tokens,
-          normalize_scales);
-      break;
-    case 2:
-      launch_moe_gather<2, T>(
-          layer_output,
-          moe_output,
-          scores,
-          mapped_slots,
-          rows_for_experts,
-          n_channels,
-          n_experts,
-          n_tokens,
-          normalize_scales);
-      break;
+    CASE_TOPK(1)
+    CASE_TOPK(2)
+    CASE_TOPK(4)
+    CASE_TOPK(8)
     default:
-      TORCH_CHECK(
-          false,
-          "error in moe_gather kernel: not support topk=%d, up to topk=%d",
-          n_top_k,
-          MaxTopK);
-  };
+      TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
+  }
+#undef CASE_TOPK
 };
 
 } // namespace MoEGatherImpl
