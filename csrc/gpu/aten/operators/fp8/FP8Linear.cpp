@@ -170,9 +170,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm.xpu", at::AtenIpexTypeXPU::fp8_gemm, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
-      "fp8_gemm.Tensor",
-      at::AtenIpexTypeXPU::fp8_gemm_v2,
-      c10::DispatchKey::XPU);
+      "fp8_gemm2.xpu", at::AtenIpexTypeXPU::fp8_gemm_v2, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm_backward.xpu",
       at::AtenIpexTypeXPU::fp8_gemm_backward,
