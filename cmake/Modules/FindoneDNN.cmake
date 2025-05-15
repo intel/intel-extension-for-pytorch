@@ -127,6 +127,10 @@ ELSE()
   LIST(APPEND ONEDNN_INCLUDE_DIR ${DNNL_INCLUDES})
 ENDIF()
 
+# Upper level targets should not load header files from oneDNN's third party.
+LIST(FILTER ONEDNN_INCLUDE_DIR EXCLUDE REGEX
+     ".*third_party/oneDNN/third_party.*")
+
 SET(ONEDNN_FOUND ON)
 MESSAGE(STATUS "Found oneDNN: TRUE")
 
