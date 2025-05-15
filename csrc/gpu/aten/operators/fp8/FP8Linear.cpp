@@ -61,26 +61,23 @@ Tensor fp8_gemm_v2(
       A.transpose_(0, 1);
     }
     if (trans_B) {
-      B.transpose_(0, 1);
+      result_shape = {A.size(0), B.size(0)};
     }
     // src{m, k}, wei{k, n}, bias{n}, dst{m, n}
-    result_shape = {A.size(0), B.size(1)};
   } else if (A.dim() == 3) {
     if (trans_A) {
       A.transpose_(1, 2);
     }
     if (B.dim() == 2) {
       if (trans_B) {
-        B.transpose_(0, 1);
+        result_shape = {A.size(0) * A.size(1), B.size(0)};
       }
       // src{b, m, k}, wei{k, n}, bias{n}, dst{b, m, n}
-      result_shape = {A.size(0) * A.size(1), B.size(1)};
     } else {
       if (trans_B) {
-        B.transpose_(1, 2);
+        result_shape = {A.size(0), A.size(1), B.size(1)};
       }
       // src{b, m, k}, wei{b, k, n}, bias{n}, dst{b, m, n}
-      result_shape = {A.size(0), A.size(1), B.size(2)};
     }
   } else {
     TORCH_CHECK(false, "linear only support for 2D and 3D tensors!\n");

@@ -593,14 +593,12 @@ static inline void dnnl_matmul_w8a16_fp8(
       mat2.scalar_type() == at::ScalarType::Float8_e5m2,
       "weight must be f8_e5m2");
   auto src_sz = mat1.sizes();
-  auto o_sz = mat1.sizes().vec();
-  auto b_sz = mat2.sizes();
-
-  *(o_sz.end() - 1) = *(b_sz.end() - 1);
+  auto o_sz = result.sizes();
+  // auto b_sz = mat2.sizes();
 
   const int m = std::reduce(
       src_sz.begin(), src_sz.end() - 1, 1, std::multiplies<int64_t>());
-  const int n = b_sz[1]; // presume channel last format
+  const int n = o_sz[1]; // presume channel last format
   const int k = *(src_sz.end() - 1);
 
   // get device, engine, stream
@@ -648,8 +646,9 @@ static inline void dnnl_matmul_w8a16_fp8(
   }
 
   int64_t lda = mat1.strides()[mat1.dim() - 2];
-  int64_t ldb =
-      trans_b ? mat2.strides()[mat2.dim() - 1] : mat2.strides()[mat2.dim() - 2];
+  int64_t ldb = mat2.strides()[mat2.dim() - 1] == 1
+      ? mat2.strides()[mat2.dim() - 2]
+      : mat2.strides()[mat2.dim() - 1];
   int64_t ldc = result.strides()[result.dim() - 2];
 
   auto f_attr = [&](primitive_attr& pattr) {
