@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sycl/sycl.hpp>
+#include <cmath>
 
 #include <c10/util/Float8_e5m2.h>
 #include <torch/all.h>
@@ -26,7 +27,7 @@ namespace at {
 namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
-struct __align__(8) vec4_t {
+struct alignas(8) vec4_t {
   scalar_t x;
   scalar_t y;
   scalar_t z;
@@ -34,7 +35,7 @@ struct __align__(8) vec4_t {
 };
 
 template <typename quant_type_t>
-struct __align__(4) q8x4_t {
+struct alignas(4) q8x4_t {
   static_assert(std::is_same_v<quant_type_t, c10::Float8_e5m2>);
   quant_type_t x;
   quant_type_t y;
@@ -42,6 +43,17 @@ struct __align__(4) q8x4_t {
   quant_type_t w;
 };
 
+template <
+    typename T,
+    typename = std::enable_if_t<std::is_same_v<T, c10::Float8_e5m2>>>
+struct quant_type_max {
+  static constexpr T val() {
+    return std::numeric_limits<T>::max();
+  }
+};
+
+template <typename T>
+static constexpr T quant_type_max_v = quant_type_max<T>::val();
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
