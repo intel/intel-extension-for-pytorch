@@ -552,8 +552,12 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
         elif self.model_backbone == "GPTNeoXForCausalLM":
-            self.bias = module.bias
-            self.norm_factor = module.norm_factor
+            self.bias = module.bias if hasattr(module, "bias") else None
+            self.norm_factor = (
+                module.norm_factor
+                if hasattr(module, "norm_factor")
+                else module.scaling if hasattr(module, "scaling") else None
+            )
             self.attention_dropout = (
                 module.attention_dropout
                 if hasattr(module, "attention_dropout")

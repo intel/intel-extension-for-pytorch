@@ -37,7 +37,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.48.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.51.3"]
     )
     import transformers
     from transformers import AutoConfig
@@ -257,8 +257,10 @@ class OptimizeTransformersNightlyTester(TestCase):
         self, m, dtype, deployment_mode, torchcompile=False, return_dict=False
     ):
         # Small differences lead to different experts being selected
-        # Fixed seed to avoid this issue on jamba
+        # Fixed seed to avoid this issue on jamba/deepseek
         if m.name == "jamba":
+            torch.manual_seed(6)
+        if m.name == "deepseekv2":
             torch.manual_seed(128)
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/{m.name}",
@@ -266,6 +268,8 @@ class OptimizeTransformersNightlyTester(TestCase):
             trust_remote_code=True,
             _attn_implementation="eager",
         )
+        if m.name == "mllama":
+            config.vision_config.torch_dtype = dtype
         model = m.model_class(config).eval()
         if m.name == "falcon":
             with torch.no_grad():

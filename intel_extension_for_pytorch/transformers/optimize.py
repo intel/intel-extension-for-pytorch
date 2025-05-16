@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
     min_version = "4.28.1"
-    validated_version = "4.48.0"
+    validated_version = "4.51.3"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -128,9 +128,11 @@ def model_convert_reference(_model):
     )
     from .generation import (
         _beam_search,
+        _beam_search_legacy,
         _greedy_search,
         _sample,
         _beam_sample,
+        _beam_sample_legacy,
         whisper_generate,
     )
 
@@ -167,6 +169,7 @@ def model_convert_reference(_model):
         GPTNeoXForCausalLM_forward,
         GPTNeoXModel_forward,
         OPTForCausalLM_forward,
+        OPTDecoder_forward,
         BloomModel_forward,
         BloomForCausalLM_forward,
         FalconModel_forward,
@@ -251,14 +254,18 @@ def model_convert_reference(_model):
         )
     # generation-wise optimizations
     convert_function(_model, "_reorder_cache", _reorder_cache)
-    convert_function(_model, "beam_search", _beam_search)
+    convert_function(_model, "beam_search", _beam_search_legacy)
     convert_function(_model, "greedy_search", _greedy_search)
     convert_function(_model, "sample", _sample)
-    convert_function(_model, "beam_sample", _beam_sample)
-    convert_function(_model, "_beam_search", _beam_search)
+    convert_function(_model, "beam_sample", _beam_sample_legacy)
     convert_function(_model, "_greedy_search", _greedy_search)
     convert_function(_model, "_sample", _sample)
-    convert_function(_model, "_beam_sample", _beam_sample)
+    if version.parse(transformers.__version__) >= version.parse("4.50.0"):
+        convert_function(_model, "_beam_search", _beam_search)
+        convert_function(_model, "_beam_sample", _beam_sample)
+    else:
+        convert_function(_model, "_beam_search", _beam_search_legacy)
+        convert_function(_model, "_beam_sample", _beam_sample_legacy)
     convert_function(
         _model,
         "_extract_past_from_model_output",
@@ -381,6 +388,11 @@ def model_convert_reference(_model):
             _model,
             "forward",
             OPTForCausalLM_forward,
+        )
+        convert_function(
+            _model.model.decoder,
+            "forward",
+            OPTDecoder_forward,
         )
         convert_function(
             _model,

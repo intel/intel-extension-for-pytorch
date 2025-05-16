@@ -236,6 +236,7 @@ def _GPTNeoXAttention_forward(
     use_cache: Optional[bool] = False,
     output_attentions: Optional[bool] = False,
 ):
+    input_shape = hidden_states.shape[:-1]
     has_layer_past = layer_past is not None
 
     qkv = self.query_key_value(hidden_states)
@@ -290,9 +291,8 @@ def _GPTNeoXAttention_forward(
             head_mask,
             attention_mask,
         )
-    attn_output = self._merge_heads(
-        attn_output, self.num_attention_heads, self.head_size
-    )
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(*input_shape, -1)
     attn_output = self.dense(attn_output)
 
     outputs = (attn_output, present)
@@ -360,8 +360,8 @@ def _OPTAttention_forward(
 
     (
         attn_output,
-        attn_weights,
-        past_key_value_decoder,
+        attn_weights_reshaped,
+        past_key_value,
     ) = self._IPEXScaleDotProduct(
         query,
         key,
@@ -371,9 +371,6 @@ def _OPTAttention_forward(
         layer_head_mask,
         attention_mask,
     )
-
-    if self.is_decoder:
-        past_key_value = past_key_value_decoder
 
     if not output_attentions:
         attn_weights_reshaped = None
@@ -2710,6 +2707,17 @@ class _IPEXAttentionRef(nn.Module):
                 self.hidden_size = module.o_proj.weight.shape[1]
             else:
                 self.hidden_size = module.o_proj.linear.weight.shape[1]
+        elif hasattr(module, "query_key_value"):
+            if hasattr(module.query_key_value, "in_features"):
+                self.hidden_size = module.query_key_value.in_features
+            elif hasattr(module.query_key_value, "linear") and hasattr(
+                module.query_key_value.linear, "in_features"
+            ):
+                self.hidden_size = module.query_key_value.linear.in_features
+            elif hasattr(module.query_key_value, "weight"):
+                self.hidden_size = module.query_key_value.weight.shape[1]
+            else:
+                self.hidden_size = module.query_key_value.linear.weight.shape[1]
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):
@@ -2722,7 +2730,8 @@ class _IPEXAttentionRef(nn.Module):
             self.num_attention_heads = module.n_heads
         elif hasattr(module, "head_dim"):
             self.num_attention_heads = self.hidden_size // module.head_dim
-
+        elif hasattr(module, "head_size"):
+            self.num_attention_heads = self.hidden_size // module.head_size
         if hasattr(module, "num_key_value_heads"):
             self.num_key_value_heads = module.num_key_value_heads
         elif hasattr(module, "num_key_value_groups"):
@@ -3105,6 +3114,8 @@ class _IPEXAttentionRef(nn.Module):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             self.scale_attn_value = self.scale_attn.item()
         if self.model_backbone == "GPTNeoXForCausalLM":
+            if hasattr(self, "scaling"):
+                self.norm_factor = self.scaling
             if isinstance(self.norm_factor, torch.Tensor):
                 self.norm_factor_value = self.norm_factor.item()
             else:
