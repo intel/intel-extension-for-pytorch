@@ -80,7 +80,7 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
-        ${IPEX_UTILS_SRCS})
+        ${IPEX_UTILS_SRCS}
         ${IPEX_VLLM_FP8_SRCS})
 
 # This workaround enables some definitions in PyTorch header file protected by USE_XPU macro.

@@ -7,15 +7,13 @@ from typing import Optional, Union
 import random
 import numpy as np
 
-FP8_DTYPE = torch.float8_e5m2
 
 def as_float32_tensor(x: Union[float, torch.tensor]) -> torch.tensor:
     return torch.as_tensor(x, dtype=torch.float32, device='xpu')
 
-def ref_dynamic_per_tensor_fp8_quant(x: torch.tensor) \
-                    -> tuple[torch.tensor, torch.tensor]:
+def ref_dynamic_per_tensor_fp8_quant(x, fp8_dtype):
 
-    fp8_traits = torch.finfo(FP8_DTYPE)
+    fp8_traits = torch.finfo(fp8_dtype)
     fp8_traits_max = fp8_traits.max
     fp8_traits_min = fp8_traits.min
     fp8_max = as_float32_tensor(fp8_traits_max)
@@ -29,7 +27,7 @@ def ref_dynamic_per_tensor_fp8_quant(x: torch.tensor) \
     ref_scale = x_max / fp8_max
     ref_iscale = one / ref_scale
     ref_out = (as_float32_tensor(x) * ref_iscale).clamp(
-        fp8_traits_min, fp8_traits_max).to(FP8_DTYPE)
+        fp8_traits_min, fp8_traits_max).to(fp8_dtype)
     return ref_out, ref_scale.view((1, ))
 
 def seed_everything(seed):
@@ -45,22 +43,24 @@ HIDDEN_SIZES += list(range(1024, 1033))  # vectorized conversion edge cases
 NUM_TOKENS = [1, 7, 83, 4096]  # Arbitrary values for testing
 SCALE_UBS = [True, False]
 SEEDS = [0]
+FP8_DTYPES = [torch.float8_e5m2, torch.float8_e4m3fn]
 
 
 @pytest.mark.parametrize("num_tokens", NUM_TOKENS)
 @pytest.mark.parametrize("hidden_size", HIDDEN_SIZES)
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("seed", SEEDS)
+@pytest.mark.parametrize("fp8_dtype", FP8_DTYPES)
 @torch.inference_mode()
 def test_dynamic_per_tensor_fp8_quant(num_tokens: int, hidden_size: int,
-                                      dtype: torch.dtype, seed: int) -> None:
+                                      dtype: torch.dtype, seed: int, fp8_dtype: torch.dtype) -> None:
     seed_everything(seed)
 
     x = torch.rand(num_tokens, hidden_size, dtype=dtype, device="xpu")
 
-    ref_out, ref_scale = ref_dynamic_per_tensor_fp8_quant(x)
+    ref_out, ref_scale = ref_dynamic_per_tensor_fp8_quant(x, fp8_dtype)
     ops_scale = torch.zeros(1, device=x.device, dtype=torch.float32)
-    ops_out = torch.empty_like(x, dtype=FP8_DTYPE)
+    ops_out = torch.empty_like(x, dtype=fp8_dtype)
     torch.ops.torch_ipex.dynamic_scaled_fp8_quant(ops_out, x, ops_scale)
 
     torch.testing.assert_close(ref_scale, ops_scale)
@@ -72,7 +72,8 @@ def test_dynamic_per_tensor_fp8_quant(num_tokens: int, hidden_size: int,
 # represent the number of elements.
 @torch.inference_mode()
 @pytest.mark.parametrize("seed", SEEDS)
-def test_fp8_quant_large(seed: int) -> None:
+@pytest.mark.parametrize("fp8_dtype", FP8_DTYPES)
+def test_fp8_quant_large(seed: int, fp8_dtype: torch.dtype) -> None:
     seed_everything(seed)
 
     num_tokens = 1024000  # Mistral-Nemo's max_position_embeddings
@@ -80,8 +81,8 @@ def test_fp8_quant_large(seed: int) -> None:
     dtype = torch.bfloat16
 
     x = torch.rand(num_tokens, hidden_size, dtype=dtype, device="xpu")
-    ref_out, scale = ref_dynamic_per_tensor_fp8_quant(x)
-    ops_out = torch.empty_like(x, dtype=FP8_DTYPE)
+    ref_out, scale = ref_dynamic_per_tensor_fp8_quant(x, fp8_dtype)
+    ops_out = torch.empty_like(x, dtype=fp8_dtype)
     torch.ops.torch_ipex.static_scaled_fp8_quant(ops_out, x, scale)
 
     # Minimize memory footprint in this test by freeing x and upconverting

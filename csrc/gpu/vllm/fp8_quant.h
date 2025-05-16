@@ -3,6 +3,7 @@
 #include <sycl/sycl.hpp>
 #include <cmath>
 
+#include <c10/util/Float8_e4m3fn.h>
 #include <c10/util/Float8_e5m2.h>
 
 #include "utils.h"
