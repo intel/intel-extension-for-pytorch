@@ -104,9 +104,8 @@ Tensor fp8_gemm_v2(
   }
 
 #ifdef USE_PRIMITIVE_CACHE
-  if ((A.scalar_type() == at::ScalarType::Half ||
-       A.scalar_type() == at::ScalarType::BFloat16) &&
-      B.scalar_type() == at::ScalarType::Float8_e5m2) {
+  if (A.scalar_type() == at::ScalarType::Half ||
+       A.scalar_type() == at::ScalarType::BFloat16) {
     torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
         result, A, B, trans_B, bias, B_scale_inv);
   } else {

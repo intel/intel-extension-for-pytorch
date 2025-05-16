@@ -44,8 +44,8 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
+            input,
             False,
             weight_fp8,
             True,
@@ -90,8 +90,8 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
+            input,
             False,
             weight_fp8,
             True,
@@ -136,7 +136,7 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
             input,
             False,
             weight_fp8,
@@ -181,8 +181,8 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
+            input,
             False,
             weight_fp8,
             True,
@@ -203,10 +203,14 @@ class TestFP8GEMMV2(TestCase):
         torch.manual_seed(seed)
         is_bias = True
 
-        input = torch.randn([8, 2], dtype=dtype, device=torch.device("xpu")) / 10
-        weight = torch.rand([3, 2], dtype=dtype).xpu() / 10
+        input = torch.randn([8, 256], dtype=dtype, device=torch.device("xpu")) / 10
+        weight = torch.rand([16, 256], dtype=dtype).xpu() / 10
 
-        gemm_ref = torch.nn.Linear(2, 3, bias=is_bias).xpu().to(dtype)
+        gemm_ref = (
+            torch.nn.Linear(input.shape[0], weight.shape[0], bias=is_bias)
+            .xpu()
+            .to(dtype)
+        )
         gemm_ref.weight.data = weight
         output_ref = gemm_ref(input)
 
@@ -217,7 +221,7 @@ class TestFP8GEMMV2(TestCase):
         scale_in = (torch.ones(1) * 2).xpu()
         (torch.ones(1) * 4).xpu()
         scale_in_inv = torch.tensor([1 / 2]).xpu()
-        scale_wei_inv = torch.tensor([1 / 4]).xpu()
+        scale_wei_inv = torch.tensor([1 / 2]).xpu()
         scale_shape = None
 
         input_fp8, _ = torch.ops.torch_ipex.cast_to_fp8(
@@ -227,7 +231,7 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
             input,
             False,
             weight_fp8,
@@ -240,8 +244,8 @@ class TestFP8GEMMV2(TestCase):
             False,
         )
 
-        # print("output_fp8 = ", output_fp8)
-        # print("output_ref = ", output_ref)
+        # print("\noutput_fp8 = \n", output_fp8)
+        # print("output_ref = \n", output_ref)
         self.assertEqual(output_fp8, output_ref, rtol=1e-1, atol=1e-2)
 
     def test_fp8_linear_E4M3_half_v2(self, dtype=torch.float16):
@@ -273,8 +277,8 @@ class TestFP8GEMMV2(TestCase):
             weight, scale_in, False, False, fp8_dtype, scale_shape
         )
 
-        output_fp8 = torch.ops.torch_ipex.fp8_gemm(
-            input_fp8,
+        output_fp8 = torch.ops.torch_ipex.fp8_gemm2(
+            input,
             False,
             weight_fp8,
             True,

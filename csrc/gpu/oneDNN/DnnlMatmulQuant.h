@@ -13,6 +13,8 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <cstdint>
 
+#include <iostream>
+
 using namespace dnnl;
 using namespace torch_ipex::xpu::oneDNN;
 
@@ -590,8 +592,9 @@ static inline void dnnl_matmul_w8a16_fp8(
     const Tensor& m2_sc,
     const int64_t group_size = 0) {
   TORCH_CHECK(
-      mat2.scalar_type() == at::ScalarType::Float8_e5m2,
-      "weight must be f8_e5m2");
+      mat2.scalar_type() == at::ScalarType::Float8_e5m2 ||
+          mat2.scalar_type() == at::ScalarType::Float8_e4m3fn,
+      "weight must be f8_e5m2 or f8_e4m3fn for fp8 matmul");
   auto src_sz = mat1.sizes();
   auto o_sz = result.sizes();
   // auto b_sz = mat2.sizes();
@@ -608,10 +611,16 @@ static inline void dnnl_matmul_w8a16_fp8(
 
   // get joint dtypes
   dnnl::joint_dtypes_t jd;
-  if (mat1.scalar_type() == at::ScalarType::Half) {
-    jd = dnnl::joint_dtypes_t::_f16_f8_e5m2;
-  } else if (mat1.scalar_type() == at::ScalarType::BFloat16) {
-    jd = dnnl::joint_dtypes_t::_bf16_f8_e5m2;
+  auto in_dtype = mat1.scalar_type();
+  auto wei_dtype = mat2.scalar_type();
+  if (in_dtype == at::ScalarType::Half) {
+    jd = wei_dtype == at::ScalarType::Float8_e5m2
+        ? dnnl::joint_dtypes_t::_f16_f8_e5m2
+        : dnnl::joint_dtypes_t::_f16_f8_e4m3;
+  } else if (in_dtype == at::ScalarType::BFloat16) {
+    jd = wei_dtype == at::ScalarType::Float8_e5m2
+        ? dnnl::joint_dtypes_t::_bf16_f8_e5m2
+        : dnnl::joint_dtypes_t::_bf16_f8_e4m3;
   } else {
     TORCH_INTERNAL_ASSERT(
         false, "Unsupported data type for fp8 matmul: ", mat1.scalar_type());
@@ -651,6 +660,9 @@ static inline void dnnl_matmul_w8a16_fp8(
       : mat2.strides()[mat2.dim() - 1];
   int64_t ldc = result.strides()[result.dim() - 2];
 
+  std::cout << "m: " << m << ", n: " << n << ", k: " << k << ", lda: " << lda
+            << ", ldb: " << ldb << ", ldc: " << ldc << std::endl;
+
   auto f_attr = [&](primitive_attr& pattr) {
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -670,12 +682,6 @@ static inline void dnnl_matmul_w8a16_fp8(
       //     {1, group_size},
       //     get_onednn_dtype(m2_sc));
     }
-
-    // if (jd == dnnl::joint_dtypes_t::_f16_f8_e5m2) {
-    //   pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
-    // } else if (jd == dnnl::joint_dtypes_t::_bf16_f8_e5m2) {
-    //   pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
-    // }
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
