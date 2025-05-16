@@ -117,7 +117,7 @@ def check_system_commands(commands):
     assert absent == 0, 'Required system command(s) not found.'
     return ret
 
-def remove_directory(directory):
+def _remove_directory(directory):
     if SYSTEM == 'Windows':
         for root, dirs, files in os.walk(directory):
             for dir_name in dirs:
@@ -128,13 +128,14 @@ def remove_directory(directory):
                 os.chmod(file_path, stat.S_IWRITE)
     shutil.rmtree(directory)
 
-def remove_file_dir(item):
-    if os.path.isfile(item):
+def remove_file_dir(item, isfile = False, isdir = False):
+    if not isfile and not isdir:
+        isfile = True
+        isdir = True
+    if os.path.isfile(item) and isfile:
         os.remove(item)
-    elif os.path.isdir(item):
-        remove_directory(item)
-    else:
-        pass
+    if os.path.isdir(item) and isdir:
+        _remove_directory(item)
 
 def clear_directory(directory):
     for item in os.listdir(directory):

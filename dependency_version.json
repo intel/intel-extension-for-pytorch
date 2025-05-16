@@ -3,9 +3,6 @@
     "max-version": "",
     "min-version": "12.3.0"
   },
-  "llvm": {
-    "commit": "llvmorg-16.0.6"
-  },
   "pytorch": {
     "index-url": "https://download.pytorch.org/whl/nightly/xpu",
     "version": {
@@ -34,24 +31,24 @@
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "linux": "2025.0",
-      "windows": "2025.0"
+      "linux": "2025.1",
+      "windows": "2025.1"
     },
     "mkl-dpcpp": {
-      "linux": "2025.0.1",
-      "windows": "2025.0.1"
+      "linux": "2025.1.0",
+      "windows": "2025.1.0"
     },
     "oneccl-devel": {
-      "linux": "2021.14.1",
+      "linux": "2021.15",
       "windows": "N/A"
     },
     "impi-devel": {
-      "linux": "2021.14.1",
+      "linux": "2021.15",
       "windows": "N/A"
     },
     "intel-pti": {
-      "linux": "0.10",
-      "windows": "0.10"
+      "linux": "0.12",
+      "windows": "0.12"
     }
   }
 }

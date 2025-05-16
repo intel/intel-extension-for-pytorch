@@ -63,8 +63,7 @@ def _patch_wheel(func,
     dir_dist = os.path.join(args[0], 'dist')
     dir_tmp = os.path.join(dir_dist, 'tmp')
     whl_file = _get_whl_from_dist(dir_dist)
-    if os.path.isdir(dir_tmp):
-        remove_directory(dir_tmp)
+    remove_file_dir(dir_tmp)
     os.mkdir(dir_tmp)
     import zipfile
     with zipfile.ZipFile(whl_file, "r") as zip_ref:
@@ -75,7 +74,31 @@ def _patch_wheel(func,
     func(*func_args)
     shutil.make_archive(whl_file, 'zip', dir_tmp)
     os.rename(f'{whl_file}.zip', whl_file)
-    remove_directory(dir_tmp)
+    remove_file_dir(dir_tmp)
+
+def _compile_base(cmd,
+                  cwd,
+                  env,
+                  show_command):
+    if show_command:
+        print(env)
+    redirect_file = os.path.join(cwd, 'build.log')
+    redirect_append = False
+    if not env is None:
+        if os.path.exists(redirect_file):
+            os.remove(redirect_file)
+        with open(redirect_file, 'w') as file:
+            file.write('******************** Environment Variables ********************\n')
+            for key, value in env.items():
+                file.write(f'{key}: {value}\n')
+            file.write('***************************************************************\n')
+        redirect_append = True
+    exec_cmds(cmd,
+              cwd = cwd,
+              env = env,
+              redirect_file = redirect_file,
+              redirect_append = redirect_append,
+              show_command = show_command)
 
 def _compile(directory,
              env,
@@ -91,27 +114,11 @@ def _compile(directory,
                   env = env,
                   show_command = show_command)
     dir_dist = os.path.join(dir_base, 'dist')
-    if os.path.isdir(dir_dist):
-        remove_directory(dir_dist)
-    if show_command:
-        print(env)
-    redirect_file = os.path.join(dir_base, 'build.log')
-    redirect_append = False
-    if not env is None:
-        if os.path.exists(redirect_file):
-            os.remove(redirect_file)
-        with open(redirect_file, 'w') as file:
-            file.write('******************** Environment Variables ********************\n')
-            for key, value in env.items():
-                file.write(f'{key}: {value}\n')
-            file.write('***************************************************************\n')
-        redirect_append = True
-    exec_cmds('python setup.py bdist_wheel',
-              cwd = dir_base,
-              env = env,
-              redirect_file = redirect_file,
-              redirect_append = redirect_append,
-              show_command = show_command)
+    remove_file_dir(dir_dist)
+    _compile_base('python setup.py bdist_wheel',
+                  cwd = dir_base,
+                  env = env,
+                  show_command = show_command)
     if SYSTEM == 'Linux' and pkg_name != '' and not disable_oneapi_integration:
         _patch_wheel(_patchelf_so_files,
                      dir_base,
@@ -145,7 +152,6 @@ def process(*args):
     global exec_cmds
     global check_system_commands
     global remove_file_dir
-    global remove_directory
     global clear_directory
     global update_source_code
     global source_env
@@ -160,7 +166,6 @@ def process(*args):
     exec_cmds = utils_module.exec_cmds
     check_system_commands = utils_module.check_system_commands
     remove_file_dir = utils_module.remove_file_dir
-    remove_directory = utils_module.remove_directory
     clear_directory = utils_module.clear_directory
     update_source_code = utils_module.update_source_code
     source_env = utils_module.source_env
@@ -203,6 +208,7 @@ def process(*args):
     # Retrieve dependency information
     sys.path.append(os.path.join(BASEDIR, SRCDIR, 'scripts', 'tools',  'compilation_helper'))
     from dep_ver_utils import process_file as dep_info_retrieve
+    INFO_GCC = dep_info_retrieve(os.path.join(BASEDIR, SRCDIR, 'dependency_version.json'), 'gcc')
     INFO_TORCH = dep_info_retrieve(os.path.join(BASEDIR, SRCDIR, 'dependency_version.json'), 'pytorch')
     INFO_TORCHVISION = dep_info_retrieve(os.path.join(BASEDIR, SRCDIR, 'dependency_version.json'), 'torchvision')
     INFO_TORCHAUDIO = dep_info_retrieve(os.path.join(BASEDIR, SRCDIR, 'dependency_version.json'), 'torchaudio')
@@ -389,6 +395,23 @@ def process(*args):
                            branch_main = 'master',
                            basedir = BASEDIR,
                            show_command = args_verbose)
+    if SYSTEM == 'Linux':
+        exec_cmds('python -m pip install packaging',
+                  silent = True,
+                  shell = True)
+        from packaging import version
+        _, line_stdout = exec_cmds('gcc -dumpfullversion',
+                               silent = True,
+                               shell = True)
+        assert len(line_stdout) == 1, f'Unexpected gcc version: {line_stdout}'
+        VER_GCC = line_stdout[0]
+        if version.parse(VER_GCC) < version.parse(INFO_GCC['min-version']):
+            print(f'Warning: Current gcc version ({VER_GCC}) is older than the expected minimum version ({INFO_GCC["min-version"]}).')
+            time.sleep(5)
+        del sys.modules['packaging']
+        exec_cmds('python -m pip uninstall -y packaging',
+                  silent = True,
+                  shell = True)
 
     # Clean Python environment
     t0 = int(time.time() * 1000)
@@ -408,37 +431,19 @@ def process(*args):
         file = os.path.join(BASEDIR, 'patchelf.tar.gz')
         directory = os.path.join(BASEDIR, 'patchelf')
         download('https://github.com/NixOS/patchelf/releases/download/0.18.0/patchelf-0.18.0-x86_64.tar.gz', file)
-        if os.path.isdir(directory):
-            remove_directory(directory)
+        remove_file_dir(directory)
         with tarfile.open(file, 'r:gz') as tar:
             tar.extractall(path = directory)
         os.remove(file)
         durations['Prepare patchelf environment'] = get_duration(t0)
         del sys.modules['tarfile']
-    elif SYSTEM == 'Windows':
-        if install_mode['torch'] == 'compile':
-            import zipfile
-            t0 = int(time.time() * 1000)
-            file = os.path.join(BASEDIR, 'level_zero_sdk.zip')
-            directory = os.path.join(BASEDIR, 'level_zero_sdk')
-            download('https://github.com/oneapi-src/level-zero/releases/download/v1.14.0/level-zero-sdk_1.14.0.zip', file)
-            if os.path.isdir(directory):
-                remove_directory(directory)
-            with zipfile.ZipFile(file, "r") as zip_ref:
-                zip_ref.extractall(directory)
-            os.remove(file)
-            durations['Prepare Level-Zero SDK environment'] = get_duration(t0)
-            del sys.modules['zipfile']
 
     # Prepare compilation environment
     t0 = int(time.time() * 1000)
     env = os.environ.copy()
-    env = source_env(DPCPP_ENV, env, show_command = args_verbose)
-    env = source_env(PTI_ENV, env, show_command = args_verbose)
     if SYSTEM == 'Linux':
         env['PATH'] = f'{os.path.join(BASEDIR, "patchelf", "bin")}{os.pathsep}{env["PATH"]}'
     elif SYSTEM == 'Windows':
-        env = source_env(OCLOC_ENV, env, show_command = args_verbose)
         env['DISTUTILS_USE_SDK'] = '1'
     else:
         pass
@@ -461,6 +466,16 @@ def process(*args):
         else:
             pass
         env_torch = env.copy()
+        env_torch = source_env(DPCPP_ENV, env_torch, show_command = args_verbose)
+        env_torch = source_env(ONEMKL_ENV, env_torch, show_command = args_verbose)
+        env_torch = source_env(PTI_ENV, env_torch, show_command = args_verbose)
+        if SYSTEM == 'Linux':
+            env_torch = source_env(ONECCL_ENV, env_torch, show_command = args_verbose)
+            env_torch = source_env(MPI_ENV, env_torch, show_command = args_verbose)
+        elif SYSTEM == 'Windows':
+            env_torch = source_env(OCLOC_ENV, env_torch, show_command = args_verbose)
+        else:
+            pass
         # env_torch['PYTORCH_BUILD_VERSION'] = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
         # env_torch['PYTORCH_BUILD_NUMBER'] = '0'
         if 'CONDA_PREFIX' in env_torch:
@@ -476,9 +491,11 @@ def process(*args):
         env_torch['USE_NUMA'] = '0'
         env_torch['USE_CUDA'] = '0'
         env_torch['USE_MPI'] = '0'
+        env_torch['USE_ONEMKL'] = '1'
+        env_torch['USE_XCCL'] = '1'
         aot = args_aot
         if aot == '':
-            # https://github.com/intel/torch-xpu-ops/blob/release/2.7/cmake/BuildFlags.cmake#L120-L124
+            # https://github.com/intel/torch-xpu-ops/blob/release/2.7/cmake/BuildFlags.cmake
             if SYSTEM == 'Linux':
                 aot = 'pvc,bmg,dg2,arl-h,mtl-h,lnl-m'
             elif SYSTEM == 'Windows':
@@ -488,21 +505,14 @@ def process(*args):
         env_torch['TORCH_XPU_ARCH_LIST'] = aot
         if SYSTEM == 'Linux':
             env_torch['USE_STATIC_MKL'] = '1'
-        elif SYSTEM == 'Windows':
-            env_torch['XPU_ENABLE_KINETO'] = '1'
-            env_torch['INCLUDE'] = f'{os.path.join(BASEDIR, "level_zero_sdk", "include")}{os.pathsep}{env_torch["INCLUDE"]}'
-        else:
-            pass
         if not args_disable_oneapi_integration:
             # https://github.com/pytorch/pytorch/blob/main/.github/scripts/generate_binary_build_matrix.py
-            env_torch['PYTORCH_EXTRA_INSTALL_REQUIREMENTS'] = 'intel-cmplr-lib-rt==2025.0.4; platform_system == "Linux" | intel-cmplr-lib-ur==2025.0.4; platform_system == "Linux" | intel-cmplr-lic-rt==2025.0.4; platform_system == "Linux" | intel-sycl-rt==2025.0.4; platform_system == "Linux" | intel-cmplr-lib-rt==2025.0.5; platform_system == "Windows" | intel-cmplr-lib-ur==2025.0.5; platform_system == "Windows" | intel-cmplr-lic-rt==2025.0.5; platform_system == "Windows" | intel-sycl-rt==2025.0.5; platform_system == "Windows" | tcmlib==1.2.0 | umf==0.9.1 | intel-pti==0.10.1'
+            env_torch['PYTORCH_EXTRA_INSTALL_REQUIREMENTS'] = "intel-cmplr-lib-rt==2025.1.1 | intel-cmplr-lib-ur==2025.1.1 | intel-cmplr-lic-rt==2025.1.1 | intel-sycl-rt==2025.1.1 | oneccl-devel==2021.15.1; platform_system == 'Linux' and platform_machine == 'x86_64' | oneccl==2021.15.1; platform_system == 'Linux' and platform_machine == 'x86_64' | impi-rt==2021.15.0; platform_system == 'Linux' and platform_machine == 'x86_64' | onemkl-sycl-blas==2025.1.0 | onemkl-sycl-dft==2025.1.0 | onemkl-sycl-lapack==2025.1.0 | onemkl-sycl-rng==2025.1.0 | onemkl-sycl-sparse==2025.1.0 | dpcpp-cpp-rt==2025.1.1 | intel-opencl-rt==2025.1.1 | mkl==2025.1.0 | intel-openmp==2025.1.1 | tbb==2022.1.0 | tcmlib==1.3.0 | umf==0.10.0 | intel-pti==0.12.0"
         _compile('pytorch',
                  env_torch,
                  pkg_name = 'torch',
                  disable_oneapi_integration = args_disable_oneapi_integration,
                  show_command = args_verbose)
-        if SYSTEM == 'Windows':
-            remove_directory(os.path.join(BASEDIR, 'level_zero_sdk'))
         ver_triton = '=='
         with open(os.path.join(BASEDIR, 'pytorch', '.ci', 'docker', 'triton_version.txt'), 'r') as file:
             ver_triton += file.read().strip()
@@ -516,21 +526,39 @@ def process(*args):
         durations['Compile PyTorch'] = get_duration(t0)
     elif install_mode['torch'] == 'pip':
         t0 = int(time.time() * 1000)
-        VER_TORCH = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
-        command = f'python -m pip install torch=={VER_TORCH}'
-        if args_with_vision:
-            VER_TORCHVISION = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
-            if VER_TORCHVISION != '':
-                VER_TORCHVISION = f'=={VER_TORCHVISION}'
-            command += f' torchvision{VER_TORCHVISION}'
-        if args_with_audio:
-            VER_TORCHAUDIO = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
-            if VER_TORCHAUDIO != '':
-                VER_TORCHAUDIO = f'=={VER_TORCHAUDIO}'
-            command += f' torchaudio{VER_TORCHAUDIO}'
-        command += f' --index-url {INFO_TORCH["index-url"]}'
-        exec_cmds(command,
-                  show_command = args_verbose)
+        INDEX_URL = INFO_TORCH['index-url']
+        if 'nightly' in INDEX_URL:
+            if args_with_vision:
+                VER = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
+                if VER != '':
+                    VER = f'=={VER}'
+                exec_cmds(f'python -m pip install torchvision{VER} --index-url {INDEX_URL}',
+                          show_command = args_verbose)
+            if args_with_audio:
+                VER = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
+                if VER != '':
+                    VER = f'=={VER}'
+                exec_cmds(f'python -m pip install torchaudio{VER} --index-url {INDEX_URL}',
+                          show_command = args_verbose)
+            VER = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
+            exec_cmds(f'python -m pip install torch=={VER} --index-url {INDEX_URL}',
+                      show_command = args_verbose)
+        else:
+            VER = INFO_TORCH['version'][SYSTEM.lower()] if isinstance(INFO_TORCH['version'], dict) else INFO_TORCH['version']
+            command = f'python -m pip install torch=={VER}'
+            if args_with_vision:
+                VER = INFO_TORCHVISION['version'][SYSTEM.lower()] if isinstance(INFO_TORCHVISION['version'], dict) else INFO_TORCHVISION['version']
+                if VER != '':
+                    VER = f'=={VER}'
+                command += f' torchvision{VER}'
+            if args_with_audio:
+                VER = INFO_TORCHAUDIO['version'][SYSTEM.lower()] if isinstance(INFO_TORCHAUDIO['version'], dict) else INFO_TORCHAUDIO['version']
+                if VER != '':
+                    VER = f'=={VER}'
+                command += f' torchaudio{VER}'
+            command += f' --index-url {INFO_TORCH["index-url"]}'
+            exec_cmds(command,
+                      show_command = args_verbose)
         durations['Install PyTorch packages'] = get_duration(t0)
     else:
         pass
@@ -570,15 +598,18 @@ def process(*args):
 
     # Install Intel® Extension for PyTorch*
     t0 = int(time.time() * 1000)
-    env = source_env(ONEMKL_ENV, env, show_command = args_verbose)
-    durations['Prepare compilation environment'] += get_duration(t0)
-
-    t0 = int(time.time() * 1000)
     env_ipex = env.copy()
+    env_ipex = source_env(DPCPP_ENV, env_ipex, show_command = args_verbose)
+    env_ipex = source_env(ONEMKL_ENV, env_ipex, show_command = args_verbose)
+    if SYSTEM == 'Windows':
+        env_ipex = source_env(OCLOC_ENV, env_ipex, show_command = args_verbose)
     exec_cmds('python -m pip install -r requirements.txt',
               cwd = os.path.join(BASEDIR, SRCDIR),
               show_command = args_verbose)
-    env_ipex['BUILD_WITH_CPU'] = '0'
+    if SYSTEM == 'Linux':
+        env_ipex['BUILD_WITH_CPU'] = '1'
+    else:
+        env_ipex['BUILD_WITH_CPU'] = '0'
     env_ipex['TORCH_XPU_ARCH_LIST'] = args_aot
     env_ipex['ENABLE_ONEAPI_INTEGRATION'] = str(int(not args_disable_oneapi_integration))
     _compile(SRCDIR,
@@ -592,28 +623,23 @@ def process(*args):
     # Install Torch-ccl
     if args_with_torch_ccl:
         t0 = int(time.time() * 1000)
-        if SYSTEM == 'Linux':
-            env = source_env(ONECCL_ENV, env, show_command = args_verbose)
-            env = source_env(MPI_ENV, env, show_command = args_verbose)
-            env['ONEAPIROOT'] = os.path.join(ONECCL_ROOT, '..', '..')
-        durations['Prepare compilation environment'] += get_duration(t0)
-
-        t0 = int(time.time() * 1000)
         env_torchccl = env.copy()
+        env_torchccl = source_env(DPCPP_ENV, env_torchccl, show_command = args_verbose)
+        env_torchccl = source_env(ONECCL_ENV, env_torchccl, show_command = args_verbose)
+        env_torchccl = source_env(MPI_ENV, env_torchccl, show_command = args_verbose)
+        env_torchccl['ONEAPIROOT'] = os.path.join(ONECCL_ROOT, '..', '..')
         env_torchccl['USE_SYSTEM_ONECCL'] = '1'
         env_torchccl['INTELONEAPIROOT'] = env_torchccl['ONEAPIROOT']
         env_torchccl['COMPUTE_BACKEND'] = 'dpcpp'
         _compile('torch-ccl',
                  env_torchccl,
-                 pkg_patchelf = 'oneccl_bindings_for_pytorch',
+                 pkg_name = 'oneccl_bindings_for_pytorch',
                  disable_oneapi_integration = args_disable_oneapi_integration,
                  show_command = args_verbose)
         durations['Compile Torch-CCL'] = get_duration(t0)
 
-    for directory in [os.path.join(BASEDIR, 'patchelf'),
-                      os.path.join(BASEDIR, 'level_zero_sdk')]:
-        if os.path.isdir(directory):
-            remove_directory(directory)
+    for directory in [os.path.join(BASEDIR, 'patchelf')]:
+        remove_file_dir(directory)
 
     # Print step duration
     print('')
@@ -731,6 +757,7 @@ if __name__ == '__main__':
                      stderr = subprocess.STDOUT,
                      shell = True,
                      text = True)
+        del sys.modules['subprocess']
         for line in iter(p.stdout.readline, ''):
             pass
         import requests
@@ -742,6 +769,7 @@ if __name__ == '__main__':
         with open(utils_filepath, 'wb') as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
+        del sys.modules['requests']
 
     process(
             args.install_pytorch,

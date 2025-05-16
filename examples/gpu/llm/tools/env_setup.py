@@ -9,10 +9,9 @@ import os
 from pathlib import Path
 import platform
 import shutil
-import subprocess
 import sys
 import time
-from compilation_utils import exec_cmds, remove_directory, remove_file_dir
+from compilation_utils import exec_cmds, remove_file_dir
 
 SYSTEM = platform.system()
 SCRIPTDIR = os.path.dirname(os.path.abspath(__file__))
@@ -97,8 +96,7 @@ if __name__ == '__main__':
         assert VER_IPEX_MAJOR != '' and VER_IPEX_MINOR != '' and VER_IPEX_PATCH != ''
         VER_IPEX=f'{VER_IPEX_MAJOR}.{VER_IPEX_MINOR}.{VER_IPEX_PATCH}+xpu'
 
-        if os.path.isdir(WHEELDIR):
-            remove_directory(WHEELDIR)
+        remove_file_dir(WHEELDIR)
         os.mkdir(WHEELDIR)
 
         cont_aux = []
@@ -145,7 +143,7 @@ if __name__ == '__main__':
                 for file in files:
                     if Path(file).suffix == '.whl':
                         shutil.copy(os.path.join(root, file), WHEELDIR)
-            for item in ['llvm-project', 'llvm-release', 'torch-ccl']:
+            for item in ['torch-ccl']:
                 remove_file_dir(os.path.join(COMPILEDIR, item))
             cmd_triton = ''
             pytorch_dir = os.path.join(COMPILEDIR, 'pytorch')
@@ -156,7 +154,7 @@ if __name__ == '__main__':
                 if ver_triton == '==':
                     ver_triton = ''
                 cmd_triton = f'python -m pip install pytorch-triton-xpu{ver_triton} --index-url {INFO_TORCH["index-url"]}'
-                remove_directory(pytorch_dir)
+                remove_file_dir(pytorch_dir)
             else:
                 cont_aux.append(f'python -m pip install torch=={VER_TORCH} --index-url {INFO_TORCH["index-url"]}')
             if SYSTEM == 'Windows':
@@ -180,4 +178,4 @@ if __name__ == '__main__':
                    env = env,
                    shell = True,
                    show_command = args.verbose)
-        remove_directory(WHEELDIR)
+        remove_file_dir(WHEELDIR)
