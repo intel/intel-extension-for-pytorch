@@ -5,6 +5,15 @@
 namespace torch_ipex {
 namespace cpu {
 
+at::Tensor call_AllReduce(const at::Tensor& self) {
+  static auto op_allreduce =
+      c10::Dispatcher::singleton()
+          .findSchemaOrThrow("deepspeed_comm::all_reduce", "")
+          .typed<at::Tensor(const at::Tensor& self)>();
+  auto ret = op_allreduce.call(self);
+  return ret;
+}
+
 IPEX_DEFINE_DISPATCH(mixtral_moe_tpp_kernel_stub);
 IPEX_DEFINE_DISPATCH(mixtral_moe_woq_kernel_stub);
 IPEX_DEFINE_DISPATCH(deepseek_moe_woq_kernel_stub);
@@ -30,7 +39,7 @@ at::Tensor mixtral_moe_tpp(
 
   if (top_x.sizes()[0] == 0)
     return output;
-  return mixtral_moe_tpp_kernel_stub(
+  output = mixtral_moe_tpp_kernel_stub(
       kCPU,
       hidden_states,
       top_x,
@@ -42,6 +51,10 @@ at::Tensor mixtral_moe_tpp(
       routing_weights,
       output,
       is_distributed);
+  if (is_distributed) {
+    call_AllReduce(output);
+  }
+  return output;
 }
 
 inline std::tuple<
@@ -104,6 +117,9 @@ at::Tensor deepseek_moe_tpp(
         output,
         is_distributed);
   }
+  if (is_distributed) {
+    call_AllReduce(output);
+  }
   return output;
 }
 
@@ -125,7 +141,7 @@ at::Tensor mixtral_moe(
 
   if (top_x.sizes()[0] == 0)
     return output;
-  return mixtral_moe_kernel_stub(
+  output = mixtral_moe_kernel_stub(
       kCPU,
       hidden_states,
       top_x,
@@ -140,6 +156,10 @@ at::Tensor mixtral_moe(
       routing_weights,
       output,
       is_distributed);
+  if (is_distributed) {
+    call_AllReduce(output);
+  }
+  return output;
 }
 
 at::Tensor deepseek_moe(
@@ -183,6 +203,9 @@ at::Tensor deepseek_moe(
         routing_weights,
         output,
         is_distributed);
+  }
+  if (is_distributed) {
+    call_AllReduce(output);
   }
   return output;
 }
@@ -229,6 +252,9 @@ at::Tensor deepseek_moe_mkl(
         output,
         is_distributed);
   }
+  if (is_distributed) {
+    call_AllReduce(output);
+  }
   return output;
 }
 at::Tensor mixtral_moe_woq(
@@ -245,7 +271,7 @@ at::Tensor mixtral_moe_woq(
 
   if (top_x.sizes()[0] == 0)
     return output;
-  return mixtral_moe_woq_kernel_stub(
+  output = mixtral_moe_woq_kernel_stub(
       kCPU,
       hidden_states,
       top_x,
@@ -256,6 +282,10 @@ at::Tensor mixtral_moe_woq(
       routing_weights,
       output,
       is_distributed);
+  if (is_distributed) {
+    call_AllReduce(output);
+  }
+  return output;
 }
 at::Tensor deepseek_moe_woq(
     const at::Tensor& hidden_states,
@@ -291,6 +321,9 @@ at::Tensor deepseek_moe_woq(
         routing_weights,
         output,
         is_distributed);
+  }
+  if (is_distributed) {
+    call_AllReduce(output);
   }
   return output;
 }

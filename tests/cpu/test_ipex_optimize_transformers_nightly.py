@@ -286,6 +286,13 @@ class OptimizeTransformersNightlyTester(TestCase):
             ]:
                 state_dict[weight] = torch.rand(state_dict[weight].shape)
             model.load_state_dict(state_dict)
+        elif m.name in ["deepseekv2", "deepseekv3"]:
+            model = model.to(dtype)
+            model.model.layers[
+                config.first_k_dense_replace
+            ].mlp.gate.e_score_correction_bias = torch.nn.Parameter(
+                torch.rand(config.n_routed_experts)
+            )
         elif m.name == "llava":
             model.get_vision_tower().load_model()
         elif m.name == "jamba":
@@ -390,7 +397,7 @@ class OptimizeTransformersNightlyTester(TestCase):
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
-        if m.name != "mllama":
+        if m.name not in ["mllama", "deepseekv3"]:
             if return_dict:
                 assert isinstance(key_ipex, dict)
                 self.assertEqual(

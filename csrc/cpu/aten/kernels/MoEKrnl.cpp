@@ -181,9 +181,6 @@ at::Tensor mixtral_moe_tpp_kernl_impl(
     curr_state =
         tpp_linear_nobias_forward_cpu(curr_state, down_wei, c10::nullopt);
   }
-  if (is_distributed) {
-    call_AllReduce(curr_state);
-  }
 
   if (hidden_states.scalar_type() == at::ScalarType::Float) {
     fuse_index_mul_index_add<float>(
@@ -237,9 +234,7 @@ at::Tensor mixtral_moe_kernl_impl(
         down_op_ctx,
         c10::nullopt);
   }
-  if (is_distributed) {
-    call_AllReduce(curr_state);
-  }
+
   if (hidden_states.scalar_type() == at::ScalarType::Float) {
     fuse_index_mul_index_add<float>(
         output, curr_state, routing_weights, top_x, idx);
@@ -271,9 +266,7 @@ at::Tensor mixtral_moe_woq_kernl_impl(
       woq_linear_mul_forward(
           curr_state, up_wei, {woq_linear_silu_forward(curr_state, gate_wei)}),
       down_wei);
-  if (is_distributed) {
-    call_AllReduce(curr_state);
-  }
+
   if (hidden_states.scalar_type() == at::ScalarType::Float) {
     fuse_index_mul_index_add<float>(
         output, curr_state, routing_weights, top_x, idx);

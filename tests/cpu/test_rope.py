@@ -292,6 +292,8 @@ class FusedROPETester(TestCase):
                 q_clone = q.clone()
                 kv_clone = kv.clone()
                 k_pe_clone = k_pe.clone()
+                q_clone2 = q.clone()
+                k_pe_clone2 = k_pe.clone()
                 q_ref, k_ref, v_ref = deepseek_rope(
                     q,
                     kv,
@@ -318,9 +320,27 @@ class FusedROPETester(TestCase):
                         qk_rope_head_dim,
                     )
                 )
+                q_ipex2, k_pe_ipex2 = (
+                    torch.ops.torch_ipex.rotary_position_embedding_deepseek_v2(
+                        q_clone2,
+                        k_pe_clone2,
+                        sincos,
+                        position_ids,
+                        num_head,
+                        q_head_dim,
+                        qk_nope_head_dim,
+                        qk_rope_head_dim,
+                    )
+                )
                 self.assertEqual(q_ref.transpose(1, 2), q_ipex, prec=prec)
                 self.assertEqual(k_ref.transpose(1, 2), k_ipex, prec=prec)
                 self.assertEqual(v_ref.transpose(1, 2), v_ipex, prec=prec)
+                self.assertEqual(q_ref.transpose(1, 2), q_ipex2, prec=prec)
+                self.assertEqual(
+                    k_ref.transpose(1, 2)[:, :, :1, qk_nope_head_dim:],
+                    k_pe_ipex2,
+                    prec=prec,
+                )
 
 
 if __name__ == "__main__":

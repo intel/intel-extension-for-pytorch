@@ -19,6 +19,7 @@ from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion impo
     _IPEXRMSNormCPU,
     _IPEXFastLayerNormCPU,
     _IPEXPagedAttentionCPU,
+    _IPEXMambaMixerCPU,
 )
 
 from intel_extension_for_pytorch.transformers.models.xpu.fusions.linear_fusion import (
@@ -76,6 +77,7 @@ CPU_fusion_modules = {
     IPEXCustomOpType.LINEAR_ADD_ADD: _IPEXlinearAddAddCPU,
     IPEXCustomOpType.LINEAR_MUL: _IPEXlinearMulCPU,
     IPEXCustomOpType.LINEAR_MOE: _IPEXGatedMLPMOECPU,
+    IPEXCustomOpType.MAMBA_MIXER: _IPEXMambaMixerCPU,
 }
 
 

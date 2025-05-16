@@ -21,6 +21,9 @@ from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion impo
     gelu_mul_cpu,
     add_rms_norm_cpu,
     add_layer_norm_cpu,
+    bgmv_shrink_cpu,
+    bgmv_expand_cpu,
+    bgmv_expand_slice_cpu,
 )
 
 

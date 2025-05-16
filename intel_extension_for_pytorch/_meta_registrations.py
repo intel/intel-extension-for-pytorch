@@ -2,6 +2,7 @@ import functools
 from typing import List, Optional
 
 import torch
+import torch._custom_ops
 import torch.library
 from torch._prims_common import IntLike
 
@@ -148,6 +149,7 @@ def meta_single_query_cached_kv_attention(
     block_size,
     max_context_len,
     alibi_slopes,
+    window_size,
     k_scale,
     v_scale,
 ):
@@ -619,7 +621,7 @@ def meta_tpp_linear_mul(
     return input.new_empty((*input.shape[:-1], out_features))
 
 
-@register_meta("masked_multihead_self_attention")
+@torch.library.register_fake("torch_ipex::masked_multihead_self_attention")
 def meta_masked_multihead_self_attention(
     query,
     key,
@@ -637,16 +639,15 @@ def meta_masked_multihead_self_attention(
     attn_output = query.new_empty(
         (query.shape[0], query.shape[2], query.shape[1], query.shape[3])
     )
-    if query.dtype == torch.bfloat16:
-        attn_output.as_strided_(
-            attn_output.shape,
-            (
-                query.shape[1] * query.shape[2] * query.shape[3],
-                query.shape[3],
-                query.shape[2] * query.shape[3],
-                1,
-            ),
-        )
+    attn_output.as_strided_(
+        attn_output.shape,
+        (
+            query.shape[1] * query.shape[2] * query.shape[3],
+            query.shape[3],
+            query.shape[2] * query.shape[3],
+            1,
+        ),
+    )
     attn_weights = None
     key_cache_out = query.new_empty(
         (key_cache.shape[0], key_cache.shape[1], key.shape[2], key.shape[3])
@@ -654,7 +655,9 @@ def meta_masked_multihead_self_attention(
     value_cache_out = query.new_empty(
         (value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3])
     )
-    beam_idx_out = query.new_empty(beam_idx.shape)
+    ctx = torch._custom_ops.get_ctx()
+    num_to_keep = ctx.new_dynamic_size()
+    beam_idx_out = query.new_empty((num_to_keep, beam_idx.shape[1]))
     return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
 
 

@@ -1,4 +1,5 @@
 import copy
+import os
 import unittest
 import torch
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
@@ -35,7 +36,8 @@ except RuntimeError:
 
 skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 skipIfNoVNNI = unittest.skipIf(
-    not core.isa_has_avx512_vnni_support(),
+    not core.isa_has_avx512_vnni_support()
+    or os.getenv("ATEN_CPU_CAPABILITY") in ["default", "avx2"],
     "OneDNN int8 GEMM may overflow without AVX512_VNNI",
 )
 

@@ -5,6 +5,7 @@
 #include "Linear.h"
 #include "WeightPack.h"
 #include "autocast/autocast_mode.h"
+#include "csrc/utils/CustomOperatorRegistration.h"
 #include "ideep/IDeepConversions.h"
 #include "utils/woq_defines.h"
 
@@ -1097,18 +1098,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_mul_forward);
   // the version without op_context
-  m.def(
-      "woq_linear(Tensor input, Tensor qweight, str weight_dtype, int[] weight_shape, Tensor[] weight_scales, "
-      "Tensor[]? weight_zeros, Tensor[]? bias, Tensor? g_idx, int group_size, int lowp_mode, int act_quant_mode, "
-      "Tensor? compensation = None) -> Tensor");
-  m.impl(
+  IPEX_OP_REGISTER_DISPATCH(
       "woq_linear",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::woq_linear_forward_v2);
-  m.impl(
+      torch_ipex::cpu::woq_linear_forward_v2,
+      c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
       "woq_linear",
-      c10::DispatchKey::AutocastCPU,
-      torch_ipex::autocast::woq_linear_forward_v2);
+      torch_ipex::autocast::woq_linear_forward_v2,
+      c10::DispatchKey::AutocastCPU);
   m.def(
       "dequantize_nf4(Tensor t, Tensor scales, int group_size, ScalarType out_dtype) -> Tensor");
   m.impl(

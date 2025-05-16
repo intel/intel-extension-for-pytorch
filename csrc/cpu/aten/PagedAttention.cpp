@@ -25,8 +25,10 @@ void single_query_cached_kv_attention_forward_cpu(
     int64_t block_size,
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   return single_query_cached_kv_attention_kernel_stub(
       kCPU,
       out,
@@ -40,8 +42,10 @@ void single_query_cached_kv_attention_forward_cpu(
       block_size,
       max_context_len,
       alibi_slopes,
+      window_size,
       k_scale,
-      v_scale);
+      v_scale,
+      softcap);
 }
 
 void reshape_and_cache_cpu(
@@ -54,7 +58,15 @@ void reshape_and_cache_cpu(
     const double k_scale,
     const double v_scale) {
   return reshape_and_cache_kernel_stub(
-      kCPU, key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
+      kCPU,
+      key,
+      value,
+      key_cache,
+      value_cache,
+      slot_mapping,
+      kv_cache_dtype,
+      k_scale,
+      v_scale);
 }
 
 void flash_attn_varlen_cpu(
@@ -70,8 +82,12 @@ void flash_attn_varlen_cpu(
     bool is_causal,
     at::Tensor& block_table,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size_left,
+    int64_t window_size_right,
+    const std::string& kv_cache_dtype,
     const double k_scale,
-    const double v_scale) {
+    const double v_scale,
+    const double softcap) {
   return flash_attn_var_len_kernel_stub(
       kCPU,
       out,
@@ -86,8 +102,12 @@ void flash_attn_varlen_cpu(
       is_causal,
       block_table,
       alibi_slopes,
+      window_size_left,
+      window_size_right,
+      kv_cache_dtype,
       k_scale,
-      v_scale);
+      v_scale,
+      softcap);
 }
 
 } // namespace cpu

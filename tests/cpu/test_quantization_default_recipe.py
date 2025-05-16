@@ -31,7 +31,7 @@ from intel_extension_for_pytorch.quantization import (
 )
 from intel_extension_for_pytorch.nn.modules.weight_only_quantization import (
     WeightOnlyQuantizedLinear,
-    Int4WeightFormat,
+    WoqWeightFormat,
 )
 import os
 
@@ -2572,7 +2572,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.GPTQ_FORMAT,
+                WoqWeightFormat.GPTQ_FORMAT,
             )
             packed_weight = op_context.get_weight()
             op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
@@ -2586,7 +2586,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.PLAIN_FORMAT,
+                WoqWeightFormat.PLAIN_FORMAT,
             )
             packed_weight_ref = op_context_ref.get_weight()
 
@@ -2628,7 +2628,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.AWQ_FORMAT,
+                WoqWeightFormat.AWQ_FORMAT,
             )
             packed_weight = op_context.get_weight()
             op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
@@ -2642,7 +2642,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 int(lowp_mode),
                 WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                 False,  # cache weight
-                Int4WeightFormat.PLAIN_FORMAT,
+                WoqWeightFormat.PLAIN_FORMAT,
             )
             packed_weight_ref = op_context_ref.get_weight()
 
@@ -2657,11 +2657,11 @@ class WeightOnlyQuantizationTester(TestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        def test(feature, has_bias):
+        def test(feature, has_bias, dtype):
             M, K, N = feature[0], feature[1], feature[2]
             model = Mod(K, N, has_bias)
             m = model.eval()
-            data = torch.rand(M, K).bfloat16() * 0.1
+            data = torch.rand(M, K).to(dtype) * 0.1
             weight = model.linear.weight
             group_size = 128
             fp8_max = 448.0
@@ -2672,7 +2672,13 @@ class WeightOnlyQuantizationTester(TestCase):
             w_fp8 = weight_grouped / w_scales.unsqueeze(-1)
             w_fp8 = w_fp8.view(N, K).to(torch.float8_e4m3fn)
             w_dq_bf16 = w_fp8.view(grouped_shape).float() * w_scales.unsqueeze(-1)
-            compute_dtype = torch.bfloat16 if M <= 4 else torch.half
+            compute_dtype = dtype
+            if dtype == torch.bfloat16 and M <= 4:
+                compute_dtype = torch.half
+            lowp_mode = (
+                WoqLowpMode.BF16 if dtype == torch.bfloat16 else WoqLowpMode.NONE
+            )
+
             w_dq_bf16 = w_dq_bf16.view(N, K).to(compute_dtype)
 
             if has_bias:
@@ -2683,7 +2689,7 @@ class WeightOnlyQuantizationTester(TestCase):
 
             qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 weight_dtype=WoqWeightDtype.FP8,
-                lowp_mode=WoqLowpMode.BF16,
+                lowp_mode=lowp_mode,
             )
             with torch.no_grad():
                 woq_m = copy.deepcopy(m)
@@ -2710,9 +2716,10 @@ class WeightOnlyQuantizationTester(TestCase):
             [1024, 1024, 1024],
         ]
         use_bias_list = [True, False]
-        cases = itertools.product(shape_list, use_bias_list)
-        for shape, use_bias in cases:
-            test(shape, use_bias)
+        dtype_list = [torch.bfloat16, torch.float]
+        cases = itertools.product(shape_list, use_bias_list, dtype_list)
+        for shape, use_bias, dtype in cases:
+            test(shape, use_bias, dtype)
 
 
 class QuantizedOpTester(TestCase):

@@ -27,8 +27,6 @@ from test_tpp_linear import (
     Linear_add_add,
 )
 
-skipTmplyforCPUIssue = unittest.skip("Skipping this test tmply. Check https://jira.devtools.intel.com/browse/IPB-2944")
-
 conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
 convtranspose_module = {
     1: torch.nn.ConvTranspose1d,
@@ -897,7 +895,6 @@ class TestCompileCases(TestCase):
                 self.assertTrue(y.dtype == dtype)
                 self.assertEqual(x.grad, ori_x.grad)
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -935,7 +932,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_gelu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -976,7 +972,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_silu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -1017,7 +1012,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_relu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -1058,7 +1052,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_mul_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -1099,7 +1092,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_add_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
@@ -1140,7 +1132,6 @@ class TestCompileCases(TestCase):
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
 
-    @skipTmplyforCPUIssue
     def test_tpp_linear_add2_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 

@@ -31,7 +31,7 @@ from intel_extension_for_pytorch.quantization._qconfig import (
 )
 
 
-class Int4WeightFormat(IntEnum):
+class WoqWeightFormat(IntEnum):
     PLAIN_FORMAT = 0
     GPTQ_FORMAT = 1
     AWQ_FORMAT = 2
@@ -184,7 +184,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         bias=None,
         group_size=-1,
         g_idx=None,
-        weight_format=Int4WeightFormat.PLAIN_FORMAT,
+        weight_format=WoqWeightFormat.PLAIN_FORMAT,
     ):
         r"""Create a weight-only quantized module from a float module and int4 weight
 
@@ -231,6 +231,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         supported_qw_dtype = [
             torch.int32,
             torch.uint8,
+            torch.int8,
             torch.quint4x2,
             torch.bfloat16,
             torch.float32,
@@ -245,6 +246,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
             mod.in_features = mod.weight.size()[1]
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
+
+        if group_size < 0:
+            scales = scales.squeeze()
+            if zero_points is not None:
+                zero_points = zero_points.squeeze()
 
         qlinear = cls._init_cls(
             mod,
@@ -275,7 +281,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         bias=None,
         group_size=-1,
         g_idx=None,
-        weight_format=Int4WeightFormat.PLAIN_FORMAT,
+        weight_format=WoqWeightFormat.PLAIN_FORMAT,
     ):
         r"""Create a weight-only quantized module from a float module and int4 weight
 
@@ -363,10 +369,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
 
         qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
-        weight_format = Int4WeightFormat.PLAIN_FORMAT
+        weight_format = WoqWeightFormat.PLAIN_FORMAT
         if quant_method == QuantMethod.AWQ_GEMM:
             scales, zero_points = _convert_awq_scales_qzeros(scales, zero_points)
-            weight_format = Int4WeightFormat.AWQ_FORMAT
+            weight_format = WoqWeightFormat.AWQ_FORMAT
         elif quant_method == QuantMethod.GPTQ_GEMM:
             if g_idx is not None:
                 qweight, scales, zero_points = _convert_optimum_format_to_desired(
@@ -374,7 +380,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 )
             else:
                 scales, zero_points = _convert_gptq_scales_qzeros(scales, zero_points)
-                weight_format = Int4WeightFormat.GPTQ_FORMAT
+                weight_format = WoqWeightFormat.GPTQ_FORMAT
 
         if bias is not None and torch.count_nonzero(bias) == 0:
             bias = None
@@ -475,7 +481,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         act_quant_mode,
         cache_weight_for_large_batch,
         is_from_int4_weight,
-        weight_format=Int4WeightFormat.PLAIN_FORMAT,
+        weight_format=WoqWeightFormat.PLAIN_FORMAT,
     ):
         if bias is None and mod.bias is not None:
             bias = mod.bias
@@ -572,7 +578,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
         act_quant_mode,
         cache_weight_for_large_batch,
         is_from_int4_weight,
-        weight_format=Int4WeightFormat.PLAIN_FORMAT,
+        weight_format=WoqWeightFormat.PLAIN_FORMAT,
     ):
         qlinear = cls._init_from_mod(mod, dtype)
         if is_from_int4_weight:
