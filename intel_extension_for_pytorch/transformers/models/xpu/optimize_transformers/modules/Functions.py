@@ -2168,3 +2168,20 @@ class IPEXRotaryEmbedding(nn.Module):
 
     def forward(self, x, position_ids):
         return None
+
+
+def ipex_tie_weights(model):
+    if hasattr(model, "tie_weights"):
+        func_ptr = model.tie_weights
+        if hasattr(func_ptr, "_ipex_wrapped") and func_ptr._ipex_wrapped:
+            return
+
+        def tie_weights_ipex_wrapper(self, *args, **kwargs):
+            func_ptr(*args, **kwargs)
+            model.lm_head.weight = nn.Parameter(
+                model.lm_head.weight.transpose(-1, -2).contiguous()
+            )
+
+        tie_weights_ipex_wrapper._ipex_wrapped = True
+
+        model.tie_weights = tie_weights_ipex_wrapper.__get__(model, model.__class__)
