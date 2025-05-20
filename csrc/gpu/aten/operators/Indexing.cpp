@@ -164,135 +164,6 @@ void index_select_impl(
   return;
 }
 
-struct NonzeroKernelFunctor {
-  void operator()(sycl::nd_item<1> item_id) const {
-    auto global_id = item_id.get_global_linear_id();
-
-    if (global_id < N) {
-      auto index = global_id / num_dim;
-      auto dim = global_id % num_dim;
-      tensor_begin[global_id] =
-          idx_flat_begin[index] / divisor[dim] % sizes[dim];
-    }
-  }
-  NonzeroKernelFunctor(
-      int64_t N_,
-      const int64_t num_dim_,
-      int64_t* tensor_begin_,
-      int64_t* idx_flat_begin_,
-      int64_t* divisor_,
-      int64_t* sizes_)
-      : N(N_),
-        num_dim(num_dim_),
-        tensor_begin(tensor_begin_),
-        idx_flat_begin(idx_flat_begin_) {
-    for (auto dim = num_dim - 1; dim >= 0; dim--) {
-      sizes[dim] = sizes_[dim];
-      divisor[dim] = divisor_[dim];
-    }
-  }
-
- private:
-  int64_t N;
-  const int64_t num_dim;
-  int64_t* tensor_begin;
-  int64_t* idx_flat_begin;
-  int64_t divisor[MAX_TENSORINFO_DIMS];
-  int64_t sizes[MAX_TENSORINFO_DIMS];
-};
-
-template <typename scalar_t>
-struct nonzero_copy_if_functor {
-  auto operator()(int64_t x) const {
-    return Numerics<scalar_t>::ne(self_begin[x], scalar_t(0));
-  }
-  nonzero_copy_if_functor(scalar_t* self_begin) : self_begin(self_begin) {}
-
- private:
-  scalar_t* self_begin;
-};
-template <>
-struct nonzero_copy_if_functor<bool> {
-  bool operator()(int64_t x) const {
-    // Using data type conversion to break deduce of execution chain in bool.
-    // Bool operations will be removed in the compiler optimization.
-    // The function returns a bool variable with one byte value stored i    n
-    // self_begin_ not 1 specified here.
-    volatile int in = (int)self_begin_[x];
-    bool res = in != int(0) ? 1 : 0;
-    return res;
-  }
-  nonzero_copy_if_functor(bool* self_begin) : self_begin_(self_begin) {}
-
- private:
-  bool* self_begin_;
-};
-
-template <typename scalar_t>
-void nonzero(Tensor& tensor, const Tensor& self_) {
-  Tensor self = self_.contiguous();
-  const int64_t num_dim = self.dim();
-  TORCH_CHECK(num_dim <= MAX_TENSORINFO_DIMS, "dim exceed max allowed dim");
-
-  int64_t N = self.numel();
-
-  if (N > 0) {
-    Tensor idx_flat = at::empty(
-        {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-    Tensor range = at::empty(
-        {N}, tensor.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-
-    scalar_t* self_begin = self.data_ptr<scalar_t>();
-    int64_t* idx_flat_begin = idx_flat.data_ptr<int64_t>();
-    int64_t* range_begin = nullptr;
-
-    nonzero_copy_if_functor<scalar_t> f(self_begin);
-    auto idx_flat_end = torch_ipex::xpu::pstl::copy_if<int64_t>(
-        range_begin, range_begin + N, idx_flat_begin, f);
-
-    auto num_nonzeros = std::distance(idx_flat_begin, idx_flat_end);
-
-    Tensor tensor_ = tensor.resize_({num_nonzeros, num_dim}).contiguous();
-    if (num_nonzeros > 0 && num_dim > 0) {
-      int64_t* tensor_begin = tensor_.data_ptr<int64_t>();
-
-      // preload sizes tensor for index calculation
-      int64_t sizes[MAX_TENSORINFO_DIMS];
-      int64_t divisor[MAX_TENSORINFO_DIMS];
-      sizes[num_dim - 1] = self.size(num_dim - 1);
-      divisor[num_dim - 1] = 1;
-      for (auto dim = num_dim - 2; dim >= 0; dim--) {
-        sizes[dim] = self.size(dim);
-        divisor[dim] = sizes[dim + 1] * divisor[dim + 1];
-      }
-
-      const int64_t N = num_nonzeros * num_dim;
-      auto& dpcpp_queue = dpcppGetCurrentQueue();
-      const auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-      const auto wgroup_size = std::min(dpcppMaxWorkGroupSize(dev_id), N);
-      const auto ngroups = (N + wgroup_size - 1) / wgroup_size;
-
-      // restore flatten idx to indices
-      auto cgf = DPCPP_Q_CGF(__cgh) {
-        NonzeroKernelFunctor kfn(
-            N, num_dim, tensor_begin, idx_flat_begin, divisor, sizes);
-        __cgh.parallel_for<decltype(kfn)>(
-            sycl::nd_range<1>(ngroups * wgroup_size, wgroup_size), kfn);
-      };
-      DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-
-      // Support non-contiguous/outplace cases
-      // TODO: Next step, we will give state of art algo/implementation.
-      // Non-contiguous/outplace cases performance will be covered there.
-      if (tensor.data_ptr() != tensor_.data_ptr()) {
-        tensor.copy_(tensor_);
-      }
-    }
-  } else {
-    tensor = tensor.resize_({N, num_dim}).contiguous();
-  }
-}
-
 template <int N>
 struct alignas(N) OpaqueType {
   char data[N];
@@ -836,45 +707,6 @@ Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
   return at::AtenIpexTypeXPU::index_select_out(self, dim, index, out);
 }
 
-Tensor& nonzero_out(const Tensor& self, Tensor& out) {
-  TORCH_CHECK(
-      self.numel() < std::numeric_limits<int>::max(),
-      "nonzero is not supported for tensors with more than INT_MAX elements, \
-      See https://github.com/pytorch/pytorch/issues/51871");
-  TORCH_CHECK(
-      out.dtype() == at::kLong,
-      "Expected object of scalar type ",
-      at::kLong,
-      " as out, but got ",
-      out.dtype());
-  TORCH_CHECK(
-      self.device() == out.device(),
-      "expected self and out to be on the same device, but got out on ",
-      out.device(),
-      " and self on ",
-      self.device());
-  TORCH_CHECK(
-      self.dim() <= 16,
-      "nonzero is not supported for tensor with more than ",
-      16,
-      " dimensions");
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
-      at::ScalarType::ComplexHalf,
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      "indexSelect",
-      [&]() { impl::nonzero<scalar_t>(out, self); });
-  return out;
-}
-
-Tensor nonzero(const at::Tensor& self) {
-  auto out = at::empty({0}, self.options().dtype(kLong));
-  return at::AtenIpexTypeXPU::nonzero_out(self, out);
-}
-
 at::Tensor index_copy_meta(
     const at::Tensor& self,
     int64_t& dim,
@@ -1202,30 +1034,6 @@ Tensor& _index_put_impl_(
 #ifdef USE_OVERRIDE_OP
 namespace {
 
-at::Tensor wrapper_XPU__nonzero(const at::Tensor& self) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device, self, "wrapper_XPU__nonzero", "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::nonzero(self);
-}
-
-at::Tensor& wrapper_XPU_out_nonzero_out(
-    const at::Tensor& self,
-    at::Tensor& out) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device, out, "wrapper_XPU_out_nonzero_out", "out");
-  c10::impl::check_and_update_common_device(
-      common_device, self, "wrapper_XPU_out_nonzero_out", "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::nonzero_out(self, out);
-}
-
 at::Tensor& wrapper_XPU_index_copy_(
     at::Tensor& self,
     int64_t dim,
@@ -1246,8 +1054,6 @@ at::Tensor& wrapper_XPU_index_copy_(
 }
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("nonzero", TORCH_FN((&wrapper_XPU__nonzero)));
-  m.impl("nonzero.out", TORCH_FN((&wrapper_XPU_out_nonzero_out)));
   m.impl("index_copy_", TORCH_FN((&wrapper_XPU_index_copy_)));
 }
 } // namespace
