@@ -129,6 +129,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                 self.attn.load_parameter = partial(
                     chatglm_load_attn_params_grouped, self.attn
                 )
+                self.attn.position_embed = self.ipex_config.rotary_embedding_class(
+                    self.ipex_config, torch.float16
+                )
             else:
                 self.attn.load_parameter = partial(
                     load_attn_fused_qkv_params, self.attn
@@ -137,9 +140,6 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
                     transpose_attn_fused_qkv_params, self.attn
                 )
 
-        self.attn.position_embed = self.ipex_config.rotary_embedding_class(
-            self.ipex_config, torch.float16
-        )
         self.mlp = (
             FalconMLP(config)
             if not self.new_decoder_architecture
