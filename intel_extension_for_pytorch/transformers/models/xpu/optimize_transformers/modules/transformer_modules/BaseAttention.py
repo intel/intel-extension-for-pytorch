@@ -125,13 +125,6 @@ class IPEXTransformerAttn(nn.Module):
         raise NotImplementedError
 
     def end_of_attention(self):
-        if IPEXTransformerAttn.timestamp % self.runtime_cache_size == 0:
-            if self.batch_size * self.beam_size > 8:
-                if (self.layer_id + 1) % 4 == 0:
-                    torch.xpu.empty_cache()
-            else:
-                if self.layer_id + 1 == self.num_of_layers:
-                    torch.xpu.empty_cache()
         if self.layer_id + 1 == self.num_of_layers:
             IPEXTransformerAttn.timestamp += 1
 
