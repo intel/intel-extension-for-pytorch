@@ -660,9 +660,6 @@ static inline void dnnl_matmul_w8a16_fp8(
       : mat2.strides()[mat2.dim() - 1];
   int64_t ldc = result.strides()[result.dim() - 2];
 
-  std::cout << "m: " << m << ", n: " << n << ", k: " << k << ", lda: " << lda
-            << ", ldb: " << ldb << ", ldc: " << ldc << std::endl;
-
   auto f_attr = [&](primitive_attr& pattr) {
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);

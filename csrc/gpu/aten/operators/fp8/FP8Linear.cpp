@@ -62,6 +62,8 @@ Tensor fp8_gemm_v2(
     }
     if (trans_B) {
       result_shape = {A.size(0), B.size(0)};
+    } else {
+      result_shape = {A.size(0), B.size(1)};
     }
     // src{m, k}, wei{k, n}, bias{n}, dst{m, n}
   } else if (A.dim() == 3) {
@@ -71,11 +73,15 @@ Tensor fp8_gemm_v2(
     if (B.dim() == 2) {
       if (trans_B) {
         result_shape = {A.size(0) * A.size(1), B.size(0)};
+      } else {
+        result_shape = {A.size(0) * A.size(1), B.size(1)};
       }
       // src{b, m, k}, wei{k, n}, bias{n}, dst{b, m, n}
     } else {
       if (trans_B) {
         result_shape = {A.size(0), A.size(1), B.size(1)};
+      } else {
+        result_shape = {A.size(0), A.size(1), B.size(2)};
       }
       // src{b, m, k}, wei{b, k, n}, bias{n}, dst{b, m, n}
     }
@@ -105,7 +111,7 @@ Tensor fp8_gemm_v2(
 
 #ifdef USE_PRIMITIVE_CACHE
   if (A.scalar_type() == at::ScalarType::Half ||
-       A.scalar_type() == at::ScalarType::BFloat16) {
+      A.scalar_type() == at::ScalarType::BFloat16) {
     torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
         result, A, B, trans_B, bias, B_scale_inv);
   } else {

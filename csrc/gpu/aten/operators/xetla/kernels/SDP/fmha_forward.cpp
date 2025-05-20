@@ -145,6 +145,7 @@ class fmha_forward_kernel_policy {
             args.head_size == HEAD_SIZE_LIMIT_0) {
           // for extremely short query length
           if constexpr (v2_available) {
+            assert(p.head_size == HEAD_SIZE_LIMIT_0);
             return policy<std::integral_constant<int, HEAD_SIZE_LIMIT_0>>(args);
           }
         } else if (args.num_queries < NUM_QUERIES_LARGE) {
