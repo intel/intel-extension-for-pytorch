@@ -2178,9 +2178,12 @@ def ipex_tie_weights(model):
 
         def tie_weights_ipex_wrapper(self, *args, **kwargs):
             func_ptr(*args, **kwargs)
-            model.lm_head.weight = nn.Parameter(
-                model.lm_head.weight.transpose(-1, -2).contiguous()
-            )
+            if getattr(self.config, "tie_word_embeddings", True):
+                output_embeddings = self.get_output_embeddings()
+                if output_embeddings is not None:
+                    output_embeddings.weight = nn.Parameter(
+                        output_embeddings.weight.transpose(-1, -2).contiguous()
+                    )
 
         tie_weights_ipex_wrapper._ipex_wrapped = True
 
