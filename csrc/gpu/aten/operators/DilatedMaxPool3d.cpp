@@ -443,10 +443,6 @@ void max_pool3d_with_indices_out_template(
     IntArrayRef padding,
     IntArrayRef dilation,
     bool ceil_mode) {
-  if (input.numel() == 0) {
-    return;
-  }
-
   TORCH_CHECK(
       kernel_size.size() == 1 || kernel_size.size() == 3,
       "max_pool3d: kernel_size must either be a single int, or a tuple "
@@ -558,6 +554,10 @@ void max_pool3d_with_indices_out_template(
           {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
     }
 
+    if (input.numel() == 0) {
+      return;
+    }
+
     std::vector<int64_t> kernel_size_vec = {kD, kH, kW};
     std::vector<int64_t> stride_vec = {dD, dH, dW};
     std::vector<int64_t> padding_vec = {padD, padH, padW};
@@ -623,6 +623,10 @@ void max_pool3d_with_indices_out_template(
             {nbatch, nblock, outputDepth, outputHeight, outputWidth},
             at::MemoryFormat::ChannelsLast3d);
       }
+    }
+
+    if (input.numel() == 0) {
+      return;
     }
 
     Tensor format_input;

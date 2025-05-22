@@ -344,8 +344,6 @@ Tensor& max_unpooling2d_forward_template(
   auto oheight = output_size[0];
   auto owidth = output_size[1];
 
-  TORCH_CHECK(self_.numel() > 0, "Input must be non-empty tensor");
-
   TORCH_CHECK(
       (self_.ndimension() == 3 || self_.ndimension() == 4),
       "Input to max_unpooling2d should be a 3d or 4d Tensor",
@@ -385,24 +383,26 @@ Tensor& max_unpooling2d_forward_template(
   output.zero_();
 
   auto count = self.numel();
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "max_unpooling2d_forward_kernel",
-      ([&] {
-        max_unpooling2d_forward_kernel(
-            self.numel(),
-            self.data_ptr<scalar_t>(),
-            indices.data_ptr<int64_t>(),
-            numChannels,
-            inputHeight,
-            inputWidth,
-            oheight,
-            owidth,
-            output.data_ptr<scalar_t>(),
-            is_smf_channels_last(self_));
-      }));
+  if (count != 0) {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        at::ScalarType::Half,
+        at::ScalarType::BFloat16,
+        self.scalar_type(),
+        "max_unpooling2d_forward_kernel",
+        ([&] {
+          max_unpooling2d_forward_kernel(
+              self.numel(),
+              self.data_ptr<scalar_t>(),
+              indices.data_ptr<int64_t>(),
+              numChannels,
+              inputHeight,
+              inputWidth,
+              oheight,
+              owidth,
+              output.data_ptr<scalar_t>(),
+              is_smf_channels_last(self_));
+        }));
+  }
 
   if (self.ndimension() == 3) {
     output.resize_({numChannels, oheight, owidth});
@@ -442,8 +442,6 @@ static void max_unpooling3d_shape_check(
   TORCH_CHECK(
       input.sizes() == indices.sizes(),
       "Shape of indices should match shape of input");
-
-  TORCH_CHECK(input.numel() > 0, "Input must be non-empty");
 
   TORCH_CHECK(
       stride[0] > 0 && stride[1] > 0 && stride[2] > 0,
@@ -533,6 +531,10 @@ Tensor& max_unpooling3d_forward_template(
   }
 
   output.zero_();
+
+  if (self.numel() == 0) {
+    return output;
+  }
 
   if (is_smf_channels_last(self_)) {
     IPEX_DISPATCH_ALL_TYPES_AND2(
