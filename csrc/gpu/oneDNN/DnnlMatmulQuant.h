@@ -597,7 +597,6 @@ static inline void dnnl_matmul_w8a16_fp8(
       "weight must be f8_e5m2 or f8_e4m3fn for fp8 matmul");
   auto src_sz = mat1.sizes();
   auto o_sz = result.sizes();
-  // auto b_sz = mat2.sizes();
 
   const int m = std::reduce(
       src_sz.begin(), src_sz.end() - 1, 1, std::multiplies<int64_t>());
@@ -664,21 +663,11 @@ static inline void dnnl_matmul_w8a16_fp8(
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-    if (1) {
-      pattr.set_scales(
-          DNNL_ARG_WEIGHTS,
-          /* mask */ 0,
-          {},
-          get_onednn_dtype(m2_sc));
-    } else {
-      // Only support N dimension group
-      pattr.set_scales_mask(DNNL_ARG_WEIGHTS, /* mask */ (1 << 1));
-      // pattr.set_scales(
-      //     DNNL_ARG_WEIGHTS,
-      //     /* mask */ (1 << 1),
-      //     {1, group_size},
-      //     get_onednn_dtype(m2_sc));
-    }
+    pattr.set_scales(
+        DNNL_ARG_WEIGHTS,
+        /* mask */ 0,
+        {},
+        get_onednn_dtype(m2_sc));
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
