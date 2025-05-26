@@ -1,5 +1,5 @@
-transformers==4.48.3
-diffusers==0.27.2
+transformers==4.51.3
+diffusers==0.33
 einops==0.8.0
-huggingface-hub==0.25.2
+huggingface-hub==0.30.0
 pillow==11.1.0

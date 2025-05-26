@@ -5,4 +5,4 @@ neural-compressor==3.3
 pydantic
 numba
 tbb
-transformers==4.48.3
+transformers==4.51.3

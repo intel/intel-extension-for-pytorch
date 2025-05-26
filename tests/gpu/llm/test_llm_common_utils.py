@@ -118,7 +118,7 @@ class TestIpexLLMOptimizeBase(TestCase):
         num_beams,
     ):
         config = AutoConfig.from_pretrained(
-            self.model_config["config_path"], return_dict=False
+            self.model_config["config_path"], return_dict=True
         )
         dtype = torch.float16
         device = "xpu"

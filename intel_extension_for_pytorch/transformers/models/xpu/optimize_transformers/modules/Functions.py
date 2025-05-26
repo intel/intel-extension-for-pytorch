@@ -770,7 +770,6 @@ def _ipex_beam_search_(
     self,
     original_funcion,
     input_ids,
-    beam_scorer,
     logits_processor=None,
     stopping_criteria=None,
     generation_config=None,
@@ -785,9 +784,6 @@ def _ipex_beam_search_(
         Parameters:
             input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
                 The sequence used as a prompt for the generation.
-            beam_scorer (`BeamScorer`):
-                An derived instance of [`BeamScorer`] that defines how beam hypotheses are constructed, stored and
-                sorted during generation. For more information, the documentation of [`BeamScorer`] should be read.
             logits_processor (`LogitsProcessorList`):
                 An instance of [`LogitsProcessorList`]. List of instances of class derived from [`LogitsProcessor`]
                 used to modify the prediction scores of the language modeling head applied at each generation step.
@@ -819,7 +815,6 @@ def _ipex_beam_search_(
     if not isinstance(model_kwargs.get("past_key_values", None), StaticCache):
         return original_funcion(
             input_ids,
-            beam_scorer,
             logits_processor,
             stopping_criteria,
             generation_config,
@@ -867,11 +862,9 @@ def _ipex_beam_search_(
     stopping_criteria = (
         stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     )
-
-    batch_size = len(beam_scorer._beam_hyps)
-    num_beams = beam_scorer.num_beams
-
     batch_beam_size, cur_len = input_ids.shape
+    num_beams = generation_config.num_beams
+    batch_size = batch_beam_size // num_beams
     model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
 
     if num_beams * batch_size != batch_beam_size:
@@ -919,8 +912,9 @@ def _ipex_beam_search_(
 
     # init parameters
     finished = torch.zeros([batch_size], dtype=torch.bool, device=input_ids.device)
-    length_penalty = beam_scorer.length_penalty
-    do_early_stopping = beam_scorer.do_early_stopping
+
+    length_penalty = generation_config.length_penalty
+    do_early_stopping = generation_config.early_stopping
 
     index_cache = torch.zeros(
         (0, batch_size * num_beams), dtype=torch.int, device=input_ids.device
@@ -1143,7 +1137,7 @@ def _ipex_beam_search_(
         max_out_seq_length,
         batch_size,
         num_beams,
-        beam_scorer.num_beam_hyps_to_keep,
+        generation_config.num_return_sequences,
         cur_len - max_in_seq_length,
         pad_token_id,
     )
@@ -2178,7 +2172,9 @@ def ipex_tie_weights(model):
 
         def tie_weights_ipex_wrapper(self, *args, **kwargs):
             func_ptr(*args, **kwargs)
-            if getattr(self.config, "tie_word_embeddings", True):
+            if getattr(
+                self.config.get_text_config(decoder=True), "tie_word_embeddings", True
+            ):
                 output_embeddings = self.get_output_embeddings()
                 if output_embeddings is not None:
                     output_embeddings.weight = nn.Parameter(

@@ -302,7 +302,7 @@ def IPEXOPTDecoder_forward(
         position_ids = cache_position.unsqueeze(0)
 
     # embed positions
-    if self._use_flash_attention_2:
+    if self.config._attn_implementation == "flash_attention_2":
         # 2d mask is passed through the layers
         causal_attention_mask = (
             attention_mask

@@ -7,10 +7,10 @@ diffusers
 mpi4py
 protobuf==3.20.3
 lm_eval==0.4.2
-huggingface-hub==0.25.2
+huggingface-hub==0.30.0
 py-cpuinfo
 bitsandbytes
-transformers==4.48.3
+transformers==4.51.3
 transformers_stream_generator
 einops
 hjson

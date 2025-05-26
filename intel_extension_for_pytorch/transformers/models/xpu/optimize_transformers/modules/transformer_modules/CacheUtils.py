@@ -27,7 +27,7 @@ try:
             self.max_batch_size = cache.max_batch_size
             self.max_cache_len = cache.max_cache_len
             self.head_dim = cache.head_dim
-            self.dtype = cache.dtype
+            self.dtype = cache._dtype
             self.tp_idx = 0
             self.tp_size = 1
             if dist.is_initialized():
