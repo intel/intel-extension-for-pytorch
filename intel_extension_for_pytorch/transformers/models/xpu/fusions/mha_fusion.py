@@ -591,6 +591,10 @@ class _IPEXPagedAttentionXPU:
             pad_k_cache = torch.nn.functional.pad(k_cache, (0, pad_size))
             pad_v_cache = torch.nn.functional.pad(v_cache, (0, pad_size))
             pad_output = torch.nn.functional.pad(output, (0, pad_size))
+        block_size = pad_k_cache.size(1)
+        if block_size * block_table_s.size(1) > max_seqlen_kv:
+            max_block_per_seq = (max_seqlen_kv + block_size - 1) // block_size
+            block_table_s = block_table_s[:, :max_block_per_seq].contiguous()
         torch.ops.torch_ipex.chunked_prefill(
             pad_query,
             pad_k_cache,
