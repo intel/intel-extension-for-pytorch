@@ -534,7 +534,17 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
 
 
 class _IPEXGatedMLPMOECPU(nn.Module):
-    def __init__(self, W13, W2, W3=None, use_prepack=False):
+    def __init__(
+        self,
+        W13,
+        W2,
+        W3=None,
+        use_prepack=False,
+        w1_scale_inv=None,
+        w2_scale_inv=None,
+        a1_scale_inv=None,
+        a2_scale_inv=None,
+    ):
         super().__init__()
 
         self.num_experts = W2.shape[0]

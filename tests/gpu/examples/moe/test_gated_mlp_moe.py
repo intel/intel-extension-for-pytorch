@@ -9,7 +9,7 @@ import pytest
 
 class MixtralMoE(torch.nn.Module):
 
-    def __init__(self, num_experts, top_k, hidden_size, intermediate_size):
+    def __init__(self, num_experts, top_k, hidden_size, intermediate_size, is_fp8):
         super().__init__()
         self.num_experts = num_experts
         self.top_k = top_k
@@ -38,11 +38,76 @@ class MixtralMoE(torch.nn.Module):
             / 10,
             requires_grad=False,
         )
-        self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
-            copy.deepcopy(self.w1_weight),
-            copy.deepcopy(self.w2_weight),
-            copy.deepcopy(self.w3_weight),
-        )
+        if not is_fp8:
+            self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+                copy.deepcopy(self.w1_weight),
+                copy.deepcopy(self.w2_weight),
+                copy.deepcopy(self.w3_weight),
+            )
+        else:
+            dtype = self.w1_weight.dtype
+            fp8_dtype = torch.float8_e5m2
+            w1_scale = torch.full((num_experts,), 4.0, device="xpu")
+            w1_scale_inv = torch.full((num_experts,), 0.25, device="xpu")
+            w2_scale = torch.full((num_experts,), 2.0, device="xpu")
+            w2_scale_inv = torch.full((num_experts,), 0.5, device="xpu")
+
+            w13_weight = torch.cat((self.w1_weight, self.w3_weight), dim=1)
+            w13_weight_fp8 = torch.empty_like(w13_weight, device="xpu", dtype=fp8_dtype)
+
+            w1_weight_fp8 = torch.empty_like(
+                self.w1_weight, device="xpu", dtype=fp8_dtype
+            )
+            w2_weight_fp8 = torch.empty_like(
+                self.w2_weight, device="xpu", dtype=fp8_dtype
+            )
+            w3_weight_fp8 = torch.empty_like(
+                self.w3_weight, device="xpu", dtype=fp8_dtype
+            )
+
+            for i in range(num_experts):
+                w13_weight_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
+                    w13_weight[i], w1_scale[i], False, False, fp8_dtype, None
+                )
+
+                w1_weight_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
+                    self.w1_weight[i], w1_scale[i], False, False, fp8_dtype, None
+                )
+                w2_weight_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
+                    self.w2_weight[i], w2_scale[i], False, False, fp8_dtype, None
+                )
+                w3_weight_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
+                    self.w3_weight[i], w1_scale[i], False, False, fp8_dtype, None
+                )
+
+                self.w1_weight[i] = torch.ops.torch_ipex.cast_from_fp8(
+                    w1_weight_fp8[i], w1_scale_inv[i], dtype
+                )
+                self.w2_weight[i] = torch.ops.torch_ipex.cast_from_fp8(
+                    w2_weight_fp8[i], w2_scale_inv[i], dtype
+                )
+                self.w3_weight[i] = torch.ops.torch_ipex.cast_from_fp8(
+                    w3_weight_fp8[i], w1_scale_inv[i], dtype
+                )
+
+            self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+                copy.deepcopy(w13_weight_fp8),
+                copy.deepcopy(w2_weight_fp8),
+                W3=None,
+                w1_scale_inv=copy.deepcopy(w1_scale_inv),
+                w2_scale_inv=copy.deepcopy(w2_scale_inv),
+            )
+
+            # XPU does not support cat fp8, W3 should be None
+            # Once XPU support cat fp8, use below code
+            # self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+            #     copy.deepcopy(w1_weight_fp8),
+            #     copy.deepcopy(w2_weight_fp8),
+            #     copy.deepcopy(w3_weight_fp8),
+            #     w1_scale_inv=copy.deepcopy(w1_scale_inv),
+            #     w2_scale_inv=copy.deepcopy(w2_scale_inv),
+            # )
+
         self.act_fn = torch.nn.SiLU()
 
     def ref_mlp(self, hidden_states: torch.Tensor, expert_id: int) -> torch.Tensor:
@@ -59,17 +124,31 @@ class MixtralMoE(torch.nn.Module):
         self,
         hidden_states: torch.Tensor,
         use_ipex_api=False,
+        use_grouped_topk=False,
+        topk_group=None,
+        num_expert_group=None,
     ) -> torch.Tensor:
         num_tokens, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
         router_logits = self.gate(hidden_states)
         if not use_ipex_api:
-            return self.ref_moe_module(hidden_states, router_logits)
+            return self.ref_moe_module(
+                hidden_states,
+                router_logits,
+                use_grouped_topk,
+                topk_group,
+                num_expert_group,
+            )
         else:
-            use_grouped_topk = False
             renormalize = True
             final_hidden_states = self.ipex_moe(
-                hidden_states, use_grouped_topk, self.top_k, router_logits, renormalize
+                hidden_states,
+                use_grouped_topk,
+                self.top_k,
+                router_logits,
+                renormalize,
+                topk_group=topk_group,
+                num_expert_group=num_expert_group,
             )
         final_hidden_states = final_hidden_states.view(num_tokens, hidden_dim)
         return final_hidden_states
@@ -78,15 +157,34 @@ class MixtralMoE(torch.nn.Module):
         self,
         hidden_states: torch.Tensor,
         router_logits: torch.Tensor,
+        use_grouped_topk=False,
+        topk_group=None,
+        num_expert_group=None,
     ) -> torch.Tensor:
+        if use_grouped_topk:
+            routing_weights, selected_experts, _, _ = (
+                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                    hidden_states,
+                    router_logits,
+                    self.top_k,
+                    True,
+                    num_expert_group,
+                    topk_group,
+                    "sigmoid",
+                    None,
+                    True,
+                )
+            )
+            selected_experts = selected_experts.to(torch.int64)
+        else:
+            routing_weights = torch.nn.functional.softmax(
+                router_logits, dim=1, dtype=torch.float
+            )
+            routing_weights, selected_experts = torch.topk(
+                routing_weights, self.top_k, dim=-1
+            )
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         num_tokens, hidden_dim = hidden_states.shape
-        routing_weights = torch.nn.functional.softmax(
-            router_logits, dim=1, dtype=torch.float
-        )
-        routing_weights, selected_experts = torch.topk(
-            routing_weights, self.top_k, dim=-1
-        )
-        routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
         final_hidden_states = torch.zeros(
             (num_tokens, hidden_dim),
@@ -111,19 +209,38 @@ class MixtralMoE(torch.nn.Module):
 
 class TestMoEModule:
     @pytest.mark.parametrize("num_experts", [8, 16])
-    def test(self, num_experts):
+    @pytest.mark.parametrize("use_grouped_topk", [True, False])
+    @pytest.mark.parametrize("is_fp8", [True, False])
+    def test(self, num_experts, use_grouped_topk, is_fp8):
         top_k = 2
         hidden_size = 1024
         intermediate_size = 14336
         dtype = torch.float16
+        topk_group = None
+        num_expert_group = None
+        if use_grouped_topk:
+            topk_group = 2
+            num_expert_group = 2
         moe_module = (
-            MixtralMoE(num_experts, top_k, hidden_size, intermediate_size)
+            MixtralMoE(num_experts, top_k, hidden_size, intermediate_size, is_fp8)
             .eval()
             .to(dtype)
         )
         torch.manual_seed(10)
         x = torch.randn([1, hidden_size], device="xpu").to(dtype) / 10
         x_ = copy.deepcopy(x)
-        ref_out = moe_module(x)
-        ipex_out = moe_module(x_, use_ipex_api=True)
+        ref_out = moe_module(
+            x,
+            use_ipex_api=False,
+            use_grouped_topk=use_grouped_topk,
+            topk_group=topk_group,
+            num_expert_group=num_expert_group,
+        )
+        ipex_out = moe_module(
+            x_,
+            use_ipex_api=True,
+            use_grouped_topk=use_grouped_topk,
+            topk_group=topk_group,
+            num_expert_group=num_expert_group,
+        )
         torch.testing.assert_close(ref_out, ipex_out, atol=1e-2, rtol=1e-2)

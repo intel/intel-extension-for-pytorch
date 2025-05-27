@@ -95,7 +95,22 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
     # W2: [num_experts, hidden_size, intermediate_size]
     # W13: [num_experts, intermediate_size * 2, hidden_size]
     # W1/W3: [num_experts, intermediate_size, hidden_size]
-    def __init__(self, W13, W2, W3=None, use_prepack=False):
+    # w1_scale_inv: [num_experts]
+    # w2_scale_inv: [num_experts]
+    # a1_scale_inv: [num_experts]
+    # a2_scale_inv: [num_experts]
+    # TODO: Only support w1_scale & w2_scale right now
+    def __init__(
+        self,
+        W13,
+        W2,
+        W3=None,
+        use_prepack=False,
+        w1_scale_inv=None,
+        w2_scale_inv=None,
+        a1_scale_inv=None,
+        a2_scale_inv=None,
+    ):
         super().__init__()
         self.num_experts = W2.shape[0]
         if W3 is None:
@@ -109,6 +124,12 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         W2.data = self.W2
         if W3 is not None:
             W3.data = self.W13
+
+        self.w13_weight_scale_inv = w1_scale_inv if w1_scale_inv is not None else None
+        self.w2_weight_scale_inv = w2_scale_inv if w2_scale_inv is not None else None
+        self.w13_input_scale_inv = a1_scale_inv if a1_scale_inv is not None else None
+        self.w2_input_scale_inv = a2_scale_inv if a2_scale_inv is not None else None
+
         torch.xpu.empty_cache()
 
     def linear_silu_mul(self, x):
@@ -130,6 +151,8 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             rows_for_experts,
             rows_for_experts_cpu,
             self.num_experts,
+            self.w13_input_scale_inv,
+            self.w13_weight_scale_inv,
         )
         hidden_states = self.linear_silu_mul(hidden_states)
         hidden_states = torch.xpu.moe_gemm(
@@ -138,6 +161,8 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             rows_for_experts,
             rows_for_experts_cpu,
             self.num_experts,
+            self.w2_input_scale_inv,
+            self.w2_weight_scale_inv,
         )
         return hidden_states
 
@@ -161,15 +186,29 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             hidden_states: [*, hidden_dim]
             router_logits: [*, num_experts]
         """
-        assert not use_grouped_topk
-        assert num_expert_group is None
-        assert topk_group is None
 
         num_tokens, hidden_dim = hidden_states.shape
         # --------- fusion:  topk softmax  -------------------
-        routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.topk_softmax(router_logits, top_k)
-        )
+        if not use_grouped_topk:
+            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
+                torch.ops.torch_ipex.topk_softmax(router_logits, top_k)
+            )
+
+        # --------- fusion:  grouped topk sigmoid  -------------------
+        elif use_grouped_topk:
+            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
+                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                    hidden_states,
+                    router_logits,
+                    top_k,
+                    False,
+                    num_expert_group,
+                    topk_group,
+                    "sigmoid",
+                    e_score_correction_bias,
+                    True,
+                )
+            )
 
         # --------- fusion: scatter + moegemm + gather -------------------
         # scatter hidden_states such that the token stride for each expert's input is contiguous

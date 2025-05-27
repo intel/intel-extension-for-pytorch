@@ -82,9 +82,9 @@ class TestTorchMethod:
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.parametrize("n_expert", [8, 16])
     @pytest.mark.parametrize("n_token", [16, 32])
-    def test_moe_scatter(self, dtype, n_expert, n_token):
+    @pytest.mark.parametrize("n_topk", [2, 4, 6, 8])
+    def test_moe_scatter(self, dtype, n_expert, n_token, n_topk):
         n_channels = 1024
-        n_topk = 2
         _, topk_indices, token_for_experts, token_offset = self.init(
             n_token, n_expert, n_topk
         )
@@ -105,7 +105,8 @@ class TestTorchMethod:
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.parametrize("n_expert", [8, 16])
     @pytest.mark.parametrize("n_token", [16, 32])
-    def test_moe_gather(self, dtype, n_expert, n_token):
+    @pytest.mark.parametrize("n_topk", [2, 4, 6, 8])
+    def test_moe_gather(self, dtype, n_expert, n_token, n_topk):
         n_channels = 1024
         n_topk = 2
         activation = torch.rand(
