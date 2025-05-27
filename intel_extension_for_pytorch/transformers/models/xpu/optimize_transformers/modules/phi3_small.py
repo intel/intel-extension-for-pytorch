@@ -132,11 +132,7 @@ def _phi3small_sdp(
                 block_mask_dense
             )
     scale = 1.0 / self.head_dim
-    if not xpu_sdpa_support(
-        self.beam_idx is not None,
-        self.beam_search_first_iter(query.size(2)),
-        self.head_dim,
-    ):
+    if not xpu_sdpa_support():
         return self.naive_sdp(
             query,
             key,

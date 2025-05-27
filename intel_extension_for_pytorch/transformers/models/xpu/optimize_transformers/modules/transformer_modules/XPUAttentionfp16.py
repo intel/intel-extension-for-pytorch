@@ -273,30 +273,17 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             # convert to FBNH layout
             key = key.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
             value = value.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
-        if not torch.xpu.has_xetla() or self.head_dim > 128:
-            attn_output, _ = self.naive_onednn_fused_sdp(
-                query,
-                key,
-                value,
-                attention_mask=attention_mask,
-                head_mask=head_mask,
-                alibi=alibi,
-                first_token=(seq_len > 1),
-            )
-        else:
-            attn_output = torch.xpu.IpexSDP(
-                query,
-                key,
-                value,
-                alibi,
-                attention_mask,
-                head_mask,
-                scale,
-                1.0,
-                0.0,
-                use_causal,
-                True,
-            )
+
+        attn_output, _ = self.naive_onednn_fused_sdp(
+            query,
+            key,
+            value,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            alibi=alibi,
+            first_token=(seq_len > 1),
+        )
+
         return attn_output, None
 
     def sdp(
@@ -311,11 +298,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         scale,
         use_causal,
     ):
-        if not xpu_sdpa_support(
-            self.beam_idx is not None,
-            self.beam_search_first_iter(query.size(2)),
-            self.head_dim,
-        ):
+        if not xpu_sdpa_support():
             return self.naive_sdp(
                 query,
                 key,

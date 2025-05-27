@@ -188,7 +188,7 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
                 attention_mask.logical_not(), torch.finfo(query.dtype).min
             )
     # Currently only PVC and MTL (without beam search) have sdp fusion available
-    if not xpu_sdpa_support(self.is_beam_search(), self.head_dim):
+    if not xpu_sdpa_support():
         return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
     key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
     (
@@ -289,21 +289,11 @@ def chatglm_load_attn_params_grouped(self, qkv_proj, out_proj, dtype):
         out_proj.qzeros = None
 
 
-# Use SDPA if XETLA support is available and head_dim is smaller than 128,
-# and it's greedy search or 1st token of beam search when 2D load instruction is not available.
-# Use SDPA if XETLA support is available when 2D block array is available.
-def xpu_sdpa_support(is_beam_search, is_1st_token_beam_search, head_dim):
-    has_2d_block = torch.xpu.has_2d_block_array()
-    has_xetla = torch.xpu.has_xetla()
-
-    if not has_2d_block:
-        return (
-            has_xetla
-            and head_dim <= 128
-            and (not is_beam_search or is_1st_token_beam_search)
-        )
-    else:
-        return has_xetla
+# Use SDPA if XETLA support, XMX and 2D block array are available.
+def xpu_sdpa_support():
+    return (
+        torch.xpu.has_xetla() and torch.xpu.has_2d_block_array() and torch.xpu.has_xmx()
+    )
 
 
 # There are two implementations of int4 woq gemm.

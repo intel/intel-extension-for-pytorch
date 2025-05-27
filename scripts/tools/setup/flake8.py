@@ -7,11 +7,13 @@ _IS_WINDOWS = sys.platform == "win32"
 
 def check_flake8_errors(base_dir, filepath):
     if shutil.which("flake8") is None:
+        print("Failed to detect flake8 installed. Please install it using 'pip install flake8'.")
         return -1
     flak8_cmd = ["flake8"]  # '--quiet'
 
     if shutil.which("black") is None:
-        return -1
+        print("Failed to detect black installed. Please install it using 'pip install black'.")
+        return -2
     black_cmd = ["black"]
 
     if os.path.isdir(filepath):
@@ -68,6 +70,6 @@ if __name__ == "__main__":
     elif ret < 0:
         print(
             "WARNING: Please install flake8 by pip install -r requirements-flake8.txt to check format!"
-        )        
+        )
     else:
         print("Pass!")

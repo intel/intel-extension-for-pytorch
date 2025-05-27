@@ -242,7 +242,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
         # Currently only PVC and MTL (without beam search) have sdp fusion available
-        if not xpu_sdpa_support(self.is_beam_search(), self.head_dim):
+        if not xpu_sdpa_support():
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
