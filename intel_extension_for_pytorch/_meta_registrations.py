@@ -132,9 +132,9 @@ def is_channels_last_3d(ten):
 
 @register_meta("reshape_and_cache")
 def meta_reshape_and_cache(
-    key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+    key, value, key_cache, value_cache, slot_mapping, kv_cache_dtype, k_scale, v_scale
 ):
-    return None
+    return key_cache, value_cache
 
 
 @register_meta("single_query_cached_kv_attention")
@@ -153,8 +153,33 @@ def meta_single_query_cached_kv_attention(
     window_size,
     k_scale,
     v_scale,
+    softcap,
 ):
-    return None
+    return output
+
+
+@register_meta("flash_attn_varlen_func")
+def meta_flash_attn_varlen_func(
+    output,
+    query,
+    k_cache,
+    v_cache,
+    cu_seq_lens_q,
+    cu_seq_lens_kv,
+    max_seq_len_q,
+    max_seq_len_kv,
+    scale,
+    is_causal,
+    block_table,
+    alibi_slopes,
+    window_size_left,
+    window_size_right,
+    kv_cache_dtype,
+    k_scale,
+    v_scale,
+    softcap,
+):
+    return output
 
 
 @register_meta("convolution_forward")

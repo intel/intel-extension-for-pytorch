@@ -2016,7 +2016,7 @@ void flash_attn_varlen_cpu_kernel_impl(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
-    const std::string& kv_cache_dtype,
+    const std::string_view& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap) {

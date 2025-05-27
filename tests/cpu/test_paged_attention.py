@@ -139,6 +139,7 @@ class PagedAttentionTest(TestCase):
         dtype: torch.dtype,
         seed: int,
         softcap: float,
+        is_compile: bool,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
@@ -194,7 +195,13 @@ class PagedAttentionTest(TestCase):
         key_cache, value_cache = key_caches[0], value_caches[0]
         # Call the paged attention kernel.
         output = torch.empty_like(query)
-        ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
+        if is_compile:
+            f_c = torch.compile(
+                ipex.llm.modules.PagedAttention.single_query_cached_kv_attention
+            )
+        else:
+            f_c = ipex.llm.modules.PagedAttention.single_query_cached_kv_attention
+        f_c(
             output,
             query,
             key_cache,
@@ -209,7 +216,6 @@ class PagedAttentionTest(TestCase):
             sliding_window,
             softcap=softcap,
         )
-
         # Run the reference implementation.
         ref_output = torch.empty_like(query)
         self.ref_single_query_cached_kv_attention(
@@ -227,7 +233,7 @@ class PagedAttentionTest(TestCase):
         )
         assert torch.allclose(output, ref_output, atol=5e-3, rtol=1e-3)
 
-    def test_paged_attention(self):
+    def _test_paged_attention(self):
         num_blocks = 128
         dtypes = [torch.bfloat16, torch.float]
         if core.onednn_has_fp16_support():
@@ -240,6 +246,9 @@ class PagedAttentionTest(TestCase):
         use_alibis = [True, False]
         softcaps = [-1, 50]
         seeds = [0]
+        COMPILE_TEST = (
+            1  # test torch.compile function for once, avoiding recompile in CI
+        )
         for (
             num_seqs,
             num_head,
@@ -264,18 +273,22 @@ class PagedAttentionTest(TestCase):
             # TODO: Support both use_softcap and window_size
             if softcap > 0 and sliding_window > 0:
                 continue
-            self._test_paged_attention_func(
-                num_seqs,
-                num_head,
-                head_size,
-                use_alibi,
-                num_blocks,
-                block_size,
-                sliding_window,
-                dtype,
-                seed,
-                softcap,
-            )
+            COMPILE = [True] if COMPILE_TEST == 1 else [False]
+            COMPILE_TEST = COMPILE_TEST - 1
+            for is_compile in COMPILE:
+                self._test_paged_attention_func(
+                    num_seqs,
+                    num_head,
+                    head_size,
+                    use_alibi,
+                    num_blocks,
+                    block_size,
+                    sliding_window,
+                    dtype,
+                    seed,
+                    softcap,
+                    is_compile,
+                )
 
     def _test_reshape_and_cache_func(
         self,
@@ -289,6 +302,7 @@ class PagedAttentionTest(TestCase):
         key_is_contiguous: bool,
         value_is_contiguous: bool,
         flash: bool,
+        is_compile: bool,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
@@ -319,7 +333,13 @@ class PagedAttentionTest(TestCase):
 
         # Call the reshape_and_cache kernel.
         if flash:
-            ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+            if is_compile:
+                f_c = torch.compile(
+                    ipex.llm.modules.PagedAttention.reshape_and_cache_flash
+                )
+            else:
+                f_c = ipex.llm.modules.PagedAttention.reshape_and_cache_flash
+            f_c(
                 key,
                 value,
                 key_cache,
@@ -327,7 +347,11 @@ class PagedAttentionTest(TestCase):
                 slot_mapping,
             )
         else:
-            ipex.llm.modules.PagedAttention.reshape_and_cache(
+            if is_compile:
+                f_c = torch.compile(ipex.llm.modules.PagedAttention.reshape_and_cache)
+            else:
+                f_c = ipex.llm.modules.PagedAttention.reshape_and_cache
+            f_c(
                 key,
                 value,
                 key_cache,
@@ -360,6 +384,9 @@ class PagedAttentionTest(TestCase):
         key_modes = [True, False]
         value_modes = [True, False]
         flashs = [True, False]
+        COMPILE_TEST = (
+            1  # test torch.compile function for once, avoiding recompile in CI
+        )
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         seeds = [0]
@@ -384,18 +411,22 @@ class PagedAttentionTest(TestCase):
             value_modes,
             flashs,
         ):
-            self._test_reshape_and_cache_func(
-                num_token,
-                num_kv_head,
-                head_size,
-                block_size,
-                num_blocks,
-                dtype,
-                seed,
-                key_is_contiguous,
-                value_is_contiguous,
-                flash,
-            )
+            COMPILE = [True, False] if COMPILE_TEST == 1 else [False]
+            COMPILE_TEST = COMPILE_TEST - 1
+            for is_compile in COMPILE:
+                self._test_reshape_and_cache_func(
+                    num_token,
+                    num_kv_head,
+                    head_size,
+                    block_size,
+                    num_blocks,
+                    dtype,
+                    seed,
+                    key_is_contiguous,
+                    value_is_contiguous,
+                    flash,
+                    is_compile,
+                )
 
 
 if __name__ == "__main__":
