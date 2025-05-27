@@ -228,6 +228,7 @@ class TestOptimizers(TestCase):
                 M, adagrad, dtype, split_master_weight_for_bf16, set_to_none, fused=True
             )
 
+    @unittest.skipIf(True, "Disable since training is deprecated")
     def test_lamb(self):
         M = TestModule()
         options = itertools.product(
