@@ -65,6 +65,17 @@ struct fmha_policy_64x128x128 : fmha_policy_base {
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
 };
 
+// for extrame long seq
+struct fmha_policy_256x128x128 : fmha_policy_base {
+  static constexpr uint32_t kBr = 256;
+  static constexpr uint32_t kSgBr = 8;
+  static constexpr uint32_t kBc = 128;
+  static constexpr uint32_t kSgBc = 128;
+  static constexpr uint32_t kHm = 128;
+  static constexpr uint32_t kSgHm = 128;
+  static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
+};
+
 struct fmha_policy_8x256x256 : fmha_policy_base {
   static constexpr uint32_t kBr = 8;
   static constexpr uint32_t kSgBr = 8;

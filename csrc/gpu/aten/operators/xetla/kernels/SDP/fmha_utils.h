@@ -534,6 +534,35 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
   }
 };
 
+template <
+    gpu_arch arch_tag,
+    typename scalar_t,
+    typename tile_desc_t,
+    typename mem_desc_t>
+void load_tile(subgroup::tile_t<scalar_t, tile_desc_t>* dst, mem_desc_t src) {
+  using load_payload_t = subgroup::
+      mem_payload_t<mem_desc_t, tile_desc_t, msg_type::block_2d, arch_tag>;
+  load_payload_t load_payload(src);
+  subgroup::tile_load(*dst, load_payload);
+}
+
+template <
+    gpu_arch arch_tag,
+    typename scalar_t,
+    typename tile_desc_t,
+    typename mem_desc_t>
+void load_tile(
+    subgroup::tile_t<scalar_t, tile_desc_t>* dst,
+    mem_desc_t src,
+    int32_t tile_offset_x,
+    int32_t tile_offset_y) {
+  using load_payload_t = subgroup::
+      mem_payload_t<mem_desc_t, tile_desc_t, msg_type::block_2d, arch_tag>;
+  src.update_coord(tile_offset_x, tile_offset_y);
+  load_payload_t load_payload(src);
+  subgroup::tile_load(*dst, load_payload);
+}
+
 } // namespace fmha
 
 } // namespace gpu::xetla

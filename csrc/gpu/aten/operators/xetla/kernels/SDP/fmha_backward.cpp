@@ -9,6 +9,298 @@ namespace gpu::xetla {
 
 namespace fmha {
 
+template <typename scalar_t, typename accum_t>
+struct arguments_t {
+  // Input tensors
+  scalar_t* dO_ptr; // [B, F, N, H] - grad_output
+  scalar_t* Q_ptr; // [B, F, N, H] -> query
+  scalar_t* K_ptr; // [B, T, N, H] -> key
+  scalar_t* V_ptr; // [B, T, N, H] -> value
+  scalar_t* B_ptr = nullptr; // [B, 1/N, F, T] - bias
+  uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
+  scalar_t* O_ptr; // [B, F, N, H] - output
+  accum_t* L_ptr; // [B, N, F]
+  accum_t* D_ptr; // [B, N, F]
+  accum_t* dQ_acc_ptr;
+  // Dropout scale is computed from dropout prob
+  accum_t dp_prob;
+  accum_t dp_scale;
+  // Output tensor
+  scalar_t* dQ_ptr;
+  scalar_t* dK_ptr;
+  scalar_t* dV_ptr;
+  scalar_t* dB_ptr = nullptr;
+  // Dimension size
+  uint32_t uB;
+  uint32_t uN;
+  uint32_t uH;
+  uint32_t uF;
+  uint32_t uT;
+
+  uint32_t bias_strideB;
+  uint32_t bias_strideN;
+  uint32_t bias_strideF;
+  uint32_t uMT;
+  // Softmax scale is the reciprocal square root of head size by default
+  accum_t sm_scale;
+  // seed/offset used to generate dropout mask
+  uint64_t seed;
+  uint64_t offset;
+  bool is_bias_add;
+
+  inline arguments_t() = default;
+  inline arguments_t(
+      scalar_t* grad_out,
+      scalar_t* query,
+      scalar_t* key,
+      scalar_t* value,
+      scalar_t* bias,
+      uint8_t* dropout,
+      scalar_t* out,
+      accum_t* l,
+      accum_t* d,
+      accum_t* grad_q_tmp,
+      accum_t dropout_prob,
+      scalar_t* grad_query,
+      scalar_t* grad_key,
+      scalar_t* grad_value,
+      scalar_t* grad_bias,
+      uint32_t num_batches,
+      uint32_t num_heads,
+      uint32_t head_size,
+      uint32_t num_queries,
+      uint32_t num_keys,
+      uint32_t bias_strideB,
+      uint32_t bias_strideN,
+      uint32_t bias_strideF,
+      uint32_t attn_mask_padded_block_size,
+      accum_t sm_scale,
+      uint64_t seed,
+      uint64_t offset)
+      : dO_ptr(grad_out),
+        Q_ptr(query),
+        K_ptr(key),
+        V_ptr(value),
+        B_ptr(bias),
+        Dp_ptr(dropout),
+        O_ptr(out),
+        L_ptr(l),
+        D_ptr(d),
+        dQ_acc_ptr(grad_q_tmp),
+        dp_prob(dropout_prob),
+        dp_scale(1.f / (1.f - dropout_prob)),
+        dQ_ptr(grad_query),
+        dK_ptr(grad_key),
+        dV_ptr(grad_value),
+        dB_ptr(grad_bias),
+        uB(num_batches),
+        uN(num_heads),
+        uH(head_size),
+        uF(num_queries),
+        uT(num_keys),
+        bias_strideB(bias_strideB),
+        bias_strideN(bias_strideN),
+        bias_strideF(bias_strideF),
+        uMT(attn_mask_padded_block_size),
+        sm_scale(sm_scale),
+        seed(seed),
+        offset(offset),
+        is_bias_add(bias_strideF == 0) {}
+};
+
+template <typename fmha_policy, typename scalar_t, gpu_arch arch_tag>
+class fmha_backward_calcD_t {
+ public:
+  static constexpr int kBlockSize = 16;
+  using accum_t = float;
+  using args_t = arguments_t<scalar_t, float>;
+
+ private:
+  static constexpr uint32_t kBr = fmha_policy::kBr;
+  static constexpr uint32_t kHm = fmha_policy::kHm;
+  static constexpr uint32_t kSgBr = fmha_policy::kSgBr;
+  static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
+
+  using tile_shape_BrHm = group::tile_shape_t<kHm, kBr, kSgHm, kSgBr>;
+
+  static constexpr uint32_t wg_size_x = tile_shape_BrHm::wg_size_x;
+  static constexpr uint32_t wg_size_y = tile_shape_BrHm::wg_size_y;
+  using work_group_t = typename tile_shape_BrHm::work_group_t;
+  static constexpr uint32_t wg_size = work_group_t::size;
+
+  static constexpr uint32_t block_size_x = kBlockSize;
+  static constexpr uint32_t block_size_y =
+      (kBlockSize > kSgBr) ? kSgBr : kBlockSize;
+
+  static_assert(
+      wg_size <= arch_attr_t<arch_tag>::thread_per_wg,
+      "The number of threads should be less than threads in one workgroup!");
+
+  // Mem desc
+  using mem_desc_dOi_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_Oi_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_Di_t =
+      mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
+
+  // tile desc
+
+  using dO_tile_desc_t = subgroup::
+      tile_desc_t<kSgHm, kSgBr, block_size_x, block_size_y, reg_layout::tiled>;
+  using dO_tile_t = subgroup::tile_t<scalar_t, dO_tile_desc_t>;
+  using dO_tile_acc_t = subgroup::tile_t<accum_t, dO_tile_desc_t>;
+
+  static constexpr uint32_t slm_size =
+      (wg_size_x > 1) ? wg_size * kSgBr * sizeof(accum_t) : 0;
+  static constexpr uint32_t nbarrier_cnt = (wg_size_x > 1) ? wg_size_y : 0;
+
+  struct context_t {
+    // thread id
+    work_group_t g;
+    uint32_t sg_idx;
+    uint32_t sg_idy;
+    // nbarrier
+    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier;
+    // mem desc variables
+    mem_desc_dOi_t mem_desc_dOi;
+    mem_desc_Oi_t mem_desc_Oi;
+    mem_desc_Di_t mem_desc_Di;
+
+    inline context_t() = default;
+
+    /// @brief Initialize variables used in the fmha dot_do_o
+    inline void init_context(const nd_item<3>& item, const args_t& args) {
+      uint32_t gid = item.get_group(0);
+      uint32_t bid = gid / args.uN;
+      uint32_t nid = gid % args.uN;
+      uint32_t sg_id = item.get_local_linear_id();
+
+      // thread id and nbarrier
+      g.init(sg_id);
+      sg_idx = sg_id % wg_size_x;
+      sg_idy = sg_id / wg_size_x;
+      nbarrier.init_nbarrier(sg_idy, nbarrier_role::producer_consumer);
+
+      uint32_t startF = item.get_group(1) * kBr;
+
+      int32_t start_x = nid * args.uH;
+      uint32_t end_x = (nid + 1) * args.uH;
+      int32_t start_y = bid * args.uF + startF;
+      uint32_t end_y = start_y + kBr;
+      uint32_t boundry_y = (bid + 1) * args.uF;
+      end_y = end_y > boundry_y ? boundry_y : end_y;
+      uint32_t pitch = args.uH * args.uN;
+
+      mem_desc_Oi.init(args.O_ptr, {end_x, end_y, pitch}, {start_x, start_y});
+      mem_desc_dOi.init(args.dO_ptr, {end_x, end_y, pitch}, {start_x, start_y});
+
+      int32_t start_x_ml = startF + sg_idy * kSgBr;
+      int32_t start_y_ml = gid;
+      mem_desc_Di.init(
+          args.D_ptr,
+          {args.uF, args.uB * args.uN, args.uF},
+          {start_x_ml, start_y_ml});
+    }
+  };
+
+  context_t ctx;
+
+  /// @brief calc_D is used to compute D = rowsum(dO * O)
+  /// [Br,H] * [Br,H] = [Br,H]
+  inline void calc_D(const args_t& args) {
+    // load dO and O from global memory
+    int32_t tile_offset_x = ctx.sg_idx * kSgHm;
+    int32_t tile_offset_y = ctx.sg_idy * kSgBr;
+    dO_tile_t matdO_load, matO_load;
+    load_tile<arch_tag>(
+        &matdO_load, ctx.mem_desc_dOi, tile_offset_x, tile_offset_y);
+    load_tile<arch_tag>(
+        &matO_load, ctx.mem_desc_Oi, tile_offset_x, tile_offset_y);
+
+    dO_tile_acc_t matAcc_dO, matAcc_O, matAcc_D;
+    subgroup::elemwise_cvt(matAcc_dO, matdO_load);
+    subgroup::elemwise_cvt(matAcc_O, matO_load);
+
+    // compute dO * O
+    matAcc_D.reg = matAcc_dO.reg * matAcc_O.reg;
+    uint32_t reducer_slm = ctx.sg_idy * wg_size_x * kSgBr * sizeof(accum_t);
+    using wg_row_sum_t =
+        group_row_reduce_t<dO_tile_acc_t, wg_size_x, reduce_op::sum, arch_tag>;
+
+    wg_row_sum_t wg_row_sum(ctx.sg_idx, ctx.sg_idy, reducer_slm);
+    xetla_vector<accum_t, kSgBr> row_sum = wg_row_sum(matAcc_D);
+
+    if constexpr (wg_size_x > 1)
+      ctx.nbarrier.arrive_wait();
+
+    // store result
+    using store_tile_desc =
+        subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
+    using store_tile_t = subgroup::tile_t<accum_t, store_tile_desc>;
+    using store_payload_t = subgroup::mem_payload_t<
+        mem_desc_Di_t,
+        store_tile_desc,
+        msg_type::block_2d,
+        arch_tag>;
+    store_tile_t matD_store;
+    store_payload_t store_payload_D(ctx.mem_desc_Di);
+
+    matD_store.reg = row_sum;
+    if (ctx.sg_idx == 0) {
+      subgroup::tile_store(matD_store, store_payload_D);
+    }
+  }
+
+ public:
+  /// @brief Gets named_barrier id consumption count.
+  /// Users query and get a named_barrier id consumption count in compile time.
+  /// @return The count of named barriers required.
+  inline static constexpr uint32_t get_barrier_count() {
+    constexpr uint32_t count = nbarrier_cnt;
+    static_assert(
+        count <= 32, "The named_barrier count should be less than 32!");
+    return count;
+  }
+
+  /// @brief Gets local memory size consumption.
+  /// Users query and get a local memory consumption size in compile time.
+  /// @return The size of local memory required.
+  inline static constexpr uint32_t get_slm_size() {
+    constexpr uint32_t size = slm_size;
+    static_assert(
+        size <= (128 * 1024),
+        "The local memory size should be less than 128KB!");
+    return size;
+  }
+
+  /// @brief Helper function to get the nd_range under the Fmha policy.
+  /// @return Expected nd_range.
+  static sycl::nd_range<3> get_nd_range(
+      uint32_t total_batches,
+      uint32_t num_queries) {
+    // local range
+    sycl::range<3> local_range = sycl::range<3>{1, wg_size_y, wg_size_x};
+    // group range
+    uint32_t group_range_m = (num_queries + kBr - 1) / kBr;
+    sycl::range<3> group_range =
+        sycl::range<3>{total_batches, group_range_m, 1};
+    return sycl::nd_range<3>{group_range * local_range, local_range};
+  }
+
+  inline KERNEL_FUNC void operator()(
+      const sycl::nd_item<3>& item,
+      const args_t& args) {
+    // allocate slm and nbarrier resource
+    xetla_local_init<get_slm_size()>();
+    xetla_nbarrier_init<get_barrier_count()>();
+
+    // initialize context
+    ctx.init_context(item, args);
+    calc_D(args);
+  }
+};
+
 template <
     typename fmha_policy,
     typename scalar_t,
@@ -20,104 +312,7 @@ class fmha_backward_t {
  public:
   using accum_t = float;
   static constexpr accum_t kNegInfinity = INFINITY * -1;
-
-  struct arguments_t {
-    // Input tensors
-    scalar_t* dO_ptr; // [B, F, N, H] - grad_output
-    scalar_t* Q_ptr; // [B, F, N, H] -> query
-    scalar_t* K_ptr; // [B, T, N, H] -> key
-    scalar_t* V_ptr; // [B, T, N, H] -> value
-    scalar_t* B_ptr = nullptr; // [B, 1/N, F, T] - bias
-    uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
-    scalar_t* O_ptr; // [B, F, N, H] - output
-    accum_t* L_ptr; // [B, N, F]
-    accum_t* D_ptr; // [B, N, F]
-    accum_t* dQ_acc_ptr;
-    // Dropout scale is computed from dropout prob
-    accum_t dp_prob;
-    accum_t dp_scale;
-    // Output tensor
-    scalar_t* dQ_ptr;
-    scalar_t* dK_ptr;
-    scalar_t* dV_ptr;
-    scalar_t* dB_ptr = nullptr;
-    // Dimension size
-    uint32_t uB;
-    uint32_t uN;
-    uint32_t uH;
-    uint32_t uF;
-    uint32_t uT;
-
-    uint32_t bias_strideB;
-    uint32_t bias_strideN;
-    uint32_t bias_strideF;
-    uint32_t uMT;
-    // Softmax scale is the reciprocal square root of head size by default
-    accum_t sm_scale;
-    // seed/offset used to generate dropout mask
-    uint64_t seed;
-    uint64_t offset;
-    bool is_bias_add;
-
-    inline arguments_t() = default;
-    inline arguments_t(
-        scalar_t* grad_out,
-        scalar_t* query,
-        scalar_t* key,
-        scalar_t* value,
-        scalar_t* bias,
-        uint8_t* dropout,
-        scalar_t* out,
-        accum_t* l,
-        accum_t* d,
-        accum_t* grad_q_tmp,
-        accum_t dropout_prob,
-        scalar_t* grad_query,
-        scalar_t* grad_key,
-        scalar_t* grad_value,
-        scalar_t* grad_bias,
-        uint32_t num_batches,
-        uint32_t num_heads,
-        uint32_t head_size,
-        uint32_t num_queries,
-        uint32_t num_keys,
-        uint32_t bias_strideB,
-        uint32_t bias_strideN,
-        uint32_t bias_strideF,
-        uint32_t attn_mask_padded_block_size,
-        accum_t sm_scale,
-        uint64_t seed,
-        uint64_t offset)
-        : dO_ptr(grad_out),
-          Q_ptr(query),
-          K_ptr(key),
-          V_ptr(value),
-          B_ptr(bias),
-          Dp_ptr(dropout),
-          O_ptr(out),
-          L_ptr(l),
-          D_ptr(d),
-          dQ_acc_ptr(grad_q_tmp),
-          dp_prob(dropout_prob),
-          dp_scale(1.f / (1.f - dropout_prob)),
-          dQ_ptr(grad_query),
-          dK_ptr(grad_key),
-          dV_ptr(grad_value),
-          dB_ptr(grad_bias),
-          uB(num_batches),
-          uN(num_heads),
-          uH(head_size),
-          uF(num_queries),
-          uT(num_keys),
-          bias_strideB(bias_strideB),
-          bias_strideN(bias_strideN),
-          bias_strideF(bias_strideF),
-          uMT(attn_mask_padded_block_size),
-          sm_scale(sm_scale),
-          seed(seed),
-          offset(offset),
-          is_bias_add(bias_strideF == 0) {}
-  };
+  using args_t = arguments_t<scalar_t, float>;
 
  private:
   // -------------------- // Compute policy // -------------------- //
@@ -206,14 +401,12 @@ class fmha_backward_t {
   // Todo: consider parallel Q(Br) as fwd did
   static constexpr uint32_t slm_size_Pij = kBr * kBc * sizeof(scalar_t);
   static constexpr uint32_t slm_size_Sij = kBr * kBc * sizeof(scalar_t);
-  static constexpr uint32_t slm_size_D =
-      (wg_size_x > 1) ? wg_size * kSgBr * sizeof(accum_t) : 0;
+
   // Slm addr to store inermediate results
   static constexpr uint32_t Pij_slm = /* slm_base */ 0;
   static constexpr uint32_t Sij_slm = Pij_slm + slm_size_Pij;
-  static constexpr uint32_t D_slm = Sij_slm + slm_size_Sij;
 
-  static constexpr uint32_t nbarrier_cnt = wg_size_x + wg_size_y;
+  static constexpr uint32_t nbarrier_cnt = 1;
   // Define kernel to compute Sij = Qi x Kj.T
   using gemm_Sij_t = group::
       gemm_t<compute_policy, tile_shape_BrBc, mem_desc_Qi_t, mem_desc_Kj_T_t>;
@@ -225,6 +418,9 @@ class fmha_backward_t {
 
   /// @brief Used to store variables in the flash mha loops
   struct context_t {
+    // Q/KV start
+    uint32_t startT;
+    uint32_t startF;
     // thread id
     work_group_BrBc_t g_brbc;
     work_group_BrHm_t g_brhm;
@@ -232,9 +428,7 @@ class fmha_backward_t {
     uint32_t sg_idx;
     uint32_t sg_idy;
     // nbarrier
-    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier;
-    xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_y;
-    // softmax statistics
+    xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
 
     // mem desc variables
     mem_desc_dOi_t mem_desc_dOi;
@@ -260,88 +454,51 @@ class fmha_backward_t {
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
-    inline void init_context(const nd_item<3>& item, const arguments_t& args) {
+    inline void init_context(const nd_item<3>& item, const args_t& args) {
       // thread id
+      uint32_t gid = item.get_group(0);
+      uint32_t bid = gid / args.uN;
+      uint32_t nid = gid % args.uN;
       uint32_t sg_id = item.get_local_linear_id();
+
+      startT = item.get_group(1) * kBc;
+
       g_brbc.init(sg_id);
       g_brhm.init(sg_id);
       g_bchm.init(sg_id);
       sg_idx = sg_id % wg_size_x;
       sg_idy = sg_id / wg_size_x;
       // nbarrier
-      nbarrier.init_nbarrier(sg_idy, nbarrier_role::producer_consumer);
-      nbarrier_y.init_nbarrier(
-          wg_size_y + sg_idx, nbarrier_role::producer_consumer);
-      // softmax statistics
-    }
+      nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
 
-    /// @brief Initialize update for dQ variables in the flash mha loop
-    inline void update_context_dQ(
-        const nd_item<3>& item,
-        const arguments_t& args,
-        uint32_t startF) {
-      // mem desc variables
-      uint32_t gid = item.get_group(0);
-      uint32_t bid = item.get_group(0) / args.uN;
-      uint32_t nid = item.get_group(0) % args.uN;
-      int32_t start_x = nid * args.uH;
-      uint32_t end_x = start_x + args.uH;
-      int32_t start_y = bid * args.uF + startF;
-      uint32_t end_y = start_y + kBr;
-      uint32_t boundary_y = (bid + 1) * args.uF;
-      end_y = end_y > boundary_y ? boundary_y : end_y;
-      uint32_t pitch = args.uH * args.uN;
+      // Init KV for shape [B, T, N, H]
+      int32_t start_x = bid * args.uT + startT;
+      uint32_t end_x = start_x + kBc;
+      uint32_t boundary_x = (bid + 1) * args.uT;
+      end_x = end_x > boundary_x ? boundary_x : end_x;
+      int32_t start_y = nid * args.uH;
+      uint32_t end_y = start_y + args.uH;
 
-      mem_desc_dQi.init(args.dQ_ptr, {end_x, end_y, pitch}, {start_x, start_y});
-      mem_desc_dQi_acc.init(
-          args.dQ_acc_ptr,
-          {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kSgHm),
-           int32_t(start_y + sg_idy * kSgBr)});
-    }
+      uint32_t pitch = args.uN * args.uH;
 
-    /// @brief Initialize update for D variables in the flash mha loop
-    inline void update_context_D(
-        const nd_item<3>& item,
-        const arguments_t& args,
-        uint32_t startF) {
-      // mem desc variables
-      uint32_t gid = item.get_group(0);
-      uint32_t bid = item.get_group(0) / args.uN;
-      uint32_t nid = item.get_group(0) % args.uN;
-      int32_t start_x = nid * args.uH;
-      uint32_t end_x = start_x + args.uH;
-      int32_t start_y = bid * args.uF + startF;
-      uint32_t end_y = start_y + kBr;
-      uint32_t boundary_y = (bid + 1) * args.uF;
-      end_y = end_y > boundary_y ? boundary_y : end_y;
-      uint32_t pitch = args.uH * args.uN;
+      mem_desc_Kj.init(args.K_ptr, {end_y, end_x, pitch}, {start_y, start_x});
+      mem_desc_Kj_T.init(args.K_ptr, {end_x, end_y, pitch}, {start_x, start_y});
+      mem_desc_Vj_T.init(args.V_ptr, {end_x, end_y, pitch}, {start_x, start_y});
 
-      mem_desc_Oi.init(
-          args.O_ptr,
-          {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kSgHm),
-           int32_t(start_y + sg_idy * kSgBr)});
-      mem_desc_dOi.init(
-          args.dO_ptr,
-          {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kSgHm),
-           int32_t(start_y + sg_idy * kSgBr)});
+      mem_desc_dKj.init(args.dK_ptr, {end_y, end_x, pitch}, {start_y, start_x});
+      mem_desc_dVj.init(args.dV_ptr, {end_y, end_x, pitch}, {start_y, start_x});
 
-      int32_t start_x_ml = startF + sg_idy * kSgBr;
-      int32_t start_y_ml = gid;
-      mem_desc_Di.init(
-          args.D_ptr,
-          {args.uF, args.uB * args.uN, args.uF},
-          {start_x_ml, start_y_ml});
+      mem_desc_Pij_L_T.init(Pij_slm, {kBr, kBc, kBr}, {0, 0});
+      mem_desc_dSij_L.init(Sij_slm, {kBc, kBr, kBc}, {0, 0});
+      mem_desc_dSij_L_T.init(Sij_slm, {kBr, kBc, kBr}, {0, 0});
     }
 
     /// @brief Initialize update for Q variables in the flash mha loop
-    inline void update_context_Q(
+    inline void update_context(
         const nd_item<3>& item,
-        const arguments_t& args,
-        uint32_t startF,
-        uint32_t startT) {
+        const args_t& args,
+        uint32_t startF_) {
+      startF = startF_;
       // mem desc variables
       uint32_t gid = item.get_group(0);
       uint32_t bid = item.get_group(0) / args.uN;
@@ -356,10 +513,7 @@ class fmha_backward_t {
 
       mem_desc_Qi.init(args.Q_ptr, {end_x, end_y, pitch}, {start_x, start_y});
       mem_desc_dQi_acc.init(
-          args.dQ_acc_ptr,
-          {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kSgHm),
-           int32_t(start_y + sg_idy * kSgBr)});
+          args.dQ_acc_ptr, {end_x, end_y, pitch}, {start_x, start_y});
       mem_desc_dOi.init(args.dO_ptr, {end_x, end_y, pitch}, {start_x, start_y});
 
       int32_t start_x_ml = startF + sg_idy * kSgBr;
@@ -372,10 +526,6 @@ class fmha_backward_t {
           args.D_ptr,
           {args.uF, args.uB * args.uN, args.uF},
           {start_x_ml, start_y_ml});
-
-      mem_desc_Pij_L_T.init(Pij_slm, {kBr, kBc, kBr}, {0, 0});
-      mem_desc_dSij_L.init(Sij_slm, {kBc, kBr, kBc}, {0, 0});
-      mem_desc_dSij_L_T.init(Sij_slm, {kBr, kBc, kBr}, {0, 0});
 
       if constexpr (kIsDropout) {
         if (args.Dp_ptr) {
@@ -427,32 +577,6 @@ class fmha_backward_t {
         }
       }
     }
-
-    /// @brief Update variables KV for each flash mha loop
-    inline void update_context_KV(
-        const nd_item<3>& item,
-        const arguments_t& args,
-        uint32_t startT) {
-      uint32_t gid = item.get_group(0);
-      uint32_t bid = gid / args.uN;
-      uint32_t nid = gid % args.uN;
-
-      int32_t start_x = bid * args.uT + startT;
-      uint32_t end_x = start_x + kBc;
-      uint32_t boundary_x = (bid + 1) * args.uT;
-      end_x = end_x > boundary_x ? boundary_x : end_x;
-      int32_t start_y = nid * args.uH;
-      uint32_t end_y = start_y + args.uH;
-
-      uint32_t pitch = args.uN * args.uH;
-
-      mem_desc_Kj.init(args.K_ptr, {end_y, end_x, pitch}, {start_y, start_x});
-      mem_desc_Kj_T.init(args.K_ptr, {end_x, end_y, pitch}, {start_x, start_y});
-      mem_desc_Vj_T.init(args.V_ptr, {end_x, end_y, pitch}, {start_x, start_y});
-
-      mem_desc_dKj.init(args.dK_ptr, {end_y, end_x, pitch}, {start_y, start_x});
-      mem_desc_dVj.init(args.dV_ptr, {end_y, end_x, pitch}, {start_y, start_x});
-    }
   };
 
   context_t ctx;
@@ -461,7 +585,7 @@ class fmha_backward_t {
 
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
-  inline void gemm_Sij(matAcc_Sij_t* matAcc_Sij, const arguments_t& args) {
+  inline void gemm_Sij(matAcc_Sij_t* matAcc_Sij, const args_t& args) {
     using gemm_args_t = typename gemm_Sij_t::arguments_t;
 
     // Gemm to comput Sij
@@ -507,21 +631,17 @@ class fmha_backward_t {
   // ====================== // apply_mask // ====================== //
 
   /// @brief apply mask to matAccSij.
-  inline void apply_mask(
-      matAcc_Sij_t* matAcc_Sij,
-      const arguments_t& args,
-      uint32_t startF,
-      uint32_t startT) {
+  inline void apply_mask(matAcc_Sij_t* matAcc_Sij, const args_t& args) {
     using tile_mask = tile_mask_t<matAcc_Sij_t>;
 
-    uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
+    uint32_t sg_startT = ctx.startT + ctx.sg_idx * kSgBc;
     uint32_t remainT = std::max(int(args.uT) - int(sg_startT), 0);
     if (remainT < kSgBc) {
       tile_mask::padding_mask(*matAcc_Sij, remainT);
     }
 
     if constexpr (kIsCausal) {
-      uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
+      uint32_t sg_startF = ctx.startF + ctx.sg_idy * kSgBr;
       if (sg_startT + kSgBc > sg_startF) {
         tile_mask::causal_mask(*matAcc_Sij, sg_startT, sg_startF);
       }
@@ -535,7 +655,7 @@ class fmha_backward_t {
       matAcc_Sij_t* matAcc_Sij,
       matAcc_Sij_t* matAcc_Sij_drop,
       dp_mask_tile_t* mask_in,
-      const arguments_t& args) {
+      const args_t& args) {
     using load_desc =
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
@@ -549,17 +669,11 @@ class fmha_backward_t {
     load_payload_t load_payload(ctx.mem_desc_Li);
     subgroup::tile_load(matL_load, load_payload);
 
-    // if constexpr (wg_size_x > 1)
-    //   ctx.nbarrier.arrive();
-
     // now Sij is Pij
     subgroup::tile_broadcast_op<subgroup::tile_minus, matAcc_Sij_t>(
         *matAcc_Sij, matL_load.reg);
 
     matAcc_Sij->reg = xetla_exp<accum_t>(matAcc_Sij->reg);
-
-    // if constexpr (wg_size_x > 1)
-    //   ctx.nbarrier.wait();
 
     if constexpr (kIsDropout) {
       if (args.Dp_ptr) {
@@ -596,9 +710,7 @@ class fmha_backward_t {
     epilogue(ctx.g_brbc, *matAcc_Sij_drop, ctx.mem_desc_Pij_L_T);
 
     xetla_fence<memory_kind::shared_local>();
-    if constexpr (wg_size_x > 1)
-      ctx.nbarrier.arrive_wait();
-    ctx.nbarrier_y.arrive_wait();
+    ctx.nbarrier.arrive_wait();
   }
 
   // ======================= // gemm_dVj // ======================= //
@@ -611,13 +723,10 @@ class fmha_backward_t {
   using matAcc_dVj_t = typename gemm_dVj_t::matAcc_t;
   /// @brief gemm_dVj is used to compute dVj = P_dropped_ij_T x dOi
   /// # [Bc,Br] x [Br,H] = [Bc,H]
-  inline void gemm_dVj(
-      matAcc_dVj_t* matAcc_dVj,
-      const arguments_t& args,
-      uint32_t startF) {
+  inline void gemm_dVj(matAcc_dVj_t* matAcc_dVj, const args_t& args) {
     using gemm_args_t = typename gemm_dVj_t::arguments_t;
 
-    uint32_t remainF = args.uF - startF;
+    uint32_t remainF = args.uF - ctx.startF;
     uint32_t boundary_k = remainF > kBr ? kBr : remainF;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
@@ -642,7 +751,7 @@ class fmha_backward_t {
   inline void gemm_dPij(
       matAcc_dPij_t* matAcc_dPij,
       dp_mask_tile_t* mask_in,
-      const arguments_t& args) {
+      const args_t& args) {
     using gemm_args_t = typename gemm_dPij_t::arguments_t;
 
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
@@ -674,7 +783,7 @@ class fmha_backward_t {
       matAcc_Sij_t* matAcc_dSij,
       matAcc_Sij_t* matAcc_Pij,
       matAcc_dPij_t* matAcc_dPij,
-      const arguments_t& args) {
+      const args_t& args) {
     using load_desc =
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
     using load_tile_t = subgroup::tile_t<accum_t, load_desc>;
@@ -708,9 +817,7 @@ class fmha_backward_t {
     epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dSij_L);
 
     xetla_fence<memory_kind::shared_local>();
-    if constexpr (wg_size_x > 1)
-      ctx.nbarrier.arrive_wait();
-    ctx.nbarrier_y.arrive_wait();
+    ctx.nbarrier.arrive_wait();
 
     // Add bias if needed
     if constexpr (kUseBias) {
@@ -733,13 +840,10 @@ class fmha_backward_t {
   using matAcc_dQi_t = typename gemm_dQi_t::matAcc_t;
   /// @brief gemm_dQi is used to compute dQi = dQi + scale * (dSij x Kj)
   /// # [Br,Bc] x [Bc,H] = [Br,H]
-  inline void gemm_dQi(
-      matAcc_dQi_t* matAcc_dQi,
-      const arguments_t& args,
-      uint32_t startT) {
+  inline void gemm_dQi(matAcc_dQi_t* matAcc_dQi, const args_t& args) {
     using gemm_args_t = typename gemm_dQi_t::arguments_t;
 
-    uint32_t remainT = args.uT - startT;
+    uint32_t remainT = args.uT - ctx.startT;
     uint32_t boundary_k = remainT > kBc ? kBc : remainT;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
@@ -752,11 +856,6 @@ class fmha_backward_t {
         gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
-
-    xetla_fence<memory_kind::shared_local>();
-    if constexpr (wg_size_x > 1)
-      ctx.nbarrier.arrive_wait();
-    ctx.nbarrier_y.arrive_wait();
   }
 
   // ======================= // gemm_dKj // ======================= //
@@ -772,8 +871,7 @@ class fmha_backward_t {
   inline void gemm_dKj(
       matAcc_dKj_t* matAcc_dKj,
       matAcc_Sij_t* matAcc_dSij,
-      const arguments_t& args,
-      uint32_t startF) {
+      const args_t& args) {
     // store dSij transpose to local
     using epilogue_s_t = group::epilogue_transp_t<
         group::epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, arch_tag>,
@@ -783,13 +881,11 @@ class fmha_backward_t {
     epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dSij_L_T);
 
     xetla_fence<memory_kind::shared_local>();
-    if constexpr (wg_size_x > 1)
-      ctx.nbarrier.arrive_wait();
-    ctx.nbarrier_y.arrive_wait();
+    ctx.nbarrier.arrive_wait();
 
     using gemm_args_t = typename gemm_dKj_t::arguments_t;
 
-    uint32_t remainF = args.uF - startF;
+    uint32_t remainF = args.uF - ctx.startF;
     uint32_t boundary_k = remainF > kBr ? kBr : remainF;
     uint32_t loop_count = (boundary_k + accum_step - 1) / accum_step;
 
@@ -807,120 +903,41 @@ class fmha_backward_t {
   // ==================== // store dQ, dK and dV // ====================== //
 
   /// @brief store raw dQi to global memory.
-  inline void store_dQi(matAcc_dQi_t& matAcc_dQi, const arguments_t& args) {
+  inline void store_dQi(matAcc_dQi_t& matAcc_dQi, const args_t& args) {
     using store_t = subgroup::mem_payload_t<
         mem_desc_dQi_acc_t,
         typename matAcc_dQi_t::tile_desc,
         msg_type::atomic_add,
         arch_tag>;
+    ctx.mem_desc_dQi_acc.update_coord(ctx.sg_idx * kSgHm, ctx.sg_idy * kSgBr);
     store_t dQ_store(ctx.mem_desc_dQi_acc);
     subgroup::tile_store(matAcc_dQi, dQ_store);
   }
 
   /// @brief store raw dKj to global memory.
-  inline void store_dKj(matAcc_dKj_t& matAcc_dKj, const arguments_t& args) {
+  inline void store_dKj(matAcc_dKj_t& matAcc_dKj, const args_t& args) {
+    subgroup::tile_t<scalar_t, typename matAcc_dKj_t::tile_desc> mat_dKj;
+    subgroup::elemwise_cvt(mat_dKj, matAcc_dKj);
+
     using epilogue_t = group::epilogue_t<
         group::epilogue_policy_default<arch_tag>,
         tile_shape_BcHm,
         mem_desc_dKj_t>;
     epilogue_t epilogue;
-    epilogue(ctx.g_bchm, matAcc_dKj, ctx.mem_desc_dKj);
+    epilogue(ctx.g_bchm, mat_dKj, ctx.mem_desc_dKj);
   }
 
   /// @brief store raw dVj to global memory.
-  inline void store_dVj(matAcc_dVj_t& matAcc_dVj, const arguments_t& args) {
+  inline void store_dVj(matAcc_dVj_t& matAcc_dVj, const args_t& args) {
+    subgroup::tile_t<scalar_t, typename matAcc_dVj_t::tile_desc> mat_dVj;
+    subgroup::elemwise_cvt(mat_dVj, matAcc_dVj);
+
     using epilogue_t = group::epilogue_t<
         group::epilogue_policy_default<arch_tag>,
         tile_shape_BcHm,
         mem_desc_dVj_t>;
     epilogue_t epilogue;
-    epilogue(ctx.g_bchm, matAcc_dVj, ctx.mem_desc_dVj);
-  }
-
-  // ======================= // calc_D // ======================= //
-
-  /// @brief calc_D is used to compute D = rowsum(dO * O)
-  /// # [Br,H] * [Br,H] = [Br,H]
-  inline void calc_D(
-      matAcc_dQi_t* matAcc_O,
-      matAcc_dQi_t* matAcc_dO,
-      matAcc_dQi_t* matAcc_D,
-      const arguments_t& args) {
-    // define matD
-    using store_desc =
-        subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
-    using store_tile_t = subgroup::tile_t<accum_t, store_desc>;
-    using store_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
-        store_desc,
-        msg_type::block_2d,
-        arch_tag>;
-
-    store_tile_t matD_store;
-
-    // load matO and matdO
-    using load_desc_O = gemm_dQi_t::matAcc_tile_desc_t;
-    using load_tile_O_t = subgroup::tile_t<scalar_t, load_desc_O>;
-    using load_payload_O_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
-        load_desc_O,
-        msg_type::block_2d,
-        arch_tag>;
-
-    load_tile_O_t matO_load;
-    load_payload_O_t load_payload_O(ctx.mem_desc_Oi);
-    subgroup::tile_load(matO_load, load_payload_O);
-
-    load_tile_O_t matdO_load;
-    load_payload_O_t load_payload_dO(ctx.mem_desc_dOi);
-    subgroup::tile_load(matdO_load, load_payload_dO);
-
-    elemwise_cvt<matAcc_dQi_t, load_tile_O_t>(*matAcc_O, matO_load);
-    elemwise_cvt<matAcc_dQi_t, load_tile_O_t>(*matAcc_dO, matdO_load);
-    matAcc_D->reg = matAcc_O->reg * matAcc_dO->reg;
-
-    using wg_row_sum_t =
-        group_row_reduce_t<matAcc_dQi_t, wg_size_x, reduce_op::sum, arch_tag>;
-    uint32_t reducer_slm =
-        D_slm + ctx.sg_idy * wg_size_x * kSgBr * sizeof(accum_t);
-
-    wg_row_sum_t wg_row_sum(ctx.sg_idx, ctx.sg_idy, reducer_slm);
-    matD_store.reg = wg_row_sum(*matAcc_D);
-
-    // store matD
-    store_payload_t store_payload_D(ctx.mem_desc_Di);
-    if (ctx.sg_idx == 0) {
-      subgroup::tile_store(matD_store, store_payload_D);
-    }
-  }
-
-  // ======================= // convert_dQ // ======================= //
-
-  /// @brief convert_dQ is used to convert dQ from fp32 to bf16
-  inline void convert_dQ(const arguments_t& args) {
-    // load matAcc_dQ
-    using load_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
-        typename gemm_dQi_t::matAcc_tile_desc_t,
-        msg_type::block_2d,
-        arch_tag>;
-
-    matAcc_dQi_t matdQ_load;
-    // mat_dQi_t matdQ;
-
-    load_payload_t load_payload(ctx.mem_desc_dQi_acc);
-    subgroup::tile_load(matdQ_load, load_payload);
-
-    matdQ_load.reg *= args.sm_scale;
-
-    // subgroup::elemwise_cvt(matdQ, matdQ_load);
-
-    using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<arch_tag>,
-        tile_shape_BrHm,
-        mem_desc_dQi_t>;
-    epilogue_t epilogue;
-    epilogue(ctx.g_brhm, matdQ_load, ctx.mem_desc_dQi);
+    epilogue(ctx.g_bchm, mat_dVj, ctx.mem_desc_dVj);
   }
 
  public:
@@ -942,7 +959,7 @@ class fmha_backward_t {
   /// Users query and get a local memory consumption size in compile time.
   /// @return The size of local memory required.
   inline static constexpr uint32_t get_slm_size() {
-    constexpr uint32_t size = slm_size_Pij + slm_size_D + slm_size_Sij;
+    constexpr uint32_t size = slm_size_Pij + slm_size_Sij;
     static_assert(
         size <= (128 * 1024),
         "The local memory size should be less than 128KB!");
@@ -951,12 +968,16 @@ class fmha_backward_t {
 
   /// @brief Helper function to get the nd_range under the Fmha policy.
   /// @return Expected nd_range.
-  static inline sycl::nd_range<3> get_nd_range(uint32_t total_batches) {
+  static inline sycl::nd_range<3> get_nd_range(
+      uint32_t total_batches,
+      uint32_t num_keys) {
     // local range
     static const sycl::range<3> local_range =
         sycl::range<3>{1, wg_size_y, wg_size_x};
     // group range
-    sycl::range<3> group_range = sycl::range<3>{total_batches, 1, 1};
+    uint32_t group_range_n = (num_keys + kBc - 1) / kBc;
+    sycl::range<3> group_range =
+        sycl::range<3>{total_batches, group_range_n, 1};
     return sycl::nd_range<3>{group_range * local_range, local_range};
   }
 
@@ -964,7 +985,7 @@ class fmha_backward_t {
 
   inline KERNEL_FUNC void operator()(
       const nd_item<3>& item,
-      const arguments_t& args) {
+      const args_t& args) {
     // allocate slm and nbarrier resource
     xetla_local_init<get_slm_size()>();
     xetla_nbarrier_init<get_barrier_count()>();
@@ -972,190 +993,206 @@ class fmha_backward_t {
     // init context
     ctx.init_context(item, args);
 
-    // Calc D
-    matAcc_dQi_t matAcc_O, matAcc_dO, matAcc_D;
+    matAcc_dKj_t matAcc_dKj(0);
+    matAcc_dVj_t matAcc_dVj(0);
+
     for (uint32_t startF = 0; startF < args.uF; startF += kBr) {
-      ctx.update_context_D(item, args, startF);
-      calc_D(&matAcc_O, &matAcc_dO, &matAcc_D, args);
-    }
-
-    matAcc_dKj_t matAcc_dKj;
-    matAcc_dVj_t matAcc_dVj;
-    for (uint32_t startT = 0; startT < args.uT; startT += kBc) {
-      // update context for KV
-      ctx.update_context_KV(item, args, startT);
-      // init dK dV
-      matAcc_dKj.init(0);
-      matAcc_dVj.init(0);
-      for (uint32_t startF = 0; startF < args.uF; startF += kBr) {
-        if constexpr (kIsCausal) {
-          if (startT >= std::min(startF + kBr, args.uF))
-            continue;
-        }
-        // update context for Q
-        ctx.update_context_Q(item, args, startF, startT);
-        // compute fwd Sij
-        matAcc_Sij_t matAcc_Sij(0);
-        gemm_Sij(&matAcc_Sij, args);
-        // apply mask
-        apply_mask(&matAcc_Sij, args, startF, startT);
-        // softmax_fwd
-        matAcc_Sij_t matAcc_Sij_drop(0);
-        dp_mask_tile_t mask_in;
-        softmax_fwd(&matAcc_Sij, &matAcc_Sij_drop, &mask_in, args);
-
-        // compute dVj
-        gemm_dVj(&matAcc_dVj, args, startF);
-        // compute dPij
-        matAcc_dPij_t matAcc_dPij(0);
-        gemm_dPij(&matAcc_dPij, &mask_in, args);
-
-        // softmax_bwd
-        matAcc_Sij_t matAcc_dSij(0);
-        softmax_bwd(&matAcc_dSij, &matAcc_Sij, &matAcc_dPij, args);
-
-        // compute dQi
-        matAcc_dQi_t matAcc_dQi(0);
-        gemm_dQi(&matAcc_dQi, args, startT);
-        store_dQi(matAcc_dQi, args);
-        // compute dKj
-        gemm_dKj(&matAcc_dKj, &matAcc_dSij, args, startF);
+      if constexpr (kIsCausal) {
+        if (ctx.startT >= std::min(startF + kBr, args.uF))
+          continue;
       }
-      // store Kj and Vj
-      matAcc_dKj.reg = args.sm_scale * matAcc_dKj.reg;
-      store_dKj(matAcc_dKj, args);
-      store_dVj(matAcc_dVj, args);
-    }
+      // update context for Q
+      ctx.update_context(item, args, startF);
+      // compute fwd Sij
+      matAcc_Sij_t matAcc_Sij(0);
+      gemm_Sij(&matAcc_Sij, args);
 
-    for (uint32_t startF = 0; startF < args.uF; startF += kBr) {
-      ctx.update_context_dQ(item, args, startF);
-      convert_dQ(args);
+      // apply mask
+      apply_mask(&matAcc_Sij, args);
+      // softmax_fwd
+      matAcc_Sij_t matAcc_Sij_drop(0);
+      dp_mask_tile_t mask_in;
+      softmax_fwd(&matAcc_Sij, &matAcc_Sij_drop, &mask_in, args);
+
+      // compute dVj
+      gemm_dVj(&matAcc_dVj, args);
+      // compute dPij
+      matAcc_dPij_t matAcc_dPij(0);
+      gemm_dPij(&matAcc_dPij, &mask_in, args);
+
+      // softmax_bwd
+      matAcc_Sij_t matAcc_dSij(0);
+      softmax_bwd(&matAcc_dSij, &matAcc_Sij, &matAcc_dPij, args);
+
+      // compute dQi
+      matAcc_dQi_t matAcc_dQi(0);
+      gemm_dQi(&matAcc_dQi, args);
+      store_dQi(matAcc_dQi, args);
+      // compute dKj
+      gemm_dKj(&matAcc_dKj, &matAcc_dSij, args);
     }
+    // store Kj and Vj
+    matAcc_dKj.reg *= args.sm_scale;
+    store_dKj(matAcc_dKj, args);
+    store_dVj(matAcc_dVj, args);
   }
 }; // fmha_backward_t
+
+template <typename fmha_policy, typename scalar_t, gpu_arch arch_tag>
+class fmha_backward_convert_t {
+ public:
+  static constexpr int kBlockSize = 16;
+  using accum_t = float;
+  using args_t = arguments_t<scalar_t, float>;
+
+ private:
+  static constexpr uint32_t kBr = fmha_policy::kBr;
+  static constexpr uint32_t kHm = fmha_policy::kHm;
+  static constexpr uint32_t kSgBr = fmha_policy::kSgBr;
+  static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
+
+  using tile_shape_BrHm = group::tile_shape_t<kHm, kBr, kSgHm, kSgBr>;
+  static constexpr uint32_t wg_size_x = tile_shape_BrHm::wg_size_x;
+  static constexpr uint32_t wg_size_y = tile_shape_BrHm::wg_size_y;
+  using work_group_t = typename tile_shape_BrHm::work_group_t;
+  static constexpr uint32_t wg_size = work_group_t::size;
+
+  static constexpr uint32_t block_size_x = kBlockSize;
+  static constexpr uint32_t block_size_y =
+      (kBlockSize > kSgBr) ? kSgBr : kBlockSize;
+
+  static_assert(
+      wg_size <= arch_attr_t<arch_tag>::thread_per_wg,
+      "The number of threads should be less than threads in one workgroup!");
+
+  using mem_desc_dQi_acc_t =
+      mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_dQi_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+
+  struct context_t {
+    // thread id
+    work_group_t g;
+    uint32_t sg_idx;
+    uint32_t sg_idy;
+    // mem desc variables
+    mem_desc_dQi_acc_t mem_desc_dQi_acc;
+    mem_desc_dQi_t mem_desc_dQi;
+
+    inline context_t() = default;
+
+    /// @brief Initialize variables used in the fmha convert_dq
+    inline void init_context(const sycl::nd_item<3>& item, const args_t& args) {
+      uint32_t sg_id = item.get_local_linear_id();
+      uint32_t gid = item.get_group(0);
+      g.init(sg_id);
+
+      sg_idx = sg_id % wg_size_x;
+      sg_idy = sg_id / wg_size_x;
+      int32_t start_y = gid * args.uF + item.get_group(1) * kBr;
+      uint32_t end_y = start_y + kBr;
+      uint32_t boundary_y = (gid + 1) * args.uF;
+      end_y = end_y > boundary_y ? boundary_y : end_y;
+
+      mem_desc_dQi_acc.init(
+          args.dQ_acc_ptr, {args.uH, end_y, args.uH}, {0, start_y});
+      mem_desc_dQi.init(args.dQ_ptr, {args.uH, end_y, args.uH}, {0, start_y});
+    }
+  };
+
+  context_t ctx;
+
+ public:
+  /// @brief Helper function to get the nd_range under the Fmha policy.
+  /// @return Expected nd_range.
+  static sycl::nd_range<3> get_nd_range(
+      uint32_t total_batches,
+      uint32_t num_queries) {
+    // local range
+    sycl::range<3> local_range = sycl::range<3>{1, wg_size_y, wg_size_x};
+    // group range
+    uint32_t group_range_m = (num_queries + kBr - 1) / kBr;
+    sycl::range<3> group_range =
+        sycl::range<3>{total_batches, group_range_m, 1};
+    return sycl::nd_range<3>{group_range * local_range, local_range};
+  }
+
+  inline KERNEL_FUNC void operator()(
+      const sycl::nd_item<3>& item,
+      const args_t& args) {
+    // initialize context
+    ctx.init_context(item, args);
+
+    using load_tile_desc_t = subgroup::tile_desc_t<
+        kSgHm,
+        kSgBr,
+        block_size_x,
+        block_size_y,
+        reg_layout::tiled>;
+    using dQi_tile_t = subgroup::tile_t<scalar_t, load_tile_desc_t>;
+    using dQi_acc_tile_t = subgroup::tile_t<accum_t, load_tile_desc_t>;
+
+    dQi_acc_tile_t matdQ_acc_load;
+    load_tile<arch_tag>(
+        &matdQ_acc_load,
+        ctx.mem_desc_dQi_acc,
+        ctx.sg_idx * kSgHm,
+        ctx.sg_idy * kSgBr);
+
+    matdQ_acc_load.reg *= args.sm_scale;
+    // Convert dQ from fp32 to fp16/bf16
+    dQi_tile_t matdQ;
+    subgroup::elemwise_cvt(matdQ, matdQ_acc_load);
+
+    using epilogue_t = group::epilogue_t<
+        group::epilogue_policy_default<arch_tag>,
+        tile_shape_BrHm,
+        mem_desc_dQi_t>;
+    epilogue_t epilogue;
+    epilogue(ctx.g, matdQ_acc_load, ctx.mem_desc_dQi);
+  }
+};
+
+template <typename fmha_calcD_op_t, typename T>
+struct FmhaBackwardCalcDFunctor {
+  KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
+    // init fmha forward op and arguments
+    fmha_calcD_op_t fmha_bwd_calcD_op;
+    // call the functor
+    fmha_bwd_calcD_op(item, args);
+  }
+  FmhaBackwardCalcDFunctor(arguments_t<T, float> args) : args(args) {}
+
+ private:
+  arguments_t<T, float> args;
+};
 
 template <typename fmha_backward_op_t, typename T>
 struct FmhaBackwardKernelFunctor {
   KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
     // init fmha forward op and arguments
     fmha_backward_op_t fmha_bwd_op;
-    using accscalar_t = fmha_backward_op_t::accum_t;
-    typename fmha_backward_op_t::arguments_t args(
-        grad_out,
-        query,
-        key,
-        value,
-        bias,
-        dropout,
-        out,
-        (accscalar_t*)log_sumexp,
-        (accscalar_t*)workspace,
-        (accscalar_t*)grad_q_tmp,
-        (accscalar_t)dropout_prob,
-        grad_query,
-        grad_key,
-        grad_value,
-        grad_bias,
-        num_batches,
-        num_heads,
-        head_size,
-        num_queries,
-        num_keys,
-        bias_strideB,
-        bias_strideN,
-        bias_strideF,
-        attn_mask_padding,
-        (accscalar_t)alpha,
-        seed,
-        offset);
-
     // call the functor
     fmha_bwd_op(item, args);
   }
-  FmhaBackwardKernelFunctor(
-      T* grad_out_,
-      T* query_,
-      T* key_,
-      T* value_,
-      T* bias_,
-      uint8_t* dropout_,
-      T* out_,
-      void* log_sumexp_,
-      void* workspace_,
-      void* grad_q_tmp_,
-      float dropout_prob_,
-      T* grad_query_,
-      T* grad_key_,
-      T* grad_value_,
-      T* grad_bias_,
-      uint32_t num_batches_,
-      uint32_t num_heads_,
-      uint32_t head_size_,
-      uint32_t num_queries_,
-      uint32_t num_keys_,
-      uint32_t bias_strideB_,
-      uint32_t bias_strideN_,
-      uint32_t bias_strideF_,
-      uint32_t attn_mask_padding_,
-      float alpha_,
-      uint64_t seed_,
-      uint64_t offset_)
-      : grad_out(grad_out_),
-        query(query_),
-        key(key_),
-        value(value_),
-        bias(bias_),
-        dropout(dropout_),
-        out(out_),
-        log_sumexp(log_sumexp_),
-        workspace(workspace_),
-        grad_q_tmp(grad_q_tmp_),
-        dropout_prob(dropout_prob_),
-        grad_query(grad_query_),
-        grad_key(grad_key_),
-        grad_value(grad_value_),
-        grad_bias(grad_bias_),
-        num_batches(num_batches_),
-        num_heads(num_heads_),
-        head_size(head_size_),
-        num_queries(num_queries_),
-        num_keys(num_keys_),
-        bias_strideB(bias_strideB_),
-        bias_strideN(bias_strideN_),
-        bias_strideF(bias_strideF_),
-        attn_mask_padding(attn_mask_padding_),
-        alpha(alpha_),
-        seed(seed_),
-        offset(offset_) {}
+  FmhaBackwardKernelFunctor(arguments_t<T, float> args) : args(args) {}
 
  private:
-  T* grad_out;
-  T* query;
-  T* key;
-  T* value;
-  T* bias;
-  uint8_t* dropout;
-  T* out;
-  void* log_sumexp;
-  void* workspace;
-  void* grad_q_tmp;
-  float dropout_prob;
-  T* grad_query;
-  T* grad_key;
-  T* grad_value;
-  T* grad_bias;
-  uint32_t num_batches;
-  uint32_t num_heads;
-  uint32_t head_size;
-  uint32_t num_queries;
-  uint32_t num_keys;
-  uint32_t bias_strideB;
-  uint32_t bias_strideN;
-  uint32_t bias_strideF;
-  uint32_t attn_mask_padding;
-  float alpha;
-  uint64_t seed;
-  uint64_t offset;
+  arguments_t<T, float> args;
+};
+
+template <typename fmha_backward_op_t, typename T>
+struct FmhaBackwardConvertFunctor {
+  KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
+    // init fmha forward op and arguments
+    fmha_backward_op_t fmha_bwd_convert_op;
+    // call the functor
+    fmha_bwd_convert_op(item, args);
+  }
+  FmhaBackwardConvertFunctor(arguments_t<T, float> args) : args(args) {}
+
+ private:
+  arguments_t<T, float> args;
 };
 
 // The launcher of fmha backward kernel
@@ -1165,7 +1202,7 @@ template <
     bool kUseBias,
     bool kIsCausal,
     bool kIsDropout>
-cgfs_t xetla_fmha_backward_kernel(
+std::vector<std::function<void(sycl::handler&)>> xetla_fmha_backward_kernel(
     T* grad_out,
     T* query,
     T* key,
@@ -1211,21 +1248,8 @@ cgfs_t xetla_fmha_backward_kernel(
       alpha);
 #endif
 
-  static constexpr gpu_arch arch_tag =
-      gpu_arch::XeHpc; // need to be modified later for multi-arch
-  // fmha backward kernel
-  using fmha_backward_op_t = fmha_backward_t<
-      fmha_policy,
-      T,
-      kUseBias,
-      kIsCausal,
-      kIsDropout,
-      arch_tag>;
-
-  sycl::nd_range<3> NdRange =
-      fmha_backward_op_t::get_nd_range(num_batches * num_heads);
-
-  FmhaBackwardKernelFunctor<fmha_backward_op_t, T> kfn(
+  using accscalar_t = float;
+  arguments_t<T, accscalar_t> args(
       grad_out,
       query,
       key,
@@ -1233,10 +1257,10 @@ cgfs_t xetla_fmha_backward_kernel(
       bias,
       dropout,
       out,
-      log_sumexp,
-      workspace,
-      grad_q_tmp,
-      dropout_prob,
+      (accscalar_t*)log_sumexp,
+      (accscalar_t*)workspace,
+      (accscalar_t*)grad_q_tmp,
+      (accscalar_t)dropout_prob,
       grad_query,
       grad_key,
       grad_value,
@@ -1250,12 +1274,49 @@ cgfs_t xetla_fmha_backward_kernel(
       bias_strideN,
       bias_strideF,
       attn_mask_padding,
-      alpha,
+      (accscalar_t)alpha,
       seed,
       offset);
-  return {[=](sycl::handler& cgh) {
-    cgh.parallel_for<decltype(kfn)>(NdRange, kfn);
-  }};
+
+  static constexpr gpu_arch arch_tag =
+      gpu_arch::XeHpc; // need to be modified later for multi-arch
+
+  std::vector<std::function<void(sycl::handler&)>> cgfs;
+
+  // fmha backward - calcD kernel
+  using fmha_calcD_op_t = fmha_backward_calcD_t<fmha_policy, T, arch_tag>;
+  sycl::nd_range<3> NdRange0 =
+      fmha_calcD_op_t::get_nd_range(num_batches * num_heads, num_queries);
+  FmhaBackwardCalcDFunctor<fmha_calcD_op_t, T> kfn0(args);
+  cgfs.push_back([=](sycl::handler& cgh) {
+    cgh.parallel_for<decltype(kfn0)>(NdRange0, kfn0);
+  });
+
+  // fmha backward - main kernel
+  using fmha_backward_op_t = fmha_backward_t<
+      fmha_policy,
+      T,
+      kUseBias,
+      kIsCausal,
+      kIsDropout,
+      arch_tag>;
+  sycl::nd_range<3> NdRange1 =
+      fmha_backward_op_t::get_nd_range(num_batches * num_heads, num_keys);
+  FmhaBackwardKernelFunctor<fmha_backward_op_t, T> kfn1(args);
+  cgfs.push_back([=](sycl::handler& cgh) {
+    cgh.parallel_for<decltype(kfn1)>(NdRange1, kfn1);
+  });
+
+  // fmha backward - convert kernel
+  using fmha_convert_op_t = fmha_backward_convert_t<fmha_policy, T, arch_tag>;
+  sycl::nd_range<3> NdRange2 =
+      fmha_convert_op_t::get_nd_range(num_batches * num_heads, num_queries);
+  FmhaBackwardConvertFunctor<fmha_convert_op_t, T> kfn2(args);
+  cgfs.push_back([=](sycl::handler& cgh) {
+    cgh.parallel_for<decltype(kfn2)>(NdRange2, kfn2);
+  });
+
+  return cgfs;
 }
 } // namespace fmha
 #define CALL_IMPL_FUNC(P)                                                  \
