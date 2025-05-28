@@ -13,14 +13,14 @@
   },
   "torchaudio": {
     "version": {
-      "linux": "2.6.0.dev20250527+xpu",
+      "linux": "2.6.0.dev20250528+xpu",
       "windows": "2.6.0.dev20250527+xpu"
     },
     "commit": "main"
   },
   "torchvision": {
     "version": {
-      "linux": "0.22.0.dev20250527+xpu",
+      "linux": "0.22.0.dev20250528+xpu",
       "windows": "0.22.0.dev20250527+xpu"
     },
     "commit": "main"
