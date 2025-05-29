@@ -9,6 +9,9 @@ from .fusions import (
     silu_mul,
     gelu_mul,
     bgmv_shrink,
+    sgmv_shrink,
     bgmv_expand,
+    sgmv_expand,
     bgmv_expand_slice,
+    sgmv_expand_slice,
 )

@@ -733,3 +733,75 @@ def meta_rmsnorm(
     eps,
 ):
     return input.new_empty(input.shape)
+
+
+@register_meta("punica_bgmv_shrink")
+def meta_bgmv_shrink(
+    out,
+    input,
+    weights,
+    indicies,
+    scale,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_bgmv_expand")
+def meta_bgmv_expand(
+    out,
+    input,
+    weights,
+    indicies,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_bgmv_expand_slice")
+def meta_bgmv_expand_slice(
+    out,
+    input,
+    weights,
+    indicies,
+    slice_offset,
+    slice_size,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_shrink")
+def meta_sgmv_shrink(
+    out,
+    inputs,
+    weights,
+    indicies,
+    seq_lens,
+    scale,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_expand")
+def meta_sgmv_expand(
+    out,
+    input,
+    weights,
+    indicies,
+    seq_lens,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_expand_slice")
+def meta_sgmv_expand_slice(
+    out,
+    input,
+    weights,
+    indicies,
+    slice_offset,
+    slice_size,
+    add_inputs,
+):
+    return out.new_empty(out.shape)

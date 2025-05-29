@@ -370,6 +370,9 @@ class VarlenAttention(nn.Module):
         is_causal: bool,
         return_softmax: bool,
         gen_: torch.Generator,
+        window_size_left: int,
+        window_size_right: int,
+        softcap: float,
     ):
         return cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, False
@@ -388,6 +391,9 @@ class VarlenAttention(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            window_size_left,
+            window_size_right,
+            softcap,
         )
 
     def forward(

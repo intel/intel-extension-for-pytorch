@@ -200,6 +200,9 @@ def varlen_attention(
     is_causal: bool,
     return_softmax: bool,
     gen_: torch.Generator,
+    window_size_left: int = -1,
+    window_size_right: int = -1,
+    softcap: float = -1.0,
 ):
     r"""
     Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
@@ -245,6 +248,9 @@ def varlen_attention(
         is_causal,
         return_softmax,
         gen_,
+        window_size_left,
+        window_size_right,
+        softcap,
     )
 
 
@@ -350,8 +356,7 @@ def bgmv_shrink(
         scaling (float): Scaling factor.
     """
     f = _get_function_from_device(input.device.type, bgmv_shrink)
-    f(input, lora_weights, output, token_lora_mapping, scaling)
-    return
+    return f(input, lora_weights, output, token_lora_mapping, scaling)
 
 
 def bgmv_expand(
@@ -374,8 +379,7 @@ def bgmv_expand(
         add_inputs (bool): Whether to add to the output tensor.
     """
     f = _get_function_from_device(input.device.type, bgmv_expand)
-    f(input, lora_weights, output, token_lora_mapping, add_inputs)
-    return
+    return f(input, lora_weights, output, token_lora_mapping, add_inputs)
 
 
 def bgmv_expand_slice(
@@ -400,7 +404,7 @@ def bgmv_expand_slice(
         add_inputs (bool): Whether to add to the output tensor.
     """
     f = _get_function_from_device(input.device.type, bgmv_expand_slice)
-    f(
+    return f(
         input,
         lora_weights,
         output,
@@ -409,4 +413,134 @@ def bgmv_expand_slice(
         slice_size,
         add_inputs,
     )
-    return
+
+
+def sgmv_shrink(
+    inputs: torch.Tensor,
+    lora_a_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    scaling: float,
+):
+    r"""
+    This function is generally the same as the one in vllm/lora/ops/sgmv_shrink.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        scaling (float):  Scaling factor.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_shrink)
+    return f(
+        inputs,
+        lora_a_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        scaling,
+    )
+
+
+def sgmv_expand(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_expand)
+    return f(
+        inputs,
+        lora_b_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        add_inputs,
+    )
+
+
+def sgmv_expand_slice(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        slice_offset (int): output_tensor's offset
+        slice_size (int): current output_tensor's size
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_expand_slice)
+    return f(
+        inputs,
+        lora_b_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )

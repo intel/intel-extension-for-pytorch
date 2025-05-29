@@ -9,6 +9,7 @@ import intel_extension_for_pytorch as ipex
 # config alined with vllm
 ATOL, RTOL = 6e-2, 6e-2
 DTYPES = [torch.float16, torch.bfloat16]
+INDUCTOR = [True, False]
 test_params = {
     "hidden_sizes": [2049],
     "batches": [4],
@@ -556,11 +557,20 @@ def check_sgmv_expand(
     device: str,
     seq_length: int,
     add_inputs: bool,
+    inductor: bool,
 ):
     """
     Compare outputs of vllm.sgmv_expand kernel against a reference
     implementation.
     """
+    ipex_sgmv_expand_op = ipex.llm.functional.fusions.sgmv_expand
+    ipex_sgmv_expand_slice_op = ipex.llm.functional.fusions.sgmv_expand_slice
+    if inductor:
+        torch._dynamo.reset()
+        ipex_sgmv_expand_op = torch.compile(ipex_sgmv_expand_op, backend="inductor")
+        ipex_sgmv_expand_slice_op = torch.compile(
+            ipex_sgmv_expand_slice_op, backend="inductor"
+        )
 
     def ipex_sgmv_expand(
         inputs: torch.Tensor,
@@ -574,10 +584,16 @@ def check_sgmv_expand(
         token_nums: int,
         add_inputs: bool = False,
     ):
-        exploded_indices = torch.repeat_interleave(lora_indices_tensor, seq_len_tensor)
-
-        ipex.llm.functional.fusions.bgmv_expand(
-            inputs, lora_b_weights, output_tensor, exploded_indices, add_inputs
+        ipex_sgmv_expand_op(
+            inputs,
+            lora_b_weights,
+            output_tensor,
+            b_seq_start_loc,
+            seq_len_tensor,
+            lora_indices_tensor,
+            batches,
+            max_seq_length,
+            add_inputs,
         )
 
     def ipex_sgmv_expand_slice(
@@ -594,13 +610,15 @@ def check_sgmv_expand(
         slice_size: int,
         add_inputs: bool = False,
     ):
-        exploded_indices = torch.repeat_interleave(lora_indices_tensor, seq_len_tensor)
-
-        ipex.llm.functional.fusions.bgmv_expand_slice(
+        ipex.llm.functional.fusions.sgmv_expand_slice(
             inputs,
             lora_b_weights,
             output_tensor,
-            exploded_indices,
+            b_seq_start_loc,
+            seq_len_tensor,
+            lora_indices_tensor,
+            batches,
+            max_seq_length,
             slice_offset,
             slice_size,
             add_inputs,
@@ -718,11 +736,17 @@ def check_sgmv_shrink(
     device: str,
     seq_length: int,
     scaling: float,
+    inductor: bool,
 ):
     """
     Compare outputs of vllm.sgmv_shrink kernel against a reference
     implementation.
     """
+
+    ipex_sgmv_shrink_op = ipex.llm.functional.fusions.sgmv_shrink
+    if inductor:
+        torch._dynamo.reset()
+        ipex_sgmv_shrink_op = torch.compile(ipex_sgmv_shrink_op, backend="inductor")
 
     def ipex_sgmv_shrink(
         inputs: torch.Tensor,
@@ -736,9 +760,16 @@ def check_sgmv_shrink(
         token_nums: int,
         scaling: float,
     ):
-        exploded_indices = torch.repeat_interleave(lora_indices_tensor, seq_len_tensor)
-        ipex.llm.functional.fusions.bgmv_shrink(
-            inputs, lora_a_weights, output_tensor, exploded_indices, scaling
+        ipex_sgmv_shrink_op(
+            inputs,
+            lora_a_weights,
+            output_tensor,
+            b_seq_start_loc,
+            seq_len_tensor,
+            lora_indices_tensor,
+            batches,
+            max_seq_length,
+            scaling,
         )
 
     def ipex_sgmv_shrink_for_nslices(
@@ -827,10 +858,18 @@ def check_bgmv_expand_slice(
     dtype: torch.dtype,
     device: str,
     add_inputs: bool,
+    inductor: bool,
 ):
     """
     Compare vllm.bgmv_expand_slice against a reference implementation.
     """
+    ipex_bgmv_expand_slice = ipex.llm.functional.fusions.bgmv_expand_slice
+    if inductor:
+        torch._dynamo.reset()
+        ipex_bgmv_expand_slice = torch.compile(
+            ipex_bgmv_expand_slice, backend="inductor"
+        )
+
     seq_length = 1
     data: PunicaTensors = generate_data_for_expand_nslices(
         batches,
@@ -847,7 +886,7 @@ def check_bgmv_expand_slice(
     data.our_out_tensor = data.our_out_tensor.to(dtype)
     data.ref_out_tensor = data.ref_out_tensor.to(dtype)
     for index in range(nslices):
-        ipex.llm.functional.fusions.bgmv_expand_slice(
+        ipex_bgmv_expand_slice(
             data.inputs_tensor,
             data.lora_weights[index],
             data.our_out_tensor,
@@ -882,10 +921,16 @@ def check_bgmv_expand(
     dtype: torch.dtype,
     device: str,
     add_inputs: bool,
+    inductor: bool,
 ):
     """
     Compare vllm.bgmv_expand against a reference implementation.
     """
+    ipex_bgmv_expand = ipex.llm.functional.fusions.bgmv_expand
+    if inductor:
+        torch._dynamo.reset()
+        ipex_bgmv_expand = torch.compile(ipex_bgmv_expand, backend="inductor")
+
     seq_length = 1
     data: PunicaTensors = generate_data(
         batches,
@@ -906,9 +951,8 @@ def check_bgmv_expand(
         add_inputs=add_inputs,
     )
     data.ref_out_tensor = data.ref_out_tensor.to(dtype)
-
     data.our_out_tensor = data.our_out_tensor.to(dtype)
-    ipex.llm.functional.fusions.bgmv_expand(
+    data.our_out_tensor = ipex_bgmv_expand(
         data.inputs_tensor,
         data.lora_weights,
         data.our_out_tensor,
@@ -928,10 +972,16 @@ def check_bgmv_shrink(
     dtype: torch.dtype,
     device: str,
     scaling: float,
+    inductor: bool,
 ):
     """
     Compare vllm.bgmv_shrink against a reference implementation.
     """
+    ipex_bgmv_shrink = ipex.llm.functional.fusions.bgmv_shrink
+    if inductor:
+        torch._dynamo.reset()
+        ipex_bgmv_shrink = torch.compile(ipex_bgmv_shrink, backend="inductor")
+
     seq_length = 1
     data: PunicaTensors = generate_data(
         batches,
@@ -955,7 +1005,7 @@ def check_bgmv_shrink(
     data.ref_out_tensor = data.ref_out_tensor.to(dtype)
 
     data.our_out_tensor = data.our_out_tensor.to(dtype)
-    ipex.llm.functional.fusions.bgmv_shrink(
+    data.our_out_tensor = ipex_bgmv_shrink(
         data.inputs_tensor,
         data.lora_weights,
         data.our_out_tensor,
@@ -969,12 +1019,13 @@ def check_bgmv_shrink(
 
 class PunicaTest(TestCase):
     def test_bgmv(self):
-        for batch, num_lora, rank, hidden_size, dtype in product(
+        for batch, num_lora, rank, hidden_size, dtype, inductor in product(
             test_params["batches"],
             test_params["num_loras"],
             test_params["max_ranks"],
             test_params["hidden_sizes"],
             DTYPES,
+            INDUCTOR,
         ):
             check_bgmv_shrink(
                 batches=batch,
@@ -984,6 +1035,7 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 scaling=0.5,
+                inductor=inductor,
             )
 
             check_bgmv_expand(
@@ -994,14 +1046,16 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 add_inputs=True,
+                inductor=inductor,
             )
 
-        for batch, num_lora, rank, hidden_size, dtype in product(
+        for batch, num_lora, rank, hidden_size, dtype, inductor in product(
             hs_test_params["batches"],
             hs_test_params["num_loras"],
             hs_test_params["max_ranks"],
             hs_test_params["hidden_sizes"],
             DTYPES,
+            INDUCTOR,
         ):
             check_bgmv_shrink(
                 batches=batch,
@@ -1011,6 +1065,7 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 scaling=0.5,
+                inductor=inductor,
             )
 
             check_bgmv_expand(
@@ -1021,16 +1076,18 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 add_inputs=True,
+                inductor=inductor,
             )
 
     def test_bgmv_expand_slice(self):
-        for batch, num_lora, rank, hidden_size, nslices, dtype in product(
+        for batch, num_lora, rank, hidden_size, nslices, dtype, inductor in product(
             test_params["batches"],
             test_params["num_loras"],
             test_params["max_ranks"],
             test_params["hidden_sizes"],
             [2, 3],
             DTYPES,
+            INDUCTOR,
         ):
             check_bgmv_expand_slice(
                 batches=batch,
@@ -1041,15 +1098,17 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 add_inputs=True,
+                inductor=inductor,
             )
 
-        for batch, num_lora, rank, hidden_size, nslices, dtype in product(
+        for batch, num_lora, rank, hidden_size, nslices, dtype, inductor in product(
             hs_test_params["batches"],
             hs_test_params["num_loras"],
             hs_test_params["max_ranks"],
             hs_test_params["hidden_sizes"],
             [2, 3],
             DTYPES,
+            INDUCTOR,
         ):
             check_bgmv_expand_slice(
                 batches=batch,
@@ -1060,16 +1119,18 @@ class PunicaTest(TestCase):
                 dtype=dtype,
                 device="cpu",
                 add_inputs=True,
+                inductor=inductor,
             )
 
     def test_sgmv(self):
-        for batches, num_loras, rank, hidden_size, nslices, dtype in product(
+        for batches, num_loras, rank, hidden_size, nslices, dtype, inductor in product(
             test_params["batches"],
             test_params["num_loras"],
             test_params["max_ranks"],
             test_params["hidden_sizes"],
             [1, 2, 3],
             DTYPES,
+            INDUCTOR,
         ):
             check_sgmv_shrink(
                 batches=batches,
@@ -1081,6 +1142,7 @@ class PunicaTest(TestCase):
                 device="cpu",
                 seq_length=128,
                 scaling=0.5,
+                inductor=inductor,
             )
             check_sgmv_expand(
                 batches=batches,
@@ -1092,15 +1154,17 @@ class PunicaTest(TestCase):
                 device="cpu",
                 seq_length=128,
                 add_inputs=True,
+                inductor=inductor,
             )
 
-        for batches, num_loras, rank, hidden_size, nslices, dtype in product(
+        for batches, num_loras, rank, hidden_size, nslices, dtype, inductor in product(
             hs_test_params["batches"],
             hs_test_params["num_loras"],
             hs_test_params["max_ranks"],
             hs_test_params["hidden_sizes"],
             [1, 2, 3],
             DTYPES,
+            INDUCTOR,
         ):
             check_sgmv_shrink(
                 batches=batches,
@@ -1112,6 +1176,7 @@ class PunicaTest(TestCase):
                 device="cpu",
                 seq_length=128,
                 scaling=0.5,
+                inductor=inductor,
             )
             check_sgmv_expand(
                 batches=batches,
@@ -1123,6 +1188,7 @@ class PunicaTest(TestCase):
                 device="cpu",
                 seq_length=128,
                 add_inputs=True,
+                inductor=inductor,
             )
 
 

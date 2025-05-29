@@ -518,10 +518,16 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         is_causal=True,
         return_softmax=False,
         gen_=None,
+        window_size_left=-1,
+        window_size_right=-1,
+        softcap=-1.0,
     ):
         assert return_softmax is False, "ipex do not support return_softmax option"
         assert gen_ is None, "ipex do not support custom random generator"
         assert zero_tensors is False, "ipex varlen_fwd do not support zero tensors"
+        assert window_size_left == -1, "ipex do not support window_size_left option"
+        assert window_size_right == -1, "ipex do not support window_size_right option"
+        assert softcap == -1.0, "ipex do not support softcap option"
 
         # Repeat kv if it is GQA.
         key = cls.repeat_kv(key, int(query.shape[1] / key.shape[1]))
@@ -602,6 +608,9 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         is_causal,
         return_softmax,
         gen_,
+        window_size_left,
+        window_size_right,
+        softcap,
     ):
         return self.apply_function(
             query,
@@ -618,6 +627,9 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            window_size_left,
+            window_size_right,
+            softcap,
         )
 
 
@@ -808,10 +820,9 @@ def bgmv_shrink_cpu(
           the lora-id related to that token with shape of [batchsize].
         scaling (float): Scaling factor.
     """
-    torch.ops.torch_ipex.punica_bgmv_shrink(
+    return torch.ops.torch_ipex.punica_bgmv_shrink(
         output_tensor, inputs, lora_a_weights, lora_indices_tensor, scaling
     )
-    return
 
 
 def bgmv_expand_cpu(
@@ -833,10 +844,9 @@ def bgmv_expand_cpu(
             to the lora-id related to that token with shape of [batchsize].
         add_inputs (bool): Whether to add to the output tensor.
     """
-    torch.ops.torch_ipex.punica_bgmv_expand(
+    return torch.ops.torch_ipex.punica_bgmv_expand(
         output_tensor, inputs, lora_b_weights, lora_indices_tensor, add_inputs
     )
-    return
 
 
 def bgmv_expand_slice_cpu(
@@ -860,7 +870,7 @@ def bgmv_expand_slice_cpu(
         slice_size (int): Slice length for output.
         add_inputs (bool): Whether to add to the output tensor.
     """
-    torch.ops.torch_ipex.punica_bgmv_expand_slice(
+    return torch.ops.torch_ipex.punica_bgmv_expand_slice(
         output_tensor,
         inputs,
         lora_b_weights,
@@ -869,4 +879,122 @@ def bgmv_expand_slice_cpu(
         slice_size,
         add_inputs,
     )
-    return
+
+
+def sgmv_shrink_cpu(
+    inputs: torch.Tensor,
+    lora_a_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    scaling: float,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_shrink.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        scaling (float):  Scaling factor.
+    """
+    return torch.ops.torch_ipex.punica_sgmv_shrink(
+        output_tensor,
+        inputs,
+        lora_a_weights,
+        lora_indices_tensor,
+        seq_len_tensor,
+        scaling,
+    )
+
+
+def sgmv_expand_cpu(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    return torch.ops.torch_ipex.punica_sgmv_expand(
+        output_tensor,
+        inputs,
+        lora_b_weights,
+        lora_indices_tensor,
+        seq_len_tensor,
+        add_inputs,
+    )
+
+
+def sgmv_expand_slice_cpu(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Not use.
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): Not use.
+        max_seq_length (int): Not use.
+        slice_offset (int): output_tensor's offset
+        slice_size (int): current output_tensor's size
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    return torch.ops.torch_ipex.punica_sgmv_expand_slice(
+        output_tensor,
+        inputs,
+        lora_b_weights,
+        lora_indices_tensor,
+        seq_len_tensor,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )
