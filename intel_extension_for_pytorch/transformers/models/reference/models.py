@@ -8433,3 +8433,59 @@ def prepare_inputs_for_generation_phio(
         audio_embed_sizes if audio_embed_sizes is not None else torch.empty([])
     )
     return model_inputs
+
+
+def prepare_inputs_for_generation_whisper(
+    self,
+    decoder_input_ids,
+    past_key_values=None,
+    use_cache=None,
+    encoder_outputs=None,
+    attention_mask=None,
+    decoder_attention_mask=None,
+    cache_position=None,
+    **kwargs,
+):
+    decoder_position_ids = None
+    if decoder_attention_mask is not None:
+        decoder_position_ids = (decoder_attention_mask.cumsum(-1) - 1).clamp(min=0)
+
+    past_length = 0
+    if past_key_values is not None:
+        past_length = past_key_values[0][0].shape[2]
+
+        # Some generation methods already pass only the last input ID
+        if decoder_input_ids.shape[1] > past_length:
+            remove_prefix_length = past_length
+        else:
+            # Default to old behavior: keep only final ID
+            remove_prefix_length = decoder_input_ids.shape[1] - 1
+
+        decoder_input_ids = decoder_input_ids[:, remove_prefix_length:]
+
+        if decoder_position_ids is not None:
+            decoder_position_ids = decoder_position_ids[:, remove_prefix_length:]
+            decoder_position_ids = decoder_position_ids.clone(
+                memory_format=torch.contiguous_format
+            )
+
+    if cache_position is None:
+        cache_position = torch.arange(
+            past_length,
+            past_length + decoder_input_ids.shape[1],
+            device=decoder_input_ids.device,
+        )
+    elif use_cache:
+        cache_position = cache_position[-decoder_input_ids.shape[1] :]
+
+    decoder_input_ids = decoder_input_ids.contiguous()
+
+    return {
+        "encoder_outputs": encoder_outputs,
+        "past_key_values": past_key_values,
+        "decoder_input_ids": decoder_input_ids,
+        "use_cache": use_cache,
+        "decoder_attention_mask": decoder_attention_mask,
+        "decoder_position_ids": decoder_position_ids,
+        "cache_position": cache_position,
+    }

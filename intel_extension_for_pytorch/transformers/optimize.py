@@ -240,6 +240,7 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_t5,
         prepare_inputs_for_generation_phi3,
         prepare_inputs_for_generation_phio,
+        prepare_inputs_for_generation_whisper,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -1151,6 +1152,11 @@ def model_convert_reference(_model):
             _IPEXAttentionRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_whisper,
         )
     elif _model.config.architectures[0] == "Maira2ForConditionalGeneration":
         convert_function(
