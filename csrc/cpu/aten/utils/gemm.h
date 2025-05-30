@@ -13,6 +13,9 @@ constexpr int block_size_m() {
 constexpr int block_size_n() {
   return 8 * TILE_N;
 }
+constexpr int block_size_n2() {
+  return 2 * TILE_N;
+}
 
 template <typename scalar_t>
 inline void copy_stub(

@@ -150,6 +150,9 @@ constexpr int block_size_m() {
 constexpr int block_size_n() {
   return 8 * TILE_N;
 }
+constexpr int block_size_n2() {
+  return 2 * TILE_N;
+}
 // convert to vnni format
 // from [N, K] to [K/2, N, 2] for bfloat16 and float16
 //
@@ -170,45 +173,76 @@ inline void pack_vnni(
   }
 }
 
-at::Tensor convert_weight_packed_bf16(at::Tensor& weight) {
+std::tuple<at::Tensor, at::Tensor> convert_weight_packed_moe_bf16(
+    at::Tensor& w1,
+    at::Tensor& w2) {
   // weight : [E, OC, IC]
   //     w1 : [E, 2N,  K]
   //     w2 : [E,  K,  N]
-  CHECK_DIM(3, weight);
-  const auto st = weight.scalar_type();
-  const int E = weight.size(0);
-  const int OC = weight.size(1);
-  const int IC = weight.size(2);
+  CHECK_DIM(3, w1);
+  CHECK_DIM(3, w2);
+  const auto st1 = w1.scalar_type();
+  const auto st2 = w2.scalar_type();
+  TORCH_CHECK(st1 == st2, "weight type mismatch");
+  const int E1 = w1.size(0);
+  const int E2 = w2.size(0);
+  const int OC1 = w1.size(1);
+  const int IC1 = w1.size(2);
+  const int OC2 = w2.size(1);
+  const int IC2 = w2.size(2);
+  TORCH_CHECK(E1 == E2 && IC2 * 2 == OC1 && IC1 == OC2, "weight size mismatch");
+  const int N = IC2;
+  const int K = IC1;
   // we handle 2 TILE_N at a time.
-  TORCH_CHECK(OC % TILE_N == 0, "invalid weight out features ", OC);
-  TORCH_CHECK(IC % TILE_K == 0, "invalid weight input features ", IC);
-  constexpr int BLOCK_N = block_size_n();
+  TORCH_CHECK(N % TILE_N == 0, "invalid weight out features ", N);
+  TORCH_CHECK(K % TILE_K == 0, "invalid weight input features ", K);
+  int BLOCK_N = block_size_n();
+  if (N < 2 * BLOCK_N) {
+    BLOCK_N = block_size_n2();
+  }
+
   // use phony sizes here [E, OC, IC], for each [E], [OC, IC] -> [IC / 2, OC, 2]
-  auto packed_weight = at::empty({E, OC, IC}, weight.options());
-  const int stride = OC * IC;
+  auto packed_weight1 = at::empty({E1, OC1, IC1}, w1.options());
+  auto packed_weight2 = at::empty({E2, OC2, IC2}, w2.options());
+  const int stride1 = OC1 * IC1;
+  const int stride2 = OC2 * IC2;
   // TODO: add float8 support
   TORCH_CHECK(
-      st == at::kBFloat16 || st == at::kHalf,
+      st1 == at::kBFloat16 || st1 == at::kHalf,
       "expect weight to be bfloat16 or float16.");
-  AT_DISPATCH_REDUCED_FLOATING_TYPES(st, "conver_weight_packed_impl", [&] {
-    const scalar_t* w_data = weight.data_ptr<scalar_t>();
-    scalar_t* packed_data = packed_weight.data_ptr<scalar_t>();
+  AT_DISPATCH_REDUCED_FLOATING_TYPES(st1, "conver_weight_packed_impl", [&] {
+    const scalar_t* w_data1 = w1.data_ptr<scalar_t>();
+    const scalar_t* w_data2 = w2.data_ptr<scalar_t>();
+    scalar_t* packed_data1 = packed_weight1.data_ptr<scalar_t>();
+    scalar_t* packed_data2 = packed_weight2.data_ptr<scalar_t>();
     // parallel on {E}
-    at::parallel_for(0, E, 0, [&](int begin, int end) {
+    at::parallel_for(0, E1, 0, [&](int begin, int end) {
       for (int e = begin; e < end; ++e) {
-        for (int n = 0; n < OC; n += BLOCK_N) {
-          int n_size = std::min(BLOCK_N, OC - n);
+        for (int n = 0; n < OC1; n += BLOCK_N) {
+          int n_size = std::min(BLOCK_N, OC1 - n);
           pack_vnni<scalar_t>(
-              packed_data + e * stride + n * IC,
-              w_data + e * stride + n * IC,
+              packed_data1 + e * stride1 + n * IC1,
+              w_data1 + e * stride1 + n * IC1,
               n_size,
-              IC);
+              IC1);
+        }
+      }
+    });
+    at::parallel_for(0, E2, 0, [&](int begin, int end) {
+      for (int e = begin; e < end; ++e) {
+        for (int n = 0; n < OC2; n += BLOCK_N) {
+          int n_size = std::min(BLOCK_N, OC2 - n);
+          pack_vnni<scalar_t>(
+              packed_data2 + e * stride2 + n * IC2,
+              w_data2 + e * stride2 + n * IC2,
+              n_size,
+              IC2);
         }
       }
     });
   });
 
-  return packed_weight;
+  return std::make_tuple(packed_weight1, packed_weight2);
 }
 
 template <typename scalar_t, int SIZE>
@@ -485,10 +519,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "grouped_topk(Tensor hidden_states, Tensor gating_output, \
         int topk, bool renormalize, int num_expert_group, int topk_group, Tensor e_score_correction_bias, Tensor routed_scaling_factor)  -> (Tensor, Tensor)");
   m.impl("grouped_topk", c10::DispatchKey::CPU, torch_ipex::cpu::grouped_topk);
-  m.def("convert_weight_packed_bf16(Tensor weight) -> Tensor");
+  m.def(
+      "convert_weight_packed_moe_bf16(Tensor weight1, Tensor weight2) -> (Tensor, Tensor)");
   m.impl(
-      "convert_weight_packed_bf16",
+      "convert_weight_packed_moe_bf16",
       c10::DispatchKey::CPU,
-      torch_ipex::cpu::convert_weight_packed_bf16);
+      torch_ipex::cpu::convert_weight_packed_moe_bf16);
 }
 } // namespace

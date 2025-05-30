@@ -492,8 +492,9 @@ class DeepSeekTester(TestCase):
                 )
                 w2_comp = None
             else:
-                packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
-                packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
+                packed_w1, packed_w2 = (
+                    torch.ops.torch_ipex.convert_weight_packed_moe_bf16(w1, w2)
+                )
                 w13_scale = None
                 w13_zp = None
                 w13_comp = None
@@ -608,6 +609,17 @@ class DeepSeekTester(TestCase):
                 run_single_test(
                     2,
                     128,
+                    2048,
+                    4,
+                    2,
+                    torch.bfloat16,
+                    renormalize=True,
+                    is_woq=is_woq,
+                    sym_quant_weight=is_sym,
+                )
+                run_single_test(
+                    2,
+                    192,
                     2048,
                     4,
                     2,
@@ -782,8 +794,9 @@ class DeepSeekTester(TestCase):
                 (topk_weights.to(torch.float), pad_weights), -1
             ).to(torch.float)
             topk_ids = torch.cat((topk_ids.to(torch.int), pad_ids), -1).to(torch.int)
-            packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
-            packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
+            packed_w1, packed_w2 = torch.ops.torch_ipex.convert_weight_packed_moe_bf16(
+                w1, w2
+            )
             w13_scale = None
             w13_zp = None
             w13_comp = None
@@ -826,9 +839,9 @@ class DeepSeekTester(TestCase):
             topk_weights, topk_ids = grouped_topk_native(
                 a, score, topk, renormalize, G, topk_group
             )
-
-            packed_w1 = torch.ops.torch_ipex.convert_weight_packed_bf16(w1)
-            packed_w2 = torch.ops.torch_ipex.convert_weight_packed_bf16(w2)
+            packed_w1, packed_w2 = torch.ops.torch_ipex.convert_weight_packed_moe_bf16(
+                w1, w2
+            )
             w13_scale = None
             w13_zp = None
             w13_comp = None

@@ -911,9 +911,14 @@ def shard_low_precision_checkpoint(
 
     """
     assert tp_grain_size % 8 == 0, "tp_grain_size must be a multiple of 8"
-    num_heads = model_config["num_attention_heads"]
-    if "num_key_value_heads" in model_config:
-        num_heads = model_config["num_key_value_heads"]
+    if isinstance(model_config, dict):
+        num_heads = model_config["num_attention_heads"]
+        if "num_key_value_heads" in model_config:
+            num_heads = model_config["num_key_value_heads"]
+    else:
+        num_heads = model_config.num_attention_heads
+        if "num_key_value_heads" in model_config:
+            num_heads = model_config.num_key_value_heads
     local_rank = rank
 
     mha_layers_split_by_N = [

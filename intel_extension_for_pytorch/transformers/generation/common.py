@@ -42,6 +42,8 @@ def _model_forward(
         "MptForCausalLM",
         "StableLmForCausalLM",
         "QWenLMHeadModel",
+        "Qwen3ForCausalLM",
+        "Qwen3MoeForCausalLM",
         "GitForCausalLM",
         "LlavaLlamaForCausalLM",
         "YuanForCausalLM",

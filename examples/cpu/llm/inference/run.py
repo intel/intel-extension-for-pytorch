@@ -280,8 +280,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--batch-size", default=1, type=int, help="batch size")
     parser.add_argument("--token-latency", action="store_true")
     parser.add_argument("--greedy", action="store_true")
+    parser.add_argument("--sample", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--disable-deployment-mode", action="store_true")
+    parser.add_argument("--enable-thinking", action="store_true")
+    parser.add_argument("--generation-config", default=None, type=str)
     parser.add_argument(
         "--image-url", default=None, type=str, help="image url for image-to-text task"
     )
@@ -364,6 +367,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
+            if args.sample:
+                infer_cmd.extend(["--sample"])
+            if args.enable_thinking:
+                infer_cmd.extend(["--enable-thinking"])
+            if args.generation_config is not None:
+                infer_cmd.extend(["--generation-config", str(args.generation_config)])
             if args.streaming:
                 infer_cmd.extend(["--streaming"])
             if args.ipex:
@@ -415,6 +424,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--quant-with-amp"])
                 if args.greedy:
                     quant_cmd.extend(["--greedy"])
+                if args.sample:
+                    quant_cmd.extend(["--sample"])
+                if args.enable_thinking:
+                    quant_cmd.extend(["--enable-thinking"])
+                if args.generation_config is not None:
+                    quant_cmd.extend(
+                        ["--generation-config", str(args.generation_config)]
+                    )
                 if args.image_url is not None:
                     quant_cmd.extend(["--image-url", str(args.image_url)])
                 if args.cache_weight_for_large_batch:
@@ -551,6 +568,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
+            if args.sample:
+                infer_cmd.extend(["--sample"])
+            if args.enable_thinking:
+                infer_cmd.extend(["--enable-thinking"])
+            if args.generation_config is not None:
+                infer_cmd.extend(["--generation-config", str(args.generation_config)])
             if args.streaming:
                 infer_cmd.extend(["--streaming"])
             if args.profile:
@@ -601,6 +624,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "mpt": ("/mpt_local_shard"),
                 "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
+                "qwen3": ("/qwen3_local_shard"),
+                "qwen3moe": ("/qwen3moe_local_shard"),
                 "qwen": ("/qwen_local_shard"),
                 "git": ("/git_local_shard"),
                 "yuan": ("/yuan_local_shard"),
@@ -669,6 +694,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:
             infer_cmd.extend(["--greedy"])
+        if args.sample:
+            infer_cmd.extend(["--sample"])
+        if args.enable_thinking:
+            infer_cmd.extend(["--enable-thinking"])
+        if args.generation_config is not None:
+            infer_cmd.extend(["--generation-config", str(args.generation_config)])
         if args.streaming:
             infer_cmd.extend(["--streaming"])
         if args.ipex:

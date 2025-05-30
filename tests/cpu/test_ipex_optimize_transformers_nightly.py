@@ -249,6 +249,20 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "qwen3",
+        transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "qwen3moe",
+        transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 
