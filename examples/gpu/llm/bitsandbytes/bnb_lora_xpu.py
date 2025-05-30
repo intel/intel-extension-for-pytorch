@@ -108,13 +108,11 @@ elif args.model_name in ["microsoft/Phi-3-mini-4k-instruct"]:
 elif args.model_name in ["meta-llama/Llama-3.1-8B", "meta-llama/Llama-3.2-3B-Instruct"]:
     lora_targets = [
         "q_proj",
-        "k_proj",
         "v_proj",
         "o_proj",
         "gate_proj",
         "up_proj",
         "down_proj",
-        "lm_head",
     ]
 
 assert lora_targets != [], "lora_targets should not be empty. If you use absolute path to load the model, pls manually set the target as above."
