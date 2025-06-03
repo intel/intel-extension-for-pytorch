@@ -23,12 +23,14 @@ at::Tensor single_query_cached_kv_attention_forward_cpu(
     at::Tensor& block_tables, // [num_seqs, max_num_blocks_per_seq]
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
-    int64_t max_context_len,
+    c10::SymInt max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size,
     const double k_scale,
     const double v_scale,
     const double softcap) {
+  // SymInt is used for max_context_len to support dynamic
+  int64_t max_context_len_int = max_context_len.expect_int();
   single_query_cached_kv_attention_kernel_stub(
       kCPU,
       out,
@@ -40,7 +42,7 @@ at::Tensor single_query_cached_kv_attention_forward_cpu(
       block_tables,
       context_lens,
       block_size,
-      max_context_len,
+      max_context_len_int,
       alibi_slopes,
       window_size,
       k_scale,
@@ -79,7 +81,7 @@ at::Tensor flash_attn_varlen_cpu(
     at::Tensor& cu_seqlens_q,
     at::Tensor& cu_seqlens_kv,
     int64_t max_seqlen_q,
-    int64_t max_seqlen_kv,
+    c10::SymInt max_seqlen_kv,
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
@@ -90,6 +92,8 @@ at::Tensor flash_attn_varlen_cpu(
     const double k_scale,
     const double v_scale,
     const double softcap) {
+  // SymInt is used for max_seqlen_kv to support dynamic
+  int64_t max_seqlen_kv_int = max_seqlen_kv.expect_int();
   flash_attn_var_len_kernel_stub(
       kCPU,
       out,
@@ -99,7 +103,7 @@ at::Tensor flash_attn_varlen_cpu(
       cu_seqlens_q,
       cu_seqlens_kv,
       max_seqlen_q,
-      max_seqlen_kv,
+      max_seqlen_kv_int,
       softmax_scale,
       is_causal,
       block_table,
