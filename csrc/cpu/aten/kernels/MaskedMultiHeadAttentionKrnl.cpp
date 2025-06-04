@@ -2487,6 +2487,12 @@ first_token_masked_mha(
       attn_weights = attn_weights.to(origin_type);
       attn_outputs = attn_outputs.to(origin_type);
     }
+    // Align the stride of attn_outputs with that of the fast path.
+    // sizes:   [n, c, h, w] -> [n, h, c, w] -> [n, h, c, w] -> [n, c, h, w]
+    // strides: [c*h*w, h*w, w, 1] -> [c*h*w, w, h*w, 1] -> [c*h*w, c*w, w, 1]
+    // -> [c*h*w, w, c*w, 1]
+    attn_outputs =
+        attn_outputs.transpose(-2, -3).contiguous().transpose(-2, -3);
   }
   return std::make_tuple(
       attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
