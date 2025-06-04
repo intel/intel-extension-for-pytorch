@@ -14,7 +14,6 @@ def nms(dets, scores, threshold, sorted=False):
 batch_score_nms = torch.ops.torch_ipex.batch_score_nms
 parallel_scale_back_batch = torch.ops.torch_ipex.parallel_scale_back_batch
 rpn_nms = torch.ops.torch_ipex.rpn_nms
-box_head_nms = torch.ops.torch_ipex.box_head_nms
 
 
 def get_rand_seed():
@@ -462,124 +461,6 @@ class TestNMS(TestCase):
         self.assertEqual(new_score_double, new_score)
         self.assertTrue(new_proposal_double[0].dtype == torch.float64)
         self.assertTrue(new_score_double[0].dtype == torch.float64)
-
-    def test_box_head_nms_result(self):
-        image_shapes = [(800, 824), (800, 1199)]
-        score_thresh = 0.05
-        nms_ = 0.5
-        detections_per_img = 100
-        num_classes = 81
-        proposals = torch.load(
-            os.path.join(os.path.dirname(__file__), "data/box_head_nms_proposals.pt")
-        )
-        class_prob = torch.load(
-            os.path.join(os.path.dirname(__file__), "data/box_head_nms_class_prob.pt")
-        )
-
-        boxes_out = []
-        scores_out = []
-        labels_out = []
-        for scores, boxes, image_shape in zip(class_prob, proposals, image_shapes):
-            boxes = boxes.reshape(-1, 4)
-            boxes[:, 0].clamp_(min=0, max=image_shape[0] - 1)
-            boxes[:, 1].clamp_(min=0, max=image_shape[1] - 1)
-            boxes[:, 2].clamp_(min=0, max=image_shape[0] - 1)
-            boxes[:, 3].clamp_(min=0, max=image_shape[1] - 1)
-            boxes = boxes.reshape(-1, num_classes * 4)
-            scores = scores.reshape(-1, num_classes)
-
-            inds_all = scores > score_thresh
-            new_boxes = []
-            new_scores = []
-            new_labels = []
-            for j in range(1, num_classes):
-                inds = inds_all[:, j].nonzero().squeeze(1)
-                scores_j = scores[inds, j]
-                boxes_j = boxes[inds, j * 4 : (j + 1) * 4]
-                if nms_ > 0:
-                    keep = nms(boxes_j, scores_j, nms_)
-                new_boxes.append(boxes_j[keep])
-                new_scores.append(scores_j[keep])
-                new_labels.append(torch.full((len(keep),), j, dtype=torch.int64))
-
-            new_boxes, new_scores, new_labels = (
-                torch.cat(new_boxes, dim=0),
-                torch.cat(new_scores, dim=0),
-                torch.cat(new_labels, dim=0),
-            )
-            number_of_detections = new_boxes.size(0)
-            if number_of_detections > detections_per_img > 0:
-                image_thresh, _ = torch.kthvalue(
-                    new_scores, number_of_detections - detections_per_img + 1
-                )
-                keep = new_scores >= image_thresh.item()
-                keep = torch.nonzero(keep).squeeze(1)
-                boxes_out.append(new_boxes[keep])
-                scores_out.append(new_scores[keep])
-                labels_out.append(new_labels[keep])
-            else:
-                boxes_out.append(new_boxes)
-                scores_out.append(new_scores)
-                labels_out.append(new_labels)
-
-        boxes_out_, scores_out_, labels_out_ = box_head_nms(
-            proposals,
-            class_prob,
-            image_shapes,
-            score_thresh,
-            nms_,
-            detections_per_img,
-            num_classes,
-        )
-
-        self.assertEqual(boxes_out, boxes_out_)
-        self.assertEqual(scores_out, scores_out_)
-        self.assertEqual(labels_out, labels_out_)
-
-        # test autocast
-        with torch.cpu.amp.autocast():
-            for datatype in (torch.bfloat16, torch.float32):
-                proposals_autocast = (
-                    proposals[0].to(datatype),
-                    proposals[1].to(datatype),
-                )
-                class_prob_autocast = (
-                    class_prob[0].to(datatype),
-                    class_prob[1].to(datatype),
-                )
-                (
-                    boxes_out_autocast,
-                    scores_out_autocast,
-                    labels_out_autocast,
-                ) = box_head_nms(
-                    proposals_autocast,
-                    class_prob_autocast,
-                    image_shapes,
-                    score_thresh,
-                    nms_,
-                    detections_per_img,
-                    num_classes,
-                )
-                self.assertTrue(boxes_out_autocast[0].dtype == torch.float32)
-                self.assertTrue(scores_out_autocast[0].dtype == torch.float32)
-
-        # test double
-        proposals_double = (proposals[0].double(), proposals[1].double())
-        class_prob_double = (class_prob[0].double(), class_prob[1].double())
-        boxes_out_double, scores_out_double, labels_out_double = box_head_nms(
-            proposals_double,
-            class_prob_double,
-            image_shapes,
-            score_thresh,
-            nms_,
-            detections_per_img,
-            num_classes,
-        )
-        self.assertEqual(boxes_out_double, boxes_out)
-        self.assertEqual(scores_out_double, scores_out)
-        self.assertEqual(labels_out_double, labels_out)
-        self.assertTrue(boxes_out_double[0].dtype == torch.float64)
-        self.assertTrue(scores_out_double[0].dtype == torch.float64)
 
 
 if __name__ == "__main__":

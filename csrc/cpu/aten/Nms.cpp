@@ -14,7 +14,6 @@ namespace cpu {
 IPEX_DEFINE_DISPATCH(nms_cpu_kernel_stub);
 IPEX_DEFINE_DISPATCH(batch_score_nms_cpu_kernel_stub);
 IPEX_DEFINE_DISPATCH(rpn_nms_cpu_kernel_stub);
-IPEX_DEFINE_DISPATCH(box_head_nms_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
@@ -94,47 +93,6 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
       min_size,
       threshold,
       max_output);
-
-  static_cast<void>(result); // Avoid warnings in case not used
-  return result;
-}
-
-std::tuple<
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>>
-box_head_nms(
-    const std::vector<at::Tensor>& batch_bboxes,
-    const std::vector<at::Tensor>& batch_scores,
-    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
-    const double score_thresh,
-    const double threshold,
-    const int64_t detections_per_img,
-    const int64_t num_classes) {
-#if defined(IPEX_DISP_OP)
-  printf("IpexExternal::box_head_nms\n");
-#endif
-  RECORD_FUNCTION("IpexExternal::box_head_nms", c10::ArrayRef<c10::IValue>({}));
-
-  /*
-  pointer to cpu::box_head_nms_cpu_kernel_impl(
-      batch_bboxes,
-      batch_scores,
-      image_shapes,
-      score_thresh,
-      threshold,
-      detections_per_img,
-      num_classes);
-  */
-  auto&& result = cpu::box_head_nms_cpu_kernel_stub(
-      kCPU,
-      batch_bboxes,
-      batch_scores,
-      image_shapes,
-      score_thresh,
-      threshold,
-      detections_per_img,
-      num_classes);
 
   static_cast<void>(result); // Avoid warnings in case not used
   return result;
@@ -260,7 +218,6 @@ static auto dispatch =
         .op("torch_ipex::nms", &torch_ipex::nms)
         .op("torch_ipex::batch_score_nms", &torch_ipex::batch_score_nms)
         .op("torch_ipex::rpn_nms", &torch_ipex::rpn_nms)
-        .op("torch_ipex::box_head_nms", &torch_ipex::box_head_nms)
         .op("torch_ipex::parallel_scale_back_batch",
             &torch_ipex::parallel_scale_back_batch);
 }
@@ -319,32 +276,6 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
       max_output);
 }
 
-std::tuple<
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>>
-box_head_nms(
-    const std::vector<at::Tensor>& batch_bboxes,
-    const std::vector<at::Tensor>& batch_scores,
-    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
-    const double score_thresh,
-    const double threshold,
-    const int64_t detections_per_img,
-    const int64_t num_classes) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
-  static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::box_head_nms", "")
-                       .typed<decltype(box_head_nms)>();
-  return op.call(
-      cpu_cached_cast(at::kFloat, batch_bboxes),
-      cpu_cached_cast(at::kFloat, batch_scores),
-      image_shapes,
-      score_thresh,
-      threshold,
-      detections_per_img,
-      num_classes);
-}
-
 std::tuple<at::Tensor, at::Tensor> parallel_scale_back_batch(
     const at::Tensor& bboxes_in,
     const at::Tensor& scores_in,
@@ -368,7 +299,6 @@ TORCH_LIBRARY_IMPL(torch_ipex, AutocastCPU, m) {
   m.impl("nms", torch_ipex::autocast::nms);
   m.impl("batch_score_nms", torch_ipex::autocast::batch_score_nms);
   m.impl("rpn_nms", torch_ipex::autocast::rpn_nms);
-  m.impl("box_head_nms", torch_ipex::autocast::box_head_nms);
   m.impl(
       "parallel_scale_back_batch",
       torch_ipex::autocast::parallel_scale_back_batch);
