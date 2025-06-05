@@ -17,7 +17,7 @@ namespace TopKSoftmaxImpl {
 template <int TopK, typename T>
 struct FusedTopkSoftmax {
   static constexpr int SgSize = 16;
-  static constexpr int MaxSg = 64;
+  static constexpr int MaxSg = 32;
   static constexpr float kNegInfinity = INFINITY * -1;
   static constexpr int ElemsPerItem = sizeof(T) > sizeof(float)
       ? 1

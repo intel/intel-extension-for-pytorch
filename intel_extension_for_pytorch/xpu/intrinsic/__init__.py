@@ -415,6 +415,8 @@ def moe_gemm(
     rows_for_experts,
     rows_for_experts_cpu,
     n_experts,
+    matrix_a_scale_inv=None,
+    matrix_b_scale_inv=None,
 ):
     """
     Performs MoE (Mixture of Experts) GEMM operation.
@@ -424,6 +426,8 @@ def moe_gemm(
     @param rows_for_experts: 2D Tensor of shape [n_experts], indicating rows belong to each expert.
     @param rows_for_experts_cpu: 2D Tensor of shape [n_experts], same as rows_for_experts but on CPU for geting ndrange.
     @param n_experts: Integer, the number of experts used in the model.
+    @param matrix_a_scale_inv: 1D Tensor of shape [n_experts], input scale.
+    @param matrix_b_scale_inv: 1D Tensor of shape [n_experts], weights scale.
 
     @note Fused moe_gemm is expected to work with n_experts < 1024, but to reduce binary size,
           we currently only instantiate templates for n_experts = 8 and n_experts = 16.
@@ -433,6 +437,8 @@ def moe_gemm(
         torch.xpu.has_2d_block_array()
         and torch.xpu.has_xmx()
         and (n_experts == 8 or n_experts == 16)
+        and matrix_a_scale_inv is None
+        and matrix_b_scale_inv is None
     )
     if use_fused_kernel:
         return torch.ops.torch_ipex.fused_moe_gemm(
@@ -448,7 +454,24 @@ def moe_gemm(
         start = 0
         for i in range(n_experts):
             end = start + rows_for_experts_cpu[i].item()
-            output[start:end] = torch.mm(matrix_a[start:end], matrix_b[i])
+            if start == end:
+                continue
+            if matrix_a_scale_inv is None and matrix_b_scale_inv is None:
+                output[start:end] = torch.mm(matrix_a[start:end], matrix_b[i])
+            else:
+                assert matrix_a_scale_inv is None
+                output[start:end] = torch.ops.torch_ipex.fp8_gemm(
+                    matrix_a[start:end],
+                    False,
+                    matrix_b[i],
+                    False,
+                    None,
+                    matrix_a.dtype,
+                    torch.ones(1, device="xpu"),
+                    matrix_b_scale_inv[i],
+                    None,
+                    False,
+                )
             start = end
 
         return output

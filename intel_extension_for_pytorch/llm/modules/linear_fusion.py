@@ -420,6 +420,10 @@ class GatedMLPMOE(nn.Module):
                            with W1, i.e., W13).
         use_prepack (bool): whether to use IPEX weights prepack optimizations or not,
                             default is True.
+        w1_scale_inv (torch.Tensor): w13 weight scale_inv
+        w2_scale_inv (torch.Tensor): w2 weight scale_inv
+        a1_scale_inv (torch.Tensor): w13 input scale_inv
+        a2_scale_inv (torch.Tensor): w2 input scale_inv
 
     `forward()`
 
@@ -443,10 +447,24 @@ class GatedMLPMOE(nn.Module):
 
     """
 
-    def __init__(self, W13, W2, W3=None, use_prepack=True):
+    def __init__(
+        self,
+        W13,
+        W2,
+        W3=None,
+        use_prepack=True,
+        w1_scale_inv=None,
+        w2_scale_inv=None,
+        a1_scale_inv=None,
+        a2_scale_inv=None,
+    ):
         super().__init__()
         self.W13 = W13
         self.W2 = W2
+        self.w1_scale_inv = w1_scale_inv
+        self.w2_scale_inv = w2_scale_inv
+        self.a1_scale_inv = a1_scale_inv
+        self.a2_scale_inv = a2_scale_inv
         self.W3 = W3
         self.use_prepack = use_prepack
         self.linear_fusion = None
@@ -457,7 +475,16 @@ class GatedMLPMOE(nn.Module):
         self.device_type = x.device.type
         self.linear_fusion = self.runtime_ops.get_module_from_device(
             self.device_type, op_type, False
-        )(self.W13, self.W2, self.W3, self.use_prepack)
+        )(
+            self.W13,
+            self.W2,
+            self.W3,
+            self.use_prepack,
+            self.w1_scale_inv,
+            self.w2_scale_inv,
+            self.a1_scale_inv,
+            self.a2_scale_inv,
+        )
 
     def forward(
         self,
