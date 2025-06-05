@@ -1,6 +1,5 @@
 # This Python file uses the following encoding: utf-8
 import re
-import os
 import sys
 import torch
 
