@@ -1017,7 +1017,7 @@ if not args.benchmark:
     generated, _ = generate()
     t_generate_span = time.time() - t_generate_start
     for i, o, _ in generated:
-        print_rank0(f"{'-'*60}\nin={i}\nout={o}\n")
+        print_rank0(f"{'-' * 60}\nin={i}\nout={o}\n")
 
 # benchmark it!
 else:
