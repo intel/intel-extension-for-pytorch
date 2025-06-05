@@ -237,30 +237,6 @@ deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` 
 deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai
 ```
 
-#### 2.1.2.3 Distributed inference among multiple nodes with TCP 
-
-A [bash script](./tools/run_scaling.sh) is provided to simplify environment configuration and the command launch.
-
-Steps:
-
-1. Enter the `llm` directory
-2. Create a `hostfile.txt` following [instructions of deepspeed](https://www.deepspeed.ai/getting-started/#resource-configuration-multi-node)
-3. Find out the network interface name used for node communication via `ifconfig` or `ibv_devices` ex : eth0
-4. Open `tools/run_scaling.sh` script to update required information in line 3 to line 11 according to your environment and needs
-5. run the command below to run distributed inference among nodes
-
-```bash
-bash tools/run_scaling.sh
-```
-
-The docker image built in [the environment setup tutorial](../README.md#2-environment-setup) functions ssh connection for distributed executions across multiple machines via Ethernet. However, it is supposed to be running with 1 single container on each machine. Inside each docker container, multiple inference instances can be launched by the `deepspeed` command.
-
-Use the command below on all machines to launch the docker containers. This command uses the host network interfaces inside the docker container. Thus, you need to put the host ip addresses into the `hostfile.txt`. Do NOT launch multiple docker containers on one single machine from the same docker image. These docker containers listen on the same machine on the same port, will result in unpredicable ssh connections.
-
-```bash
-docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:main bash
-```
-
 **Note:** For models on HuggingFace require access privileges, you need to run the `huggingface-cli login` command in each docker container to config a HuggingFace access token.
 
 ## 2.2 Detail instructions for running LLM models

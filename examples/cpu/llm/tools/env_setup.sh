@@ -48,7 +48,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     COMMIT_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:commit)
     VER_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:version)
     VER_TORCHCCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k torch-ccl:version)
-    COMMIT_ONECCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k oneCCL:commit)
     VER_GCC=$(python tools/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
     VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
     VER_TRANSFORMERS=$(python tools/dep_ver_utils.py -f dependency_version.json -k transformers:version)
@@ -161,10 +160,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh 1
+        bash compile_bundle.sh 0
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-        cp torch-ccl/dist/*.whl ${WHEELFOLDER}
-        rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
+        rm -rf compile_bundle.sh llvm-project llvm-release
     fi
 
     echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
@@ -197,21 +195,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     else
         echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
     fi
-
-    # Install OneCCL
-    if [ -d oneCCL ]; then
-        rm -rf oneCCL
-    fi
-    git clone https://github.com/oneapi-src/oneCCL.git
-    cd oneCCL
-    git checkout ${COMMIT_ONECCL}
-    mkdir build
-    cd build
-    cmake -DBUILD_EXAMPLES=FALSE -DBUILD_FT=FALSE ..
-    make -j install
-    cd ../..
-    cp -r oneCCL/build/_install ${CCLFOLDER}
-    rm -rf oneCCL
 
     cd ${BASEFOLDER}/..
 fi

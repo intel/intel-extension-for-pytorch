@@ -36,7 +36,6 @@
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
 #include "aten/TPPShmAllReduceAdd.h"
-#include "comm/comm.h"
 #include "runtime/CPUPool.h"
 #include "runtime/TaskExecutor.h"
 #include "toolkit/sklearn.h"
@@ -273,12 +272,6 @@ void InitIpexModuleBindings(py::module m) {
   m.def("tpp_clip_grad_norm", &torch_ipex::tpp::clip_grad_norm);
   m.def("tpp_fused_lamb", &torch_ipex::tpp::fused_lamb);
   m.def("tpp_fused_lamb_v2", &torch_ipex::tpp::fused_lamb_v2);
-
-  // communication related
-  m.def("get_rank", &torch_ipex::cpu::get_rank);
-  m.def("tpp_shm_allreduce", &torch_ipex::cpu::tpp_shmallreduce_forward);
-  m.def("get_world_size", &torch_ipex::cpu::get_world_size);
-  m.def("barrier", &torch_ipex::cpu::barrier);
 
   // Module version
   m.def("_get_mkl_version", []() {

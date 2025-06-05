@@ -23,9 +23,6 @@
     "version": "",
     "commit": "097f0637d5b002f8d3e1a647f8622ef0359438a4"
   },
-  "oneCCL": {
-    "commit": "2021.12"
-  },
   "lm-evaluation-harness": {
     "commit": "cc9778fbe4fa1a709be2abed9deb6180fd40e7e2"
   }

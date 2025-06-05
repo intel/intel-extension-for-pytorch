@@ -13,7 +13,6 @@ if(env_cxx_standard GREATER -1)
 endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
-#oneCCL build only support the gnu standard
 set(CMAKE_CXX_EXTENSIONS ON)
 
 if(MSVC)

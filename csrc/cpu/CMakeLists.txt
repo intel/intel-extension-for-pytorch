@@ -10,22 +10,6 @@ set(DNNL_BUILD_EXAMPLES FALSE CACHE BOOL "" FORCE)
 set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
-#find_package(TorchCCL REQUIRED)
-# Find OneCCL Lib
-set(DEPENDS_LIB)
-if(BUILD_CPU_WITH_ONECCL)
-  include(${IPEX_ROOT_DIR}/cmake/Modules/FindoneCCL.cmake)
-  # Find OneCCL Lib
-  link_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/oneCCL/deps/mpi/lib)
-  find_package(oneCCL REQUIRED)
-  list(APPEND DEPENDS_LIB oneCCL)
-  list(APPEND DEPENDS_LIB mpi)
-  set(RPATH_VALUE)
-  list(APPEND RPATH_VALUE "$ORIGIN")
-  list(APPEND RPATH_VALUE "$ORIGIN/../opt/mpi/lib")
-  set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}")
-endif()   
-
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
 
@@ -59,14 +43,6 @@ ENDIF()
 if(USE_LIBXSMM)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LIBXSMM")
 endif(USE_LIBXSMM)
-
-if(BUILD_CPU_WITH_ONECCL)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_CPU_WITH_ONECCL") 
-endif(BUILD_CPU_WITH_ONECCL)
-
-if(USE_SHM)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_SHM")
-endif(USE_SHM)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_IPEX_MAIN_LIB")
 
@@ -107,7 +83,6 @@ add_subdirectory(${IPEX_CPU_ROOT_DIR}/isa)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/toolkit)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/runtime)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/utils)
-add_subdirectory(${IPEX_CPU_ROOT_DIR}/comm)
 
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/jit)
 
@@ -120,7 +95,7 @@ endif(USE_LIBXSMM)
 
 set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_CPU_CPP_JIT_SRCS} ${IPEX_JIT_COMMON_CPP_SRCS}
     ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_CPU_CPP_TOOLKIT_SRCS} ${IPEX_UTLIS_CPP_SRCS} 
-    ${IPEX_CPU_CPP_TPP_SRCS} ${IPEX_CPU_CPP_COMM_SRCS})
+    ${IPEX_CPU_CPP_TPP_SRCS})
 
 list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
@@ -161,10 +136,6 @@ else()
 endif()
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IDEEP_INCLUDE_DIR})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
-
-if(BUILD_CPU_WITH_ONECCL)
-  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${DEPENDS_LIB})
-endif(BUILD_CPU_WITH_ONECCL)
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
