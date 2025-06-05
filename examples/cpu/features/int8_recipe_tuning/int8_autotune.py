@@ -84,7 +84,7 @@ model, optimizer = ipex.optimize(model, optimizer=optimizer)
 
 epochs = 5
 for t in range(epochs):
-    print(f"Epoch {t+1}\n-------------------------------")
+    print(f"Epoch {t + 1}\n-------------------------------")
     train(train_dataloader, model, loss_fn, optimizer)
 print("Done!")
 
