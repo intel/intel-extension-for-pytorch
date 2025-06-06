@@ -990,6 +990,7 @@ void moe_scatter(
     CASE_TOPK(1)
     CASE_TOPK(2)
     CASE_TOPK(4)
+    CASE_TOPK(6)
     CASE_TOPK(8)
     default:
       TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
@@ -1315,6 +1316,7 @@ void moe_gather(
     CASE_TOPK(1)
     CASE_TOPK(2)
     CASE_TOPK(4)
+    CASE_TOPK(6)
     CASE_TOPK(8)
     default:
       TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
