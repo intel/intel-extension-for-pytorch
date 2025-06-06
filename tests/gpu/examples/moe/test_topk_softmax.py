@@ -43,3 +43,32 @@ class TestTorchMethod:
         )
         assert torch.equal(ref_topk_indices, topk_indices)
         assert torch.equal(ref_token_for_experts, token_for_experts)
+
+    @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+    @pytest.mark.parametrize("full_nan", [True, False])
+    def test_topk_softmax_nan(
+        self,
+        dtype,
+        full_nan,
+    ):
+        n_token = 32
+        n_expert = 32
+        n_topk = 8
+
+        if full_nan:
+            gating_logits = torch.full(
+                (n_token, n_expert), float("nan"), device=dpcpp_device, dtype=dtype
+            )
+        else:
+            gating_logits = torch.randn(
+                n_token, n_expert, device=dpcpp_device, dtype=dtype
+            )
+            gating_logits[0][0] = float("nan")
+
+        topk_weights, topk_indices, token_for_experts, expert_offsets = (
+            torch.ops.torch_ipex.topk_softmax(gating_logits, n_topk)
+        )
+
+        assert torch.all(topk_indices < n_expert)
+        assert torch.all(token_for_experts <= n_token * n_topk)
+        assert torch.all(expert_offsets < n_token * n_topk)

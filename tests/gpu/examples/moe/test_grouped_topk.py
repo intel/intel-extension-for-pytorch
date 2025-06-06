@@ -124,3 +124,49 @@ class TestTorchMethod:
         )
         # assert torch.equal(ref_topk_indices_sorted, topk_indices_sorted)
         # assert torch.equal(ref_token_for_experts, token_for_experts)
+
+    @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+    @pytest.mark.parametrize("renormalize", [True])
+    @pytest.mark.parametrize("sorted", [True, False])
+    @pytest.mark.parametrize("full_nan", [True, False])
+    def test_grouped_topk_sigmoid_nan(
+        self,
+        dtype,
+        renormalize,
+        sorted,
+        full_nan,
+    ):
+        n_token = 512
+        n_expert = 256
+        n_topk = 8
+        n_expert_group = 8
+        n_topk_group = 4
+
+        gating_output = torch.randn(n_token, n_expert, device=dpcpp_device).to(dtype)
+        hidden_states = torch.zeros(n_token, n_expert, device=dpcpp_device).to(dtype)
+        bias = torch.randn(n_expert, device=dpcpp_device).to(dtype)
+
+        if full_nan:
+            gating_output = torch.full(
+                gating_output.size(), float("nan"), device=dpcpp_device, dtype=dtype
+            )
+        else:
+            gating_output[0][0] = float("nan")
+
+        topk_weights, topk_indices, token_for_experts, expert_offsets = (
+            torch.ops.torch_ipex.grouped_topk_sigmoid(
+                hidden_states,
+                gating_output,
+                n_topk,
+                renormalize,
+                n_expert_group,
+                n_topk_group,
+                "sigmoid",
+                bias,
+                sorted,
+            )
+        )
+
+        assert torch.all(topk_indices < n_expert)
+        assert torch.all(token_for_experts <= n_token * n_topk)
+        assert torch.all(expert_offsets < n_token * n_topk)

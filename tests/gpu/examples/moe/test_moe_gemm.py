@@ -65,8 +65,8 @@ class TestTorchMethod:
         else:
             fp8_dtype = torch.float8_e5m2
             scale_shape = None
-            matrix_b_scale = torch.full((n_experts,), 4.0, device=dpcpp_device)
-            matrix_b_scale_inv = torch.full((n_experts,), 0.25, device=dpcpp_device)
+            matrix_b_scale = torch.full((n_experts,), 2.0, device=dpcpp_device)
+            matrix_b_scale_inv = torch.full((n_experts,), 0.5, device=dpcpp_device)
             matrix_b_fp8 = torch.empty_like(
                 matrix_b, device=dpcpp_device, dtype=fp8_dtype
             )

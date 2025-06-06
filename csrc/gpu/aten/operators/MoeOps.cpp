@@ -103,7 +103,7 @@ struct FusedTopkSoftmax {
         }
 
         for (int j = 0; j < ElemsPerItem; ++j) {
-          if (data[j] > topk_data[k]) {
+          if (!(data[j] <= topk_data[k])) {
             topk_data[k] = data[j];
             topk_idx[k] = i * ElemsPerItem + j;
           }
@@ -301,7 +301,7 @@ struct FusedGroupedTopK {
     for (int i = 0; i < n; ++i) {
       val[i] = kNegInfinity;
       for (int j = 0; j < dim; ++j) {
-        if (val[i] < src[j]) {
+        if (!(val[i] >= src[j])) {
           idx[i] = j;
           val[i] = src[j];
         }
@@ -312,9 +312,9 @@ struct FusedGroupedTopK {
 
   template <int n>
   inline int argmin(float* val) const {
-    float min_val = kPosInfinity;
-    int idx = -1;
-    for (int i = 0; i < n; ++i) {
+    float min_val = val[0];
+    int idx = 0;
+    for (int i = 1; i < n; ++i) {
       if (min_val > val[i]) {
         min_val = val[i];
         idx = i;
@@ -325,8 +325,8 @@ struct FusedGroupedTopK {
 
   template <int n>
   inline void get_topk_nosort(float* val, int* idx, float* src, int dim) const {
-    float min_val = kPosInfinity;
-    int min_idx = -1;
+    float min_val = src[0];
+    int min_idx = 0;
     for (int i = 0; i < n; ++i) {
       val[i] = src[i];
       idx[i] = i;
