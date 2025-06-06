@@ -49,9 +49,6 @@ class NewIPEXQWEN2DecoderLayer(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        grouped = (
-            self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head
-        )
         if dtype == "fp16":
             self.attn = IPEXAttention(self.ipex_config, self.layer_idx)
         elif dtype == "int4" and xpu_gemm_use_xetla():
@@ -122,6 +119,9 @@ class NewIPEXQWEN2DecoderLayer(IPEXTransformerBlock):
             impl=impl_mode,
             tp_size=tp_size,
             tp_group=tp_group,
+            head_dim=getattr(
+                config, "head_dim", config.hidden_size // config.num_attention_heads
+            ),
         )
 
     def port_attn_parameter(self):
@@ -170,7 +170,6 @@ class NewIPEXQWEN2DecoderLayer(IPEXTransformerBlock):
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAttn.batch_size
         IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
-
         residual = hidden_states
         layernorm_output = self.input_layernorm(hidden_states)
 

@@ -867,6 +867,28 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "Qwen3ForCausalLM":
+        convert_function(_model, "forward", Qwen2ForCausalLM_forward)
+        convert_function(_model.model, "forward", QWen2Model_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen3.modeling_qwen3.Qwen3Attention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen3.modeling_qwen3.Qwen3DecoderLayer,
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     elif _model.config.architectures[0] == "GitForCausalLM":
         convert_function(_model, "forward", GitForCausalLM_forward)
         convert_function(_model.git.encoder, "forward", GitEncoder_forward)

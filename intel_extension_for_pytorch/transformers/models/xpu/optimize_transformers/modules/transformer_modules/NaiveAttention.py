@@ -32,7 +32,11 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.num_attn_head = config.num_attention_head
         self.tp_size = config.tp_size
         self.tp_group = config.tp_group
-        self.head_dim = self.embed_dim // self.num_attn_head
+        self.head_dim = (
+            config.head_dim
+            if config.head_dim is not None
+            else self.embed_dim // self.num_attn_head
+        )
         self.num_attn_head = self.num_attn_head // self.tp_size
         self.max_position = config.max_positions
         self.max_out_position = config.max_out_positions

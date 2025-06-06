@@ -13,7 +13,11 @@ from .model_utils import xpu_gemm_use_xetla
 
 class IPEXAttentionInt4(IPEXAttention):
     def __init__(
-        self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
+        self,
+        config: IPEXTransformerConfig,
+        layer_idx: Optional[int] = None,
+        q_norm=None,
+        k_norm=None,
     ) -> None:
         super().__init__(config)
         self.config = config
@@ -22,8 +26,13 @@ class IPEXAttentionInt4(IPEXAttention):
         self.use_causal_mask = config.use_causal_mask
         self.num_heads = config.num_attention_head
         self.num_kv_heads = config.num_key_value_head
-        self.head_dim = self.hidden_size // self.num_heads
-
+        self.head_dim = (
+            config.head_dim
+            if config.head_dim is not None
+            else config.embedding_dim // config.num_attention_head
+        )
+        self.q_norm = q_norm
+        self.k_norm = k_norm
         self.q_proj_quant = WeightOnlyQuantizedLinear(
             in_features=4096, out_features=4096
         )

@@ -21,7 +21,11 @@ class IPEXAttention(IPEXTransformerAttnNaive):
     cache_format = None
 
     def __init__(
-        self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
+        self,
+        config: IPEXTransformerConfig,
+        layer_idx: Optional[int] = None,
+        q_norm=None,
+        k_norm=None,
     ) -> None:
         super().__init__(config)
         self.config = config
@@ -30,7 +34,13 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         self.use_causal_mask = config.use_causal_mask
         self.num_heads = config.num_attention_head // self.tp_size
         self.num_kv_heads = config.num_key_value_head // self.tp_size
-        self.head_dim = config.embedding_dim // config.num_attention_head
+        self.head_dim = (
+            config.head_dim
+            if config.head_dim is not None
+            else config.embedding_dim // config.num_attention_head
+        )
+        self.q_norm = q_norm
+        self.k_norm = k_norm
         # TODO: add different Gemm type support here
         self.qkv_proj = IPEXQKVFusedGemm(
             self.num_heads,
@@ -430,7 +440,6 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             and IPEXAttention.cache_format is None
         ):
             IPEXAttention.cache_format = past_key_value.cache_format
-
         bs, curr_len, _ = hidden_states.size()
         # TODO this wa will be removed after qkv gemm support strided write on F dim, we need this now
         # for performance reason
@@ -468,6 +477,14 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             )
         # qkv gemm
         query, key, value = self.compute_qkv_gemm(hidden_states, query, key, value)
+        input_shape = hidden_states.shape[:-1]
+        hidden_shape = (*input_shape, -1, self.head_dim)
+        if self.q_norm is not None:
+            query = self.q_norm(query.view(hidden_shape))
+
+        if self.k_norm is not None:
+            out = self.k_norm(key.view(hidden_shape))
+            key.copy_(out.reshape(key.shape))
 
         query = query.view(
             [query.shape[0], query.shape[1], self.num_heads, self.head_dim]
@@ -526,7 +543,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         # transpose back to [bs, curr_len, num_heads, head_dim]
         attn_output = attn_output.transpose(1, 2).reshape(
-            [bs, curr_len, self.hidden_size]
+            [bs, curr_len, self.head_dim * self.num_heads]
         )
         # o proj + residual
         residual = kwargs.get("residual", None)

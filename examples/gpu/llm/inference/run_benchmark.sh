@@ -184,6 +184,18 @@ Run_benchmark_qwen2.5-0.5b() {
     mv trace.json ${dir}
 }
 
+## QWen3-4b
+Run_benchmark_qwen3-4b() {
+    model=Qwen/Qwen3-4B
+    sub_model_name=qwen3-4b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
 
 ## Phi3-mini
 Run_benchmark_Phi3-mini() {
@@ -304,6 +316,7 @@ main() {
     Run_benchmark_Mistral-7B
     Run_benchmark_Llava1.5-7b
     Run_benchmark_Phi4-mini
+    Run_benchmark_qwen3-4b
 }
 
 main

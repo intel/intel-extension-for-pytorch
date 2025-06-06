@@ -3229,6 +3229,16 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
+        elif self.model_backbone == "Qwen3ForCausalLM":
+            return _QWen2Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
         elif self.model_backbone == "GPTNeoXForCausalLM":
             return _GPTNeoXAttention_forward(
                 self,

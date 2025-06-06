@@ -279,7 +279,6 @@ class GLMRotaryEmbedding(GPTJRotaryEmbedding):
 class LlamaRotaryEmbeddingBase(torch.nn.Module):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None):
         super().__init__()
-
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
@@ -400,6 +399,7 @@ class LlamaRotaryEmbeddingRef(torch.nn.Module):
     def __init__(self, config: IPEXTransformerConfig):
         super().__init__()
         self.config = config
+        breakpoint()
         self.head_dim = int(config.embed_dim / config.num_attention_heads)
         self.max_position_embeddings = config.max_positions
         self.device = config.device
@@ -512,11 +512,16 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
 
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
-        self.dim = int(
-            config.embedding_dim
-            / config.num_attention_head
-            * config.partial_rotary_factor
+        self.dim = (
+            config.head_dim
+            if config.head_dim is not None
+            else int(
+                config.embedding_dim
+                / config.num_attention_head
+                * config.partial_rotary_factor
+            )
         )
+
         LlamaRotaryEmbedding.max_position_embedding = config.max_positions
         self.base = config.positional_embedding_base
         self.device = config.device

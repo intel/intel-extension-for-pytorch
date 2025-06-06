@@ -43,6 +43,19 @@ Run_benchmark_qwen2-7b_int4() {
     mv trace.json ${dir}
 }
 
+## QWen3-8b
+Run_benchmark_qwen3-8b_int4() {
+    model=Qwen/Qwen3-8B
+    sub_model_name=qwen3-8b
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency --disable_optimize_transformers 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
 ## GPT-J-6B
 Run_benchmark_gpt-j-6b_int4() {
     model=EleutherAI/gpt-j-6B
@@ -179,6 +192,7 @@ main() {
     Run_benchmark_glm4-9b-chat
     Run_benchmark_Mistral_int4
     Run_benchmark_Phi4_int4
+    Run_benchmark_qwen3-8b_int4
 }
 
 main

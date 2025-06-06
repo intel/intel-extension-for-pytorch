@@ -62,6 +62,7 @@ class IPEXTransformerConfig:
     transpose: bool = True
     dynamic_cache_stride: int = 16
     sliding_window: int = None
+    head_dim: int = None
 
 
 @dataclass
