@@ -124,17 +124,31 @@ class MixtralMoE(torch.nn.Module):
         self,
         hidden_states: torch.Tensor,
         use_ipex_api=False,
+        use_grouped_topk=False,
+        topk_group=None,
+        num_expert_group=None,
     ) -> torch.Tensor:
         num_tokens, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
         router_logits = self.gate(hidden_states)
         if not use_ipex_api:
-            return self.ref_moe_module(hidden_states, router_logits)
+            return self.ref_moe_module(
+                hidden_states,
+                router_logits,
+                use_grouped_topk,
+                topk_group,
+                num_expert_group,
+            )
         else:
-            use_grouped_topk = False
             renormalize = True
             final_hidden_states = self.ipex_moe(
-                hidden_states, use_grouped_topk, self.top_k, router_logits, renormalize
+                hidden_states,
+                use_grouped_topk,
+                self.top_k,
+                router_logits,
+                renormalize,
+                topk_group=topk_group,
+                num_expert_group=num_expert_group,
             )
         final_hidden_states = final_hidden_states.view(num_tokens, hidden_dim)
         return final_hidden_states
@@ -143,15 +157,34 @@ class MixtralMoE(torch.nn.Module):
         self,
         hidden_states: torch.Tensor,
         router_logits: torch.Tensor,
+        use_grouped_topk=False,
+        topk_group=None,
+        num_expert_group=None,
     ) -> torch.Tensor:
+        if use_grouped_topk:
+            routing_weights, selected_experts, _, _ = (
+                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                    hidden_states,
+                    router_logits,
+                    self.top_k,
+                    True,
+                    num_expert_group,
+                    topk_group,
+                    "sigmoid",
+                    None,
+                    True,
+                )
+            )
+            selected_experts = selected_experts.to(torch.int64)
+        else:
+            routing_weights = torch.nn.functional.softmax(
+                router_logits, dim=1, dtype=torch.float
+            )
+            routing_weights, selected_experts = torch.topk(
+                routing_weights, self.top_k, dim=-1
+            )
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         num_tokens, hidden_dim = hidden_states.shape
-        routing_weights = torch.nn.functional.softmax(
-            router_logits, dim=1, dtype=torch.float
-        )
-        routing_weights, selected_experts = torch.topk(
-            routing_weights, self.top_k, dim=-1
-        )
-        routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
         final_hidden_states = torch.zeros(
             (num_tokens, hidden_dim),
@@ -176,12 +209,18 @@ class MixtralMoE(torch.nn.Module):
 
 class TestMoEModule:
     @pytest.mark.parametrize("num_experts", [8, 16])
+    @pytest.mark.parametrize("use_grouped_topk", [True, False])
     @pytest.mark.parametrize("is_fp8", [True, False])
-    def test(self, num_experts, is_fp8):
+    def test(self, num_experts, use_grouped_topk, is_fp8):
         top_k = 2
         hidden_size = 1024
         intermediate_size = 14336
         dtype = torch.float16
+        topk_group = None
+        num_expert_group = None
+        if use_grouped_topk:
+            topk_group = 2
+            num_expert_group = 2
         moe_module = (
             MixtralMoE(num_experts, top_k, hidden_size, intermediate_size, is_fp8)
             .eval()
@@ -190,6 +229,18 @@ class TestMoEModule:
         torch.manual_seed(10)
         x = torch.randn([1, hidden_size], device="xpu").to(dtype) / 10
         x_ = copy.deepcopy(x)
-        ref_out = moe_module(x)
-        ipex_out = moe_module(x_, use_ipex_api=True)
+        ref_out = moe_module(
+            x,
+            use_ipex_api=False,
+            use_grouped_topk=use_grouped_topk,
+            topk_group=topk_group,
+            num_expert_group=num_expert_group,
+        )
+        ipex_out = moe_module(
+            x_,
+            use_ipex_api=True,
+            use_grouped_topk=use_grouped_topk,
+            topk_group=topk_group,
+            num_expert_group=num_expert_group,
+        )
         torch.testing.assert_close(ref_out, ipex_out, atol=1e-2, rtol=1e-2)

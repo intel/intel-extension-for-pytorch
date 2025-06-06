@@ -187,15 +187,29 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             hidden_states: [*, hidden_dim]
             router_logits: [*, num_experts]
         """
-        assert not use_grouped_topk
-        assert num_expert_group is None
-        assert topk_group is None
 
         num_tokens, hidden_dim = hidden_states.shape
         # --------- fusion:  topk softmax  -------------------
-        routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.topk_softmax(router_logits, top_k)
-        )
+        if not use_grouped_topk:
+            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
+                torch.ops.torch_ipex.topk_softmax(router_logits, top_k)
+            )
+
+        # --------- fusion:  grouped topk sigmoid  -------------------
+        elif use_grouped_topk:
+            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
+                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                    hidden_states,
+                    router_logits,
+                    top_k,
+                    True,
+                    num_expert_group,
+                    topk_group,
+                    "sigmoid",
+                    e_score_correction_bias,
+                    True,
+                )
+            )
 
         if custom_routing_function is not None:
             # Ipex doesn't have op that can calculate rows_for_experts, expert_offsets.
