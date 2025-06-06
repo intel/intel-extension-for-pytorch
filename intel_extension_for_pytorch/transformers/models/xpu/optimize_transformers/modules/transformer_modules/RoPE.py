@@ -399,7 +399,6 @@ class LlamaRotaryEmbeddingRef(torch.nn.Module):
     def __init__(self, config: IPEXTransformerConfig):
         super().__init__()
         self.config = config
-        breakpoint()
         self.head_dim = int(config.embed_dim / config.num_attention_heads)
         self.max_position_embeddings = config.max_positions
         self.device = config.device
