@@ -1,8 +1,8 @@
+from functools import lru_cache
 from typing import List
+
 import torch
 from torch._dynamo.backends.registry import register_backend
-from torch._inductor.compile_fx import compile_fx
-from functools import lru_cache
 
 
 def _get_device_from_graph_module(graph_module: torch.fx.GraphModule):
@@ -85,6 +85,7 @@ def ipex(
                 so here syngraph compiler is not available"
             )
         else:
+            from torch._inductor.compile_fx import compile_fx
             from .._inductor.xpu import register_xpu_fusion_to_inductor
 
             # register xpu fusion to inductor to avoid the circular import via torch._inductor.compile_fx
