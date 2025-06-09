@@ -2297,7 +2297,7 @@ class LibriSpeech:
                             ],
                             dtype=self.amp_dtype,
                         ).contiguous(),
-                        torch.zeros(1, 4, dtype=torch.long),
+                        torch.zeros(1, 1, dtype=torch.long),
                     )
                     for i in range(self.config.num_hidden_layers)
                 ]

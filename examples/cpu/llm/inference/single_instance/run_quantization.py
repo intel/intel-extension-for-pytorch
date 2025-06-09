@@ -928,7 +928,7 @@ def get_example_inputs(model):
                     torch.zeros(
                         [1, 32, n_heads, head_dim], dtype=amp_dtype
                     ).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 1, dtype=torch.long),
                 )
                 for i in range(n_layers)
             ]

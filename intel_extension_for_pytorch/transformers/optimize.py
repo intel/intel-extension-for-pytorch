@@ -1414,7 +1414,7 @@ def get_dummy_input(_model, return_dict=False):
                         ],
                         dtype=dtype,
                     ).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 1, dtype=torch.long),
                 )
                 for i in range(model_num_layers)
             ]

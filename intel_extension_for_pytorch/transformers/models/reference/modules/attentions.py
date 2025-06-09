@@ -2317,6 +2317,8 @@ def _WhisperAttention_forward(
             if past_key_value is not None
             else None
         )
+    elif is_cross_attention and self.is_decoder:
+        decoded_tokens = torch.tensor(-1, dtype=torch.long).contiguous()
     else:
         decoded_tokens = torch.zeros(1, dtype=torch.long).contiguous()[0]
 

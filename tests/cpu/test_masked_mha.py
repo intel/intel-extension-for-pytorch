@@ -795,10 +795,61 @@ class MaskedMHATest(TestCase):
                 )
                 self.assertEqual(outputs[0], ref_outputs[0], prec=1e-2)
 
+    def _test_cross_attention(self):
+        head_size = 64
+        max_position = 32
+        seq_len = 1
+        head_num = 20
+        dtype = torch.float32
+        offset = torch.tensor(-1, dtype=torch.long)
+        query = torch.rand((1, seq_len, head_num, head_size), dtype=dtype)
+        key = torch.rand((1, max_position, head_num, head_size), dtype=dtype)
+        value = torch.rand((1, max_position, head_num, head_size), dtype=dtype)
+        key_cache = key.clone()
+        value_cache = value.clone()
+        beam_idx = torch.zeros((max_position, 1), dtype=torch.int64)
+        attention_mask = torch.zeros((1, 1, seq_len, max_position), dtype=dtype)
+        with torch.inference_mode(), torch.no_grad():
+            ref_outputs = torch.ops.torch_ipex.flash_attention(
+                query.transpose(1, 2).contiguous(),
+                key.transpose(1, 2).contiguous(),
+                value.transpose(1, 2).contiguous(),
+                dropout_p=0.0,
+                is_causal=False,
+                attention_mask=attention_mask,
+            )
+        for dtype in [torch.bfloat16, torch.half]:
+            with torch.inference_mode(), torch.no_grad(), torch.autocast(
+                device_type="cpu",
+                enabled=True,
+                dtype=dtype,
+            ):
+                query = query.to(dtype)
+                key = key.to(dtype)
+                value = value.to(dtype)
+                key_cache = key_cache.to(dtype)
+                value_cache = value_cache.to(dtype)
+                attention_mask = attention_mask.to(dtype)
+                outputs = torch.ops.torch_ipex.masked_multihead_self_attention(
+                    query,
+                    key,
+                    value,
+                    key_cache,
+                    value_cache,
+                    beam_idx,
+                    offset,
+                    head_size**0.5,
+                    max_position,
+                    None,
+                    attention_mask,
+                )
+                self.assertEqual(outputs[0], ref_outputs[0], prec=1e-2)
+
     def test_mha(self):
         self._test_mha(torchcompile=False)
         self._test_mha_fp16(torchcompile=False)
         self._test_masked_multihead_self_attention()
+        self._test_cross_attention()
 
 
 if __name__ == "__main__":
