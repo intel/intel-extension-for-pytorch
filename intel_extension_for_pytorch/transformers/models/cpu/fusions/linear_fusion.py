@@ -470,6 +470,7 @@ class _IPEXlinearSiluMulCPU(nn.Module):
                     if self.linear_m.bias is not None
                     else x.new_empty(0)
                 ),
+                self.linear_m.out_features,
             )
         elif (
             self.woq

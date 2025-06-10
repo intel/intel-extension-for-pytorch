@@ -650,6 +650,18 @@ def meta_tpp_linear_mul(
     return input.new_empty((*input.shape[:-1], out_features))
 
 
+@register_meta("tpp_fused_gate_up_proj")
+def meta_tpp_fused_gate_up_proj(
+    t_in,
+    t_wt_gate,
+    t_bias_gate,
+    t_wt_up,
+    t_bias_up,
+    out_features,
+):
+    return t_in.new_empty((*t_in.shape[:-1], out_features))
+
+
 @torch.library.register_fake("torch_ipex::masked_multihead_self_attention")
 def meta_masked_multihead_self_attention(
     query,

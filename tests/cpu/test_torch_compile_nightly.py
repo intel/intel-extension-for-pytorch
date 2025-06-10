@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import SGD
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.nn import FrozenBatchNorm2d
 
 from common_utils import TestCase
@@ -25,6 +26,7 @@ from test_tpp_linear import (
     Linear_mul,
     Linear_add,
     Linear_add_add,
+    Linear_Gate_Up,
 )
 
 conv_module = {1: torch.nn.Conv1d, 2: torch.nn.Conv2d, 3: torch.nn.Conv3d}
@@ -1213,6 +1215,55 @@ class TestCompileCases(TestCase):
             self.assertEqual(out, ref_out)
             self.assertTrue(out.dtype == dtype)
             _disable_tpp()
+
+    def test_tpp_fused_gate_up_proj_torchcompile(self):
+        in_feature = 64
+        out_feature = 32
+
+        x = torch.randn(1, 4, in_feature)
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        if core.isa_has_amx_fp16_support():
+            dtypes.append(torch.float16)
+        with torch.no_grad():
+            for dtype, bias_gate, bias_up, dynamic in itertools.product(
+                dtypes,
+                [False, True],
+                [False, True],
+                [True, False],
+            ):
+                model = Linear_Gate_Up(
+                    in_feature, out_feature, bias_gate, bias_up
+                ).eval()
+                if dtype == torch.bfloat16:
+                    x = x.to(torch.bfloat16)
+                    model = model.to(torch.bfloat16)
+                elif dtype == torch.float16:
+                    x = x.to(torch.float16)
+                    model = model.to(torch.float16)
+
+                _enable_tpp()
+                model = ipex.optimize(model, dtype=dtype)
+
+                def fn(x):
+                    return torch.ops.torch_ipex.tpp_fused_gate_up_proj(
+                        x,
+                        model.gate_proj.weight,
+                        model.gate_proj.bias,
+                        model.up_proj.weight,
+                        model.up_proj.bias,
+                        out_feature,
+                    )
+
+                ref_out = fn(x)
+                torch._dynamo.reset()
+                compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
+                out = compile_fn(x)
+                self.assertEqual(out, ref_out)
+                _disable_tpp()
 
 
 if __name__ == "__main__":
