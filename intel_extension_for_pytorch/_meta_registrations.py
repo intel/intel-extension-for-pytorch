@@ -690,6 +690,21 @@ def meta_masked_multihead_self_attention(
     return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
 
 
+@torch.library.register_fake("torch_ipex::prepare_4d_causal_attention_mask")
+def meta_prepare_4d_causal_attention_mask(
+    attention_mask,
+    inputs_embeds,
+    past_kv_len,
+    finfo_min,
+    sliding_window,
+):
+    ctx = torch._custom_ops.get_ctx()
+    num_to_keep = ctx.new_dynamic_size()
+    return inputs_embeds.new_empty(
+        (inputs_embeds.shape[0], 1, inputs_embeds.shape[1], num_to_keep)
+    )
+
+
 @register_meta("rotary_position_embedding")
 def meta_rotary_position_embedding(
     t_in,

@@ -814,6 +814,42 @@ class TestCompileCases(TestCase):
         MaskedMHATest._test_mha(self, torchcompile=True)
         MaskedMHATest._test_mha_fp16(self, torchcompile=True)
 
+    def test_prepare_4d_causal_attention_mask_torchcompile(self):
+        def fn(attention_mask, inputs_embeds, past_kv_len, finfo_min, sliding_window):
+            return torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+                attention_mask, inputs_embeds, past_kv_len, finfo_min, sliding_window
+            )
+
+        for dtype in [torch.float32, torch.bfloat16]:
+            for sliding_window in [10, 40]:
+                for seq_len in [1, 32]:
+                    inputs_embeds = torch.rand((1, seq_len, 768), dtype=dtype)
+                    finfo_min = torch.finfo(dtype).min
+                    past_key_values_length = 0
+                    if seq_len == 1:
+                        past_key_values_length = 32
+                    attention_mask = torch.ones(
+                        (1, past_key_values_length + seq_len), dtype=torch.long
+                    )
+                    ref_output = fn(
+                        attention_mask,
+                        inputs_embeds,
+                        torch.tensor(past_key_values_length).contiguous(),
+                        torch.tensor(finfo_min).contiguous(),
+                        sliding_window,
+                    )
+                    torch._dynamo.reset()
+                    torch._dynamo.config.capture_dynamic_output_shape_ops = True
+                    compiled_fn = torch.compile(fn, backend="ipex", dynamic=True)
+                    output = compiled_fn(
+                        attention_mask,
+                        inputs_embeds,
+                        torch.tensor(past_key_values_length).contiguous(),
+                        torch.tensor(finfo_min).contiguous(),
+                        sliding_window,
+                    )
+                    self.assertEqual(output, ref_output)
+
     @skipIfNoTorchVision
     def test_torchvision_roialign_inference_torchcompile(self):
         pool_size = 5
