@@ -81,22 +81,6 @@
   dispatch:
     XPU: multilabel_margin_loss_forward_xpu_
 
-- func: _linalg_det(Tensor A) -> (Tensor result, Tensor LU, Tensor pivots)
-  structured_delegate: _linalg_det.result
-
-- func: _linalg_det.result(Tensor A, *, Tensor(a!) result, Tensor(b!) LU, Tensor(c!) pivots) -> (Tensor(a!) result, Tensor(b!) LU, Tensor(c!) pivots)
-  structured: True
-  dispatch:
-    XPU: _linalg_det_out_xpu
-
-- func: _linalg_slogdet(Tensor A) -> (Tensor sign, Tensor logabsdet, Tensor LU, Tensor pivots)
-  structured_delegate: _linalg_slogdet.sign
-
-- func: _linalg_slogdet.sign(Tensor A, *, Tensor(a!) sign, Tensor(b!) logabsdet, Tensor(c!) LU, Tensor(d!) pivots) -> (Tensor(a!) sign, Tensor(b!) logabsdet, Tensor(c!) LU, Tensor(d!) pivots)
-  structured: True
-  dispatch:
-    XPU: _linalg_slogdet_out_xpu
-
 - func: _scaled_dot_product_efficient_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_bias, bool compute_log_sumexp, float dropout_p=0.0, bool is_causal=False, *, float? scale=None) -> (Tensor output, Tensor log_sumexp, Tensor philox_seed, Tensor philox_offset)
   dispatch:
     XPU: _scaled_dot_product_efficient_attention_xpu
@@ -113,14 +97,6 @@
   variants: function
   dispatch:
     XPU: _validate_compressed_sparse_indices_xpu
-
-- func: linalg_eigvals(Tensor self) -> Tensor
-  python_module: linalg
-
-- func: linalg_eigvals.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-  python_module: linalg
-  dispatch:
-    XPU: linalg_eigvals_out
 
 - func: quantize_per_channel(Tensor self, Tensor scales, Tensor zero_points, int axis, ScalarType dtype) -> Tensor
   variants: function
