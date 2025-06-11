@@ -65,7 +65,7 @@ XETLA_KERNEL_API cgf_t xetla_dequantize_int4_weight(
       n,
       k / DEQUANT_S,
       n);
-  cl::sycl::nd_range<3> nd_range = int4_dequantize_kernel::get_nd_range(args);
+  sycl::nd_range<3> nd_range = int4_dequantize_kernel::get_nd_range(args);
   XetlaInt4DequantizeRunFunctor<int4_dequantize_kernel> kfn(args);
   return [=](sycl::handler& cgh) {
     cgh.parallel_for<decltype(kfn)>(nd_range, kfn);

@@ -195,8 +195,8 @@ struct dispatch_policy_stream_k {
   /// @brief Host helper function to get the expected nd_range under the current
   /// GEMM config.
   /// @return Expected nd_range.
-  cl::sycl::range<3> get_group_range() const {
-    cl::sycl::range<3> group_range = cl::sycl::range<3>{1, 1, num_workgroups};
+  sycl::range<3> get_group_range() const {
+    sycl::range<3> group_range = sycl::range<3>{1, 1, num_workgroups};
     return group_range;
   };
 

@@ -4,7 +4,7 @@
 
 namespace torch_ipex::xpu::xetla {
 
-using namespace cl::sycl;
+using namespace sycl;
 using namespace gpu;
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;

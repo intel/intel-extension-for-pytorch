@@ -82,6 +82,21 @@ template <
     typename compute_attr_,
     typename perf_tuning_knob_,
     gpu_arch arch_tag_>
+struct compute_policy_default_multi_xmx : public compute_policy_default_xmx<
+                                          compute_attr_,
+                                          perf_tuning_knob_,
+                                          arch_tag_> {};
+
+
+/// @brief Compute policy for unaligned shape and xmx engine.
+/// @tparam compute_attr_ Is compute-related attributes.
+/// @tparam perf_tuning_knob_ Is performance-related knobs.
+/// @tparam arch_tag_ Is the HW architecture.
+/// @brief Specialized for Xe architecture.
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    gpu_arch arch_tag_>
 struct compute_policy_unaligned_xmx : public compute_policy_default_xmx<
                                           compute_attr_,
                                           perf_tuning_knob_,

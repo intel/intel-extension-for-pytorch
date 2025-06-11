@@ -752,16 +752,16 @@ std::vector<std::function<void(sycl::handler&)>> gru_forward_impl(
       sg_tile_k_1,
       arch_tag>;
   const int num_layers = layer_size;
-  cl::sycl::range<3> GroupRange = {
+  sycl::range<3> GroupRange = {
       num_layers,
       (M + wg_tile_m - 1) / wg_tile_m,
       // (H + wg_tile_n - 1) / wg_tile_n
       1};
-  cl::sycl::range<3> LocalRange{
+  sycl::range<3> LocalRange{
       1,
       (wg_tile_m + sg_tile_m - 1) / sg_tile_m,
       (wg_tile_n + sg_tile_n - 1) / sg_tile_n};
-  cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
+  sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   // launch kernels
   std::vector<std::function<void(sycl::handler&)>> cgfs;

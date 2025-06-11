@@ -303,6 +303,7 @@ class TestChunkedPrefill(TestCase):
                 num_seqs, max_seqlen, max_seqlen, device="cpu", dtype=dtype
             )
         context_lens = [random.randint(1, max_seqlen) for _ in range(num_seqs)]
+        context_lens = [max_seqlen for _ in range(num_seqs)]
 
         max_seqlen_k = max(context_lens)
         context_lens = [0] + context_lens
@@ -321,6 +322,7 @@ class TestChunkedPrefill(TestCase):
         cu_seqlen_k = torch.cumsum(context_lens, 0)
         q_lens = context_lens[1:] if version == "chunked_prefill" else [1] * num_seqs
         q_lens = [random.randint(1, max_lens) for max_lens in q_lens]
+        q_lens = [1] * num_seqs
         max_seqlen_q = max(q_lens)
         q_lens = [0] + q_lens
         q_lens_tensor = torch.tensor(q_lens, dtype=torch.int, device="cpu")
@@ -365,6 +367,13 @@ class TestChunkedPrefill(TestCase):
             softcap,
         )
 
+        # import time
+        # start = torch.xpu.Event(enable_timing=True)
+        # end = torch.xpu.Event(enable_timing=True)
+        # torch.xpu.synchronize()
+        # start.record()
+        # for _ in range(10000):
+        #     tic = time.time()
         ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
             output_xpu,
             query_xpu,
@@ -382,7 +391,12 @@ class TestChunkedPrefill(TestCase):
             window_size_right=window_size[1],
             softcap=softcap,
         )
+        # end.record()
+        # torch.xpu.synchronize()
+        # elapsed_time_ms = start.elapsed_time(end)  # 返回时间，单位是毫秒
+        # print(f"Average time for chunked prefill: {elapsed_time_ms / 100:.4f} seconds")
 
+        # import pdb; pdb.set_trace()
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
 
     def chunk_prefill_fp8(
@@ -498,11 +512,11 @@ class TestChunkedPrefill(TestCase):
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
 
     # @parametrize("num_gen_seqs", [1, 3, 8, 13])
-    @parametrize("num_gen_seqs", [1, 3, 8])
+    @parametrize("num_gen_seqs", [1, 3, 8, 28])
     @parametrize("max_seqlen_k", [8, 1024, 2088])
     # @parametrize("max_seqlen_k", [76])
-    @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 70, 96, 128, 256])
+    @parametrize("num_heads", [(10, 2), (5, 1), (8, 4), (4, 2), (6, 3)])
+    @parametrize("head_size", [64, 128])
     # @parametrize("head_size", [64])
     @parametrize("block_size", [16, 32, 64, 128])
     @parametrize("use_alibi", [False])

@@ -89,6 +89,15 @@ template <
     class enable = void>
 class gemm_selector_t {};
 
+template <
+    typename compute_policy,
+    typename tile_shape,
+    typename mem_desc_a,
+    typename mem_desc_b,
+    uint32_t kHeadPerKv_,
+    class enable = void>
+class gqa_t {};
+
 /// @} xetla_gemm
 
 } // namespace gpu::xetla::group

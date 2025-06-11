@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <ext/intel/esimd.hpp>
 #include <version.hpp>
 #include "./common_types.hpp"

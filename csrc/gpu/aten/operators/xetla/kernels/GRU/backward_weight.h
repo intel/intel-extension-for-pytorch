@@ -704,15 +704,15 @@ cgfs_t gru_backward_weight_impl(
   const int num_layers = layer_size;
   size_t H = hidden_size;
 
-  cl::sycl::range<3> GroupRange{
+  sycl::range<3> GroupRange{
       num_layers,
       (3 * H + wg_tile_m - 1) / wg_tile_m,
       (H + wg_tile_n_0 - 1) / wg_tile_n_0};
-  cl::sycl::range<3> LocalRange{
+  sycl::range<3> LocalRange{
       1,
       (wg_tile_m + sg_tile_m - 1) / sg_tile_m,
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
-  cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
+  sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input, arch_tag> kfn(
       err0_ptr,

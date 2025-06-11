@@ -28,6 +28,7 @@
 #include <group/gemm/compute_policy.hpp>
 #include <group/gemm/impl/default_fpu_xe.hpp>
 #include <group/gemm/impl/default_xmx_xe.hpp>
+#include <group/gemm/impl/default_multi_xmx_xe.hpp>
 #include <group/gemm/impl/pre_processing_xe.hpp>
 #include <group/gemm/impl/selector_xe.hpp>
 #include <group/gemm/impl/unaligned_fpu_xe.hpp>

@@ -112,27 +112,27 @@ struct int4_dequantize_t<
     uint32_t zp_ld;
   };
 
-  static cl::sycl::range<3> get_local_range() {
+  static sycl::range<3> get_local_range() {
     uint32_t local_range_k = (wg_tile_k + sg_tile_k - 1) / sg_tile_k;
     uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
     XETLA_PRINTF("Local range: {%d, %d, %d}", 1, local_range_k, local_range_n);
-    return cl::sycl::range<3>{1, local_range_k, local_range_n};
+    return sycl::range<3>{1, local_range_k, local_range_n};
   };
 
-  static cl::sycl::range<3> get_group_range(
+  static sycl::range<3> get_group_range(
       uint32_t matrix_k,
       uint32_t matrix_n) {
     uint32_t group_range_k = (matrix_k + wg_tile_k - 1) / wg_tile_k;
     uint32_t group_range_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
     XETLA_PRINTF("Group range: {%d, %d, %d}", 1, group_range_k, group_range_n);
-    return cl::sycl::range<3>{1, group_range_k, group_range_n};
+    return sycl::range<3>{1, group_range_k, group_range_n};
   };
 
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
-    cl::sycl::range<3> local_range = get_local_range();
-    cl::sycl::range<3> group_range =
+  static sycl::nd_range<3> get_nd_range(arguments_t& args) {
+    sycl::range<3> local_range = get_local_range();
+    sycl::range<3> group_range =
         get_group_range(args.matrix_k, args.matrix_n);
-    return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+    return sycl::nd_range<3>{group_range * local_range, local_range};
   };
 
   using mat_qweight_tile_desc_t = subgroup::tile_desc_t<

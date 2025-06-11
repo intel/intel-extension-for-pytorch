@@ -24,6 +24,16 @@ This is an implementation of the Flash Attention algorithm
 
 namespace gpu::xetla {
 
+static inline bool _load_using_fmha_v3() {
+  auto envar = std::getenv("IPEX_FMHA_V3");
+  if (envar) {
+    if (strcmp(envar, "0") == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// @brief Main execution function for flash mha forward.
 template <
     typename T,
@@ -56,12 +66,12 @@ class fmha_forward_kernel_policy {
         T,
         arch_tag,
         kUseAlibi,
-        kUseBias,
+        false,
         kIsCausal,
-        kSeqLast,
-        kIsTraining,
-        kIsDropout,
-        kIsVarlen,
+        false,
+        false,
+        false,
+        true,
         kIsLocal>(std::forward<Args>(args)...);
   }
 
@@ -78,6 +88,13 @@ class fmha_forward_kernel_policy {
     // << std::endl;
     if (args.block_size == 64) {
       // std::cout << "block size 64" << std::endl;
+      if (args.num_queries == NUM_QUERIES_GREEDY && _load_using_fmha_v3()) {
+        if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+          return kernel_call<fmha_policy_1x64x64>(args);
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+          return kernel_call<fmha_policy_1x64x128>(args);
+        }
+      }
       if (args.head_size <= HEAD_SIZE_LIMIT_0) {
         return kernel_call<fmha_policy_64x64x64>(args);
       } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
@@ -91,6 +108,13 @@ class fmha_forward_kernel_policy {
         return {};
       }
     } else if (args.block_size == 128) {
+      if (args.num_queries == NUM_QUERIES_GREEDY && _load_using_fmha_v3()) {
+        if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+          return kernel_call<fmha_policy_1x128x64>(args);
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+          return kernel_call<fmha_policy_1x128x128>(args);
+        }
+      }
       // std::cout << "block size 128 " << std::endl;
       if (args.head_size <= HEAD_SIZE_LIMIT_0) {
         return kernel_call<fmha_policy_64x128x64>(args);
@@ -240,23 +264,23 @@ cgfs_t _fmha_forward_kernel(
     return dispatch_fmha_forward<fp16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<fp16>(args),
         args.alibi != nullptr, // is alibi
-        args.attn_mask != nullptr, // is is_attn_mask
+        false, // args.attn_mask != nullptr, // is is_attn_mask
         args.is_causal,
-        args.seq_last,
-        args.is_training,
-        args.is_dropout,
-        args.is_varlen,
+        false, // args.seq_last,
+        false, // args.is_training,
+        false, // args.is_dropout,
+        true,  // args.is_varlen,
         args.is_local);
   } else if constexpr (arch_tag != gpu_arch::XeLpg) {
     return dispatch_fmha_forward<bf16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<bf16>(args),
         args.alibi != nullptr, // is alibi
-        args.attn_mask != nullptr, // is is_attn_mask
+        false, // args.attn_mask != nullptr, // is is_attn_mask
         args.is_causal,
-        args.seq_last,
-        args.is_training,
-        args.is_dropout,
-        args.is_varlen,
+        false, // args.seq_last,
+        false, // args.is_training,
+        false, // args.is_dropout,
+        true,  // args.is_varlen,
         args.is_local);
     return {};
   } else {

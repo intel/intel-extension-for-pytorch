@@ -51,6 +51,7 @@ struct dispatch_fmha_forward_args_t {
   int32_t* block_tables;
   uint32_t max_blocks_per_seq;
   uint32_t block_size;
+  bool pure_decode;
   dispatch_fmha_forward_args_t(const fmha_forward_kernel_args_t& args)
       : query(reinterpret_cast<T*>(args.query)),
         key(reinterpret_cast<T*>(args.key)),
