@@ -96,8 +96,10 @@ class TestNNMethod(TestCase):
         grad = torch.full(
             [1, 64, 256, 256], 1e-3, dtype=dtype, device=cpu_device, requires_grad=True
         ).to(dpcpp_device)
-        conv = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False).to(
-            dpcpp_device
+        conv = (
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False)
+            .to(dpcpp_device)
+            .half()
         )
         y_fp32 = conv(x)
         y_fp32.backward(grad)
