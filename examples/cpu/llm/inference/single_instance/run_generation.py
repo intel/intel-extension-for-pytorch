@@ -396,6 +396,7 @@ if args.torch_compile:
             "[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode"
             " to False if want to use torch.compile."
         )
+    torch._dynamo.config.capture_dynamic_output_shape_ops = True
     model.forward = torch.compile(model.forward, dynamic=True, backend=args.backend)
 
 
