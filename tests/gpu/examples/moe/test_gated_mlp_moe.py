@@ -127,6 +127,7 @@ class MixtralMoE(torch.nn.Module):
         use_grouped_topk=False,
         topk_group=None,
         num_expert_group=None,
+        scoring_func="sigmoid",
     ) -> torch.Tensor:
         num_tokens, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
@@ -138,6 +139,7 @@ class MixtralMoE(torch.nn.Module):
                 use_grouped_topk,
                 topk_group,
                 num_expert_group,
+                scoring_func=scoring_func,
             )
         else:
             renormalize = True
@@ -149,6 +151,7 @@ class MixtralMoE(torch.nn.Module):
                 renormalize,
                 topk_group=topk_group,
                 num_expert_group=num_expert_group,
+                scoring_func=scoring_func,
             )
         final_hidden_states = final_hidden_states.view(num_tokens, hidden_dim)
         return final_hidden_states
@@ -160,17 +163,18 @@ class MixtralMoE(torch.nn.Module):
         use_grouped_topk=False,
         topk_group=None,
         num_expert_group=None,
+        scoring_func="sigmoid",
     ) -> torch.Tensor:
         if use_grouped_topk:
             routing_weights, selected_experts, _, _ = (
-                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                torch.ops.torch_ipex.grouped_topk_scoring(
                     hidden_states,
                     router_logits,
                     self.top_k,
                     True,
                     num_expert_group,
                     topk_group,
-                    "sigmoid",
+                    scoring_func,
                     None,
                     True,
                 )
@@ -211,7 +215,8 @@ class TestMoEModule:
     @pytest.mark.parametrize("num_experts", [8, 16])
     @pytest.mark.parametrize("use_grouped_topk", [True, False])
     @pytest.mark.parametrize("is_fp8", [True, False])
-    def test(self, num_experts, use_grouped_topk, is_fp8):
+    @pytest.mark.parametrize("scoring_func", ["sigmoid", "softmax"])
+    def test(self, num_experts, use_grouped_topk, is_fp8, scoring_func):
         top_k = 2
         hidden_size = 1024
         intermediate_size = 14336
@@ -235,6 +240,7 @@ class TestMoEModule:
             use_grouped_topk=use_grouped_topk,
             topk_group=topk_group,
             num_expert_group=num_expert_group,
+            scoring_func=scoring_func,
         )
         ipex_out = moe_module(
             x_,
@@ -242,5 +248,6 @@ class TestMoEModule:
             use_grouped_topk=use_grouped_topk,
             topk_group=topk_group,
             num_expert_group=num_expert_group,
+            scoring_func=scoring_func,
         )
         torch.testing.assert_close(ref_out, ipex_out, atol=1e-2, rtol=1e-2)

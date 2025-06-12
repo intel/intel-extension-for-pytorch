@@ -226,7 +226,13 @@ void fused_topk_softmax(
 }; // namespace TopKSoftmaxImpl
 
 namespace GroupedTopKImpl {
-template <typename T, bool renorm, int topk_group, int topk>
+
+enum class ScoringFunc {
+  Sigmoid,
+  Softmax,
+};
+
+template <typename T, int topk_group, int topk>
 struct FusedGroupedTopK {
   static constexpr float kPosInfinity = INFINITY;
   static constexpr float kNegInfinity = (-1) * kPosInfinity;
@@ -244,7 +250,9 @@ struct FusedGroupedTopK {
       const int num_tokens,
       const int num_experts,
       const int num_expert_group,
-      const bool sorted)
+      const bool sorted,
+      const bool renormalize,
+      const ScoringFunc scoring_mode)
       : gating_output(gating_output),
         bias(bias),
         topk_weights(topk_weights),
@@ -257,7 +265,9 @@ struct FusedGroupedTopK {
         num_experts(num_experts),
         num_expert_group(num_expert_group),
         chk_per_group(num_experts / num_expert_group),
-        sorted(sorted) {}
+        sorted(sorted),
+        renormalize(renormalize),
+        scoring_mode(scoring_mode) {}
 
   static inline sycl::nd_range<1> get_nd_range(const int num_tokens) {
     int total_sg = divup(num_tokens, SgSize) * SgSize;
@@ -368,22 +378,62 @@ struct FusedGroupedTopK {
     float one = 1.0f;
     float max_val;
     // sigmoid, addbias and max
-    for (int64_t i = 0; i < num_expert_group; ++i) {
-      max_val = kNegInfinity;
-      for (int64_t j = 0; j < chk_per_group; ++j) {
-        int64_t k = i * chk_per_group + j;
-        float t;
-        float s = src[k];
-        float b = bias[k];
-        if (bias != nullptr) {
-          t = one / (one + sycl::native::exp(-s)) + b;
-        } else {
-          t = one / (one + sycl::native::exp(-s));
+    if (scoring_mode == ScoringFunc::Sigmoid) {
+      for (int64_t i = 0; i < num_expert_group; ++i) {
+        max_val = kNegInfinity;
+        for (int64_t j = 0; j < chk_per_group; ++j) {
+          int64_t k = i * chk_per_group + j;
+          float t;
+          float s = src[k];
+          if (bias != nullptr) {
+            float b = bias[k];
+            t = one / (one + sycl::native::exp(-s)) + b;
+          } else {
+            t = one / (one + sycl::native::exp(-s));
+          }
+          score_buf[k] = t;
+          max_val = std::max(t, max_val);
         }
-        score_buf[k] = t;
-        max_val = std::max(t, max_val);
+        max_buf[i] = max_val; // num_token, num_expert_group
       }
-      max_buf[i] = max_val; // num_token, num_expert_group
+    } else if (scoring_mode == ScoringFunc::Softmax) {
+      float softmax_max = kNegInfinity;
+      float softmax_sum = 0.0f;
+      for (int64_t i = 0; i < num_expert_group; ++i) {
+        for (int64_t j = 0; j < chk_per_group; ++j) {
+          int64_t k = i * chk_per_group + j;
+          float s = src[k];
+          if (!(softmax_max >= s)) {
+            softmax_max = s;
+          }
+        }
+      }
+      for (int64_t i = 0; i < num_expert_group; ++i) {
+        for (int64_t j = 0; j < chk_per_group; ++j) {
+          int64_t k = i * chk_per_group + j;
+          float s = src[k];
+          s = sycl::native::exp(s - softmax_max);
+          softmax_sum += s;
+          score_buf[k] = s;
+        }
+      }
+      for (int64_t i = 0; i < num_expert_group; ++i) {
+        max_val = kNegInfinity;
+        for (int64_t j = 0; j < chk_per_group; ++j) {
+          int64_t k = i * chk_per_group + j;
+          float t;
+          float s = score_buf[k];
+          if (bias != nullptr) {
+            float b = bias[k];
+            t = s / softmax_sum + b;
+          } else {
+            t = s / softmax_sum;
+          }
+          score_buf[k] = t;
+          max_val = std::max(t, max_val);
+        }
+        max_buf[i] = max_val; // num_token, num_expert_group
+      }
     }
     // topk index only
     float topk_group_data[topk_group];
@@ -418,7 +468,7 @@ struct FusedGroupedTopK {
       row_sum += topk_data[i];
     }
     for (int i = 0; i < topk; ++i) {
-      if constexpr (renorm) {
+      if (renormalize) {
         topk_wgts[i] = topk_data[i] / row_sum;
       } else {
         topk_wgts[i] = topk_data[i];
@@ -473,10 +523,12 @@ struct FusedGroupedTopK {
   const int num_expert_group;
   const int64_t chk_per_group;
   const bool sorted;
+  const bool renormalize;
+  const ScoringFunc scoring_mode;
 };
 
 template <typename T, int topk, int topk_group>
-void launch_fused_grouped_topk_sigmoid(
+void launch_fused_grouped_topk_scoring(
     sycl::queue& queue,
     const T* gating_output,
     const T* bias,
@@ -489,9 +541,10 @@ void launch_fused_grouped_topk_sigmoid(
     const int num_tokens,
     const int num_experts,
     const int num_expert_group,
-    const bool sorted) {
-  // addbias and renorm are set to true by default
-  using Kernel = FusedGroupedTopK<T, true, topk_group, topk>;
+    const bool sorted,
+    const bool renormalize,
+    const ScoringFunc scoring_mode) {
+  using Kernel = FusedGroupedTopK<T, topk_group, topk>;
   // int slm_size = Kernel::get_slm_size(num_tokens, num_experts);
   auto range = Kernel::get_nd_range(num_tokens);
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -509,7 +562,9 @@ void launch_fused_grouped_topk_sigmoid(
         num_tokens,
         num_experts,
         num_expert_group,
-        sorted);
+        sorted,
+        renormalize,
+        scoring_mode);
     cgh.parallel_for(range, task);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -529,13 +584,15 @@ using LAUNCH_FUNC = void (*)(
     const int,
     const int,
     const int,
-    const bool);
+    const bool,
+    const bool,
+    const ScoringFunc);
 
 #define DEFINE_GROUPED_TOPK_FUNC(T, a, b) \
-  &launch_fused_grouped_topk_sigmoid<T, a, b>
+  &launch_fused_grouped_topk_scoring<T, a, b>
 
 template <typename T>
-void fused_grouped_topk_sigmoid(
+void fused_grouped_topk_scoring(
     const T* gating_output,
     const T* bias,
     float* topk_weights,
@@ -549,7 +606,9 @@ void fused_grouped_topk_sigmoid(
     const int num_expert_group,
     const int topk,
     const int topk_group,
-    const bool sorted) {
+    const bool sorted,
+    const bool renormalize,
+    const ScoringFunc scoring_mode) {
   auto& queue = dpcppGetCurrentQueue();
 
   TORCH_CHECK(
@@ -610,7 +669,9 @@ void fused_grouped_topk_sigmoid(
       num_tokens,
       num_experts,
       num_expert_group,
-      sorted);
+      sorted,
+      renormalize,
+      scoring_mode);
 }
 
 }; // namespace GroupedTopKImpl
@@ -1384,7 +1445,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
  * offsets).
  */
 static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-grouped_topk_sigmoid(
+grouped_topk_scoring(
     const Tensor& hidden_states,
     const Tensor& gating_output,
     const int64_t n_topk,
@@ -1415,6 +1476,19 @@ grouped_topk_sigmoid(
   int n_tokens = shape[0];
   int n_experts = shape[1];
 
+  GroupedTopKImpl::ScoringFunc scoring_mode;
+  if (scoring_func == "sigmoid") {
+    scoring_mode = GroupedTopKImpl::ScoringFunc::Sigmoid;
+  } else if (scoring_func == "softmax") {
+    scoring_mode = GroupedTopKImpl::ScoringFunc::Softmax;
+  } else {
+    TORCH_CHECK(
+        false,
+        "Unsupported scoring function: ",
+        scoring_func,
+        ". Supported functions are: sigmoid, softmax, add_bias");
+  }
+
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
@@ -1428,7 +1502,7 @@ grouped_topk_sigmoid(
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
   if (gating_output.scalar_type() == at::kBFloat16) {
     using scalar_t = sycl::ext::oneapi::bfloat16;
-    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1443,10 +1517,12 @@ grouped_topk_sigmoid(
         n_expert_group,
         n_topk,
         n_topk_group,
-        sorted);
+        sorted,
+        renormalize,
+        scoring_mode);
   } else if (gating_output.scalar_type() == at::kHalf) {
     using scalar_t = sycl::half;
-    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1461,10 +1537,12 @@ grouped_topk_sigmoid(
         n_expert_group,
         n_topk,
         n_topk_group,
-        sorted);
+        sorted,
+        renormalize,
+        scoring_mode);
   } else {
     using scalar_t = float;
-    GroupedTopKImpl::fused_grouped_topk_sigmoid<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1479,7 +1557,9 @@ grouped_topk_sigmoid(
         n_expert_group,
         n_topk,
         n_topk_group,
-        sorted);
+        sorted,
+        renormalize,
+        scoring_mode);
   }
   return std::make_tuple(topk_weights, topk_indices, rows_for_experts, offsets);
 }
@@ -1641,7 +1721,7 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("topk_softmax.moe", at::AtenIpexTypeXPU::topk_softmax);
   IPEX_OP_REGISTER(
-      "grouped_topk_sigmoid.moe", at::AtenIpexTypeXPU::grouped_topk_sigmoid);
+      "grouped_topk_scoring.moe", at::AtenIpexTypeXPU::grouped_topk_scoring);
   IPEX_OP_REGISTER("moe_scatter.moe", at::AtenIpexTypeXPU::moe_scatter);
   IPEX_OP_REGISTER("moe_gather.moe", at::AtenIpexTypeXPU::moe_gather);
 }

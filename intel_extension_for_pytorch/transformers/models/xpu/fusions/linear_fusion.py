@@ -176,7 +176,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         topk_group: Optional[int] = None,
         num_expert_group: Optional[int] = None,
         custom_routing_function: Optional[Callable] = None,
-        scoring_func: Optional[str] = None,
+        scoring_func: Optional[str] = "sigmoid",
         e_score_correction_bias: Optional[
             torch.Tensor
         ] = None,  # todo, last three arguments not implement here. tmply added for frontend alignment with CPU
@@ -197,14 +197,14 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         # --------- fusion:  grouped topk sigmoid  -------------------
         elif use_grouped_topk:
             routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-                torch.ops.torch_ipex.grouped_topk_sigmoid(
+                torch.ops.torch_ipex.grouped_topk_scoring(
                     hidden_states,
                     router_logits,
                     top_k,
-                    False,
+                    False, # renormalize will be handled in moe_gather
                     num_expert_group,
                     topk_group,
-                    "sigmoid",
+                    scoring_func,
                     e_score_correction_bias,
                     True,
                 )
