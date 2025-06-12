@@ -690,15 +690,15 @@ def meta_masked_multihead_self_attention(
         ),
     )
     attn_weights = None
-    key_cache_out = query.new_empty(
-        (key_cache.shape[0], key_cache.shape[1], key.shape[2], key.shape[3])
-    )
-    value_cache_out = query.new_empty(
-        (value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3])
-    )
     ctx = torch._custom_ops.get_ctx()
     num_to_keep = ctx.new_dynamic_size()
-    beam_idx_out = query.new_empty((num_to_keep, beam_idx.shape[1]))
+    key_cache_out = query.new_empty(
+        (num_to_keep, beam_idx.shape[1], key.shape[2], key.shape[3])
+    )
+    value_cache_out = query.new_empty(
+        (num_to_keep, beam_idx.shape[1], value.shape[2], value.shape[3])
+    )
+    beam_idx_out = query.new_empty((num_to_keep + 2, beam_idx.shape[1]))
     return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
 
 

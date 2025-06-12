@@ -515,6 +515,7 @@ class MaskedMHATest(TestCase):
 
             if torchcompile:
                 torch._dynamo.reset()
+                torch._dynamo.config.capture_dynamic_output_shape_ops = True
                 ipex._set_compiler_backend("inductor")
                 mha = torch.compile(mha, backend="ipex")
 
