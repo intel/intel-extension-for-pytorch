@@ -12,6 +12,8 @@ DTYPE_BITS_MAPPING = {
     "int4_fullrange": 4,
     "int4_clip": 4,
     "int8": 8,
+    "fp8_e5m2": 8,
+    "fp8_e4m3fn": 8,
 }
 
 
@@ -315,12 +317,16 @@ class WeightOnlyQuantizedLinear(nn.Module):
             torch.int16,
             torch.int32,
             torch.int64,
+            torch.float8_e5m2,
+            torch.float8_e4m3fn,
         ], "Only support torch.int8|16|32|64 as compressed dtype."
         dtype_bits_mapping = {
             torch.int8: 8,
             torch.int16: 16,
             torch.int32: 32,
             torch.int64: 64,
+            torch.float8_e5m2: 8,
+            torch.float8_e4m3fn: 8,
         }
         self.bits = DTYPE_BITS_MAPPING[weight_dtype]
         self.compress_bits = dtype_bits_mapping[compression_dtype]
@@ -369,9 +375,13 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.scales.data = self.scales.contiguous().to(torch.float16)
         if self.bias is not None:
             self.bias.data = self.bias.contiguous().to(torch.float16)
-        if self.scheme == "sym" and self.quant_method == 0:
+        if (
+            self.scheme == "sym"
+            and self.quant_method == 0
+            and self.weight_dtype == "int4_fullrange"
+        ):
             self.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
-        elif self.quant_method == 0:
+        elif self.quant_method == 0 and self.weight_dtype == "int4_fullrange":
             self.qzeros += 0x11111111
 
     @classmethod
@@ -387,7 +397,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size: int = -1,
         g_idx: Optional[torch.Tensor] = None,
         quant_method=0,  # QuantMethod(GPTQ_GEMM)
-        dtype=0,  # QUantDtype(INT4)
+        dtype=0,  # QuantDtype(INT4)
         **kwargs
     ):
         r"""Create a weight-only quantized module from weight
@@ -415,7 +425,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
         assert (
             dtype == QuantDtype.INT4
-        ), "IPEX only support INT4 as quantization data type for now."
+            or dtype == QuantDtype.FP8_E5M2
+            or dtype == QuantDtype.FP8_E4M3FN
+        ), "IPEX only support INT4 FP8_E5M2 FP8_E4M3FN as quantization data type for now."
         assert quant_method in [
             QuantMethod.GPTQ_GEMM,
             QuantMethod.AWQ_GEMM,
@@ -430,14 +442,22 @@ class WeightOnlyQuantizedLinear(nn.Module):
             scheme = "asym"
             compression_dim = 0
             compression_dtype = torch.int32
+        if dtype == QuantDtype.FP8_E5M2:
+            compression_dtype = torch.float8_e5m2
+        elif dtype == QuantDtype.FP8_E4M3FN:
+            compression_dtype = torch.float8_e4m3fn
         cls_inst = WeightOnlyQuantizedLinear(
             in_features=in_feature,
             out_features=out_feature,
             bias=True if bias is not None else False,
             compute_dtype="fp32",
             compress_statistics=True,
-            weight_dtype="int4_fullrange",
-            scale_dtype="fp16",
+            weight_dtype=(
+                "int4_fullrange"
+                if dtype == QuantDtype.INT4
+                else "fp8_e5m2" if dtype == QuantDtype.FP8_E5M2 else "fp8_e4m3fn"
+            ),
+            scale_dtype="fp16" if scales.dtype == torch.float16 else "fp32",
             blocksize=group_size,
             scheme=scheme,
             double_quant_scale_dtype=None,
@@ -471,7 +491,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             cls_inst.qweight.data.copy_(qweight_new)
             cls_inst.qzeros.data.copy_(qzeros_new)
 
-        if not cls_inst.weight_transposed:
+        if not cls_inst.weight_transposed and dtype == QuantDtype.INT4:
             if xpu_gemm_use_xetla():
                 # Transpose the weight/scale/zp to xetla format
                 cls_inst.transpose_xetla_woq_format()
@@ -483,12 +503,16 @@ class WeightOnlyQuantizedLinear(nn.Module):
             cls_inst.weight_transposed = True
             cls_inst.use_optimum_format = False
 
+        if dtype == QuantDtype.FP8_E5M2 or dtype == QuantDtype.FP8_E4M3FN:
+            if qweight.shape[0] != in_feature:
+                cls_inst.weight_transposed = True
+
         return cls_inst
 
-    def forward(self, input: Tensor) -> Tensor:
+    def forward(self, input: Tensor, bias: Optional[torch.Tensor] = None) -> Tensor:
         if self.compute_dtype == "fp16":
             input = input.to(convert_dtype_str2torch(self.compute_dtype))
-        if not self.weight_transposed:
+        if not self.weight_transposed and self.weight_dtype == "int4_fullrange":
             if xpu_gemm_use_xetla():
                 # Transpose the weight/scale/zp to xetla format
                 self.transpose_xetla_woq_format()
@@ -500,44 +524,53 @@ class WeightOnlyQuantizedLinear(nn.Module):
             self.weight_transposed = True
             self.use_optimum_format = False
 
-        if xpu_gemm_use_xetla():
-            # TODO input.shape[1] > 1 seems not work on gidx scenario, need to fix this bug
-            if input.dim() == 3:
-                m = input.size(1)
+        if self.weight_dtype == "int4_fullrange":
+            if xpu_gemm_use_xetla():
+                # TODO input.shape[1] > 1 seems not work on gidx scenario, need to fix this bug
+                if input.dim() == 3:
+                    m = input.size(1)
+                else:
+                    m = input.size(0)
+                if m > 1:
+                    return dequant_gemm_block(input, self)
+                return torch.ops.torch_ipex.mm_low_bits(
+                    input,
+                    self.qweight,
+                    self.scales,
+                    self.qzeros,
+                    self.bias,
+                    self.bias is not None,
+                    self.compute_dtype,
+                    self.weight_dtype,
+                    self.blocksize,
+                    self.g_idx,
+                )
+            elif self.bias is not None:
+                return torch.ops.torch_ipex.mm_bias_int4(
+                    input,
+                    self.qweight,
+                    self.bias,
+                    self.scales,
+                    self.qzeros,
+                    self.blocksize,
+                    self.g_idx,
+                )
             else:
-                m = input.size(0)
-            if m > 1:
-                return dequant_gemm_block(input, self)
-            return torch.ops.torch_ipex.mm_low_bits(
-                input,
-                self.qweight,
-                self.scales,
-                self.qzeros,
-                self.bias,
-                self.bias is not None,
-                self.compute_dtype,
-                self.weight_dtype,
-                self.blocksize,
-                self.g_idx,
-            )
-        elif self.bias is not None:
-            return torch.ops.torch_ipex.mm_bias_int4(
-                input,
-                self.qweight,
-                self.bias,
-                self.scales,
-                self.qzeros,
-                self.blocksize,
-                self.g_idx,
-            )
+                return torch.ops.torch_ipex.mm_int4(
+                    input,
+                    self.qweight,
+                    self.scales,
+                    self.qzeros,
+                    self.blocksize,
+                    self.g_idx,
+                )
         else:
-            return torch.ops.torch_ipex.mm_int4(
+            return torch.ops.torch_ipex.fp8_gemm_w8a16(
                 input,
                 self.qweight,
+                self.weight_transposed,
                 self.scales,
-                self.qzeros,
-                self.blocksize,
-                self.g_idx,
+                bias,
             )
 
     def set_weights_bias(self, weight_data, bias=None, update_g_idx=True):
@@ -678,3 +711,59 @@ def dequant_gemm_block_with_params(
     if bias is not None:
         output += bias
     return output
+
+
+class FP8ScaledQuant:
+    @classmethod
+    def scaled_fp8_quant(
+        cls,
+        input: torch.Tensor,
+        out_dtype: torch.dtype,
+        scale: Optional[torch.Tensor] = None,
+        num_token_padding: Optional[int] = None,
+        scale_ub: Optional[torch.Tensor] = None,
+        use_per_token_if_dynamic: bool = False,
+    ):
+        """
+        Quantize input tensor to FP8 and return quantized tensor and scale.
+
+        This function supports both static and dynamic quantization: If you
+        provide the scale, it will use static scaling and if you omit it,
+        the scale will be determined dynamically. The function also allows
+        optional padding of the output tensors for downstream kernels that
+        will benefit from padding.
+
+        Args:
+            input: The input tensor to be quantized to FP8
+            scale: Optional scaling factor for the FP8 quantization
+            scale_ub: Optional upper bound for scaling factor in dynamic
+                per token case
+            num_token_padding: If specified, pad the first dimension
+                of the output to at least this value.
+            use_per_token_if_dynamic: Whether to do per_tensor or per_token
+                in the dynamic quantization case.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: The output tensor in FP8 and
+                scaling factor.
+        """
+        # This code assumes batch_dim and num_tokens are flattened
+        assert input.ndim == 2
+        shape: Union[tuple[int, int], torch.Size] = input.shape
+        if num_token_padding:
+            shape = (max(num_token_padding, input.shape[0]), shape[1])
+        output = torch.empty(shape, device=input.device, dtype=out_dtype)
+
+        if scale is None:
+            if use_per_token_if_dynamic:
+                # TODO: add per-token support
+                pass
+            else:
+                scale = torch.zeros(1, device=input.device, dtype=torch.float32)
+                torch.ops.torch_ipex.dynamic_scaled_fp8_quant(output, input, scale)
+        else:
+            # num_token_padding not implemented for this case
+            assert scale.numel() == 1 or num_token_padding is None
+            torch.ops.torch_ipex.static_scaled_fp8_quant(output, input, scale)
+
+        return output, scale

@@ -78,6 +78,101 @@ T1 concat(const T1& t1, const T2& t2, const Ts&... ts) {
 
 namespace dnnl {
 
+enum class joint_dtypes_t {
+  f32 = 0,
+  f16,
+  bf16,
+  int8,
+  f16_int4,
+  bf16_int4,
+  f16_f8_e5m2,
+  bf16_f8_e5m2,
+  f16_f8_e4m3,
+  bf16_f8_e4m3,
+};
+
+enum class trans_type_t { nn = 0, nt, tn, tt };
+
+enum class bias_type_t { none = 0, scalar, m, n, mn };
+
+template <joint_dtypes_t Ts>
+struct onednn_types_mapper;
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::f16_int4> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::f16, dnnl::memory::data_type::u4);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::bf16_int4> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::bf16, dnnl::memory::data_type::u4);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::f16_f8_e5m2> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::f16, dnnl::memory::data_type::f8_e5m2);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::bf16_f8_e5m2> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::bf16, dnnl::memory::data_type::f8_e5m2);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::f16_f8_e4m3> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::f16, dnnl::memory::data_type::f8_e4m3);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::bf16_f8_e4m3> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::bf16, dnnl::memory::data_type::f8_e4m3);
+  }
+};
+
+// TODO: bias types maybe not right
+static inline dnnl::memory::dims get_bias_type(
+    bias_type_t b_dims,
+    const int m,
+    const int n) {
+  switch (b_dims) {
+    case bias_type_t::none:
+      return {0};
+    case bias_type_t::scalar:
+      return {1, 1};
+    case bias_type_t::m:
+      return {m, 1};
+    case bias_type_t::n:
+      return {1, n};
+    case bias_type_t::mn:
+      return {m, n};
+    default:
+      throw std::runtime_error("unsupported bias type ...");
+  }
+}
+
 static constexpr int cache_capacity = 512;
 
 class primitive_ext : public primitive {
@@ -353,10 +448,274 @@ class primitive_ext : public primitive {
   dnnl_exec_arg_t c_args[max_args];
 };
 
+template <trans_type_t Tt>
+static inline void get_strides(
+    memory::dims& src_strides,
+    memory::dims& wei_strides,
+    memory::dims& dst_strides,
+    const int64_t lda,
+    const int64_t ldb,
+    const int64_t ldc) {}
+
+template <>
+static inline void get_strides<trans_type_t::nt>(
+    memory::dims& src_strides,
+    memory::dims& wei_strides,
+    memory::dims& dst_strides,
+    const int64_t lda,
+    const int64_t ldb,
+    const int64_t ldc) {
+  src_strides = {lda, 1};
+  wei_strides = {1, ldb};
+  dst_strides = {ldc, 1};
+}
+
+template <>
+static inline void get_strides<trans_type_t::nn>(
+    memory::dims& src_strides,
+    memory::dims& wei_strides,
+    memory::dims& dst_strides,
+    const int64_t lda,
+    const int64_t ldb,
+    const int64_t ldc) {
+  src_strides = {lda, 1};
+  wei_strides = {ldb, 1};
+  dst_strides = {ldc, 1};
+}
+
 using primitive_cache = lru_cache<memory::dims, primitive_ext>;
 
+template <trans_type_t Tt, joint_dtypes_t Ts, typename F>
+struct matmul_primitive_cache_t {
+  static inline primitive_ext& get(
+      const int m,
+      const int n,
+      const int k,
+      const int64_t lda,
+      const int64_t ldb,
+      const int64_t ldc,
+      const bias_type_t
+          b_dims, // for shapeless bias, not put it into template parameter
+      const int device_id,
+      F f_attr,
+      const int scale_group_size,
+      const int zp_group_size) {
+    auto& cached = get_cache(device_id);
+    memory::dims src_strides, wei_strides, dst_strides;
+    get_strides<Tt>(src_strides, wei_strides, dst_strides, lda, ldb, ldc);
+    auto pri_key = torch_ipex::xpu::oneDNN::concat(
+        src_strides,
+        wei_strides,
+        m,
+        n,
+        k,
+        int(b_dims),
+        scale_group_size,
+        zp_group_size);
+    auto iter = cached.find(pri_key);
+    if (iter == cached.end()) {
+      auto [src_dt, wei_dt] = onednn_types_mapper<Ts>::get();
+
+      auto src_md = memory::desc({m, k}, src_dt, src_strides);
+      auto wei_md = memory::desc({k, n}, wei_dt, wei_strides);
+      // TODO: dst data type is not same as src data type?
+      auto dst_md = memory::desc({m, n}, src_dt, dst_strides);
+      auto bias_format = b_dims == bias_type_t::none
+          ? dnnl::memory::format_tag::undef
+          : dnnl::memory::format_tag::ab;
+      auto bias_md = memory::desc(
+          get_bias_type(b_dims, m, n), src_dt, bias_format); // {m, n} or {1, n}
+
+      primitive_attr pattr;
+      f_attr(pattr);
+
+      dnnl::matmul::primitive_desc matmul_pd;
+      at::Device curDevice = at::Device(at::kXPU, device_id);
+      auto aengine = GpuEngineManager::Instance().get_engine(curDevice);
+      if (b_dims == bias_type_t::none) {
+        matmul_pd = dnnl::matmul::primitive_desc(
+            aengine, src_md, wei_md, dst_md, pattr);
+      } else {
+        matmul_pd = dnnl::matmul::primitive_desc(
+            aengine, src_md, wei_md, bias_md, dst_md, pattr);
+      }
+
+      return cached.insert({pri_key, primitive_ext(dnnl::matmul(matmul_pd))})
+          .first->second;
+    } else {
+      return iter->second;
+    }
+  }
+
+ private:
+  static constexpr int max_cache_capacity = 512;
+  // if default constructor of primitive cache could read the environment
+  // variable then it'll save a lot of trouble
+  static inline thread_local std::array<primitive_cache, 16> mappings;
+
+  // this won't be needed if primitive_cache have good default constructor
+  static inline primitive_cache& get_cache(const int device_id) {
+    auto& mapping = mappings[device_id];
+    if (mapping.max_size() == 0) {
+      mapping.resize(max_cache_capacity);
+    }
+    return mapping;
+  }
+};
+
+template <joint_dtypes_t Ts, typename F>
+static inline primitive_ext& matmul_primitive_create_and_cache(
+    const trans_type_t Tt,
+    const bias_type_t b_dims,
+    const int m,
+    const int n,
+    const int k,
+    const int64_t lda,
+    const int64_t ldb,
+    const int64_t ldc,
+    const int device_id,
+    F attr,
+    const int scale_group_size,
+    const int zp_group_size) {
+  switch (Tt) {
+    case trans_type_t::nt:
+      return matmul_primitive_cache_t<trans_type_t::nt, Ts, F>::get(
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          b_dims,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case trans_type_t::nn:
+      return matmul_primitive_cache_t<trans_type_t::nn, Ts, F>::get(
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          b_dims,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    default:
+      throw std::runtime_error("unsupported trans type ...");
+  }
+}
+
 template <typename F>
-static inline primitive_ext& dnnlMatmulCreatePrimitive(
+static inline primitive_ext& matmul_primitive_create_and_cache(
+    const joint_dtypes_t Ts,
+    const trans_type_t Tt,
+    const bias_type_t b_dims,
+    const int m,
+    const int n,
+    const int k,
+    const int64_t lda,
+    const int64_t ldb, // is weight ldb necessary?
+    const int64_t ldc,
+    const int device_id,
+    F attr,
+    const int scale_group_size = 1,
+    const int zp_group_size = 1) {
+  switch (Ts) {
+    case joint_dtypes_t::f16_int4:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::f16_int4, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::bf16_int4:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_int4, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::f16_f8_e5m2:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::f16_f8_e5m2, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::bf16_f8_e5m2:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_f8_e5m2, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::f16_f8_e4m3:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::f16_f8_e4m3, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::bf16_f8_e4m3:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_f8_e4m3, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    default:
+      throw std::runtime_error("Only support int4 and fp8 gemm ...");
+  }
+}
+
+template <typename F>
+static inline primitive_ext& matmul_primitive_create_and_cache(
     const Tensor& src,
     const Tensor& wei,
     const c10::optional<Tensor>& bias,

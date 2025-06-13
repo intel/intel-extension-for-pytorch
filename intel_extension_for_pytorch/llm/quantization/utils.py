@@ -8,3 +8,5 @@ class QuantMethod(IntEnum):
 
 class QuantDtype(IntEnum):
     INT4 = 0
+    FP8_E5M2 = 1
+    FP8_E4M3FN = 2

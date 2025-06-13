@@ -43,7 +43,7 @@ class IPEXWeightOnlyQuantizedLinear(nn.Module):
         Args:
             qweight (Tensor): tensor in int32 dtype and contains actually int4 data
             scales (Tensor): scales for qweight
-            zero_points (Tensor): zero points for qweight
+            zero_points (Tensor): zero points for qweight. FP8 does not need zero points.
             in_features (int): size of each input sample
             out_features (int): size of each output sample
             qconfig (object): Defining the IPEX quantization recipe for Weight only quantization.
@@ -77,5 +77,5 @@ class IPEXWeightOnlyQuantizedLinear(nn.Module):
         )
         return cls(woq_linear_impl)
 
-    def forward(self, x, **kwargs):
-        return self.woq_linear_impl(x, **kwargs)
+    def forward(self, x, bias: Optional[torch.Tensor] = None, **kwargs):
+        return self.woq_linear_impl(x, bias, **kwargs)

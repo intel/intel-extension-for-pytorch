@@ -12,6 +12,7 @@
 import torch
 import pytest
 import intel_extension_for_pytorch as ipex  # noqa
+from intel_extension_for_pytorch.llm.quantization.utils import QuantDtype
 
 
 @pytest.mark.parametrize("fp8_dtype", [torch.float8_e4m3fn, torch.float8_e5m2])
@@ -59,3 +60,50 @@ def test_fp8_linear_v2(fp8_dtype, dtype, is_input_fp8, is_bias):
     )
 
     torch.testing.assert_close(output_fp8, output_ref, atol=1e-2, rtol=1e-2)
+
+
+@pytest.mark.parametrize("fp8_dtype", [torch.float8_e4m3fn, torch.float8_e5m2])
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+@pytest.mark.parametrize("is_bias", [True, False])
+def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias):
+    seed = 1234
+    torch.manual_seed(seed)
+
+    input = torch.randn([8, 2], dtype=dtype, device=torch.device("xpu")) / 10.0
+    weight = torch.rand([3, 2], dtype=dtype).xpu() / 10.0
+    gemm_ref = torch.nn.Linear(2, 3, bias=is_bias).xpu().to(dtype)
+
+    scale_wei = (torch.ones(1) * 4).xpu()
+    scale_wei_inv = torch.tensor([0.25]).xpu()
+    scale_shape = None
+
+    weight_fp8, _ = torch.ops.torch_ipex.cast_to_fp8(
+        weight, scale_wei, False, False, fp8_dtype, scale_shape
+    )
+
+    weight_dequant = torch.ops.torch_ipex.cast_from_fp8(
+        weight_fp8, scale_wei_inv, dtype
+    )
+    gemm_ref.weight.data = weight_dequant
+    output_ref = gemm_ref(input)
+
+    fp8_linear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
+        weight_fp8,
+        scale_wei_inv,
+        torch.Tensor(),
+        in_features=weight.shape[1],
+        out_features=weight.shape[0],
+        dtype=(
+            QuantDtype.FP8_E5M2
+            if fp8_dtype == torch.float8_e5m2
+            else QuantDtype.FP8_E4M3FN
+        ),
+    )
+
+    output_fp8 = fp8_linear(input, gemm_ref.bias.data.clone() if is_bias else None)
+
+    torch.testing.assert_close(output_fp8, output_ref, atol=1e-2, rtol=1e-2)
+
+
+if __name__ == "__main__":
+    test_fp8_linear_w8a16(torch.float8_e5m2, torch.float16, True)

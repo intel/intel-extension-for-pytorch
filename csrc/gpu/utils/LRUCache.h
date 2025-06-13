@@ -73,6 +73,7 @@ class lru_cache {
   using size_type = typename std::list<node_t>::size_type;
 
   lru_cache(size_type capacity) : capacity_(capacity) {}
+  lru_cache() : capacity_(0) {}
 
   size_type size() const {
     return map_.size();

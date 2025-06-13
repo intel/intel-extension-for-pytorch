@@ -20,6 +20,7 @@
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
 
+#include <oneDNN/DnnlMatmulQuant.h>
 #include <oneDNN/FP8_Matmul.h>
 #include <quantized/QUtils.h>
 #include <runtime/Utils.h>
@@ -109,6 +110,51 @@ Tensor fp8_gemm_v2(
   return result;
 }
 
+Tensor fp8_gemm_w8a16(
+    const Tensor& A,
+    const Tensor& B,
+    bool trans_B,
+    const c10::optional<Tensor>& B_scale_,
+    const c10::optional<Tensor>& bias_) {
+  std::vector<int64_t> result_shape;
+  if (A.dim() == 2) {
+    if (trans_B) {
+      B.transpose_(0, 1);
+    }
+    result_shape = {A.size(0), B.size(1)};
+    // src{m, k}, wei{k, n}, bias{n}, dst{m, n}
+  } else if (A.dim() == 3) {
+    if (B.dim() == 2) {
+      if (trans_B) {
+        B.transpose_(0, 1);
+      }
+      result_shape = {A.size(0), A.size(1), B.size(1)};
+      // src{b, m, k}, wei{k, n}, bias{n}, dst{b, m, n}
+    } else {
+      TORCH_CHECK(false, "fp8_gemm only support 2D weight\n");
+    }
+  } else {
+    TORCH_CHECK(false, "linear only support for 2D and 3D tensors!\n");
+  }
+
+  at::Tensor result = at::empty(result_shape, A.options());
+
+  at::Tensor B_scale = B_scale_.has_value()
+      ? B_scale_.value()
+      : at::ones({1}, B.options().dtype(A.dtype()));
+
+#ifdef USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
+      result, A, B, !B.is_contiguous(), bias_, B_scale);
+#else
+  TORCH_CHECK(
+      false,
+      "fp8_gemm_w8a16 is not supported without USE_PRIMITIVE_CACHE, please enable it by set USE_PRIMITIVE_CACHE=1 when compiling IPEX. \n");
+#endif // USE_PRIMITIVE_CACHE
+
+  return result;
+}
+
 Tensor fp8_gemm_backward(
     const Tensor& m1 /*grad_out*/,
     int64_t m1_format,
@@ -157,6 +203,10 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm.Tensor",
       at::AtenIpexTypeXPU::fp8_gemm_v2,
+      c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "fp8_gemm_w8a16.xpu",
+      at::AtenIpexTypeXPU::fp8_gemm_w8a16,
       c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm_backward.xpu",
