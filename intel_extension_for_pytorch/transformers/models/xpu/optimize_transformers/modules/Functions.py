@@ -2115,6 +2115,7 @@ def ipex_disable_attn_mask_prepare(model):
             transformers.models.opt.modeling_opt.OPTForCausalLM: "OPTModel",
             transformers.models.glm.modeling_glm.GlmForCausalLM: "GlmModel",
             transformers.models.mistral.modeling_mistral.MistralForCausalLM: "MistralModel",
+            transformers.models.falcon.modeling_falcon.FalconForCausalLM: "FalconModel",
         }
         model_list.update(model_list_new)
 
@@ -2151,6 +2152,7 @@ def ipex_disable_rotary_emb(model):
         transformers.models.opt.modeling_opt.OPTModel,
         transformers.models.phi3.modeling_phi3.Phi3Model,
         transformers.models.qwen2.modeling_qwen2.Qwen2Model,
+        transformers.models.falcon.modeling_falcon.FalconModel,
     }
     if type(model) in model_list and hasattr(model, "rotary_emb"):
         model.rotary_emb = IPEXRotaryEmbedding()
