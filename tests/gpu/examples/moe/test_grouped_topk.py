@@ -7,7 +7,7 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod:
-    def ref_grouped_topk_sigmoid(
+    def ref_grouped_topk_scoring(
         self,
         gating_output,
         topk,
@@ -72,9 +72,10 @@ class TestTorchMethod:
     @pytest.mark.parametrize("n_topk", [4, 6, 8])
     @pytest.mark.parametrize("n_topk_group", [4, 6, 8])
     @pytest.mark.parametrize("n_expert_group", [8])
-    @pytest.mark.parametrize("renormalize", [True])
+    @pytest.mark.parametrize("renormalize", [True, False])
     @pytest.mark.parametrize("sorted", [True, False])
-    def test_grouped_topk_sigmoid(
+    @pytest.mark.parametrize("scoring_func", ["sigmoid", "softmax"])
+    def test_grouped_topk_scoring(
         self,
         seed,
         dtype,
@@ -85,6 +86,7 @@ class TestTorchMethod:
         n_topk_group,
         renormalize,
         sorted,
+        scoring_func,
     ):
 
         torch.manual_seed(seed)
@@ -93,19 +95,25 @@ class TestTorchMethod:
         bias = torch.randn(n_expert, device=dpcpp_device).to(dtype)
 
         ref_topk_weights, ref_topk_indices, ref_token_for_experts = (
-            self.ref_grouped_topk_sigmoid(
-                gating_output, n_topk, renormalize, n_expert_group, n_topk_group, bias
+            self.ref_grouped_topk_scoring(
+                gating_output,
+                n_topk,
+                renormalize,
+                n_expert_group,
+                n_topk_group,
+                bias,
+                scoring_func,
             )
         )
         topk_weights, topk_indices, token_for_experts, _ = (
-            torch.ops.torch_ipex.grouped_topk_sigmoid(
+            torch.ops.torch_ipex.grouped_topk_scoring(
                 hidden_states,
                 gating_output,
                 n_topk,
                 renormalize,
                 n_expert_group,
                 n_topk_group,
-                "sigmoid",
+                scoring_func,
                 bias,
                 sorted,
             )
@@ -154,7 +162,7 @@ class TestTorchMethod:
             gating_output[0][0] = float("nan")
 
         topk_weights, topk_indices, token_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.grouped_topk_sigmoid(
+            torch.ops.torch_ipex.grouped_topk_scoring(
                 hidden_states,
                 gating_output,
                 n_topk,
