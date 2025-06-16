@@ -48,13 +48,6 @@ fi
 
 cd ${BASEFOLDER}/../${MODE}
 if [ ${MODE} == "inference" ]; then
-    ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
-    if [ ! -d ${ONECCL_PATH} ]; then
-        echo "Warning: oneCCL is not available."
-    else
-        source ${ONECCL_PATH}/env/setvars.sh
-    fi
-
     cd ..
     if [ ! -d jdk-22.0.2 ]; then
         wget https://download.java.net/java/GA/jdk22.0.2/c9ecb94cd31b495da20a27d4581645e8/9/GPL/openjdk-22.0.2_linux-x64_bin.tar.gz

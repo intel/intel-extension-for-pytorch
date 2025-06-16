@@ -5,14 +5,13 @@ set -e
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 WHEELFOLDER=${BASEFOLDER}/../wheels
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
-CCLFOLDER=${BASEFOLDER}/../oneCCL_release
 cd ${BASEFOLDER}/..
 
 # Mode: Select to compile projects into wheel files or install wheel files compiled.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
 #           | | | | | | | └- Install wheel files
 #           | | | | | | └--- Compile wheel files
-#           | | | | | └----- Install from prebuilt wheel files for ipex, torch-ccl, ds
+#           | | | | | └----- Install from prebuilt wheel files for ipex
 #           | | | | └------- Compile DeepSpeed from source
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
@@ -26,8 +25,7 @@ if [ $# -gt 0 ]; then
         MODE=$1
     fi
 fi
-if [ ! -f ${WHEELFOLDER}/lm_eval*.whl ] ||
-   [ ! -d ${CCLFOLDER} ]; then
+if [ ! -f ${WHEELFOLDER}/lm_eval*.whl ]; then
     (( MODE |= 0x02 ))
 fi
 
@@ -47,7 +45,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     COMMIT_LM_EVA=$(python tools/dep_ver_utils.py -f dependency_version.json -k lm-evaluation-harness:commit)
     COMMIT_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:commit)
     VER_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:version)
-    VER_TORCHCCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k torch-ccl:version)
     VER_GCC=$(python tools/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
     VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
     VER_TRANSFORMERS=$(python tools/dep_ver_utils.py -f dependency_version.json -k transformers:version)
@@ -70,9 +67,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf ${WHEELFOLDER}
     fi
     mkdir ${WHEELFOLDER}
-    if [ -d ${CCLFOLDER} ]; then
-        rm -rf ${CCLFOLDER}
-    fi
 
     # Install deps
     python -m pip install cmake==3.28.4 ninja
@@ -89,9 +83,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             exit 4
         else
             echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
+            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
             python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+            python -m pip install intel-extension-for-pytorch==${VER_IPEX} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
         fi
     else
         function ver_compare() {

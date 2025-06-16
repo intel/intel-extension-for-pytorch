@@ -61,10 +61,7 @@ RUN . ~/miniforge3/bin/activate && conda create -y -n py310 python=3.10 && conda
     cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     cd ./llm && \
     bash tools/env_setup.sh 9 && \
-    python -m pip cache purge && \
-    mv ./oneCCL_release /opt/oneCCL && \
-    chown -R root:root /opt/oneCCL && \
-    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh
+    python -m pip cache purge
 ARG PORT_SSH=22
 RUN mkdir /var/run/sshd && \
     sed -i "s/#Port.*/Port ${PORT_SSH}/" /etc/ssh/sshd_config && \
@@ -79,7 +76,6 @@ RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
     echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
     echo "conda activate py310" >> ${ENTRYPOINT} && \
     echo "TMP=\$(python -c \"import torch; import os; print(os.path.abspath(os.path.dirname(torch.__file__)))\")" >> ${ENTRYPOINT} && \
-    echo ". \${TMP}/../oneccl_bindings_for_pytorch/env/setvars.sh" >> ${ENTRYPOINT} && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ${ENTRYPOINT} && \
     echo "\"\${CMDS[@]}\"" >> ${ENTRYPOINT} && \
     chmod +x ${ENTRYPOINT}
