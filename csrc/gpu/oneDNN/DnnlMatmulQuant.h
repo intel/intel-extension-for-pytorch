@@ -70,6 +70,11 @@ static at::Tensor dnnl_matmul_w4a16_common(
   // For GPTQ with desc_act=True scenario
   auto mat1 = g_idx.has_value() ? mat1_.index_select(-1, g_idx.value()) : mat1_;
 
+  // transpose mat2 if mat2's shape is [N, K/8]
+  if (m2_trans) {
+    mat2.transpose_(0, 1);
+  }
+
   auto src_sz = mat1.sizes();
   auto o_sz = mat1.sizes().vec();
   auto b_sz = mat2.sizes();
@@ -117,8 +122,9 @@ static at::Tensor dnnl_matmul_w4a16_common(
     b_type = bias_type_t::none;
   }
 
+  auto mat1_flat = mat1.flatten(0, -2);
   const int64_t ldb = mat2.strides()[mat2.dim() - 1] * 8; // for int4 matmul
-  const int64_t lda = mat1.strides()[mat1.dim() - 2];
+  const int64_t lda = mat1_flat.strides()[mat1_flat.dim() - 2];
   const int64_t ldc = result.strides()[result.dim() - 2];
 
   // only support nt for int4 matmul
@@ -167,7 +173,7 @@ static at::Tensor dnnl_matmul_w4a16_common(
         zp.data_ptr(),
         [&]() {
           int n = mat2.sizes()[1];
-          int k = mat1.sizes()[1];
+          int k = mat1_flat.sizes()[1];
 
           const uint64_t num_groups = (uint64_t)(k / group_size);
           memory zp_B_u4_m(
