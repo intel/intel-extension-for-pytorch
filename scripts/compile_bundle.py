@@ -48,8 +48,8 @@ def _patchelf_so_files(dir,
                        pkg_name,
                        env,
                        show_command):
-    exec_cmds(f'''find {pkg_name} -maxdepth 1 -name "*.so" -exec patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../../' --force-rpath {{}} \;
-                  find {pkg_name}/lib -name "*.so" -exec patchelf --set-rpath '$ORIGIN:$ORIGIN/../../../../' --force-rpath {{}} \;''',
+    exec_cmds(f'''find {pkg_name} -maxdepth 1 -name "*.so" -exec patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../../' --force-rpath {{}} \\;
+                  find {pkg_name}/lib -name "*.so" -exec patchelf --set-rpath '$ORIGIN:$ORIGIN/../../../../' --force-rpath {{}} \\;''',
               shell = True,
               cwd = dir,
               env = env,
