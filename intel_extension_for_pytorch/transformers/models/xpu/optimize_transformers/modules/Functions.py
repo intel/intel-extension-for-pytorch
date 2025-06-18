@@ -2119,6 +2119,12 @@ def ipex_disable_attn_mask_prepare(model):
         }
         model_list.update(model_list_new)
 
+    if version.parse(transformers.__version__) >= version.parse("4.51"):
+        model_list_new = {
+            transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM: "Qwen3Model",
+        }
+        model_list.update(model_list_new)
+
     if type(model) in model_list.keys():
         base_module = type(model).__base__.__module__
         module_spec = importlib.import_module(base_module)
@@ -2152,6 +2158,7 @@ def ipex_disable_rotary_emb(model):
         transformers.models.opt.modeling_opt.OPTModel,
         transformers.models.phi3.modeling_phi3.Phi3Model,
         transformers.models.qwen2.modeling_qwen2.Qwen2Model,
+        transformers.models.qwen3.modeling_qwen3.Qwen3Model,
         transformers.models.falcon.modeling_falcon.FalconModel,
     }
     if type(model) in model_list and hasattr(model, "rotary_emb"):
