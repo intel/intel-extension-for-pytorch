@@ -298,7 +298,7 @@ class RMSNormBackward
 };
 
 template <typename scalar_t, typename mean_t, typename weight_t>
-void RMSNormKernelImplInternal(
+std::tuple<Tensor, Tensor> RMSNormKernelImplInternal(
     const Tensor& X,
     const Tensor& gamma,
     int64_t M,
@@ -341,9 +341,10 @@ void RMSNormKernelImplInternal(
     NormUpdateKernelImpl<scalar_t, mean_t, weight_t, RMSNormForward, true>(
         rms_norm_forward, config, can_use_32bit_index);
   }
+  return std::make_tuple(Y, rstd);
 }
 
-void RMSNormKernelImpl(
+std::tuple<Tensor, Tensor> RMSNormKernelImpl(
     const Tensor& X,
     const Tensor& gamma,
     int64_t M,
@@ -367,6 +368,7 @@ void RMSNormKernelImpl(
               X, gamma, M, N, static_cast<acc_type<scalar_t>>(eps), Y, rstd);
         }
       });
+  return std::make_tuple(Y, rstd);
 }
 
 std::tuple<Tensor, Tensor> rms_norm_fw(
@@ -634,12 +636,23 @@ Tensor rms_norm_impl(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(TORCH_SELECTIVE_SCHEMA(
+      "torch_ipex::rms_norm.xpu(Tensor X, int[] normalized_shape, Tensor W, float epsilon) -> (Tensor _0, Tensor _1)"));
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.impl(
+      TORCH_SELECTIVE_NAME("torch_ipex::rms_norm.xpu"),
+      c10::DispatchKey::XPU,
+      TORCH_FN(at::AtenIpexTypeXPU::rms_norm_fw));
+}
+
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "rms_norm_impl",
       at::AtenIpexTypeXPU::rms_norm_impl,
       c10::DispatchKey::AutogradXPU);
-  IPEX_OP_REGISTER("rms_norm.xpu", at::AtenIpexTypeXPU::rms_norm_fw);
 }
 } // namespace

@@ -87,3 +87,10 @@ def meta_torch_ipex_linear_pointwise_default(
     input_tensor, weight, bias, attr, scalars, algorithm
 ):
     return input_tensor.new_empty((*input_tensor.shape[:-1], weight.shape[0]))
+
+
+@register_meta("rms_norm", "xpu")
+def meta_rms_norm(input, normalized_shape, weight, eps):
+    output = input.new_empty(input.shape)
+    rstd = input.new_empty((input.shape[0],), dtype=input.dtype)
+    return (output, rstd)
