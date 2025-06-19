@@ -19,26 +19,6 @@
   dispatch:
     XPU: geometric_xpu_
 
-- func: max_unpool2d.out(Tensor self, Tensor indices, SymInt[2] output_size, *, Tensor(a!) out) -> Tensor(a!)
-  python_module: nn
-  dispatch:
-    XPU: max_unpooling2d_forward_out_dpcpp
-
-- func: max_unpool2d(Tensor self, Tensor indices, SymInt[2] output_size) -> Tensor
-  python_module: nn
-  dispatch:
-    XPU: max_unpooling2d_forward_dpcpp
-
-- func: max_unpool3d.out(Tensor self, Tensor indices, SymInt[3] output_size, int[3] stride, int[3] padding, *, Tensor(a!) out) -> Tensor(a!)
-  python_module: nn
-  dispatch:
-    XPU: max_unpooling3d_forward_out_dpcpp
-
-- func: max_unpool3d(Tensor self, Tensor indices, SymInt[3] output_size, int[3] stride, int[3] padding) -> Tensor
-  python_module: nn
-  dispatch:
-    XPU: max_unpooling3d_forward_dpcpp
-
 - func: multilabel_margin_loss_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, int reduction, Tensor is_target, *, Tensor(a!) grad_input) -> Tensor(a!)
   python_module: nn
   dispatch:
