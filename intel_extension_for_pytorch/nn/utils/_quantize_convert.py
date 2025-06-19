@@ -3,7 +3,12 @@ import intel_extension_for_pytorch as ipex  # noqa
 import torch.nn as nn
 from torch import Tensor
 from typing import Optional, List
-
+import os
+from intel_extension_for_pytorch.llm.quantization.utils import (
+    XPUWoqActQuantMode,
+    XPU_UNSUPPORTED_ACT_QUANT_MODES,
+    VLLM_ACT_QUANT_MODE_TO_XPU,
+)
 
 DTYPE_BITS_MAPPING = {
     "nf4": 4,
@@ -15,6 +20,15 @@ DTYPE_BITS_MAPPING = {
     "fp8_e5m2": 8,
     "fp8_e4m3fn": 8,
 }
+
+# currently disable W4A8 computation by default
+USE_W4A8_GEMM = os.environ.get("USE_W4A8_COMPUTE", "OFF").upper() in [
+    "1",
+    "Y",
+    "ON",
+    "YES",
+    "TRUE",
+]
 
 
 class GPTQShuffle(nn.Module):
@@ -285,6 +299,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         device=None,
         use_optimum_format=False,
         quant_method=0,  # QuantMethod(GPTQ_GEMM)
+        act_quant_mode=XPUWoqActQuantMode.UNQUANT_A,
     ) -> None:
         super().__init__()
         self.in_features = in_features
@@ -347,6 +362,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.register_buffer("g_idx", None)
         self.force_xetla = False
         self.quant_method = quant_method
+        if act_quant_mode not in XPU_UNSUPPORTED_ACT_QUANT_MODES:
+            self.act_quant_mode = VLLM_ACT_QUANT_MODE_TO_XPU[act_quant_mode]
+        else:
+            # otherwise use per-token asym quantization for activation
+            self.act_quant_mode = XPUWoqActQuantMode.QUANT_A_PER_M
 
     def transpose_xetla_woq_format(self):
         # The xetla int4 GEMM has the following requirements:
@@ -446,6 +466,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
             compression_dtype = torch.float8_e5m2
         elif dtype == QuantDtype.FP8_E4M3FN:
             compression_dtype = torch.float8_e4m3fn
+        act_quant_mode = XPUWoqActQuantMode.UNQUANT_A
+        if qconfig is not None and hasattr(qconfig, "global_qconfig"):
+            if hasattr(qconfig.global_qconfig, "act_quant_mode"):
+                act_quant_mode = qconfig.global_qconfig.act_quant_mode
         cls_inst = WeightOnlyQuantizedLinear(
             in_features=in_feature,
             out_features=out_feature,
@@ -466,6 +490,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             device="xpu",
             use_optimum_format=False,
             quant_method=quant_method,
+            act_quant_mode=act_quant_mode,
         )
 
         if g_idx is not None and quant_method == QuantMethod.GPTQ_GEMM:
@@ -546,24 +571,47 @@ class WeightOnlyQuantizedLinear(nn.Module):
                     self.g_idx,
                 )
             elif self.bias is not None:
-                return torch.ops.torch_ipex.mm_bias_int4(
-                    input,
-                    self.qweight,
-                    self.bias,
-                    self.scales,
-                    self.qzeros,
-                    self.blocksize,
-                    self.g_idx,
-                )
+                if USE_W4A8_GEMM:
+                    return torch.ops.torch_ipex.mm_bias_w4a8(
+                        input,
+                        self.qweight,
+                        self.bias,
+                        self.scales,
+                        self.qzeros,
+                        self.act_quant_mode,
+                        self.blocksize,
+                        self.g_idx,
+                    )
+                else:
+                    return torch.ops.torch_ipex.mm_bias_int4(
+                        input,
+                        self.qweight,
+                        self.bias,
+                        self.scales,
+                        self.qzeros,
+                        self.blocksize,
+                        self.g_idx,
+                    )
             else:
-                return torch.ops.torch_ipex.mm_int4(
-                    input,
-                    self.qweight,
-                    self.scales,
-                    self.qzeros,
-                    self.blocksize,
-                    self.g_idx,
-                )
+                if USE_W4A8_GEMM:
+                    return torch.ops.torch_ipex.mm_w4a8(
+                        input,
+                        self.qweight,
+                        self.scales,
+                        self.qzeros,
+                        self.act_quant_mode,
+                        self.blocksize,
+                        self.g_idx,
+                    )
+                else:
+                    return torch.ops.torch_ipex.mm_int4(
+                        input,
+                        self.qweight,
+                        self.scales,
+                        self.qzeros,
+                        self.blocksize,
+                        self.g_idx,
+                    )
         else:
             return torch.ops.torch_ipex.fp8_gemm_w8a16(
                 input,

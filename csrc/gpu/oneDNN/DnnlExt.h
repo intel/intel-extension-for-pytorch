@@ -85,6 +85,8 @@ enum class joint_dtypes_t {
   int8,
   f16_int4,
   bf16_int4,
+  s8_int4,
+  u8_int4,
   f16_f8_e5m2,
   bf16_f8_e5m2,
   f16_f8_e4m3,
@@ -113,6 +115,24 @@ struct onednn_types_mapper<joint_dtypes_t::bf16_int4> {
   get() {
     return std::make_tuple(
         dnnl::memory::data_type::bf16, dnnl::memory::data_type::u4);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::s8_int4> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::s8, dnnl::memory::data_type::u4);
+  }
+};
+
+template <>
+struct onednn_types_mapper<joint_dtypes_t::u8_int4> {
+  static inline std::tuple<dnnl::memory::data_type, dnnl::memory::data_type>
+  get() {
+    return std::make_tuple(
+        dnnl::memory::data_type::u8, dnnl::memory::data_type::u4);
   }
 };
 
@@ -518,13 +538,19 @@ struct matmul_primitive_cache_t {
 
       auto src_md = memory::desc({m, k}, src_dt, src_strides);
       auto wei_md = memory::desc({k, n}, wei_dt, wei_strides);
-      // TODO: dst data type is not same as src data type?
-      auto dst_md = memory::desc({m, n}, src_dt, dst_strides);
+      // TODO: should decide dst dt in a better way?
+      auto dst_dt =
+          (((src_dt == dnnl::memory::data_type::s8 ||
+             src_dt == dnnl::memory::data_type::u8) &&
+            (wei_dt == dnnl::memory::data_type::u4))
+               ? dnnl::memory::data_type::f16
+               : src_dt);
+      auto dst_md = memory::desc({m, n}, dst_dt, dst_strides);
       auto bias_format = b_dims == bias_type_t::none
           ? dnnl::memory::format_tag::undef
           : dnnl::memory::format_tag::ab;
       auto bias_md = memory::desc(
-          get_bias_type(b_dims, m, n), src_dt, bias_format); // {m, n} or {1, n}
+          get_bias_type(b_dims, m, n), dst_dt, bias_format); // {m, n} or {1, n}
 
       primitive_attr pattr;
       f_attr(pattr);
@@ -641,6 +667,34 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
           zp_group_size);
     case joint_dtypes_t::bf16_int4:
       return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_int4, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::s8_int4:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::s8_int4, F>(
+          Tt,
+          b_dims,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::u8_int4:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::u8_int4, F>(
           Tt,
           b_dims,
           m,

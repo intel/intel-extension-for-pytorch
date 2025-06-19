@@ -1118,6 +1118,209 @@ static Tensor mm_bias_add_int4(
   }
 }
 
+static Tensor mm_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(false, "mm_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+      out,
+      input,
+      weight,
+      std::nullopt,
+      weight_scl,
+      weight_zp,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+static Tensor mm_bias_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias_,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(
+      false, "mm_bias_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+      out,
+      input,
+      weight,
+      bias_,
+      weight_scl,
+      weight_zp,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+static Tensor mm_add_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(
+      false, "mm_add_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_add(
+      out,
+      input,
+      weight,
+      std::nullopt,
+      weight_scl,
+      weight_zp,
+      res,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+static Tensor mm_bias_add_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(
+      false, "mm_bias_add_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_add(
+      out,
+      input,
+      weight,
+      bias,
+      weight_scl,
+      weight_zp,
+      res,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+static Tensor mm_silu_mul_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(
+      false, "mm_silu_mul_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_silu_mul(
+      out,
+      input,
+      weight,
+      std::nullopt,
+      weight_scl,
+      weight_zp,
+      res,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+static Tensor mm_bias_silu_mul_w4a8(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t act_quant_mode,
+    int64_t group_size,
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
+  TORCH_CHECK(
+      act_quant_mode != -1,
+      "Expect per-tensor or per-token quantization for activation but got ",
+      act_quant_mode);
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(
+      false,
+      "mm_bias_silu_mul_w4a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+  torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_silu_mul(
+      out,
+      input,
+      weight,
+      bias,
+      weight_scl,
+      weight_zp,
+      res,
+      group_size,
+      false,
+      g_idx,
+      act_quant_mode);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -1166,6 +1369,15 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
   IPEX_OP_REGISTER(
       "mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
+  IPEX_OP_REGISTER("mm_w4a8.xpu", at::AtenIpexTypeXPU::mm_w4a8);
+  IPEX_OP_REGISTER("mm_bias_w4a8.xpu", at::AtenIpexTypeXPU::mm_bias_w4a8);
+  IPEX_OP_REGISTER("mm_add_w4a8.xpu", at::AtenIpexTypeXPU::mm_add_w4a8);
+  IPEX_OP_REGISTER(
+      "mm_bias_add_w4a8.xpu", at::AtenIpexTypeXPU::mm_bias_add_w4a8);
+  IPEX_OP_REGISTER(
+      "mm_silu_mul_w4a8.xpu", at::AtenIpexTypeXPU::mm_silu_mul_w4a8);
+  IPEX_OP_REGISTER(
+      "mm_bias_silu_mul_w4a8.xpu", at::AtenIpexTypeXPU::mm_bias_silu_mul_w4a8);
 }
 } // namespace
 #else

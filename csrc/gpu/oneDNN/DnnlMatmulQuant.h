@@ -4,17 +4,20 @@
 #include <ATen/record_function.h>
 
 #include <oneDNN/Runtime.h>
+#include <oneDNN/Utils.h>
 #include <runtime/Utils.h>
 #include <tensor/Tensor.h>
 #include <utils/LRUCache.h>
 #include "DnnlExt.h"
 #include "Utils.h"
+#include "aten/operators/act_dynamic_quant.h"
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <cstdint>
 
 using namespace dnnl;
 using namespace torch_ipex::xpu::oneDNN;
+using namespace at::AtenIpexTypeXPU;
 
 #ifdef USE_PRIMITIVE_CACHE
 
@@ -25,12 +28,43 @@ static inline void set_quant_primitive_attr(
     primitive_attr& pattr,
     const Tensor& scale,
     const Tensor& zp,
-    const int64_t group_size) {
+    const int64_t group_size,
+    const int64_t act_quant_mode,
+    const int64_t k) {
   // set scale and zero point for matmul args
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
-
+  // set scale and zp for quantized activation
+  if (act_quant_mode == static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M_SYM)) {
+    pattr.set_scales(
+        DNNL_ARG_SRC,
+        /* mask */ (1 << 0) + (1 << 1),
+        {1, k},
+        get_onednn_dtype(scale));
+    pattr.set_zero_points(
+        DNNL_ARG_SRC,
+        /* mask */ (1 << 0) + (1 << 1),
+        {1, k},
+        memory::data_type::s32);
+  } else if (
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR_SYM)) {
+    pattr.set_scales(
+        DNNL_ARG_SRC,
+        /* mask */ 0,
+        {},
+        get_onednn_dtype(scale));
+    pattr.set_zero_points(
+        DNNL_ARG_SRC,
+        /* mask */ 0,
+        {},
+        memory::data_type::s32);
+  }
   pattr.set_scales(
       DNNL_ARG_WEIGHTS,
       /* mask */ (1 << 0) + (1 << 1),
@@ -50,7 +84,10 @@ static inline void set_quant_primitive_attr(
         {group_size, 1},
         memory::data_type::u4);
   }
-  pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+  // when both src and weight are integer types, disallow fp16 as fpmath_mode
+  // so that int8 gemm can be used for acceleration
+  if (act_quant_mode == static_cast<int64_t>(ActQuantScheme::UNQUANT_A))
+    pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
 }
 
 template <typename F>
@@ -61,12 +98,19 @@ static at::Tensor dnnl_matmul_w4a16_common(
     const std::optional<Tensor>& bias,
     const Tensor& scale, // [k/group_size, n]
     const Tensor& zp, // [k/group_size, n/8]
+    int64_t act_quant_mode, // unquant for w4a16
     int64_t group_size,
     bool m2_trans,
     const c10::optional<Tensor>& g_idx,
     F pattr,
     Tensor res_flat,
     Tensor res1_flat) {
+  TORCH_CHECK(
+      act_quant_mode >= static_cast<int64_t>(ActQuantScheme::UNQUANT_A) &&
+          act_quant_mode <=
+              static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M_SYM),
+      "Unsupported quant mode for activation, expect UNQUANT, PER_TENSOR or PER_TOKEN but got",
+      act_quant_mode);
   // For GPTQ with desc_act=True scenario
   auto mat1 = g_idx.has_value() ? mat1_.index_select(-1, g_idx.value()) : mat1_;
 
@@ -91,11 +135,35 @@ static at::Tensor dnnl_matmul_w4a16_common(
   at::Device curDevice = at::Device(at::kXPU, device_id);
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
+  Tensor act_scale, act_zp;
+  bool quant_act =
+      (act_quant_mode != static_cast<int64_t>(ActQuantScheme::UNQUANT_A));
+  bool use_sym_quant = is_sym_quant(act_quant_mode);
+  if (act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR_SYM)) {
+    // per-tensor quantization
+    std::tie(mat1, act_scale, act_zp) =
+        at::AtenIpexTypeXPU::dynamic_per_tensor_quant(mat1, use_sym_quant);
+  } else if (
+      act_quant_mode == static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M_SYM)) {
+    // per-token quantization
+    std::tie(mat1, act_scale, act_zp) =
+        at::AtenIpexTypeXPU::dynamic_per_token_quant(mat1, use_sym_quant);
+  }
+
   dnnl::joint_dtypes_t jd;
   if (mat1.scalar_type() == at::ScalarType::Half) {
     jd = dnnl::joint_dtypes_t::f16_int4;
   } else if (mat1.scalar_type() == at::ScalarType::BFloat16) {
     jd = dnnl::joint_dtypes_t::bf16_int4;
+  } else if (mat1.scalar_type() == at::ScalarType::Char) {
+    jd = dnnl::joint_dtypes_t::s8_int4;
+  } else if (mat1.scalar_type() == at::ScalarType::Byte) {
+    jd = dnnl::joint_dtypes_t::u8_int4;
   } else {
     TORCH_INTERNAL_ASSERT(
         false, "Unsupported data type for int4 matmul: ", mat1.scalar_type());
@@ -146,6 +214,45 @@ static at::Tensor dnnl_matmul_w4a16_common(
       zp_group_size);
 
   int arg_off = 0;
+  if (quant_act) {
+    memory m1_sc_m, m1_zp_m;
+    if (act_quant_mode ==
+            static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR) ||
+        act_quant_mode ==
+            static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR_SYM)) {
+      // per-tensor quantization
+      auto Q_PER_TENSOR_SC_MD =
+          memory::desc({1}, get_onednn_dtype(act_scale), memory::format_tag::x);
+      auto Q_PER_TENSOR_ZP_MD =
+          memory::desc({1}, get_onednn_dtype(act_zp), memory::format_tag::x);
+      m1_sc_m =
+          dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, act_scale.data_ptr());
+      m1_zp_m =
+          dpcpp_onednn_memory(Q_PER_TENSOR_ZP_MD, engine, act_zp.data_ptr());
+    } else {
+      // per-token quantization
+      auto Q_PER_TOKEN_SC_MD = memory::desc(
+          {m, 1}, get_onednn_dtype(act_scale), memory::format_tag::ab);
+      auto Q_PER_TOKEN_ZP_MD = memory::desc(
+          {m, 1}, get_onednn_dtype(act_zp), memory::format_tag::ab);
+      m1_sc_m =
+          dpcpp_onednn_memory(Q_PER_TOKEN_SC_MD, engine, act_scale.data_ptr());
+      m1_zp_m =
+          dpcpp_onednn_memory(Q_PER_TOKEN_ZP_MD, engine, act_zp.data_ptr());
+    }
+
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC,
+        act_scale.data_ptr(),
+        [&]() { return m1_sc_m; });
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC,
+        act_zp.data_ptr(),
+        [&]() { return m1_zp_m; });
+  }
+
   // set scale and zero point for matmul args
   matmul_ext.set_attribute(
       arg_off++,
@@ -224,7 +331,6 @@ static at::Tensor dnnl_matmul_w4a16_common(
 #endif
 
   auto strm = GpuStreamManager::Instance().get_stream();
-  /* matmul_ext.execute(strm, engine, std::move(arg_handles), arg_off); */
   DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
       matmul_ext, strm, engine, arg_handles, arg_off);
 
@@ -240,11 +346,13 @@ static at::Tensor dnnl_matmul_w4a16(
     const Tensor& zp, // [k/group_size, n/8]
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION("dnnl_matmul_w4a16", std::vector<c10::IValue>({mat1, mat2}));
 
   auto quant = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
   };
 
   result = dnnl_matmul_w4a16_common(
@@ -254,6 +362,7 @@ static at::Tensor dnnl_matmul_w4a16(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -273,12 +382,14 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
     const Tensor& zp, // [k/group_size, N/8]
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_silu", std::vector<c10::IValue>({mat1, mat2}));
 
   auto silu = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     pattr.set_post_ops(po);
@@ -291,6 +402,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -311,13 +423,15 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
     const Tensor& res,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_resmul", std::vector<c10::IValue>({mat1, mat2}));
 
   auto res_flat = res.flatten(0, -2);
   auto resmul = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -330,6 +444,7 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -350,13 +465,15 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
     int64_t group_size,
     c10::string_view approximate,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_bias_gelu",
       std::vector<c10::IValue>({mat1, mat2}));
 
   auto bias_gelu = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     if (approximate == "none") {
       po.append_eltwise(algorithm::eltwise_gelu_erf, 1.f, 0.f);
@@ -375,6 +492,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -396,7 +514,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
     const Tensor& res1,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_bias_resadd_resadd",
       std::vector<c10::IValue>({mat1, mat2}));
@@ -404,7 +523,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
   auto res_flat = res.flatten(0, -2);
   auto res1_flat = res1.flatten(0, -2);
   auto bias_resadd_resadd = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     po.append_binary(algorithm::binary_add, get_onednn_md(res1_flat));
@@ -418,6 +538,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -438,13 +559,15 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
     const Tensor& res,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_silu_mul", std::vector<c10::IValue>({mat1, mat2}));
 
   auto res_flat = res.flatten(0, -2);
   auto silu_mul = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -458,6 +581,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -478,14 +602,16 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
     const Tensor& res,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_bias_silu_mul",
       std::vector<c10::IValue>({mat1, mat2}));
 
   auto res_flat = res.flatten(0, -2);
   auto silu_mul_int4 = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -499,6 +625,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -519,13 +646,15 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
     const Tensor& res,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_add", std::vector<c10::IValue>({mat1, mat2}));
 
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -538,6 +667,7 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
@@ -558,13 +688,15 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
     const Tensor& res,
     int64_t group_size,
     bool m2_trans,
-    const c10::optional<Tensor>& g_idx) {
+    const c10::optional<Tensor>& g_idx,
+    int64_t act_quant_mode = -1) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_bias_add", std::vector<c10::IValue>({mat1, mat2}));
 
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
-    set_quant_primitive_attr(pattr, scale, zp, group_size);
+    set_quant_primitive_attr(
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -577,6 +709,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
       bias,
       scale,
       zp,
+      act_quant_mode,
       group_size,
       m2_trans,
       g_idx,
