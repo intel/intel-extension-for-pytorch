@@ -569,6 +569,7 @@ class TestChunkedPrefill(TestCase):
         is_causal,
         dtype,
         softcap,
+        window_size,
     ):
         self.chunk_prefill(
             num_gen_seqs,

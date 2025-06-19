@@ -39,7 +39,7 @@
         "forced_bos_token_id": null,
         "forced_eos_token_id": null,
         "hidden_act": "silu",
-        "hidden_size": 4096,
+        "hidden_size": 1024,
         "id2label": {
             "0": "LABEL_0",
             "1": "LABEL_1"

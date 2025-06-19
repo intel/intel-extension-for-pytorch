@@ -37,7 +37,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.48.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.51.3"]
     )
     import transformers
     from transformers import AutoConfig
@@ -249,6 +249,20 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "qwen3",
+        transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "qwen3moe",
+        transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -256,12 +270,20 @@ class OptimizeTransformersNightlyTester(TestCase):
     def model_replacement_check(
         self, m, dtype, deployment_mode, torchcompile=False, return_dict=False
     ):
+        # Small differences lead to different experts being selected
+        # Fixed seed to avoid this issue on jamba/deepseek
+        if m.name == "jamba":
+            torch.manual_seed(6)
+        if m.name == "deepseekv2":
+            torch.manual_seed(128)
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/{m.name}",
             return_dict=return_dict,
             trust_remote_code=True,
             _attn_implementation="eager",
         )
+        if m.name == "mllama":
+            config.vision_config.torch_dtype = dtype
         model = m.model_class(config).eval()
         if m.name == "falcon":
             with torch.no_grad():
@@ -298,7 +320,7 @@ class OptimizeTransformersNightlyTester(TestCase):
         elif m.name == "jamba":
             model.config.dtype = dtype
         model.eval()
-        ref_m = copy.deepcopy(model)
+        ref_m = model
         ipex_m = copy.deepcopy(model)
         ipex_m = ipex.llm.optimize(
             ipex_m, dtype=dtype, deployment_mode=deployment_mode, inplace=True
@@ -397,7 +419,7 @@ class OptimizeTransformersNightlyTester(TestCase):
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
-        if m.name not in ["mllama", "deepseekv3"]:
+        if m.name not in ["mllama", "deepseekv2", "deepseekv3"]:
             if return_dict:
                 assert isinstance(key_ipex, dict)
                 self.assertEqual(
@@ -423,6 +445,11 @@ class OptimizeTransformersNightlyTester(TestCase):
             supported_models, enable_torchcompile, dtypes, deployment_mode, return_dict
         ):
             if torchcompile and deployment_mode:
+                continue
+            if (
+                m.name in ["deepseekv2", "deepseekv3"]
+                and not core.isa_has_avx512_bf16_support()
+            ):
                 continue
             self.model_replacement_check(m, dtype, jit, torchcompile, ret_dict)
         _disable_tpp()

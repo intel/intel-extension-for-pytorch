@@ -272,6 +272,55 @@ class TestPagedAttention(TestCase):
                 alibi_slopes_xpu,
                 softcap,
             )
+
+            output_return = torch.xpu.paged_attention_v1(
+                output_xpu,
+                query_xpu,
+                key_cache_xpu,
+                value_cache_xpu,
+                num_queries_per_kv,
+                scale,
+                block_tables_xpu,
+                context_lens_xpu,
+                block_size,
+                max_context_len,
+                alibi_slopes_xpu,
+                softcap,
+            )
+
+            output_return_deprecated = (
+                ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
+                    output_xpu_deprecated,
+                    query_xpu,
+                    key_cache_xpu,
+                    value_cache_xpu,
+                    head_mapping_xpu,
+                    scale,
+                    block_tables_xpu,
+                    context_lens_xpu,
+                    block_size,
+                    max_context_len,
+                    alibi_slopes_xpu,
+                    softcap=softcap,
+                )
+            )
+
+            output_return_clone = (
+                ipex.llm.modules.PagedAttention.single_query_kv_attention(
+                    output_xpu_clone,
+                    query_xpu,
+                    key_cache_xpu,
+                    value_cache_xpu,
+                    num_queries_per_kv,
+                    scale,
+                    block_tables_xpu,
+                    context_lens_xpu,
+                    block_size,
+                    max_context_len,
+                    alibi_slopes_xpu,
+                    softcap,
+                )
+            )
         elif version == "v2":
             num_partitions = (max_context_len + PARTITION_SIZE - 1) // PARTITION_SIZE
             # Note: PARTITION_SIZE must be equal to paged_attention_policy.hpp::paged_attention_policy_v2::partition_size
@@ -334,6 +383,55 @@ class TestPagedAttention(TestCase):
                 alibi_slopes_xpu,
                 softcap,
             )
+            output_return_deprecated = (
+                ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
+                    output_xpu_deprecated,
+                    query_xpu,
+                    key_cache_xpu,
+                    value_cache_xpu,
+                    head_mapping_xpu,
+                    scale,
+                    block_tables_xpu,
+                    context_lens_xpu,
+                    block_size,
+                    max_context_len,
+                    alibi_slopes_xpu,
+                    softcap=softcap,
+                )
+            )
+            output_return_clone = (
+                ipex.llm.modules.PagedAttention.single_query_kv_attention(
+                    output_xpu_clone,
+                    query_xpu,
+                    key_cache_xpu,
+                    value_cache_xpu,
+                    num_queries_per_kv,
+                    scale,
+                    block_tables_xpu,
+                    context_lens_xpu,
+                    block_size,
+                    max_context_len,
+                    alibi_slopes_xpu,
+                    softcap,
+                )
+            )
+            output_return = torch.xpu.paged_attention_v2(
+                output_xpu,
+                exp_sums_xpu,
+                max_logits_xpu,
+                tmp_output_xpu,
+                query_xpu,
+                key_cache_xpu,
+                value_cache_xpu,
+                block_tables_xpu,
+                context_lens_xpu,
+                num_queries_per_kv,
+                scale,
+                block_size,
+                max_context_len,
+                alibi_slopes_xpu,
+                softcap,
+            )
         else:
             assert False, f"Unknown version: {version}"  # noqa
 
@@ -362,6 +460,18 @@ class TestPagedAttention(TestCase):
         )
         torch.testing.assert_close(
             output_clone, ref_output.float(), atol=1e-3, rtol=1e-2
+        )
+        torch.testing.assert_close(
+            output_return.cpu().float(), ref_output.float(), atol=1e-3, rtol=1e-2
+        )
+        torch.testing.assert_close(
+            output_return_deprecated.cpu().float(),
+            ref_output.float(),
+            atol=1e-3,
+            rtol=1e-2,
+        )
+        torch.testing.assert_close(
+            output_return_clone.cpu().float(), ref_output.float(), atol=1e-3, rtol=1e-2
         )
         print(f"attention {version} {dtype} accuracy test passed")
 

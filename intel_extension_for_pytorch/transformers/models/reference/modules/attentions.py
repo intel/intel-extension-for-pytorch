@@ -236,6 +236,7 @@ def _GPTNeoXAttention_forward(
     use_cache: Optional[bool] = False,
     output_attentions: Optional[bool] = False,
 ):
+    input_shape = hidden_states.shape[:-1]
     has_layer_past = layer_past is not None
 
     qkv = self.query_key_value(hidden_states)
@@ -290,9 +291,8 @@ def _GPTNeoXAttention_forward(
             head_mask,
             attention_mask,
         )
-    attn_output = self._merge_heads(
-        attn_output, self.num_attention_heads, self.head_size
-    )
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(*input_shape, -1)
     attn_output = self.dense(attn_output)
 
     outputs = (attn_output, present)
@@ -360,8 +360,8 @@ def _OPTAttention_forward(
 
     (
         attn_output,
-        attn_weights,
-        past_key_value_decoder,
+        attn_weights_reshaped,
+        past_key_value,
     ) = self._IPEXScaleDotProduct(
         query,
         key,
@@ -371,9 +371,6 @@ def _OPTAttention_forward(
         layer_head_mask,
         attention_mask,
     )
-
-    if self.is_decoder:
-        past_key_value = past_key_value_decoder
 
     if not output_attentions:
         attn_weights_reshaped = None
@@ -1571,6 +1568,91 @@ def _StableLMEpochAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _QWen3Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+):
+    bsz, q_len, _ = hidden_states.size()
+    query = self.q_proj(hidden_states)
+    key = self.k_proj(hidden_states)
+    value = self.v_proj(hidden_states)
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    query = self.q_norm(query.view(bsz, q_len, self.num_heads, self.head_dim))
+    key = self.k_norm(key.view(bsz, q_len, self.num_key_value_heads, self.head_dim))
+    value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+    key = self._IPEXROPE(
+        key,
+        position_ids,
+        self.num_key_value_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+    query = self._IPEXROPE(
+        query,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+
+    if use_cache:
+        (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            math.sqrt(self.head_dim),
+            past_key_value,
+            None,
+            attention_mask,
+        )
+    else:
+        value_states = value.transpose(1, 2)
+        query_states = query.transpose(1, 2)
+        key_states = key.transpose(1, 2)
+        kv_seq_len = key_states.shape[-2]
+
+        past_key_value = None
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = _repeat_kv(key_states, self.num_key_value_groups)
+        value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+        attn_weights = torch.matmul(
+            query_states, key_states.transpose(2, 3)
+        ) / math.sqrt(self.head_dim)
+
+        if attention_mask is not None:
+            attn_weights = torch.tensor(attn_weights) + torch.tensor(attention_mask)
+            attn_weights = torch.max(
+                attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+            )
+
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(query_states.dtype)
+        attn_output = torch.matmul(attn_weights, value_states)
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _QWen2Attention_forward(
     self,
     hidden_states: torch.Tensor,
@@ -1840,7 +1922,7 @@ def _GitVisionAttention_forward(
         None,
         attention_mask,
         vision=True,
-        add_causal_mask=False,
+        add_casual_mask=False,
     )
     if not output_attentions:
         attn_weights = None
@@ -2165,7 +2247,7 @@ def _Phi3Attention_forward(
         past_key_value,
         None,
         attention_mask,
-        add_causal_mask=False,
+        add_casual_mask=False,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -2710,6 +2792,17 @@ class _IPEXAttentionRef(nn.Module):
                 self.hidden_size = module.o_proj.weight.shape[1]
             else:
                 self.hidden_size = module.o_proj.linear.weight.shape[1]
+        elif hasattr(module, "query_key_value"):
+            if hasattr(module.query_key_value, "in_features"):
+                self.hidden_size = module.query_key_value.in_features
+            elif hasattr(module.query_key_value, "linear") and hasattr(
+                module.query_key_value.linear, "in_features"
+            ):
+                self.hidden_size = module.query_key_value.linear.in_features
+            elif hasattr(module.query_key_value, "weight"):
+                self.hidden_size = module.query_key_value.weight.shape[1]
+            else:
+                self.hidden_size = module.query_key_value.linear.weight.shape[1]
 
         # common known as num of attention_heads
         if hasattr(module, "num_attention_heads"):
@@ -2722,7 +2815,8 @@ class _IPEXAttentionRef(nn.Module):
             self.num_attention_heads = module.n_heads
         elif hasattr(module, "head_dim"):
             self.num_attention_heads = self.hidden_size // module.head_dim
-
+        elif hasattr(module, "head_size"):
+            self.num_attention_heads = self.hidden_size // module.head_size
         if hasattr(module, "num_key_value_heads"):
             self.num_key_value_heads = module.num_key_value_heads
         elif hasattr(module, "num_key_value_groups"):
@@ -3106,6 +3200,8 @@ class _IPEXAttentionRef(nn.Module):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             self.scale_attn_value = self.scale_attn.item()
         if self.model_backbone == "GPTNeoXForCausalLM":
+            if hasattr(self, "scaling"):
+                self.norm_factor = self.scaling
             if isinstance(self.norm_factor, torch.Tensor):
                 self.norm_factor_value = self.norm_factor.item()
             else:
@@ -3221,6 +3317,16 @@ class _IPEXAttentionRef(nn.Module):
                 )
         elif self.model_backbone == "Qwen2ForCausalLM":
             return _QWen2Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone in ["Qwen3ForCausalLM", "Qwen3MoeForCausalLM"]:
+            return _QWen3Attention_forward(
                 self,
                 hidden_states,
                 attention_mask,

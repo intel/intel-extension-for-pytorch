@@ -78,4 +78,7 @@ class IPEXWeightOnlyQuantizedLinear(nn.Module):
         return cls(woq_linear_impl)
 
     def forward(self, x, bias: Optional[torch.Tensor] = None, **kwargs):
-        return self.woq_linear_impl(x, bias, **kwargs)
+        if bias is not None and self.woq_linear_impl.qweight.device.type == "xpu":
+            return self.woq_linear_impl(x, bias, **kwargs)
+        else:
+            return self.woq_linear_impl(x, **kwargs)

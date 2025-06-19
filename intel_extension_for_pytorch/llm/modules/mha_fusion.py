@@ -502,6 +502,10 @@ class PagedAttention:
     The block tables are used to map the logical block of sequence into the physical block.
 
     [class method]: reshape_and_cache
+
+    .. highlight:: python
+    .. code-block:: python
+
     ipex.llm.modules.PagedAttention.reshape_and_cache(
         key,
         value,
@@ -676,6 +680,7 @@ class PagedAttention:
             alibi_slopes,
             window_size_left,
             window_size_right,
+            kv_cache_dtype,
             k_scale,
             v_scale,
             softcap,
@@ -720,7 +725,7 @@ class PagedAttention:
         k_scale: float = 1.0,
         v_scale: float = 1.0,
     ):
-        cls.runtime_ops.get_module_from_device(
+        return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
         ).reshape_and_cache(
             key,
@@ -1060,6 +1065,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.causal_conv1d_fn(
             x,
             weight,
@@ -1067,7 +1073,8 @@ class MambaMixer:
             initial_states=None,
             return_final_states=False,
             final_states_out=None,
-            activation="silu")
+            activation="silu"
+        )
 
     Args:
         x (torch.Tensor): x tensor, shape: [batch, dim, seqlen].
@@ -1082,13 +1089,15 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.causal_conv1d_update(
             x,
             conv_state,
             weight,
             bias=None,
             activation=None,
-            cache_seqlens=None)
+            cache_seqlens=None
+        )
 
     Args:
         x (torch.Tensor): x tensor, shape: [batch, dim] or [batch, dim, seqlen].
@@ -1105,6 +1114,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.selective_state_update(
             state,
             x,
@@ -1115,7 +1125,8 @@ class MambaMixer:
             D=None,
             z=None,
             dt_bias=None,
-            dt_softplus=False)
+            dt_softplus=False
+        )
 
     Args:
         state (torch.Tensor): state tensor, shape: [batch, dim, dstate] or [batch, nheads, dim, dstate].
@@ -1133,6 +1144,7 @@ class MambaMixer:
 
     .. highlight:: python
     .. code-block:: python
+
         ipex.llm.modules.MambaMixer.selective_scan_fn(
             u,
             delta,
@@ -1143,7 +1155,8 @@ class MambaMixer:
             z=None,
             delta_bias=None,
             delta_softplus=False,
-            return_last_state=False)
+            return_last_state=False
+        )
 
     Args:
         u (torch.Tensor): u tensor, shape: [batch, dim, seqlen].

@@ -75,9 +75,41 @@ def MllamaVisionEncoderLayer_forward(
     # Self Attention
     residual = hidden_state
     hidden_state = self.input_layernorm(hidden_state)
-    hidden_state, attn_weights = self.self_attn(
-        hidden_state, attention_mask=attention_mask
-    )
+    if output_attentions:
+        hidden_state, attn_weights = self.self_attn(
+            hidden_state, attention_mask=attention_mask
+        )
+    else:
+        query = self.self_attn.q_proj(hidden_state)
+        key = self.self_attn.k_proj(hidden_state)
+        value = self.self_attn.v_proj(hidden_state)
+
+        batch_size, q_seq_len, _ = query.shape
+        _, kv_seq_len, _ = key.shape
+
+        query = query.view(
+            batch_size, q_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+        key = key.view(
+            batch_size, kv_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+        value = value.view(
+            batch_size, kv_seq_len, self.self_attn.num_heads, self.self_attn.head_dim
+        )
+
+        query = query.transpose(1, 2)
+        key = key.transpose(1, 2)
+        value = value.transpose(1, 2)
+
+        attn_output = F.scaled_dot_product_attention(
+            query, key, value, attn_mask=attention_mask
+        )
+
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = attn_output.reshape(batch_size, q_seq_len, -1)
+
+        hidden_state = self.self_attn.o_proj(attn_output)
+        attn_weights = None
     if self.is_gated:
         hidden_state = self.gate_attn.tanh() * hidden_state
 
@@ -1953,9 +1985,81 @@ def JambaMambaDecoderLayer_forward(
     return outputs
 
 
+def Qwen3MoeDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    output_router_logits: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    **kwargs,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    # hidden_states = self.mlp(hidden_states)
+    router_logits = None
+    if hasattr(self.mlp, "experts"):
+        orig_shape = hidden_states.shape
+        hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+        # router_logits: (batch * sequence_length, n_experts)
+        router_logits = self.mlp.gate(hidden_states)
+
+        routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
+        routing_weights, selected_experts = torch.topk(
+            routing_weights, self.mlp.top_k, dim=-1
+        )
+        if self.mlp.norm_topk_prob:
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+        # we cast back to the input dtype
+        routing_weights = routing_weights.to(hidden_states.dtype)
+        hidden_states = moe_infer(
+            self, hidden_states, selected_experts, routing_weights
+        ).view(*orig_shape)
+        hidden_states = residual + hidden_states
+    else:
+        mlp_gate = self.linear_silu_mul(hidden_states)
+
+        if not self.distributed:
+            hidden_states = self.mlp_linear_add(mlp_gate, residual)
+        else:
+            hidden_states = self.mlp.down_proj(mlp_gate)
+            hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+    if output_attentions:
+        outputs += (self_attn_weights,)
+    if use_cache:
+        outputs += (present_key_value,)
+    if output_router_logits:
+        outputs += (router_logits,)
+    return outputs
+
+
 def moe_infer(self, x, topk_ids, topk_weight):
     if self.use_fused_moe or self.use_fused_moe_woq:
-        if self.unify_experts:
+        if hasattr(self, "unify_experts") and self.unify_experts:
             final_out = torch.ops.torch_ipex.fused_experts_with_shared(
                 x,
                 self.w13_weight,
@@ -2148,6 +2252,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "Qwen2ForCausalLM",
+            "Qwen3ForCausalLM",
         ]:
             self.is_cross_decoder = False
             if (
@@ -2405,7 +2510,11 @@ class _IPEXDecoderLayerRef(nn.Module):
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
                     del self.__dict__["_modules"]["mamba"].out_proj
-        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
+        elif self.model_backbone in [
+            "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
+            "Qwen3MoeForCausalLM",
+        ]:
             # use fused moe only when bf16/woq
             self.use_fused_moe = (
                 True
@@ -2424,7 +2533,12 @@ class _IPEXDecoderLayerRef(nn.Module):
             self.deepseek_lowbit_load = False
             if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
                 # shared_experts
-                if config.n_shared_experts is not None:
+                if self.model_backbone == "Qwen3MoeForCausalLM":
+                    config.n_routed_experts = config.num_experts
+                if (
+                    hasattr(config, "n_shared_experts")
+                    and config.n_shared_experts is not None
+                ):
                     self.unify_experts = False
                     if config.n_shared_experts == 1:
                         self.unify_experts = True
@@ -2646,7 +2760,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                     output_attentions,
                     use_cache,
                 )
-        elif self.model_backbone == "Qwen2ForCausalLM":
+        elif self.model_backbone in ["Qwen2ForCausalLM", "Qwen3ForCausalLM"]:
             return Qwen2DecoderLayer_forward(
                 self,
                 hidden_states,
@@ -2654,6 +2768,17 @@ class _IPEXDecoderLayerRef(nn.Module):
                 position_ids,
                 past_key_value,
                 output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Qwen3MoeForCausalLM":
+            return Qwen3MoeDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                output_router_logits,
                 use_cache,
             )
         elif self.model_backbone == "OPTForCausalLM":

@@ -160,6 +160,8 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "QWenLMHeadModel",
+            "Qwen3MoeForCausalLM",
+            "Qwen3ForCausalLM",
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
             "Maira2ForConditionalGeneration",
@@ -250,6 +252,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if self.model_backbone in [
                 "DeepseekV2ForCausalLM",
                 "DeepseekV3ForCausalLM",
+                "Qwen3MoeForCausalLM",
             ]:
                 if hasattr(self.mlp, "shared_experts") and self.unify_experts:
                     if (
@@ -426,20 +429,15 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                 w13_shared_weight = torch.stack(
                                     [self.mlp.shared_experts.w13_shared_weight]
                                 ).detach()
-                                self.w13_shared_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                        w13_shared_weight
-                                    )
-                                )
-                                del self.mlp.shared_experts.w13_shared_weight
                                 w2_shared_weight = torch.stack(
                                     [self.mlp.shared_experts.w2_shared_weight]
                                 ).detach()
-                                self.w2_shared_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                        w2_shared_weight
+                                self.w13_shared_weight, self.w2_shared_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed_moe_bf16(
+                                        w13_shared_weight, w2_shared_weight
                                     )
                                 )
+                                del self.mlp.shared_experts.w13_shared_weight
                                 del self.mlp.shared_experts.w2_shared_weight
                                 # dummy scale/zps
                                 self.w13_shared_scale = None
@@ -679,7 +677,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             if is_da8w8 and w2_comp is not None:
                                 w2_compensation_list.append(w2_comp)
                             del self.__dict__["_modules"]["mlp"].experts[idx].down_proj
-                        if self.unify_experts:
+                        if hasattr(self, "unify_experts") and self.unify_experts:
                             w13_qweight_list.append(self.w13_shared_weight[0])
                             del self.w13_shared_weight
                             w13_scale_list.append(self.w13_shared_scale[0])
@@ -750,25 +748,19 @@ class _IPEXDecoderLayerCPU(nn.Module):
                                         for idx in range(len(self.mlp.experts))
                                     ]
                                 ).detach()
-                                self.w13_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                        w13_weight
-                                    )
-                                )
-                                for idx in range(len(self.mlp.experts)):
-                                    del self.mlp.experts[idx].w13_weight
                                 w2_weight = torch.stack(
                                     [
                                         self.mlp.experts[idx].w2_weight
                                         for idx in range(len(self.mlp.experts))
                                     ]
                                 ).detach()
-                                self.w2_weight = (
-                                    torch.ops.torch_ipex.convert_weight_packed_bf16(
-                                        w2_weight
+                                self.w13_weight, self.w2_weight = (
+                                    torch.ops.torch_ipex.convert_weight_packed_moe_bf16(
+                                        w13_weight, w2_weight
                                     )
                                 )
                                 for idx in range(len(self.mlp.experts)):
+                                    del self.mlp.experts[idx].w13_weight
                                     del self.mlp.experts[idx].w2_weight
                                 # dummy scale/zps
 
@@ -925,7 +917,11 @@ class _IPEXDecoderLayerCPU(nn.Module):
                             self.gate_ctx = []
                             self.up_ctx = []
                             self.down_ctx = []
-                            offset = self.mlp.ep_rank * self.mlp.experts_per_rank
+                            offset = (
+                                0
+                                if self.model_backbone == "Qwen3MoeForCausalLM"
+                                else self.mlp.ep_rank * self.mlp.experts_per_rank
+                            )
                             for expert_idx in range(len(self.mlp.experts)):
                                 expert_layer = self.mlp.experts[expert_idx + offset]
                                 if self.moe_linear_type in [0, 1]:

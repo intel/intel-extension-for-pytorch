@@ -42,7 +42,7 @@ def get_ipex_isa_env_setting():
     return env_isa
 
 
-def get_currnet_isa_level():
+def get_current_isa_level():
     return core._get_current_isa_level().lower()
 
 
@@ -61,7 +61,7 @@ def check_not_sync_onednn_isa_level():
 class TestDynDisp(unittest.TestCase):
     def test_manual_select_kernel(self):
         env_isa = get_ipex_isa_env_setting()
-        cur_isa = get_currnet_isa_level()
+        cur_isa = get_current_isa_level()
         max_bin_isa = get_highest_binary_support_isa_level()
         max_cpu_isa = get_highest_cpu_support_isa_level()
 
@@ -70,12 +70,12 @@ class TestDynDisp(unittest.TestCase):
         if env_isa is not None:
             expected_isa_val = min(get_isa_val(env_isa), expected_isa_val)
 
-        actural_isa_val = get_isa_val(cur_isa)
+        actual_isa_val = get_isa_val(cur_isa)
 
         # Isa level and compiler version are not linear relationship.
         # gcc 9.4 can build avx512_vnni.
         # gcc 11.3 start to support avx2_vnni.
-        self.assertTrue(actural_isa_val <= expected_isa_val)
+        self.assertTrue(actual_isa_val <= expected_isa_val)
         return
 
     def test_dyndisp_in_supported_set(self):
@@ -84,7 +84,7 @@ class TestDynDisp(unittest.TestCase):
         if env_isa is not None:
             return
 
-        cur_isa = get_currnet_isa_level()
+        cur_isa = get_current_isa_level()
         expected_isa = cur_isa in supported_isa_set
 
         self.assertTrue(expected_isa)
@@ -109,13 +109,32 @@ class TestDynDisp(unittest.TestCase):
     def test_onednn_do_not_set_isa_level(self):
         command = 'ONEDNN_MAX_CPU_ISA=avx2 python -c "import torch; import intel_extension_for_pytorch._C \
             as core; print(core._get_current_isa_level().lower())" '
-        cur_ipex_isa = get_currnet_isa_level()
+        cur_ipex_isa = get_current_isa_level()
         with subprocess.Popen(
             command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as p:
             out = p.stdout.readlines()
             cur_ipex_isa_1 = str(out[-1], "utf-8").strip()
             self.assertTrue(cur_ipex_isa == cur_ipex_isa_1)
+
+
+class TestIsaCheck(unittest.TestCase):
+    def test_isa_check(self):
+        cur_isa = get_current_isa_level()
+        actual_isa_val = get_isa_val(cur_isa)
+        if actual_isa_val >= 6:
+            self.assertTrue(core.isa_has_amx_support())
+            self.assertTrue(core.isa_has_avx512_bf16_support())
+            self.assertTrue(core.isa_has_avx512_vnni_support())
+            self.assertTrue(core.isa_has_avx512_support())
+            self.assertTrue(core.isa_has_avx2_vnni_support())
+            self.assertTrue(core.isa_has_avx2_support())
+        elif actual_isa_val >= 3:
+            self.assertTrue(core.isa_has_avx512_support())
+            self.assertTrue(core.isa_has_avx2_support())
+        elif actual_isa_val >= 2:
+            self.assertTrue(core.isa_has_avx2_vnni_support())
+            self.assertTrue(core.isa_has_avx2_support())
 
 
 if __name__ == "__main__":

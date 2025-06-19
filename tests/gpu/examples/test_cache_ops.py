@@ -278,12 +278,32 @@ def test_reshape_and_cache(
         ipex.llm.modules.PagedAttention.reshape_and_cache(
             key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
         )
+        cloned_key_cache_1_return, cloned_value_cache_1_return = (
+            ipex.llm.modules.PagedAttention.reshape_and_cache(
+                key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
+            )
+        )
+        key_cache_return, value_cache_return = (
+            ipex.llm.modules.PagedAttention.reshape_and_cache(
+                key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
+            )
+        )
     else:
         ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
             key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
         )
         ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
             key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
+        )
+        cloned_key_cache_1_return, cloned_value_cache_1_return = (
+            ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+                key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
+            )
+        )
+        key_cache_return, value_cache_return = (
+            ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+                key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
+            )
         )
 
     # Run the reference implementation.
@@ -310,6 +330,14 @@ def test_reshape_and_cache(
     assert torch.allclose(cloned_key_cache_1, cloned_key_cache, atol=1e-2, rtol=1e-2)
     assert torch.allclose(
         cloned_value_cache_1, cloned_value_cache, atol=1e-2, rtol=1e-2
+    )
+    assert torch.allclose(key_cache_return, cloned_key_cache, atol=1e-2, rtol=1e-2)
+    assert torch.allclose(value_cache_return, cloned_value_cache, atol=1e-2, rtol=1e-2)
+    assert torch.allclose(
+        cloned_key_cache_1_return, cloned_key_cache, atol=1e-2, rtol=1e-2
+    )
+    assert torch.allclose(
+        cloned_value_cache_1_return, cloned_value_cache, atol=1e-2, rtol=1e-2
     )
     torch.set_default_device("cpu")
     torch.xpu.empty_cache()

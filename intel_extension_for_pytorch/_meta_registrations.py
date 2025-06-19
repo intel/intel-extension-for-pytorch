@@ -131,9 +131,9 @@ def is_channels_last_3d(ten):
 
 @register_meta("reshape_and_cache")
 def meta_reshape_and_cache(
-    key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale
+    key, value, key_cache, value_cache, slot_mapping, kv_cache_dtype, k_scale, v_scale
 ):
-    return None
+    return key_cache, value_cache
 
 
 @register_meta("single_query_cached_kv_attention")
@@ -152,8 +152,33 @@ def meta_single_query_cached_kv_attention(
     window_size,
     k_scale,
     v_scale,
+    softcap,
 ):
-    return None
+    return output
+
+
+@register_meta("flash_attn_varlen_func")
+def meta_flash_attn_varlen_func(
+    output,
+    query,
+    k_cache,
+    v_cache,
+    cu_seq_lens_q,
+    cu_seq_lens_kv,
+    max_seq_len_q,
+    max_seq_len_kv,
+    scale,
+    is_causal,
+    block_table,
+    alibi_slopes,
+    window_size_left,
+    window_size_right,
+    kv_cache_dtype,
+    k_scale,
+    v_scale,
+    softcap,
+):
+    return output
 
 
 @register_meta("convolution_forward")
@@ -634,7 +659,7 @@ def meta_masked_multihead_self_attention(
     max_positions,
     head_mask,
     attention_mask,
-    add_causal_mask=None,
+    add_casual_mask=None,
 ):
     attn_output = query.new_empty(
         (query.shape[0], query.shape[2], query.shape[1], query.shape[3])
@@ -704,3 +729,75 @@ def meta_rmsnorm(
     eps,
 ):
     return input.new_empty(input.shape)
+
+
+@register_meta("punica_bgmv_shrink")
+def meta_bgmv_shrink(
+    out,
+    input,
+    weights,
+    indicies,
+    scale,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_bgmv_expand")
+def meta_bgmv_expand(
+    out,
+    input,
+    weights,
+    indicies,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_bgmv_expand_slice")
+def meta_bgmv_expand_slice(
+    out,
+    input,
+    weights,
+    indicies,
+    slice_offset,
+    slice_size,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_shrink")
+def meta_sgmv_shrink(
+    out,
+    inputs,
+    weights,
+    indicies,
+    seq_lens,
+    scale,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_expand")
+def meta_sgmv_expand(
+    out,
+    input,
+    weights,
+    indicies,
+    seq_lens,
+    add_inputs,
+):
+    return out.new_empty(out.shape)
+
+
+@register_meta("punica_sgmv_expand_slice")
+def meta_sgmv_expand_slice(
+    out,
+    input,
+    weights,
+    indicies,
+    slice_offset,
+    slice_size,
+    add_inputs,
+):
+    return out.new_empty(out.shape)

@@ -46,6 +46,15 @@ def IPEX_WEIGHT_PREPACK_MODULE_CPU():
             deepspeed_modules_mapping.update(
                 {LmHeadLinearAllreduce: _IPEXLmHeadLinearAllreduce}
             )
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if module not in deepspeed_modules_mapping:
+                    if issubclass(module, LinearAllreduce):
+                        deepspeed_modules_mapping[module] = _IPEXLinearAllreduce
+                    elif issubclass(module, LinearLayer):
+                        deepspeed_modules_mapping[module] = _IPEXLinear
+                    else:
+                        raise ValueError(f"Unrecognized module type: {module}")
         torch_modules.update(deepspeed_modules_mapping)
 
     return torch_modules
@@ -243,7 +252,9 @@ def get_shared_parameter_status(module, shared_p):
     if deepspeed_modules is not None:
         LinearAllreduce, LinearLayer = deepspeed_modules[:2]
 
-        if isinstance(module, (LinearLayer, LinearAllreduce)):
+        if isinstance(module, (LinearLayer, LinearAllreduce)) or issubclass(
+            type(module), (LinearLayer, LinearAllreduce)
+        ):
             module.weight = torch.nn.Parameter(module.weight, requires_grad=False)
             if module.bias is not None:
                 module.bias = torch.nn.Parameter(module.bias, requires_grad=False)
@@ -308,8 +319,9 @@ def patch_state_dict(model, params_attr, mode):
             # for DDP model, there is an extra module
             name_list = name_list[1:]
         model_or_param = model
+        # attr may not in custom param. do not convert these attr data to fp32.
         for attr in name_list:
-            model_or_param = getattr(model_or_param, attr)
+            model_or_param = getattr(model_or_param, attr, None)
         return model_or_param
 
     def to_public_fp32(model, state_dict, params_attr):

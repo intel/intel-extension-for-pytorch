@@ -1234,7 +1234,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
     min_version = "4.6.0"
-    max_version = "4.48.0"
+    max_version = "4.51.3"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "Please installed the transformers with version: between {} and {}".format(
@@ -1259,9 +1259,10 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         position_ids_persistent = True
     PT_OPTIMIZER_TO_TPP_OPTIMIZER = {
         torch.optim.AdamW: AdamW,
-        transformers.optimization.AdamW: AdamW,
         torch.optim.SGD: SGD,
     }
+    if hasattr(transformers.optimization, "AdamW"):
+        PT_OPTIMIZER_TO_TPP_OPTIMIZER[transformers.optimization.AdamW] = AdamW
     if dtype not in (
         torch.float,
         torch.bfloat16,

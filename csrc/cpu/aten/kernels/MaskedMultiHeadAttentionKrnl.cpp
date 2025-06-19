@@ -1526,7 +1526,10 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto attn_outs_stride_privT = private_attn_outs.stride(0);
   auto attn_outs_stride_privB = private_attn_outs.stride(1);
   auto attn_outs_stride_privH = private_attn_outs.stride(2);
-
+  if (kv_block_size < seq_len) {
+    kv_block_count = max_parallel_parts;
+    kv_block_size = (seq_len + kv_block_count - 1) / kv_block_count;
+  }
   {
     RECORD_FUNCTION(
         "ipex::iakv_sdp::matmul(attn_w, value)",
@@ -2536,9 +2539,6 @@ first_token_deepseekv2_mla(
         add_casual_mask,
         attention_mask,
         1. / scale_attn));
-    if (v_head_size != head_size) {
-      attn_outputs = attn_outputs.slice(-1, 0, v_head_size);
-    }
   } else {
     if (origin_type == at::kHalf) {
       key = key.to(at::kFloat);
@@ -2558,6 +2558,9 @@ first_token_deepseekv2_mla(
       attn_weights = attn_weights.to(origin_type);
       attn_outputs = attn_outputs.to(origin_type);
     }
+  }
+  if (v_head_size != head_size) {
+    attn_outputs = attn_outputs.slice(-1, 0, v_head_size);
   }
   return std::make_tuple(attn_outputs, attn_weights, kv_cache, beam_idx);
 }

@@ -479,9 +479,13 @@ void fused_experts_kernel_impl(
 
   constexpr int BLOCK_M = block_size_m();
   constexpr int T_BLOCK_N = block_size_n(); // Tuned block_n for AMX
+  constexpr int T_BLOCK_N2 = block_size_n2();
   constexpr int Q_BLOCK_N = WOQ_N_BLOCK_SIZE; // Tuned block_n for WOQ
   int BLOCK_N = is_woq ? Q_BLOCK_N : T_BLOCK_N;
   int Q_BLOCK_K = is_woq ? packed_w2_tensor.size(3) : -1;
+  if (!is_woq && N < 2 * BLOCK_N) {
+    BLOCK_N = T_BLOCK_N2;
+  }
   // stage 1: intermediate_cache1 = silu(hidden_states @ w1)
   const int MB = div_up(num_tokens_post_pad, BLOCK_M);
   const int NB = div_up(N, BLOCK_N);
@@ -712,8 +716,11 @@ void fused_experts_kernel_impl(
       if (is_woq) {
         silu_and_mul<scalar_t, Q_BLOCK_N>(
             ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
-      } else {
+      } else if (BLOCK_N == T_BLOCK_N) {
         silu_and_mul<scalar_t, T_BLOCK_N>(
+            ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
+      } else {
+        silu_and_mul<scalar_t, T_BLOCK_N2>(
             ic1 + offset * N + nb * BLOCK_N, C0_f, C1_f, m_size, N);
       }
       if (use_brgemm) {

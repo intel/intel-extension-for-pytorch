@@ -151,7 +151,7 @@ def indirect_access_kv_cache_attention(
     head_mask: Optional[Tuple[torch.Tensor]] = None,
     attention_mask: Optional[Tuple[torch.Tensor]] = None,
     alibi: Optional[torch.Tensor] = None,
-    add_causal_mask: Optional[bool] = True,
+    add_casual_mask: Optional[bool] = True,
     seq_info: Optional[torch.Tensor] = None,
     text_max_length: Optional[int] = 0,
 ):
@@ -228,7 +228,7 @@ def indirect_access_kv_cache_attention(
         head_mask,
         attention_mask,
         alibi,
-        add_causal_mask,
+        add_casual_mask,
         seq_info,
         text_max_length,
     )
@@ -536,8 +536,7 @@ def bgmv_shrink(
             inputs[i] @ lora_a_weights[lora_indices_tensor[i]] * scale
     """
     f = _get_function_from_device(inputs.device.type, bgmv_shrink)
-    f(inputs, lora_a_weights, output_tensor, lora_indices_tensor, scaling)
-    return
+    return f(inputs, lora_a_weights, output_tensor, lora_indices_tensor, scaling)
 
 
 def bgmv_expand(
@@ -567,8 +566,7 @@ def bgmv_expand(
             + (inputs[i] if add_inputs else 0)
     """
     f = _get_function_from_device(inputs.device.type, bgmv_expand)
-    f(inputs, lora_b_weights, output_tensor, lora_indices_tensor, add_inputs)
-    return
+    return f(inputs, lora_b_weights, output_tensor, lora_indices_tensor, add_inputs)
 
 
 def bgmv_expand_slice(
@@ -602,7 +600,7 @@ def bgmv_expand_slice(
             + (inputs[i] if add_inputs else 0)
     """
     f = _get_function_from_device(inputs.device.type, bgmv_expand_slice)
-    f(
+    return f(
         inputs,
         lora_b_weights,
         output_tensor,
@@ -611,7 +609,6 @@ def bgmv_expand_slice(
         slice_size,
         add_inputs,
     )
-    return
 
 
 def sgmv_shrink(
@@ -647,7 +644,7 @@ def sgmv_shrink(
         scaling (float):  Scaling factor.
     """
     f = _get_function_from_device(inputs.device.type, sgmv_shrink)
-    f(
+    return f(
         inputs,
         lora_a_weights,
         output_tensor,
@@ -658,7 +655,6 @@ def sgmv_shrink(
         max_seq_length,
         scaling,
     )
-    return
 
 
 def sgmv_expand(
@@ -695,7 +691,7 @@ def sgmv_expand(
             results to the output.
     """
     f = _get_function_from_device(inputs.device.type, sgmv_expand)
-    f(
+    return f(
         inputs,
         lora_b_weights,
         output_tensor,
@@ -706,7 +702,6 @@ def sgmv_expand(
         max_seq_length,
         add_inputs,
     )
-    return
 
 
 def sgmv_expand_slice(
@@ -747,7 +742,7 @@ def sgmv_expand_slice(
             results to the output.
     """
     f = _get_function_from_device(inputs.device.type, sgmv_expand_slice)
-    f(
+    return f(
         inputs,
         lora_b_weights,
         output_tensor,
@@ -760,4 +755,3 @@ def sgmv_expand_slice(
         slice_size,
         add_inputs,
     )
-    return

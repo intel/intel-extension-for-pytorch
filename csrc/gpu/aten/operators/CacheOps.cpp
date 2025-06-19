@@ -639,7 +639,7 @@ void dpcpp_reshape_and_cache_flash_kernel(
               v_scale);                                           \
       });
 
-void reshape_and_cache(
+std::tuple<at::Tensor, at::Tensor> reshape_and_cache(
     at::Tensor& key, // [num_tokens, num_heads, head_size]
     at::Tensor& value, // [num_tokens, num_heads, head_size]
     at::Tensor&
@@ -660,9 +660,10 @@ void reshape_and_cache(
   int value_stride = value.stride(0);
   DISPATCH_BY_KV_CACHE_DTYPE(
       key.dtype(), kv_cache_dtype, CALL_RESHAPE_AND_CACHE)
+  return std::make_tuple(key_cache, value_cache);
 }
 
-void reshape_and_cache_flash(
+std::tuple<at::Tensor, at::Tensor> reshape_and_cache_flash(
     at::Tensor& key, // [num_tokens, num_heads, head_size]
     at::Tensor& value, // [num_tokens, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks, block_size, num_heads, head_size]
@@ -683,6 +684,7 @@ void reshape_and_cache_flash(
   TORCH_CHECK(key_cache.stride(0) == value_cache.stride(0));
   DISPATCH_BY_KV_CACHE_DTYPE(
       key.dtype(), kv_cache_dtype, CALL_RESHAPE_AND_CACHE_FLASH)
+  return std::make_tuple(key_cache, value_cache);
 }
 
 IPEX_LIBRARY_FRAGMENT() {

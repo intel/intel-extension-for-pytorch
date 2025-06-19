@@ -13,7 +13,7 @@ IPEX_DEFINE_DISPATCH(flash_attn_var_len_kernel_stub);
 /*
  *Caculate the masked multihead attention for decoder layer in decoder only
  */
-void single_query_cached_kv_attention_forward_cpu(
+at::Tensor single_query_cached_kv_attention_forward_cpu(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
@@ -29,7 +29,7 @@ void single_query_cached_kv_attention_forward_cpu(
     const double k_scale,
     const double v_scale,
     const double softcap) {
-  return single_query_cached_kv_attention_kernel_stub(
+  single_query_cached_kv_attention_kernel_stub(
       kCPU,
       out,
       query,
@@ -46,9 +46,10 @@ void single_query_cached_kv_attention_forward_cpu(
       k_scale,
       v_scale,
       softcap);
+  return out;
 }
 
-void reshape_and_cache_cpu(
+std::tuple<at::Tensor, at::Tensor> reshape_and_cache_cpu(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
@@ -57,7 +58,7 @@ void reshape_and_cache_cpu(
     const std::string& kv_cache_dtype,
     const double k_scale,
     const double v_scale) {
-  return reshape_and_cache_kernel_stub(
+  reshape_and_cache_kernel_stub(
       kCPU,
       key,
       value,
@@ -67,9 +68,10 @@ void reshape_and_cache_cpu(
       kv_cache_dtype,
       k_scale,
       v_scale);
+  return std::make_tuple(key_cache, value_cache);
 }
 
-void flash_attn_varlen_cpu(
+at::Tensor flash_attn_varlen_cpu(
     at::Tensor& out,
     at::Tensor& query,
     at::Tensor& key,
@@ -84,11 +86,11 @@ void flash_attn_varlen_cpu(
     const c10::optional<at::Tensor>& alibi_slopes,
     int64_t window_size_left,
     int64_t window_size_right,
-    const std::string& kv_cache_dtype,
+    const std::string_view& kv_cache_dtype,
     const double k_scale,
     const double v_scale,
     const double softcap) {
-  return flash_attn_var_len_kernel_stub(
+  flash_attn_var_len_kernel_stub(
       kCPU,
       out,
       query,
@@ -108,6 +110,7 @@ void flash_attn_varlen_cpu(
       k_scale,
       v_scale,
       softcap);
+  return out;
 }
 
 } // namespace cpu

@@ -76,7 +76,7 @@ def mha_ref(q, k, v, scale, is_causal, window_size, softcap):
 
 class TestFlashAttnVarLen(TestCase):
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def _test_flash_attn_varlen(
         self,
         num_heads: int,
@@ -86,6 +86,7 @@ class TestFlashAttnVarLen(TestCase):
         is_causal: bool,
         dtype: torch.dtype,
         softcap: float,
+        is_compile: bool,
     ) -> None:
         random.seed(0)
         torch.manual_seed(0)
@@ -163,7 +164,11 @@ class TestFlashAttnVarLen(TestCase):
             output_ref[cu_seq_lens_q[i] : cu_seq_lens_q[i + 1]] = output_i
 
         output = torch.empty_like(query)
-        ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
+        if is_compile:
+            f_c = torch.compile(ipex.llm.modules.PagedAttention.flash_attn_varlen_func)
+        else:
+            f_c = ipex.llm.modules.PagedAttention.flash_attn_varlen_func
+        f_c(
             output,
             query,
             k_cache,
@@ -185,7 +190,7 @@ class TestFlashAttnVarLen(TestCase):
             output_ref, output, atol=1e-6 if dtype == torch.float else 5e-2
         )
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def _test_flash_attn_varlen_fp8(
         self,
         num_heads: int,
@@ -195,6 +200,7 @@ class TestFlashAttnVarLen(TestCase):
         is_causal: bool,
         dtype: torch.dtype,
         softcap: float,
+        is_compile: bool,
     ) -> None:
         random.seed(0)
         torch.manual_seed(0)
@@ -255,6 +261,7 @@ class TestFlashAttnVarLen(TestCase):
         scale = float(1.0 / (head_size**0.5))
 
         output_ref = torch.empty_like(query)
+
         ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
             output_ref,
             query,
@@ -272,9 +279,12 @@ class TestFlashAttnVarLen(TestCase):
             window_size[1],
             softcap=softcap,
         )
-
+        if is_compile:
+            f_c = torch.compile(ipex.llm.modules.PagedAttention.flash_attn_varlen_func)
+        else:
+            f_c = ipex.llm.modules.PagedAttention.flash_attn_varlen_func
         output = torch.empty_like(query)
-        ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
+        f_c(
             output,
             query,
             k_cache.to(torch.float8_e5m2),
@@ -297,6 +307,9 @@ class TestFlashAttnVarLen(TestCase):
         )
 
     def test_flash_attn_varlen(self):
+        COMPILE_TEST = (
+            1  # test torch.compile function for once, avoiding recompile in CI
+        )
         for (
             num_heads,
             num_queries_per_kv,
@@ -314,17 +327,24 @@ class TestFlashAttnVarLen(TestCase):
             DTYPES,
             SOFTCAP,
         ):
-            self._test_flash_attn_varlen(
-                num_heads,
-                num_queries_per_kv,
-                head_size,
-                window_size,
-                is_causal,
-                dtype,
-                softcap,
-            )
+            COMPILE = [True, False] if COMPILE_TEST == 1 else [False]
+            COMPILE_TEST = COMPILE_TEST - 1
+            for is_compile in COMPILE:
+                self._test_flash_attn_varlen(
+                    num_heads,
+                    num_queries_per_kv,
+                    head_size,
+                    window_size,
+                    is_causal,
+                    dtype,
+                    softcap,
+                    is_compile,
+                )
 
     def test_flash_attn_varlen_fp8(self):
+        COMPILE_TEST = (
+            1  # test torch.compile function for once, avoiding recompile in CI
+        )
         for (
             num_heads,
             num_queries_per_kv,
@@ -342,15 +362,19 @@ class TestFlashAttnVarLen(TestCase):
             [torch.float, torch.bfloat16],
             SOFTCAP,
         ):
-            self._test_flash_attn_varlen_fp8(
-                num_heads,
-                num_queries_per_kv,
-                head_size,
-                window_size,
-                is_causal,
-                dtype,
-                softcap,
-            )
+            COMPILE = [True, False] if COMPILE_TEST == 1 else [False]
+            COMPILE_TEST = COMPILE_TEST - 1
+            for is_compile in COMPILE:
+                self._test_flash_attn_varlen_fp8(
+                    num_heads,
+                    num_queries_per_kv,
+                    head_size,
+                    window_size,
+                    is_causal,
+                    dtype,
+                    softcap,
+                    is_compile,
+                )
 
 
 if __name__ == "__main__":

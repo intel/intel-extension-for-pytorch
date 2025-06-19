@@ -1452,7 +1452,7 @@ Tensor xetla_fsdp_index_forward(
   return output;
 }
 
-void xetla_paged_attention_impl_v1(
+Tensor xetla_paged_attention_impl_v1(
     Tensor& out,
     const Tensor& query,
     const Tensor& key_cache,
@@ -1520,9 +1520,10 @@ void xetla_paged_attention_impl_v1(
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
 #endif
+  return out;
 }
 
-void xetla_paged_attention_v1(
+Tensor xetla_paged_attention_v1(
     Tensor& out,
     const Tensor& query,
     const Tensor& key_cache,
@@ -1537,7 +1538,7 @@ void xetla_paged_attention_v1(
     const double softcap = -1.) {
   RECORD_FUNCTION("xetla_paged_attention_v1", {});
 
-  xetla_paged_attention_impl_v1(
+  return xetla_paged_attention_impl_v1(
       out,
       query,
       key_cache,
@@ -1551,7 +1552,7 @@ void xetla_paged_attention_v1(
       alibi_slopes);
 }
 
-void xetla_paged_attention_impl_v2(
+Tensor xetla_paged_attention_impl_v2(
     Tensor& max_logits,
     Tensor& exp_sums,
     Tensor& tmp_out,
@@ -1621,9 +1622,10 @@ void xetla_paged_attention_impl_v2(
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
 #endif
+  return out;
 }
 
-void xetla_paged_attention_v2(
+Tensor xetla_paged_attention_v2(
     Tensor& max_logits,
     Tensor& exp_sums,
     Tensor& tmp_out,
@@ -1641,7 +1643,7 @@ void xetla_paged_attention_v2(
     const double softcap = -1.) {
   RECORD_FUNCTION("xetla_paged_attention_v2", {});
 
-  xetla_paged_attention_impl_v2(
+  return xetla_paged_attention_impl_v2(
       max_logits,
       exp_sums,
       tmp_out,
@@ -1659,7 +1661,7 @@ void xetla_paged_attention_v2(
       softcap);
 }
 
-void paged_attention(
+Tensor paged_attention(
     Tensor& output,
     const Tensor& query,
     const Tensor& key_cache,
@@ -1687,7 +1689,7 @@ void paged_attention(
         {num_tokens, num_heads, num_partitions},
         query.options().dtype(at::kFloat).device(query.device()));
     Tensor max_logits = at::empty_like(exp_sums);
-    xetla_paged_attention_v2(
+    return xetla_paged_attention_v2(
         max_logits,
         exp_sums,
         tmp_output,
@@ -1704,7 +1706,7 @@ void paged_attention(
         alibi_slopes,
         softcap);
   } else {
-    xetla_paged_attention_v1(
+    return xetla_paged_attention_v1(
         output,
         query,
         key_cache,

@@ -100,18 +100,21 @@ def may_import_deepspeed_modules():
     try:
         # import deepspeed in a global space will raise circular import error
         # intel-extension-for-deepspeed imports both IPEX and deepspeed
+        import deepspeed.module_inject.layers as dslayers
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
 
         ds_layers = [LinearAllreduce, LinearLayer]
 
-        # TODO: remove this logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
-        try:
-            from deepspeed.module_inject.layers import LmHeadLinearAllreduce
+        from deepspeed.module_inject.layers import LmHeadLinearAllreduce
 
-            ds_layers.append(LmHeadLinearAllreduce)
-            return ds_layers
-        except ImportError:
-            return ds_layers
+        ds_layers.append(LmHeadLinearAllreduce)
+        ds_layers += list(
+            cls
+            for cls in dslayers.LinearAllreduce.__subclasses__()
+            if cls is not LmHeadLinearAllreduce
+        )
+        ds_layers += list(cls for cls in dslayers.LinearLayer.__subclasses__())
+        return ds_layers
     except ImportError:
         return None
 

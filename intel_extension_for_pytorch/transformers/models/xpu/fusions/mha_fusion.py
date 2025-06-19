@@ -436,7 +436,7 @@ class _IPEXPagedAttentionXPU:
         k_scale=1.0,
         v_scale=1.0,
     ):  # todo, k_scale and v_scale not implement here. tmply add arguments for frontend alignment with CPU
-        torch.ops.torch_ipex.reshape_and_cache(
+        return torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
@@ -459,7 +459,7 @@ class _IPEXPagedAttentionXPU:
         k_scale=1.0,
         v_scale=1.0,
     ):
-        torch.ops.torch_ipex.reshape_and_cache_flash(
+        return torch.ops.torch_ipex.reshape_and_cache_flash(
             key,
             value,
             key_cache,
@@ -495,7 +495,7 @@ class _IPEXPagedAttentionXPU:
         )
         num_queries_per_tokens = (head_mapping == 0).sum()
         query = query.contiguous()
-        torch.ops.torch_ipex.paged_attention(
+        return torch.ops.torch_ipex.paged_attention(
             output,
             query,
             key_cache,
@@ -528,7 +528,7 @@ class _IPEXPagedAttentionXPU:
     ):
         query = query.contiguous()
         key_cache, value_cache = convert_from_fp8(query.dtype, key_cache, value_cache)
-        torch.ops.torch_ipex.paged_attention(
+        return torch.ops.torch_ipex.paged_attention(
             output,
             query,
             key_cache,
@@ -595,7 +595,7 @@ class _IPEXPagedAttentionXPU:
         if block_size * block_table_s.size(1) > max_seqlen_kv:
             max_block_per_seq = (max_seqlen_kv + block_size - 1) // block_size
             block_table_s = block_table_s[:, :max_block_per_seq].contiguous()
-        torch.ops.torch_ipex.chunked_prefill(
+        return torch.ops.torch_ipex.chunked_prefill(
             pad_query,
             pad_k_cache,
             pad_v_cache,

@@ -42,6 +42,8 @@ from llm.inference.utils.model_class.mistral import MistralConfig
 from llm.inference.utils.model_class.mixtral import MixtralConfig
 from llm.inference.utils.model_class.mpt import MPTConfig
 from llm.inference.utils.model_class.stablelm import StableLMConfig
+from llm.inference.utils.model_class.qwen3 import Qwen3Config
+from llm.inference.utils.model_class.qwen3moe import Qwen3moeConfig
 from llm.inference.utils.model_class.qwen import QwenConfig
 from llm.inference.utils.model_class.qwen2 import Qwen2Config
 from llm.inference.utils.model_class.git import GitConfig
@@ -55,6 +57,14 @@ from llm.inference.utils.model_class.maira2 import MAIRA2Config
 from llm.inference.utils.model_class.jamba import JambaConfig
 from llm.inference.utils.model_class.deepseek import DeepseekV2Config, DeepseekV3Config
 
+
+def str_to_kwargs(s):
+    return dict(
+        (k, float(v) if "." in v else int(v))
+        for k, v in (item.split("=") for item in s.split(","))
+    )
+
+
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
     "-m", "--model-id", default=None, type=str, required=True, help="your llm model"
@@ -62,7 +72,7 @@ parser.add_argument(
 parser.add_argument(
     "--vision-text-model",
     action="store_true",
-    help="whether or not it is vision-text multi-model structure",
+    help="[deprecated] whether it is vision-text multi-model structure",
 )
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
@@ -184,6 +194,14 @@ parser.add_argument(
 )
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--sample", action="store_true")
+parser.add_argument("--enable-thinking", action="store_true")
+parser.add_argument(
+    "--generation-config",
+    type=str_to_kwargs,
+    default="temperature=0.9",
+    help="generation config",
+)
 parser.add_argument("--profile", action="store_true")
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -302,6 +320,11 @@ if args.verbose:
     logger.setLevel(logging.DEBUG)
     ipex.set_logging_level(logging.DEBUG)
 
+if args.vision_text_model:
+    logger.warning(
+        "'--vision-text-model' flag is deprecated. Please set '--input-mode 1' instead."
+    )
+    args.input_mode = "1"
 
 # disable
 try:
@@ -354,7 +377,7 @@ elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.searc
     "llava", config.architectures[0], re.IGNORECASE
 ):
 
-    if args.vision_text_model:
+    if args.input_mode == "1":
         model = MLLAMAConfig(args.model_id)
         from PIL import Image
 
@@ -362,7 +385,7 @@ elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.searc
             if image_file.startswith("http://") or image_file.startswith("https://"):
                 import requests
 
-                raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+                raw_image = Image.open(requests.get(image_file, stream=True).raw)
             else:
                 raw_image = Image.open(image_file)
             return raw_image
@@ -394,6 +417,10 @@ elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
     model = MixtralConfig(args.model_id)
 elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
     model = StableLMConfig(args.model_id)
+elif re.search("qwen3moe", config.architectures[0], re.IGNORECASE):
+    model = Qwen3moeConfig(args.model_id)
+elif re.search("qwen3", config.architectures[0], re.IGNORECASE):
+    model = Qwen3Config(args.model_id)
 elif re.search("qwen", config.architectures[0], re.IGNORECASE):
     if re.search("qwen2", config.architectures[0], re.IGNORECASE):
         model = Qwen2Config(args.model_id)
@@ -455,7 +482,7 @@ elif re.search("phi4mm", config.architectures[0], re.IGNORECASE):
         if image_file.startswith("http://") or image_file.startswith("https://"):
             import requests
 
-            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+            raw_image = Image.open(requests.get(image_file, stream=True).raw)
         else:
             raw_image = Image.open(image_file)
         return raw_image
@@ -589,12 +616,12 @@ if args.streaming:
         streamer = TextStreamer(tokenizer)
 
 generate_kwargs = dict(
-    do_sample=False,
-    temperature=0.9,
+    do_sample=True if args.sample else False,
     num_beams=num_beams,
     max_new_tokens=args.max_new_tokens,
     min_new_tokens=args.max_new_tokens,
     streamer=streamer,
+    **args.generation_config,
 )
 if re.search("t5", config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
@@ -1526,65 +1553,83 @@ if args.benchmark:
             ipex._set_optimized_model_for_generation(
                 user_model, optimized_model=self_jit
             )
-
-    if model.name == "git":
-        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
-    elif model.name == "llava":
-        if args.prompt is not None:
+    for test_bs in [args.batch_size]:
+        if model.name == "git":
+            prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+        elif model.name == "llava":
+            if args.prompt is not None:
+                prompt = args.prompt
+            image = load_image(args.image_url)
+            image = [image] * test_bs
+            if user_model.config.mm_use_im_start_end:
+                prompt = (
+                    DEFAULT_IM_START_TOKEN
+                    + DEFAULT_IMAGE_TOKEN
+                    + DEFAULT_IM_END_TOKEN
+                    + "\n"
+                    + prompt
+                )
+            else:
+                prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
+            conv.append_message(conv.roles[0], prompt)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt()
+            image_processor = model.get_image_processor()
+        elif model.name == "whisper":
+            sample = librosa.load(args.audio, sr=16000)
+            prompt = sample[0]
+            generate_kwargs.pop("min_new_tokens", None)
+        elif model.name == "maira2":
             prompt = args.prompt
-        image = load_image(args.image_url)
-        image = [image] * args.batch_size
-        if user_model.config.mm_use_im_start_end:
-            prompt = (
-                DEFAULT_IM_START_TOKEN
-                + DEFAULT_IMAGE_TOKEN
-                + DEFAULT_IM_END_TOKEN
-                + "\n"
-                + prompt
+            sample = download_and_open(args.image_url)
+            process_input_func = (
+                tokenizer.process_reporting_input
+                if hasattr(tokenizer, "process_reporting_input")
+                else tokenizer.format_and_preprocess_reporting_input
             )
-        else:
-            prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
-        conv.append_message(conv.roles[0], prompt)
-        conv.append_message(conv.roles[1], None)
-        prompt = conv.get_prompt()
-        image_processor = model.get_image_processor()
-    elif model.name == "whisper":
-        sample = librosa.load(args.audio, sr=16000)
-        prompt = sample[0]
-        generate_kwargs.pop("min_new_tokens", None)
-    elif model.name == "maira2":
-        prompt = args.prompt
-        sample = download_and_open(args.image_url)
-        process_input_func = (
-            tokenizer.process_reporting_input
-            if hasattr(tokenizer, "process_reporting_input")
-            else tokenizer.format_and_preprocess_reporting_input
-        )
-    elif model.name == "phi4mm":
-        prompt = args.prompt
-        sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
-    else:
-        # input prompt
-        current_path = pathlib.Path(__file__).parent.resolve()
-        with open(str(current_path) + "/prompt.json") as f:
-            prompt_pool = json.load(f)
-        if args.prompt is not None:
+        elif model.name == "phi4mm":
             prompt = args.prompt
-        # elif int(args.input_tokens) > 8192:
-        #     prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
-        elif args.input_tokens in prompt_pool[model.name]:
-            prompt = prompt_pool[model.name][args.input_tokens]
+            sample = soundfile.read(args.audio) if config.input_mode in [2, 3] else None
         else:
-            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+            # input prompt
+            current_path = pathlib.Path(__file__).parent.resolve()
+            with open(str(current_path) + "/prompt.json") as f:
+                prompt_pool = json.load(f)
+            if args.prompt is not None:
+                prompt = args.prompt
+            # elif int(args.input_tokens) > 8192:
+            #     prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
+            elif args.input_tokens in prompt_pool[model.name]:
+                if model.name == "qwen3moe":
+                    prompt_list = []
+                    for i in range(test_bs):
+                        prompt = prompt_pool[model.name][args.input_tokens][str(i)]
+                        messages = [{"role": "user", "content": prompt}]
+                        prompt = tokenizer.apply_chat_template(
+                            messages,
+                            tokenize=False,
+                            add_generation_prompt=True,
+                            enable_thinking=args.enable_thinking,
+                        )
+                        prompt_list.append(prompt)
+                    prompt = prompt_list
+                else:
+                    prompt = prompt_pool[model.name][args.input_tokens]
+            else:
+                raise SystemExit(
+                    "[ERROR] Plese use --prompt if want to use custom input."
+                )
 
-        if model.name == "mllama":
-            raw_image = load_image(args.image_url)
-            raw_image = [raw_image] * args.batch_size
-            inputs = tokenizer(raw_image, prompt, return_tensors="pt")
-            input_size = inputs["input_ids"].size(dim=1)
-        else:
-            input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
-        print("---- Prompt size:", input_size)
+            if model.name == "mllama":
+                raw_image = load_image(args.image_url)
+                raw_image = [raw_image] * test_bs
+                inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+                input_size = inputs["input_ids"].size(dim=1)
+            else:
+                input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(
+                    dim=1
+                )
+            print("---- Prompt size:", input_size)
 
     if args.token_latency:
         if not hasattr(user_model.config, "token_latency"):
@@ -1594,7 +1639,8 @@ if args.benchmark:
     total_time = 0.0
     num_iter = args.num_iter
     num_warmup = args.num_warmup
-    prompt = [prompt] * args.batch_size
+    if model.name != "qwen3moe":
+        prompt = [prompt] * args.batch_size
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled
