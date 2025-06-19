@@ -518,6 +518,8 @@ ContextConvolution create(
   if (input_size.size() == 5) {
     format_tag = ideep::format_tag::ncdhw;
   } else if (input_size.size() == 3) {
+    TORCH_WARN(
+        "Conv1d channels last support will be deprecated in Intel® Extension for PyTorch* 2.9.");
     format_tag = ideep::format_tag::nwc;
   }
   if (weight_is_channels_last_) {

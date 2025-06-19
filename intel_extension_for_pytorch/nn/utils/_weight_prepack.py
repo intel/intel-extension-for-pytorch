@@ -1,3 +1,4 @@
+# coding=utf-8
 import os
 import torch
 import torch.nn as nn
@@ -250,6 +251,9 @@ class _IPEXConvNd(_IPEXPrepackModule):
 
 class _IPEXConv1d(_IPEXConvNd):
     def __init__(self):
+        logger.warning(
+            "Conv1d channels last support will be deprecated in Intel® Extension for PyTorch* 2.9."
+        )
         super(_IPEXConv1d, self).__init__()
 
 

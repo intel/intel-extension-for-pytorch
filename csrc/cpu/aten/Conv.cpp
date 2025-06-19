@@ -122,6 +122,8 @@ at::Tensor convolution_kernel(
   } else {
     // This a temporary workaround before channels last 1D is formally supported
     // in PyTorch. We will force to return nwc output.
+    TORCH_WARN(
+        "Conv1d channels last support will be deprecated in Intel® Extension for PyTorch* 2.9.");
     std::vector<int64_t> output_strides = {
         (output_sizes[1] * output_sizes[2]), 1, output_sizes[1]};
     output = at::empty_strided(output_sizes, output_strides, input.options());
