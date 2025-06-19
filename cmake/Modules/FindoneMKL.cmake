@@ -146,12 +146,22 @@ if(NOT MKL_CORE)
 endif()
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
-  set(MKL_SYCL "${LIB_PREFIX}mkl_sycl${LIB_SUFFIX}")
-  find_library(MKL_LIB_SYCL ${MKL_SYCL} HINTS ${mkl_root_hint}
-      PATH_SUFFIXES lib NO_DEFAULT_PATH)
-  if(NOT MKL_LIB_SYCL)
-    message(FATAL_ERROR "oneMKL library ${MKL_SYCL} not found")
-  endif()
+  set(MKL_LIB_NAMES "mkl_sycl_blas" "mkl_sycl_dft" "mkl_sycl_lapack"
+                    "mkl_sycl_rng" "mkl_sycl_sparse")
+  set(MKL_LIB_SYCL)
+  foreach(LIB_NAME IN LISTS MKL_LIB_NAMES)
+    find_library(
+      ${LIB_NAME}_library
+      NAMES ${LIB_PREFIX}${LIB_NAME}${LIB_SUFFIX}
+      HINTS ${mkl_root_hint}
+      PATH_SUFFIXES lib
+      NO_DEFAULT_PATH)
+    list(APPEND MKL_LIB_SYCL ${${LIB_NAME}_library})
+
+    if(NOT ${LIB_NAME}_library)
+      message(FATAL_ERROR "oneMKL library ${LIB_PREFIX}${LIB_NAME}${LIB_SUFFIX} not found")
+    endif()
+  endforeach()
 endif()
 
 # https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
