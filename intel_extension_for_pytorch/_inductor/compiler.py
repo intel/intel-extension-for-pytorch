@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 import torch
 from torch._subclasses import FakeTensor
 from torch.utils._mode_utils import no_dispatch
@@ -61,6 +62,10 @@ def compile(
 
         return compile_fx(model, example_inputs, mode, options)
     elif _get_compiler_backend() == "torchscript":
+        logger.warning(
+            "'torchscript' path will be deprecated in a future release of Intel® Extension for PyTorch*, "
+            + "please use 'inductor' path instead."
+        )
         try:
             with no_dispatch():
                 real_inputs = list(map(defake, example_inputs))

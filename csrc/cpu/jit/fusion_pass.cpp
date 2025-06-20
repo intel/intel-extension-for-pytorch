@@ -259,6 +259,9 @@ size_t getInstantiatedBailoutDepth() {
 }
 
 void FusionPass(std::shared_ptr<Graph>& graph) {
+  TORCH_WARN(
+      "JIT pass will be deprecated in a future release of Intel® Extension for PyTorch*, "
+      "we recommend using 'torch.compile(model, backend='ipex')' instead.");
   GRAPH_DUMP(
       "Before RemoveProfileNodesAndSpecializeTypes. Beginning of "
       "optimization pass",
