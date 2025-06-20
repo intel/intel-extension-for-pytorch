@@ -490,6 +490,9 @@ def optimize(
         and opt_properties.split_master_weight_for_bf16
         and dtype is torch.bfloat16
     ):
+        logger.warning(
+            "'split_master_weight_for_bf16' will be deprecated in a future release of Intel® Extension for PyTorch*."
+        )
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
             msg = (
@@ -594,6 +597,9 @@ def optimize(
 
     # with an optimizer
     if opt_properties.fuse_update_step:
+        logger.warning(
+            "'fuse_update_step' will be deprecated in a future release of Intel® Extension for PyTorch*."
+        )
         optimized_optimizer = optimizer_fusion(
             optimized_optimizer,
             device_type,
