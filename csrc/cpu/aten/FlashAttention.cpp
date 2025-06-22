@@ -39,15 +39,13 @@ std::tuple<at::Tensor, at::Tensor> flash_attention_forward_cpu(
 }
 
 /*
- *Substitude the flash attention SDPA in PT.
- *In order to add optimizations which are hard to upstream, like TPP layout
- *conversion.
+ *Disable the substitution of the flash attention SDPA in PT.
  */
-TORCH_LIBRARY_IMPL(aten, CPU, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("aten::_scaled_dot_product_flash_attention_for_cpu"),
-      TORCH_FN((&torch_ipex::cpu::flash_attention_forward_cpu)));
-}
+// TORCH_LIBRARY_IMPL(aten, CPU, m) {
+//   m.impl(
+//       TORCH_SELECTIVE_NAME("aten::_scaled_dot_product_flash_attention_for_cpu"),
+//       TORCH_FN((&torch_ipex::cpu::flash_attention_forward_cpu)));
+// }
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
