@@ -17,7 +17,7 @@ Run_llama2-7b_fsdp_alpaca_dataset() {
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
         --gradient_accumulation_steps 1 \
-        --evaluation_strategy "no" \
+        --eval_strategy "no" \
         --save_strategy "steps" \
         --save_steps 2000 \
         --save_total_limit 1 \
@@ -44,7 +44,7 @@ Run_llama2-7b_fsdp_alpaca_dataset_peft() {
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
         --gradient_accumulation_steps 1 \
-        --evaluation_strategy "no" \
+        --eval_strategy "no" \
         --save_strategy "steps" \
         --save_steps 2000 \
         --save_total_limit 1 \
@@ -68,7 +68,7 @@ Run_llama2-7b_fsdp_huggingface_dataset() {
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
         --gradient_accumulation_steps 1 \
-        --evaluation_strategy "no" \
+        --eval_strategy "no" \
         --save_strategy "steps" \
         --save_steps 2000 \
         --save_total_limit 1 \
@@ -95,7 +95,7 @@ Run_llama2-7b_fsdp_huggingface_dataset_peft() {
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
         --gradient_accumulation_steps 1 \
-        --evaluation_strategy "no" \
+        --eval_strategy "no" \
         --save_strategy "steps" \
         --save_steps 2000 \
         --save_total_limit 1 \

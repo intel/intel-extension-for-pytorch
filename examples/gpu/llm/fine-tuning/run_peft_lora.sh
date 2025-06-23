@@ -14,7 +14,7 @@ Run_peft_lora_phi3-mini() {
 	--lora_alpha ${lora_alpha} \
     --lora_target_modules ${lora_target_modules} \
 	--output_dir="output" \
-	--evaluation_strategy="epoch" \
+	--eval_strategy="epoch" \
 	--learning_rate=1e-3 \
 	--per_device_train_batch_size=1 \
 	--num_train_epochs=1 \
@@ -36,7 +36,7 @@ Run_peft_lora_qwen2-1.5b() {
     --lora_alpha ${lora_alpha} \
     --lora_target_modules ${lora_target_modules} \
     --output_dir="output" \
-    --evaluation_strategy="epoch" \
+    --eval_strategy="epoch" \
     --learning_rate=1e-3 \
     --per_device_train_batch_size=1 \
     --num_train_epochs=1 \

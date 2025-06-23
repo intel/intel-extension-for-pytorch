@@ -16,7 +16,7 @@ Run_llama3-8b_peft_singlecard() {
         --use_peft True \
         --max_seq_length 128 \
         --output_dir="output" \
-        --evaluation_strategy="epoch" \
+        --eval_strategy="epoch" \
         --learning_rate=1e-3 \
         --auto_find_batch_size=True \
         --num_train_epochs=1 \
@@ -34,7 +34,7 @@ Run_llama3-8b_peft_fsdp() {
         --use_peft True \
         --max_seq_length 128 \
         --output_dir="output" \
-        --evaluation_strategy="epoch" \
+        --eval_strategy="epoch" \
         --learning_rate=1e-3 \
         --gradient_accumulation_steps=1 \
         --per_device_train_batch_size=8 \

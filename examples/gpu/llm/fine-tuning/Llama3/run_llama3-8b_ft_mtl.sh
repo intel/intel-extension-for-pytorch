@@ -7,7 +7,7 @@ Run_llama3-8b_peft() {
         --use_peft True \
         --max_seq_length 128 \
         --output_dir="output" \
-        --evaluation_strategy="epoch" \
+        --eval_strategy="epoch" \
         --learning_rate=1e-3 \
         --auto_find_batch_size=True \
         --num_train_epochs=1 \
