@@ -454,14 +454,14 @@ class gemm_universal_t<
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM config.
   /// @return Expected local range.
-  static inline const cl::sycl::range<3> get_local_range() {
+  static inline const sycl::range<3> get_local_range() {
     XETLA_PRINTF(
         "Local range: {%d, %d, %d}",
         num_local_kslicing,
         local_range_m,
         local_range_n);
-    static const cl::sycl::range<3> local_range =
-        cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
+    static const sycl::range<3> local_range =
+        sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
     return local_range;
   };
 
@@ -472,7 +472,7 @@ class gemm_universal_t<
   /// @param matrix_n Is the size of the n dimension of the matrix
   /// multiplication (m x k x n).
   /// @return Expected group range.
-  static inline cl::sycl::range<3> get_group_range(
+  static inline sycl::range<3> get_group_range(
       uint32_t matrix_m,
       uint32_t matrix_n) {
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
@@ -483,8 +483,7 @@ class gemm_universal_t<
         num_global_kslicing,
         group_range_m,
         group_range_n);
-    return cl::sycl::range<3>{
-        num_global_kslicing, group_range_m, group_range_n};
+    return sycl::range<3>{num_global_kslicing, group_range_m, group_range_n};
   };
 
   /// @brief Host helper function to get the expected nd_range under the current
@@ -493,12 +492,10 @@ class gemm_universal_t<
   /// variables.
   /// @return Expected nd_range.
   template <quant_mode quant_mode>
-  static inline cl::sycl::nd_range<3> get_nd_range(
-      arguments_t<quant_mode>& args) {
-    const cl::sycl::range<3> local_range = get_local_range();
-    cl::sycl::range<3> group_range =
-        get_group_range(args.matrix_m, args.matrix_n);
-    return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+  static inline sycl::nd_range<3> get_nd_range(arguments_t<quant_mode>& args) {
+    const sycl::range<3> local_range = get_local_range();
+    sycl::range<3> group_range = get_group_range(args.matrix_m, args.matrix_n);
+    return sycl::nd_range<3>{group_range * local_range, local_range};
   };
 
   /// @brief Host helper function to get the expected accumulation buffer size

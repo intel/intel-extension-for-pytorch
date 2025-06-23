@@ -723,16 +723,16 @@ struct HgemmQKVGemm {
 
   static constexpr uint32_t thread_range_m = WG_M / SG_M;
   static constexpr uint32_t thread_range_n = WG_N / SG_N;
-  static inline cl::sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       const uint32_t m,
       const uint32_t n,
       const uint32_t group) {
-    static const cl::sycl::range<3> LocalRange{
+    static const sycl::range<3> LocalRange{
         gemm_tile_policy::SLM_KS, thread_range_m, thread_range_n};
     const uint32_t group_range_m = (m + WG_M - 1) / WG_M;
     const uint32_t group_range_n = (n + WG_N - 1) / WG_N;
-    const cl::sycl::range<3> GroupRange{group, group_range_m, group_range_n};
-    return cl::sycl::nd_range<3>{GroupRange * LocalRange, LocalRange};
+    const sycl::range<3> GroupRange{group, group_range_m, group_range_n};
+    return sycl::nd_range<3>{GroupRange * LocalRange, LocalRange};
   };
 };
 
@@ -760,7 +760,7 @@ struct HgemmQKVKernelFunctor {
   using tile_op_t = chained_tile_op_t<>;
   using qkv_gemm_t = HgemmQKVGemm<scalar_t, tile_policy_t, tile_op_t, arch_tag>;
   using gemm_op_t = qkv_gemm_t::gemm_op_t;
-  static inline cl::sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       const uint32_t m,
       const uint32_t n,
       const uint32_t group) {
@@ -900,7 +900,7 @@ inline cgfs_t hgemm_qkv(
       ldc,
       size_b,
       size_o);
-  cl::sycl::nd_range<3> NDRange = hgemm_qkt_t::get_nd_range(m, n, group);
+  sycl::nd_range<3> NDRange = hgemm_qkt_t::get_nd_range(m, n, group);
   return {
       [=](sycl::handler& cgh) { cgh.parallel_for<hgemm_qkt_t>(NDRange, kfn); }};
 }
@@ -929,7 +929,7 @@ struct HgemmQKVBiasKernelFunctor {
   using tile_op_t =
       chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t, arch_tag>>;
   using qkv_gemm_t = HgemmQKVGemm<scalar_t, tile_policy_t, tile_op_t, arch_tag>;
-  static inline cl::sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       const uint32_t m,
       const uint32_t n,
       const uint32_t group) {
@@ -1085,7 +1085,7 @@ inline cgfs_t hgemm_qkv_bias(
       size_b,
       size_o,
       size_bias);
-  cl::sycl::nd_range<3> NDRange = gemm_qkv_bias_t::get_nd_range(m, n, group);
+  sycl::nd_range<3> NDRange = gemm_qkv_bias_t::get_nd_range(m, n, group);
   return {[=](sycl::handler& cgh) {
     cgh.parallel_for<gemm_qkv_bias_t>(NDRange, kfn);
   }};
@@ -1131,7 +1131,7 @@ inline cgfs_t hgemm_qkv_group(
   using qkv_gemm_t = HgemmQKVGemm<scalar_t, tile_policy_t, tile_op_t, arch_tag>;
   using gemm_op_t = qkv_gemm_t::gemm_op_t;
 
-  cl::sycl::nd_range<3> NDRange =
+  sycl::nd_range<3> NDRange =
       qkv_gemm_t::get_nd_range(m, head_dim, num_kv_head * group);
   uint32_t lda = k;
   uint32_t ldb = B_ROW_MAJOR ? num_kv_head * group * head_dim : k;
@@ -1215,7 +1215,7 @@ inline cgfs_t hgemm_qkv_group_bias(
   using qkv_gemm_t = HgemmQKVGemm<scalar_t, tile_policy_t, tile_op_t, arch_tag>;
   using gemm_op_t = qkv_gemm_t::gemm_op_t;
 
-  cl::sycl::nd_range<3> NDRange =
+  sycl::nd_range<3> NDRange =
       qkv_gemm_t::get_nd_range(m, head_dim, num_kv_head * group);
   uint32_t lda = k;
   uint32_t ldb = B_ROW_MAJOR ? num_kv_head * group * head_dim : k;

@@ -863,16 +863,16 @@ cgfs_t gru_backward_data_impl(
 
   size_t N = batch_size;
   size_t H = hidden_size;
-  cl::sycl::range<3> GroupRange{
+  sycl::range<3> GroupRange{
       1,
       (N + wg_tile_m - 1) / wg_tile_m,
       // (H + wg_tile_n_0 - 1) / wg_tile_n_0
       1};
-  cl::sycl::range<3> LocalRange{
+  sycl::range<3> LocalRange{
       1,
       (wg_tile_m + sg_tile_m - 1) / sg_tile_m,
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
-  cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
+  sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input, arch_tag> kfn(
       layer_err_ptr,

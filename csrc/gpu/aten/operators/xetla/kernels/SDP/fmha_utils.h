@@ -158,7 +158,6 @@ struct tile_mask_t {
                                (i * num_block_x + j) * block_elems)
                            .xetla_format<accum_t, block_size_y, block_size_x>();
         int real_x = start_x + j * block_size_x;
-        int end_x = real_x + block_size_x - 1;
         xetla_vector<int32_t, block_size_x> blk_seq_x =
             xetla_vector_gen<int32_t, block_size_x>(real_x, 1);
 #pragma unroll
@@ -192,7 +191,6 @@ struct tile_mask_t {
                     tail_start_y * tile_size_x + j * tail_block_elems)
                 .xetla_format<accum_t, tail_size_y, block_size_x>();
         int real_x = start_x + j * block_size_x;
-        int end_x = real_x + block_size_x - 1;
         xetla_vector<int32_t, block_size_x> blk_seq_x =
             xetla_vector_gen<int32_t, block_size_x>(real_x, 1);
 #pragma unroll
@@ -220,10 +218,9 @@ struct tile_mask_t {
       mat_t& src,
       float alibi_slopes,
       uint32_t start_x,
-      uint32_t start_y) {
+      [[maybe_unused]] uint32_t start_y) {
 #pragma unroll
     for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
-      uint32_t blk_start_y = start_y + i * block_size_y;
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
         uint32_t blk_start_x = start_x + j * block_size_x;
@@ -246,7 +243,6 @@ struct tile_mask_t {
       constexpr uint32_t tail_size_y = tile_size_y % block_size_y;
       constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
 
-      uint32_t blk_start_y = start_y + tail_start_y;
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
         uint32_t blk_start_x = start_x + j * block_size_x;

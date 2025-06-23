@@ -9,9 +9,10 @@ This is an implementation of the Flash Attention algorithm
 #include "SDP/fmha_forward.hpp"
 #include "SDP/fmha_forward_kernel.hpp"
 #include "SDP/fmha_forward_v2.hpp"
+#include "SDP/fmha_forward_v3.hpp"
 
 // clang-format off
-// macros to be filled in CMake 
+// macros to be filled in CMake
 #define IMPL_T ${IMPL_T}
 #define IMPL_ARCH_TAG gpu_arch::${IMPL_ARCH_TAG}
 #define GPU_ARCH_${IMPL_ARCH_TAG}
@@ -25,6 +26,22 @@ This is an implementation of the Flash Attention algorithm
 #cmakedefine01 IMPL_KISLOCAL
 // clang-format on
 
+#define LAUNCH_GQA_KERNEL_IMPL(kHeadPerKv) \
+    do { \
+        using fmha_forward_op_t = fmha_forward_v3_t< \
+            fmha_policy, T, arch_tag, kUseAlibi, kUseBias, kIsCausal, \
+            kSeqLast, kIsTraining, kIsDropout, kVarlen, kIsLocal, kHeadPerKv>; \
+        \
+        sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range( \
+            args.num_batches * args.num_kv_heads, args.num_queries); \
+        \
+        FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args); \
+        \
+        return {[=](sycl::handler& cgh) { \
+            cgh.parallel_for(NdRange, kfn); \
+        }}; \
+    } while(0)
+
 namespace gpu::xetla {
 
 namespace fmha {
@@ -34,6 +51,7 @@ struct is_fmha_v2 : std::false_type {};
 
 template <int head_dim>
 struct is_fmha_v2<std::integral_constant<int, head_dim>> : std::true_type {};
+
 
 // The launcher of fmha forward kernel
 template <
@@ -51,8 +69,9 @@ template <
 cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
 #ifdef SDP_DBG
   printf(
-      "B, N, Nkv, F, T, H: %u, %u, %u, %u, %u, %u, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d,"
+      "Use_v2: %b, B, N, Nkv, F, T, H: %u, %u, %u, %u, %u, %u, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d,"
       "IsDropout: %d, IsVarlen: %d, IsLocal: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
+      is_fmha_v2<fmha_policy>::value,
       args.num_batches,
       args.num_heads,
       args.num_kv_heads,
@@ -75,28 +94,47 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
       args.dropout_prob,
       kSeqLast);
 #endif
+
   constexpr bool kUseV2 = is_fmha_v2<fmha_policy>::value;
   // fmha forward kernel
 
   if constexpr (!kUseV2) {
-    using fmha_forward_op_t = fmha_forward_t<
-        fmha_policy,
-        T,
-        arch_tag,
-        kUseAlibi,
-        kUseBias,
-        kIsCausal,
-        kSeqLast,
-        kIsTraining,
-        kIsDropout,
-        kVarlen,
-        kIsLocal>;
+    if constexpr (std::is_same_v<fmha_policy, fmha_policy_1x64x64> ||
+                  std::is_same_v<fmha_policy, fmha_policy_1x128x64> ||
+                  std::is_same_v<fmha_policy, fmha_policy_1x64x128> ||
+                  std::is_same_v<fmha_policy, fmha_policy_1x128x128>){
+      auto kHeadPerKv = args.num_heads / args.num_kv_heads;
+      switch (kHeadPerKv) {
+          case 1: LAUNCH_GQA_KERNEL_IMPL(1);
+          case 2: LAUNCH_GQA_KERNEL_IMPL(2);
+          case 4: LAUNCH_GQA_KERNEL_IMPL(4);
+          case 5: LAUNCH_GQA_KERNEL_IMPL(5);
+          case 7: LAUNCH_GQA_KERNEL_IMPL(7);
+          case 8: LAUNCH_GQA_KERNEL_IMPL(8);
+          default: {
+              throw std::runtime_error("Unsupported kHeadPerKv value");
+          }
+      }
+    } else {
+      using fmha_forward_op_t = fmha_forward_t<
+          fmha_policy,
+          T,
+          arch_tag,
+          kUseAlibi,
+          kUseBias,
+          kIsCausal,
+          kSeqLast,
+          kIsTraining,
+          kIsDropout,
+          kVarlen,
+          kIsLocal>;
 
-    sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
-        args.num_batches * args.num_heads, args.num_queries);
+      sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
+          args.num_batches * args.num_heads, args.num_queries);
 
-    FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args);
-    return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+      FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args);
+      return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+    }
   } else {
     static constexpr uint32_t sg_num = arch_attr_t<arch_tag>::thread_per_wg;
     using fmha_forward_op_t =
@@ -133,6 +171,10 @@ INSTANTIATE_POLICY(fmha_policy_64x128x512);
 
 // chunked prefill policy support only pvc now
 #if defined(GPU_ARCH_XeHpc)
+INSTANTIATE_POLICY(fmha_policy_1x64x64);
+INSTANTIATE_POLICY(fmha_policy_1x64x128);
+INSTANTIATE_POLICY(fmha_policy_1x128x64);
+INSTANTIATE_POLICY(fmha_policy_1x128x128);
 INSTANTIATE_POLICY(fmha_policy_64x64x64);
 INSTANTIATE_POLICY(fmha_policy_64x64x128);
 INSTANTIATE_POLICY(fmha_policy_64x64x256);

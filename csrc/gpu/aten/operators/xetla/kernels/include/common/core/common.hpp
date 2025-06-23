@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
 #include <ext/intel/esimd.hpp>
+#include <sycl/sycl.hpp>
 #include <version.hpp>
 #include "./common_types.hpp"
 

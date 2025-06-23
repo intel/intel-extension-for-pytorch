@@ -261,20 +261,20 @@ class gemm_universal_t<
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM config.
   /// @return Expected local range.
-  static inline const cl::sycl::range<3> get_local_range() {
+  static inline const sycl::range<3> get_local_range() {
     // Linearize for stream_k algorithm
-    static const cl::sycl::range<3> local_range =
-        cl::sycl::range<3>{1, 1, local_range_m * local_range_n};
+    static const sycl::range<3> local_range =
+        sycl::range<3>{1, 1, local_range_m * local_range_n};
     return local_range;
   };
 
   /// @brief Host helper function to get the expected nd_range under the current
   /// GEMM config.
   /// @return Expected nd_range.
-  static inline cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
-    const cl::sycl::range<3> local_range = get_local_range();
-    cl::sycl::range<3> group_range = args.stream_k_args.get_group_range();
-    return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+  static inline sycl::nd_range<3> get_nd_range(arguments_t& args) {
+    const sycl::range<3> local_range = get_local_range();
+    sycl::range<3> group_range = args.stream_k_args.get_group_range();
+    return sycl::nd_range<3>{group_range * local_range, local_range};
   };
 
   /// @brief Host helper function to get the expected accumulation buffer size

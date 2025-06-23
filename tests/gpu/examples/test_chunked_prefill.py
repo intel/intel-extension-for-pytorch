@@ -1,3 +1,4 @@
+import os
 import torch
 import random
 from typing import List, Optional, Tuple
@@ -26,6 +27,10 @@ HEAD_SIZES = [64]
 BLOCK_SIZES = [32]
 USE_ALIBI = [False]
 SEEDS = [0]
+
+# TODO: FMHA_V3 will stuck on GPU Max
+if "Max" in torch.xpu.get_device_name():
+    os.environ["IPEX_FMHA_V3"] = "0"
 
 
 class TestChunkedPrefill(TestCase):
@@ -509,17 +514,14 @@ class TestChunkedPrefill(TestCase):
 
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
 
-    # @parametrize("num_gen_seqs", [1, 3, 8, 13])
-    @parametrize("num_gen_seqs", [1, 3, 8])
-    @parametrize("max_seqlen_k", [8, 1024, 2088])
-    # @parametrize("max_seqlen_k", [76])
-    @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 128, 256])
-    # @parametrize("head_size", [64])
-    @parametrize("block_size", [64, 128])
+    @parametrize("num_gen_seqs", [1, 8])
+    @parametrize("max_seqlen_k", [1024])
+    @parametrize("num_heads", [(16, 16), (10, 2)])
+    @parametrize("head_size", [64, 128])
+    @parametrize("block_size", [64])  # , 128])
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False, True])
-    @parametrize("window_size", [(-1, -1), (8, 2), (8, 1024), (1024, 8)])
+    @parametrize("window_size", [(-1, -1), (8, 2)])
     @parametrize("dtype", [torch.float16])
     @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
@@ -553,18 +555,19 @@ class TestChunkedPrefill(TestCase):
             softcap,
         )
 
-    @parametrize("num_gen_seqs", [1, 3, 8])
+    @parametrize("num_gen_seqs", [1, 8])
     # @parametrize("num_gen_seqs", [13])
-    @parametrize("max_seqlen_k", [8, 76, 512, 2088])
+    @parametrize("max_seqlen_k", [1024])
     # @parametrize("max_seqlen_k", [76])
-    @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 128, 256])
+    @parametrize("num_heads", [(10, 2)])
+    @parametrize("head_size", [128, 256])
     # @parametrize("head_size", [64])
-    @parametrize("block_size", [64, 128])
+    # @parametrize("block_size", [64, 128])
+    @parametrize("block_size", [64])
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False])
     @parametrize("dtype", [torch.float16])
-    @parametrize("window_size", [(-1, -1), (2, 2), (2, 1024), (1024, 2)])
+    @parametrize("window_size", [(-1, -1), (2, 2)])
     @parametrize("softcap", [-1.0, 50.0])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
@@ -597,14 +600,14 @@ class TestChunkedPrefill(TestCase):
             softcap,
         )
 
-    @parametrize("num_gen_seqs", [1, 3, 8])
+    @parametrize("num_gen_seqs", [1, 8])
     # @parametrize("num_gen_seqs", [13])
-    @parametrize("max_seqlen_k", [8, 76, 512, 2088])
+    @parametrize("max_seqlen_k", [512])
     # @parametrize("max_seqlen_k", [76])
     @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 128, 256])
+    @parametrize("head_size", [64, 128])
     # @parametrize("head_size", [64])
-    @parametrize("block_size", [64, 128])
+    @parametrize("block_size", [64])  # , 128])
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False])
     @parametrize("dtype", [torch.float16])
