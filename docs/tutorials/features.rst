@@ -99,7 +99,7 @@ Graph Optimization
 To further optimize TorchScript performance, Intel® Extension for PyTorch\* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
 For more detailed information, check `Graph Optimization <features/graph_optimization.md>`_.
 
-Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend taking advantage of Intel® Extension for PyTorch* with `TorchScript <https://pytorch.org/docs/stable/jit.html>`_. You may wish to run with the ``torch.jit.trace()`` function first, since it generally works better with Intel® Extension for PyTorch* than using the ``torch.jit.script()`` function. More detailed information can be found at the `pytorch.org website <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules>`_.
+Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode.
 
 .. toctree::
    :hidden:
@@ -123,25 +123,6 @@ Intel® Extension for PyTorch* also optimizes operators and implements several c
 .. autoclass:: MergedEmbeddingBagWithSGD
 
 **Auto kernel selection** is a feature that enables users to tune for better performance with GEMM operations. We aim to provide good default performance by leveraging the best of math libraries and enabling `weights_prepack`. The feature was tested with broad set of models. If you want to try other options, you can use `auto_kernel_selection` toggle in `ipex.optimize()` to switch, and you can disable `weights_prepack` in `ipex.optimize()` if you are more concerned about the memory footprint than performance gain. However, in most cases, we recommend sticking with the default settings for the best experience.
-
-
-Optimizer Optimization
-----------------------
-
-Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:
-
-1. Operator fusion for the computation in the optimizers.
-2. SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.
-
-
-For details, refer to `Optimizer Fusion <features/optimizer_fusion.md>`_ and `Split SGD <features/split_sgd.html>`_ 
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   features/optimizer_fusion
-   features/split_sgd
 
 Runtime Extension
 -----------------

@@ -228,13 +228,13 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Met
 cd distributed
 
 # Distributed inference in FP32
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype float32 --ipex --tasks lambada_openai
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype float32 --ipex --tasks lambada_openai
 
 # Distributed inference in BF16
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype bfloat16 --ipex --tasks lambada_openai
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --dtype bfloat16 --ipex --tasks lambada_openai
 
 # Distributed inference with Weight-Only Quantization
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model "../saved_results/llama_local_shard/" --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai
 ```
 
 **Note:** For models on HuggingFace require access privileges, you need to run the `huggingface-cli login` command in each docker container to config a HuggingFace access token.
@@ -764,30 +764,30 @@ cd ./distributed
 
 - Command:
 ```bash
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype float32 --ipex --tasks <TASK_NAME>
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype float32 --ipex --tasks <TASK_NAME>
 ```
 
 - An example of a pre-sharded Llama model:
 ```bash
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --dtype float32 --ipex --tasks lambada_openai
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --dtype float32 --ipex --tasks lambada_openai
 ```
 
 #### 3.2.2.3 BF16:
 - Command:
 ```bash
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype bfloat16 --ipex --tasks <TASK_NAME>
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --dtype bfloat16 --ipex --tasks <TASK_NAME>
 ```
 
 - An example of a pre-sharded Llama model:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --dtype bfloat16 --ipex --tasks lambada_openai
+deepspeed  --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --dtype bfloat16 --ipex --tasks lambada_openai
 ```
 
 #### 3.2.2.4 Weight-only quantization INT8:
 
 - Command:
 ```bash
-deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
+deepspeed  --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <SHARD MODEL PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
 Similar to script usage for performance benchmarking, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
@@ -805,7 +805,7 @@ Similar to script usage for performance benchmarking, we need to update some arg
 
 - An example of a pre-sharded INT8 Llama model:
 ```bash
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ../saved_results/llama_local_shard --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
 #### 3.2.2.5 Weight-only quantization INT4:
@@ -816,13 +816,13 @@ INT4 checkpoints cannot be pre-sharded, so in the command `--model` should be se
 
 - Command:
 ```bash
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <INT4_CKPT_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks <TASK_NAME>
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model <INT4_CKPT_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks <TASK_NAME>
 ```
 
 - An example to run Llama-3.1-8B:
 ```bash
 huggingface-cli download hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4 --local-dir ./Llama-3.1-8B-GPTQ
-deepspeed --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ./Llama-3.1-8B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks lambada_openai
+deepspeed --num_accelerators 2 --bind_cores_to_rank run_accuracy_with_deepspeed.py --model ./Llama-3.1-8B-GPTQ --ipex-weight-only-quantization --weight-dtype INT4 --lowp-mode BF16 --quant-with-amp --ipex --tasks lambada_openai
 ```
 
 <br>

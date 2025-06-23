@@ -1,4 +1,4 @@
-# IPEX LLAMA2 7B lora alpaca finetuning training on CPUs (distributed)
+# IPEX LLAMA2 7B lora alpaca finetuning training on CPUs (Deprecated)
 
 ## Description
 

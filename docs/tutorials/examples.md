@@ -39,24 +39,6 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 [//]: # (marker_inf_bert_imp_fp32)
 [//]: # (marker_inf_bert_imp_fp32)
 
-#### TorchScript Mode
-
-We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
-
-##### Resnet50
-
-**Note:** You need to install `torchvision` Python package to run the following example.
-
-[//]: # (marker_inf_rn50_ts_fp32)
-[//]: # (marker_inf_rn50_ts_fp32)
-
-##### BERT
-
-**Note:** You need to install `transformers` Python package to run the following example.
-
-[//]: # (marker_inf_bert_ts_fp32)
-[//]: # (marker_inf_bert_ts_fp32)
-
 #### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
 ##### Resnet50
@@ -95,24 +77,6 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
 [//]: # (marker_inf_bert_imp_bf16)
 [//]: # (marker_inf_bert_imp_bf16)
-
-#### TorchScript Mode
-
-We recommend using Intel® Extension for PyTorch\* with [TorchScript](https://pytorch.org/docs/stable/jit.html) for further optimizations.
-
-##### Resnet50
-
-**Note:** You need to install `torchvision` Python package to run the following example.
-
-[//]: # (marker_inf_rn50_ts_bf16)
-[//]: # (marker_inf_rn50_ts_bf16)
-
-##### BERT
-
-**Note:** You need to install `transformers` Python package to run the following example.
-
-[//]: # (marker_inf_bert_ts_bf16)
-[//]: # (marker_inf_bert_ts_bf16)
 
 #### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 

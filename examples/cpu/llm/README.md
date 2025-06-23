@@ -113,8 +113,4 @@ wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prom
 
 # 3. How To Run LLM with ipex.llm
 
-Inference and fine-tuning are supported in individual directories.
-
-For inference example scripts, visit the [inference](./inference/) directory.
-
-For fine-tuning example scripts, visit the [fine-tuning](./fine-tuning/) directory.
+Please visit the [inference](./inference/) directory for the example commands and related information.
