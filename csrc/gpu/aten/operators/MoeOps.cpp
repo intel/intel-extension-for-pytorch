@@ -14,151 +14,206 @@ namespace AtenIpexTypeXPU {
 
 namespace TopKSoftmaxImpl {
 // Each WI compute  one token
-template <int TopK, typename T>
+template <typename T>
 struct FusedTopkSoftmax {
-  static constexpr int SgSize = 16;
-  static constexpr int MaxSg = 32;
+  static constexpr int sub_group_size = 32;
+  static constexpr int max_group_size = 1024;
+  static constexpr int malloc_per_item = 8;
   static constexpr float kNegInfinity = INFINITY * -1;
-  static constexpr int ElemsPerItem = sizeof(T) > sizeof(float)
-      ? 1
-      : sizeof(float) / sizeof(T);
 
   FusedTopkSoftmax(
-      sycl::local_accessor<T, 1> slm,
-      const T* gating_output,
       float* topk_weights,
-      int* topk_indices,
+      int* topk_ids,
       int* rows_for_experts,
       int* offsets,
-      const int num_tokens,
-      const int num_experts)
-      : slm(slm),
-        gating_output(gating_output),
-        topk_weights(topk_weights),
-        topk_indices(topk_indices),
+      const T* gating_output,
+      const bool renormalize,
+      const int tokens,
+      const int experts,
+      const int top_k)
+      : topk_weights(topk_weights),
+        topk_ids(topk_ids),
         rows_for_experts(rows_for_experts),
         offsets(offsets),
-        num_tokens(num_tokens),
-        num_experts(num_experts) {}
+        gating_output(gating_output),
+        renormalize(renormalize),
+        tokens(tokens),
+        experts(experts),
+        top_k(top_k) {}
 
-  static inline int get_slm_size(const int num_tokens, const int num_experts) {
-    int total_sg = (num_tokens + SgSize - 1) / SgSize;
-    int local_sg = total_sg < MaxSg ? total_sg : MaxSg;
-    return local_sg * SgSize * num_experts * sizeof(T);
-  }
+  static inline sycl::nd_range<3> get_nd_range(
+      const int tokens,
+      const int experts) {
+    int calc_per_item = (experts + sub_group_size - 1) / sub_group_size;
+    int group_size = (experts + calc_per_item - 1) / calc_per_item;
+    group_size = group_size < sub_group_size ? sub_group_size : group_size;
+    group_size = group_size < max_group_size ? group_size : max_group_size;
+    int sub_groups_per_group =
+        (group_size + sub_group_size - 1) / sub_group_size;
+    group_size = sub_groups_per_group * sub_group_size;
+    int global_size =
+        (tokens + sub_groups_per_group - 1) / sub_groups_per_group;
 
-  static inline sycl::nd_range<3> get_nd_range(const int num_tokens) {
-    int total_sg = (num_tokens + SgSize - 1) / SgSize;
-    int local_sg = total_sg < MaxSg ? total_sg : MaxSg;
-    int num_wg = (total_sg + local_sg - 1) / local_sg;
-    sycl::range<3> local(1, 1, local_sg * SgSize);
-    sycl::range<3> global(1, 1, num_wg);
+    sycl::range<3> local(1, 1, group_size);
+    sycl::range<3> global(1, 1, global_size);
     return sycl::nd_range<3>(global * local, local);
   }
 
-  void operator()(sycl::nd_item<3> item) const {
-    T* slm_ptr =
-        slm.template get_multi_ptr<sycl::access::decorated::no>().get();
-    // load data from global memory to shared memory
+  static inline T Sigmoid(T x) {
+    float sycl_x = static_cast<float>(x);
+    float result = 1.0f / (1.0f + sycl::exp(-sycl_x));
+    return static_cast<T>(result);
+  }
+
+  [[sycl::reqd_sub_group_size(sub_group_size)]] void operator()(
+      sycl::nd_item<3> item) const {
+    int group_id = item.get_group_linear_id();
     int local_range = item.get_local_range(2);
-    int gid = item.get_group(2);
-    int group_offset = gid * local_range;
+    int sub_groups_per_group = local_range / sub_group_size;
+    int calc_per_item = (experts + sub_group_size - 1) / sub_group_size;
 
-    if (group_offset >= num_tokens)
-      return;
+    sycl::sub_group sg = item.get_sub_group();
+    int sg_id = sg.get_group_id();
+    int sg_local_id = sg.get_local_id();
 
-    int local_id = item.get_local_linear_id();
+    int tid = group_id * sub_groups_per_group + sg_id;
 
-    int start = group_offset * num_experts;
-    int end = (group_offset + local_range) < num_tokens
-        ? (group_offset + local_range) * num_experts
-        : num_tokens * num_experts;
-    // TODO(Performance): fix instruction dependency
-    for (int i = local_id * ElemsPerItem; (start + i) < end;
-         i += local_range * ElemsPerItem) {
-      T logits[ElemsPerItem];
-#pragma unroll
-      for (int j = 0; j < ElemsPerItem; j++) {
-        logits[j] = *(gating_output + start + i + j);
-      }
+    if (tid >= tokens) {
+      return; // Out of bounds
+    }
 
-      for (int j = 0; j < ElemsPerItem; j++) {
-        slm_ptr[i + j] = logits[j];
+    T local_elems[malloc_per_item];
+    int local_idx[malloc_per_item];
+
+    int start_offset = sg_local_id * calc_per_item;
+    int local_num = calc_per_item;
+
+    if (start_offset + local_num >= experts) {
+      local_num = experts - start_offset;
+      if (local_num < 0) {
+        local_num = 0; // No elements to process
       }
     }
-    item.barrier(sycl::access::fence_space::local_space);
 
-    if (group_offset + local_id >= num_tokens)
-      return;
+    for (int e = 0; e < calc_per_item; ++e) {
+      local_elems[e] = kNegInfinity;
+      local_idx[e] = -1;
+    }
 
-    // calculate topk
-    sycl::vec<float, TopK> topk_data(kNegInfinity);
-    sycl::vec<int, TopK> topk_idx(-1);
-    int local_offset = local_id * num_experts;
-    for (int k = 0; k < TopK; ++k) {
-      for (int i = 0; i < num_experts / ElemsPerItem; ++i) {
-        T data[ElemsPerItem];
-        for (int j = 0; j < ElemsPerItem; ++j) {
-          data[j] = slm_ptr[local_offset + i * ElemsPerItem + j];
+    for (int e = 0; e < local_num; ++e) {
+      local_elems[e] = gating_output[tid * experts + start_offset + e];
+      local_idx[e] = start_offset + e;
+    }
+
+    // Perform top-k selection
+    T topk_weights_local[malloc_per_item];
+    int topk_ids_local[malloc_per_item];
+
+    for (int k = 0; k < top_k; ++k) {
+      T k_max = kNegInfinity;
+      int k_max_idx = -1;
+      int remove_ix = -1;
+      for (int e = 0; e < calc_per_item; ++e) {
+        T my_val = local_elems[e];
+        int my_idx = local_idx[e];
+        for (int offset = sub_group_size / 2; offset > 0; offset /= 2) {
+          T other_val = sycl::permute_group_by_xor(sg, my_val, offset);
+          int other_idx = sycl::permute_group_by_xor(sg, my_idx, offset);
+          if (other_val > my_val ||
+              (other_val == my_val && other_idx < my_idx)) {
+            my_val = other_val;
+            my_idx = other_idx;
+          }
         }
+        if (!(my_val <= k_max)) {
+          k_max = my_val;
+          k_max_idx = my_idx;
 
-        for (int j = 0; j < ElemsPerItem; ++j) {
-          if (!(data[j] <= topk_data[k])) {
-            topk_data[k] = data[j];
-            topk_idx[k] = i * ElemsPerItem + j;
+          if (k_max_idx == local_idx[e]) {
+            remove_ix = e; // Mark this index for removal
           }
         }
       }
-      slm_ptr[local_offset + topk_idx[k]] = kNegInfinity;
-    }
-
-    // perform softmax
-    const float softmax_max = topk_data[0];
-    float softmax_sum(0);
-    for (int k = 0; k < TopK; ++k) {
-      topk_data[k] = sycl::exp(topk_data[k] - softmax_max);
-      softmax_sum += topk_data[k];
-    }
-
-    for (int i = 0; i < num_experts / ElemsPerItem; ++i) {
-      T data[ElemsPerItem];
-      for (int j = 0; j < ElemsPerItem; ++j) {
-        data[j] = slm_ptr[local_offset + i * ElemsPerItem + j];
+      topk_weights_local[k] = k_max;
+      topk_ids_local[k] = k_max_idx;
+      if (remove_ix != -1) {
+        // Reset the score to avoid re-selection
+        local_elems[remove_ix] = kNegInfinity;
+        local_idx[remove_ix] = -1;
+        remove_ix = -1;
       }
-      for (int j = 0; j < ElemsPerItem; ++j)
-        softmax_sum += sycl::exp(float(data[j]) - softmax_max);
     }
 
-    for (int k = 0; k < TopK; ++k) {
-      topk_data[k] /= softmax_sum;
+    float max_score = topk_weights_local[0];
+    float sum_exp = 0;
+
+    for (int i = 0; i < top_k; ++i) {
+      float score = topk_weights_local[i];
+      sum_exp += sycl::exp(score - max_score);
     }
 
-    // store data to global memory and  atomic add to rows_for_experts
-    // TODO: add hierarchy atomic add for large token number senario
-    int offset = group_offset * TopK + local_id * TopK;
-    for (int k = 0; k < TopK; ++k) {
-      topk_weights[offset + k] = topk_data[k];
-      topk_indices[offset + k] = topk_idx[k];
-      auto ref_num_tokens = sycl::atomic_ref<
-          int,
-          sycl::memory_order_relaxed,
-          sycl::memory_scope_device,
-          sycl::access::address_space::global_space>(
-          *(rows_for_experts + topk_idx[k]));
-      int old = ref_num_tokens.fetch_add(1);
-      offsets[offset + k] = old;
+    for (int e = 0; e < calc_per_item; ++e) {
+      float score = local_elems[e];
+      float my_val = sycl::exp(score - max_score);
+      for (int offset = sub_group_size / 2; offset > 0; offset /= 2) {
+        float other_val = sycl::permute_group_by_xor(sg, my_val, offset);
+        my_val += other_val;
+      }
+      sum_exp += my_val;
+    }
+
+    for (int i = 0; i < top_k; ++i) {
+      float score = topk_weights_local[i];
+      topk_weights_local[i] = sycl::exp(score - max_score) / sum_exp;
+    }
+
+    if (renormalize) {
+      // Renormalize the top-k weights
+      float sum = 0;
+      for (int i = 0; i < top_k; ++i) {
+        sum += topk_weights_local[i];
+      }
+      if (sum > 0) {
+        for (int i = 0; i < top_k; ++i) {
+          topk_weights_local[i] /= sum;
+        }
+      }
+    }
+
+    if (sg_local_id == 0) {
+      int offset = tid * top_k;
+      for (int i = 0; i < top_k; ++i) {
+        topk_weights[offset + i] = topk_weights_local[i];
+        if (topk_ids_local[i] < 0 || topk_ids_local[i] >= experts) {
+          // Ensure valid index
+          topk_ids[offset + i] = 0;
+          offsets[offset + i] = 0;
+          continue;
+        }
+        topk_ids[offset + i] = topk_ids_local[i];
+        auto ref_num_tokens = sycl::atomic_ref<
+            int,
+            sycl::memory_order_relaxed,
+            sycl::memory_scope_device,
+            sycl::access::address_space::global_space>(
+            *(rows_for_experts + topk_ids_local[i]));
+        int old = ref_num_tokens.fetch_add(1);
+        offsets[offset + i] = old;
+      }
     }
   }
-  sycl::local_accessor<T, 1> slm;
-  const T* gating_output;
   float* topk_weights;
-  int* topk_indices;
+  int* topk_ids;
   int* rows_for_experts;
   int* offsets;
-  const int num_tokens;
-  const int num_experts;
+  const T* gating_output;
+  const bool renormalize;
+  const int tokens;
+  const int experts;
+  const int top_k;
 };
-template <int TopK, typename T>
+
+template <typename T>
 void launch_fused_topk_softmax(
     sycl::queue& queue,
     const T* gating_output,
@@ -166,22 +221,24 @@ void launch_fused_topk_softmax(
     int* topk_indices,
     int* rows_for_experts,
     int* offsets,
+    const bool renormalize,
+    const int top_k,
     const int num_tokens,
     const int num_experts) {
-  using Kernel = FusedTopkSoftmax<TopK, T>;
-  int slm_size = Kernel::get_slm_size(num_tokens, num_experts);
-  auto range = Kernel::get_nd_range(num_tokens);
+  using Kernel = FusedTopkSoftmax<T>;
+  auto range = Kernel::get_nd_range(num_tokens, num_experts);
+
   auto cgf = DPCPP_Q_CGF(cgh) {
-    sycl::local_accessor<T, 1> accessor(slm_size / sizeof(T), cgh);
     Kernel task(
-        accessor,
-        gating_output,
         topk_weights,
         topk_indices,
         rows_for_experts,
         offsets,
+        gating_output,
+        renormalize,
         num_tokens,
-        num_experts);
+        num_experts,
+        top_k);
     cgh.parallel_for(range, task);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
@@ -194,32 +251,23 @@ void fused_topk_softmax(
     int* topk_indices,
     int* rows_for_experts,
     int* offsets,
+    const bool renormalize,
     const int num_tokens,
     const int num_experts,
     const int topk) {
   auto& queue = dpcppGetCurrentQueue();
 
-#define CASE_TOPK(K)                 \
-  case K:                            \
-    launch_fused_topk_softmax<K, T>( \
-        queue,                       \
-        gating_output,               \
-        topk_weights,                \
-        topk_indices,                \
-        rows_for_experts,            \
-        offsets,                     \
-        num_tokens,                  \
-        num_experts);                \
-    break;
-  switch (topk) {
-    CASE_TOPK(1)
-    CASE_TOPK(2)
-    CASE_TOPK(4)
-    CASE_TOPK(8)
-    default:
-      TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
-  }
-#undef CASE_TOPK
+  launch_fused_topk_softmax(
+      queue,
+      gating_output,
+      topk_weights,
+      topk_indices,
+      rows_for_experts,
+      offsets,
+      renormalize,
+      topk,
+      num_tokens,
+      num_experts);
 };
 }; // namespace TopKSoftmaxImpl
 
@@ -1476,7 +1524,8 @@ void moe_sum(
  */
 static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
     const Tensor& gating_output,
-    const int64_t n_topk) {
+    const int64_t n_topk,
+    const bool renormalize) {
   auto shape = gating_output.sizes().vec();
   TORCH_CHECK(
       shape.size() == 2,
@@ -1485,6 +1534,11 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
       "D");
   int n_tokens = shape[0];
   int n_experts = shape[1];
+
+  TORCH_CHECK(
+      n_experts <= 128,
+      "n_experts only support up to 128, but got ",
+      n_experts);
 
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
@@ -1506,6 +1560,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
             reinterpret_cast<int*>(topk_indices.data_ptr()),
             reinterpret_cast<int*>(rows_for_experts.data_ptr()),
             reinterpret_cast<int*>(offsets.data_ptr()),
+            renormalize,
             n_tokens,
             n_experts,
             n_topk);

@@ -34,7 +34,7 @@ class TestTorchMethod:
             self.ref_topk_softmax(gating_logits, n_topk)
         )
         topk_weights, topk_indices, token_for_experts, _ = (
-            torch.ops.torch_ipex.topk_softmax(gating_logits, n_topk)
+            torch.ops.torch_ipex.topk_softmax(gating_logits, n_topk, False)
         )
 
         # Compare the results
@@ -66,9 +66,12 @@ class TestTorchMethod:
             gating_logits[0][0] = float("nan")
 
         topk_weights, topk_indices, token_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.topk_softmax(gating_logits, n_topk)
+            torch.ops.torch_ipex.topk_softmax(gating_logits, n_topk, False)
         )
 
         assert torch.all(topk_indices < n_expert)
+        assert torch.all(topk_indices >= 0)
         assert torch.all(token_for_experts <= n_token * n_topk)
+        assert torch.all(token_for_experts >= 0)
         assert torch.all(expert_offsets < n_token * n_topk)
+        assert torch.all(expert_offsets >= 0)
