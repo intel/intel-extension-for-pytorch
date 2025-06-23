@@ -522,7 +522,11 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         if (
             self.num_heads != self.num_kv_heads
             and self.beam_search_next_token(query.size(2))
-            or (self.num_heads != self.num_kv_heads and not xpu_sdpa_support())
+            or (
+                self.num_heads != self.num_kv_heads
+                and self.num_heads > key.shape[1]
+                and not xpu_sdpa_support()
+            )
         ):
             num_group = self.num_heads // self.num_kv_heads
             key = self.repeat_kv(key, num_group)
