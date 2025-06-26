@@ -145,9 +145,11 @@ def process(*args):
     args_with_vision = args[5]
     args_with_audio = args[6]
     args_with_torch_ccl = args[7]
-    args_incremental = args[8]
-    args_verbose = args[9]
-    args_oneapi_root_dir = args[10]
+    args_rel_with_deb_info = args[8]
+    args_debug = args[9]
+    args_incremental = args[10]
+    args_verbose = args[11]
+    args_oneapi_root_dir = args[12]
 
     global exec_cmds
     global check_system_commands
@@ -493,6 +495,10 @@ def process(*args):
         env_torch['USE_MPI'] = '0'
         env_torch['USE_ONEMKL'] = '1'
         env_torch['USE_XCCL'] = '1'
+        if args_rel_with_deb_info:
+            env_torch['REL_WITH_DEB_INFO'] = '1'
+        if args_debug:
+            env_torch['DEBUG'] = '1'
         aot = args_aot
         if aot == '':
             # https://github.com/intel/torch-xpu-ops/blob/release/2.7/cmake/BuildFlags.cmake
@@ -612,6 +618,10 @@ def process(*args):
         env_ipex['BUILD_WITH_CPU'] = '0'
     env_ipex['TORCH_XPU_ARCH_LIST'] = args_aot
     env_ipex['ENABLE_ONEAPI_INTEGRATION'] = str(int(not args_disable_oneapi_integration))
+    if args_rel_with_deb_info:
+        env_ipex['REL_WITH_DEB_INFO'] = '1'
+    if args_debug:
+        env_ipex['DEBUG'] = '1'
     _compile(SRCDIR,
              env_ipex,
              pkg_name = 'intel_extension_for_pytorch',
@@ -741,6 +751,17 @@ if __name__ == '__main__':
         help = 'Show more information for debugging compilation.',
         action = 'store_true',
     )
+    grp_dbg = parser.add_mutually_exclusive_group(required=True)
+    grp_dbg.add_argument(
+        '--rel-with-deb-info',
+        help = 'Build release version with debugging info.',
+        action = 'store_true',
+    )
+    grp_dbg.add_argument(
+        '--debug',
+        help = 'Build with debug mode.',
+        action = 'store_true',
+    )
     args = parser.parse_args()
 
     utils_filepath = os.path.join(BASEDIR, UTILSFILENAME)
@@ -780,6 +801,8 @@ if __name__ == '__main__':
             args.with_vision,
             args.with_audio,
             args.with_torch_ccl,
+            args.rel_with_deb_info,
+            args.debug,
             args.incremental,
             args.verbose,
             args.oneapi_root_dir

@@ -131,6 +131,8 @@ if __name__ == '__main__':
                 False,
                 True,
                 False,
+                False,
+                False,
                 args.verbose,
                 args.oneapi_root_dir
             )
