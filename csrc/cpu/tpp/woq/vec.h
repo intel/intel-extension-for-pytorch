@@ -312,8 +312,15 @@ inline void _vec_store_two_floats_as_bfloat16(
   v = _mm512_inserti64x4(v, v1_bf16, 1);
   _mm512_storeu_si512(addr, v);
 #else
-  // TODO(jgong5): emuclate AVX512BF16 downcast
-  TLA_ASSERT(false, "not implemented");
+  // emuclate AVX512BF16 downcast
+  alignas(64) float src[32];
+  _mm512_store_ps(src, v0);
+  _mm512_store_ps(src + 16, v1);
+  for (int i = 0; i < 32; ++i) {
+    uint32_t as_int = reinterpret_cast<uint32_t&>(src[i]);
+    uint16_t bf16 = static_cast<uint16_t>(as_int >> 16);
+    addr[i] = *reinterpret_cast<torch_ipex::tpp::bfloat16*>(&bf16);
+  }
 #endif
 };
 

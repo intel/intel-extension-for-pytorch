@@ -535,6 +535,7 @@ class DeepSeekTester(TestCase):
             is_woq=False,
             sym_quant_weight=False,
         ):
+            torch.manual_seed(128)
             a = torch.randn((m, k), device="cpu", dtype=dtype) / 10
             score = torch.randn((m, e), device="cpu", dtype=dtype)
             w13_list = []

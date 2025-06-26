@@ -11,7 +11,7 @@ cd ${BASEFOLDER}/..
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
 #           | | | | | | | └- Install wheel files
 #           | | | | | | └--- Compile wheel files
-#           | | | | | └----- Install from prebuilt wheel files for ipex
+#           | | | | | └----- Install from prebuilt wheel files for ipex, ds
 #           | | | | └------- Compile DeepSpeed from source
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
@@ -88,60 +88,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             python -m pip install intel-extension-for-pytorch==${VER_IPEX} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
         fi
     else
-        function ver_compare() {
-            VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
-            VER_MINOR_CUR=$(echo $1 | cut -d "." -f 2)
-            VER_PATCH_CUR=$(echo $1 | cut -d "." -f 3)
-            VER_MAJOR_REQ=$(echo $2 | cut -d "." -f 1)
-            VER_MINOR_REQ=$(echo $2 | cut -d "." -f 2)
-            VER_PATCH_REQ=$(echo $2 | cut -d "." -f 3)
-            RET=0
-            if [[ ${VER_MAJOR_CUR} -lt ${VER_MAJOR_REQ} ]]; then
-                RET=1
-            else
-                if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
-                   [[ ${VER_MINOR_CUR} -lt ${VER_MINOR_REQ} ]]; then
-                    RET=2
-                else
-                    if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
-                       [[ ${VER_MINOR_CUR} -eq ${VER_MINOR_REQ} ]] &&
-                       [[ ${VER_PATCH_CUR} -lt ${VER_PATCH_REQ} ]]; then
-                        RET=3
-                    fi
-                fi
-            fi
-            echo ${RET}
-        }
-        VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
-        if [ ${VER_COMP} -ne 0 ]; then
-            echo -e '\a'
-            echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
-            echo "         Found GCC version $(gcc -dumpfullversion)"
-            echo "         Installing gcc and g++ 12.3 with conda"
-            echo ""
-            set +e
-            command -v conda > /dev/null
-            EXIST_CONDA=$?
-            set -e
-            if [ ${EXIST_CONDA} -gt 0 ]; then
-                echo "[Error] Command \"conda\" is not available."
-                exit 5
-            else
-                conda install -y sysroot_linux-64==2.28 c-compiler cxx-compiler gcc==12.3 gxx==12.3 zstd -c conda-forge
-                if [ -z ${CONDA_BUILD_SYSROOT} ]; then
-                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
-                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
-                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
-                fi
-                set +e
-                echo ${LD_LIBRARY_PATH} | grep "${CONDA_PREFIX}/lib:" > /dev/null
-                if [ $? -gt 0 ]; then
-                    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
-                fi
-                set -e
-            fi
-        fi
-
         set +e
         echo ${VER_TORCH} | grep "dev" > /dev/null
         TORCH_DEV=$?
@@ -152,11 +98,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         fi
         echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" >> ${AUX_INSTALL_SCRIPT}
         # Install PyTorch and Intel® Extension for PyTorch*
-        cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
-        sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh 0
-        cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-        rm -rf compile_bundle.sh llvm-project llvm-release
+        python ${BASEFOLDER}/../../../../scripts/compile_bundle.py
+        cp ${BASEFOLDER}/../../../../dist/*.whl ${WHEELFOLDER}
     fi
 
     echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
