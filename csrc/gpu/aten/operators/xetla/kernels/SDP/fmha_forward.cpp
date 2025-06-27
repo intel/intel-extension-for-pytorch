@@ -19,7 +19,6 @@ This is an implementation of the Flash Attention algorithm
 #define HEAD_SIZE_LIMIT_3 512
 #define NUM_QUERIES_GREEDY 1
 #define NUM_QUERIES_LARGE 64
-#define NUM_QUERIES_EXTRAME 512
 #define NUM_KEYS_LIMIT_0 128
 #define NUM_KEYS_LIMIT_1 512
 
@@ -204,10 +203,8 @@ class fmha_forward_kernel_policy {
           // for long query length
           if constexpr (arch_tag == gpu_arch::XeLpg)
             return policy<fmha_policy_32x128x128>(args);
-          else if (args.num_queries < NUM_QUERIES_EXTRAME)
-            return policy<fmha_policy_64x128x128>(args);
           else
-            return policy<fmha_policy_256x128x128>(args);
+            return policy<fmha_policy_64x128x128>(args);
         }
       } else if constexpr (arch_tag == gpu_arch::XeLpg) {
         std::cout << "Larger head_size are experiencing problems on MTL...\n";
