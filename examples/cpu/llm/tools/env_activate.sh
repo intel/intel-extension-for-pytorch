@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MSG_USAGE="Usage: source $0 [inference|fine-tuning]"
+MSG_USAGE="Usage: source $0 inference"
 if [ $# -eq 0 ]; then
     echo ${MSG_USAGE}
     return 1
@@ -75,5 +75,6 @@ if [ ${MODE} == "inference" ]; then
     ln -s ../prompt.json
     cd ..
 elif [ ${MODE} == "fine-tuning" ]; then
+    echo "LLM fine-tuning example will be deprecated in a future release of Intel® Extension for PyTorch*."
     python -m pip install -r requirements.txt
 fi

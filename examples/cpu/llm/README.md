@@ -32,7 +32,7 @@ cd llm
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh inference
 ```
 
 ## 2.2 Conda-based environment setup with compilation from source
@@ -51,11 +51,11 @@ conda activate llm
 
 # Setup the environment with the provided script
 cd examples/cpu/llm
-bash ./tools/env_setup.sh 11
+bash ./tools/env_setup.sh 3
 
 # Activate environment variables
 # set bash script argument to "inference" or "fine-tuning" for different usages
-source ./tools/env_activate.sh [inference|fine-tuning]
+source ./tools/env_activate.sh inference
 ```
 
 ## 2.3 [Optional] Setup for Running Jupyter Notebooks

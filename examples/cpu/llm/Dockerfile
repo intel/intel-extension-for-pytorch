@@ -44,7 +44,7 @@ COPY . ./intel-extension-for-pytorch
 RUN python -m venv venv && . ~/venv/bin/activate && \
     cd intel-extension-for-pytorch/examples/cpu/llm && \
     export CC=gcc && export CXX=g++ && \
-    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 14; else bash tools/env_setup.sh 10; fi && \
+    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi && \
     unset CC && unset CXX
 
 FROM base AS deploy
@@ -61,7 +61,7 @@ COPY --from=dev /root/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh ./l
 RUN python -m venv venv && . ~/venv/bin/activate && \
     cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     cd ./llm && \
-    bash tools/env_setup.sh 9 && \
+    bash tools/env_setup.sh 1 && \
     python -m pip cache purge
 ARG PORT_SSH=22
 RUN mkdir /var/run/sshd && \

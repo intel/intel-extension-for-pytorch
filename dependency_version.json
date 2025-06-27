@@ -14,8 +14,8 @@
     "version": "0.23.0.dev20250623+cpu"
   },
   "deepspeed": {
-    "version": "",
-    "commit": "61829b55ea59a5f7d6386f4f061ca13e7aeccae3"
+    "version": "0.17.1",
+    "commit": ""
   },
   "lm-evaluation-harness": {
     "commit": "cc9778fbe4fa1a709be2abed9deb6180fd40e7e2"
