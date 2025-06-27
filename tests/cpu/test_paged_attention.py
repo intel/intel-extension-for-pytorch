@@ -1,11 +1,19 @@
 import torch
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+import os
 import unittest
 import random
 from typing import List, Optional, Tuple
 from itertools import product
 import intel_extension_for_pytorch._C as core
+
+from enum import Enum
+
+
+class SingleQueryKernels(str, Enum):
+    FLASH_DECODING = "1"
+    VNNI = "2"
 
 
 class PagedAttentionTest(TestCase):
@@ -233,7 +241,11 @@ class PagedAttentionTest(TestCase):
         )
         assert torch.allclose(output, ref_output, atol=5e-3, rtol=1e-3)
 
-    def _test_paged_attention(self):
+    def test_paged_attention(self):
+        paged_attention_single_query_kernels = [
+            SingleQueryKernels.FLASH_DECODING,
+            SingleQueryKernels.VNNI,
+        ]
         num_blocks = 128
         dtypes = [torch.bfloat16, torch.float]
         if core.onednn_has_fp16_support():
@@ -250,6 +262,7 @@ class PagedAttentionTest(TestCase):
             1  # test torch.compile function for once, avoiding recompile in CI
         )
         for (
+            kernel,
             num_seqs,
             num_head,
             head_size,
@@ -260,6 +273,7 @@ class PagedAttentionTest(TestCase):
             seed,
             softcap,
         ) in product(
+            paged_attention_single_query_kernels,
             num_gen_seqs,
             num_heads,
             head_sizes,
@@ -270,8 +284,13 @@ class PagedAttentionTest(TestCase):
             seeds,
             softcaps,
         ):
+            os.environ["PAGED_ATTENTION_SINGLE_QUERY_KERNEL"] = kernel
             # TODO: Support both use_softcap and window_size
             if softcap > 0 and sliding_window > 0:
+                continue
+            if kernel is SingleQueryKernels.VNNI and (
+                head_size % 2 == 1 or block_size % 2 == 1 or sliding_window > 0
+            ):
                 continue
             COMPILE = [True] if COMPILE_TEST == 1 else [False]
             COMPILE_TEST = COMPILE_TEST - 1

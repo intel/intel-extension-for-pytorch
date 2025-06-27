@@ -26,6 +26,7 @@
 #include "vec/vec.h"
 
 #define PARTITION_SIZE 128
+enum PAGED_ATTENTION_SINGLE_QUERY_KERNELS { FLASH_DECODING = 1, VNNI = 2 };
 
 template <typename scalar_t>
 static inline scalar_t* conditional_data_ptr(scalar_t* ptr, scalar_t* ptr2) {
@@ -343,6 +344,22 @@ void reduce_head<at::BFloat16, at::Float8_e5m2>(
 #endif
 }
 
+template <>
+void reduce_head<at::BFloat16, at::Float8_e5m2>(
+    const at::BFloat16* q_ptr_start,
+    const at::Float8_e5m2* k_cache_start,
+    float* attn_w_pos,
+    int64_t head_size) {
+  attn_w_pos[0] = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  _reduce_head_e5m2(q_ptr_start, k_cache_start, attn_w_pos, head_size);
+#else
+  for (auto hsi = 0; hsi < head_size; hsi++) {
+    attn_w_pos[0] += (float)q_ptr_start[hsi] * (float)k_cache_start[hsi];
+  }
+#endif
+}
+
 template <typename OT, typename CT>
 inline void mul_attenion_weights_and_value_of_head(
     const float* attn_w,
@@ -422,7 +439,6 @@ inline void mul_attenion_weights_and_value_of_head(
     OT* attn_out_start,
     int64_t head_size,
     bool accumulated) {
-  const auto vec_size = at::vec::Vectorized<OT>::size();
   auto hsi = 0;
 #if defined(CPU_CAPABILITY_AVX512)
   torch_ipex::cpu::kernel::_mul_and_accumulate<CT, OT, CT>(
@@ -439,6 +455,28 @@ inline void mul_attenion_weights_and_value_of_head(
       attn_out_start[hsi] += attn_w * (OT)v_cache_start[hsi];
     } else {
       attn_out_start[hsi] = attn_w * (OT)v_cache_start[hsi];
+    }
+  }
+#endif
+}
+
+template <>
+inline void mul_attenion_weights_and_value_of_head<float, at::Float8_e5m2>(
+    const float& attn_w,
+    const at::Float8_e5m2* v_cache_start,
+    float* attn_out_start,
+    int64_t head_size,
+    bool accumulated) {
+  auto hsi = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  _mul_and_accumulate_e5m2(
+      attn_w, v_cache_start, attn_out_start, head_size, accumulated);
+#else
+  for (hsi = 0; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += attn_w * (float)v_cache_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * (float)v_cache_start[hsi];
     }
   }
 #endif
@@ -617,6 +655,7 @@ at::Tensor deduce_prompt(at::Tensor& block_tables) {
 /**
  * Performs scale-dot-product for the next token based on cached key-value
  * attention.
+ * With VNNI, no flash decoding (for beam search)
  *
  * This function computes the attention weights and applies the attention
  * mechanism to obtain the final output. It takes in tensors representing the
@@ -654,9 +693,12 @@ void single_query_cached_kv_attention_vnni_kernel(
     int64_t block_size,
     int64_t max_context_len,
     const c10::optional<at::Tensor>& alibi_slopes,
+    int64_t window_size,
     const double k_scale,
     const double v_scale,
     const double softcap) {
+  // TODO: Support window_size
+  TORCH_CHECK(window_size > 0, "Sliding window unsupported");
   bool use_softcap = softcap == -1 ? false : true;
   auto scale_ = use_softcap ? 1.0 : scale;
   auto out_ptr = out.data_ptr<scalar_t>();
@@ -1055,6 +1097,7 @@ void single_query_cached_kv_attention_vnni_kernel(
 /**
  * Performs scale-dot-product for the next token based on cached key-value
  * attention.
+ * No VNNI, with flash decoding (for greedy search with large number of cores)
  *
  * This function computes the attention weights and applies the attention
  * mechanism to obtain the final output. It takes in tensors representing the
@@ -1081,7 +1124,7 @@ void single_query_cached_kv_attention_vnni_kernel(
  * @param v_scale       Scaling factor for value cache of data type fp8.
  */
 template <typename scalar_t, typename cache_t>
-void single_query_cached_kv_attention_kernel(
+void single_query_cached_kv_attention_fd_kernel(
     at::Tensor& out,
     at::Tensor& query,
     at::Tensor& key_cache,
@@ -1404,7 +1447,7 @@ void single_query_cached_kv_attention_kernel(
           head_size);
     }
   }
-} // single_query_cached_kv_attention_kernel
+} // single_query_cached_kv_attention_fd_kernel
 
 /**
  * Reshapes and caches the key and value tensors based on the provided slot
@@ -1799,6 +1842,7 @@ void flash_attn_varlen_kernel(
     }
   }
 }
+
 void single_query_cached_kv_attention_kernel_impl(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
@@ -1818,36 +1862,34 @@ void single_query_cached_kv_attention_kernel_impl(
   RECORD_FUNCTION(
       "ipex::single_query_cached_kv_attention_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
-  // dispatch kernel according to the data type of input tensor
-  auto num_seqs = query.size(0);
-  auto num_heads = query.size(1);
-  auto head_size = query.size(2);
-  auto num_kv_heads = key_cache.size(1);
-  auto kv_head_group_size = num_heads / num_kv_heads;
-  int beam_size = deduce_beam_size(block_tables);
-  int batch_size = num_seqs / beam_size;
-  auto thread_numbers = omp_get_max_threads();
-  // heuristic to use vnni layout or not
-  bool use_vnni = beam_size >= 4 &&
-      num_heads * batch_size > thread_numbers * 2 && kv_head_group_size == 1 &&
-      head_size % 2 == 0 && block_size % 2 == 0;
-  if (key_cache.scalar_type() != at::ScalarType::Float8_e5m2 && use_vnni) {
-    if (out.scalar_type() == at::ScalarType::Float) {
-      single_query_cached_kv_attention_vnni_kernel<float, float>(
-          out,
-          query,
-          key_cache,
-          value_cache,
-          scale,
-          block_tables,
-          context_lens,
-          block_size,
-          max_context_len,
-          alibi_slopes,
-          k_scale,
-          v_scale,
-          softcap);
-    } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+
+  // heuristic to choose kernel
+  int32_t single_query_kernel_name = FLASH_DECODING;
+  const int32_t forced_single_query_kernel =
+      torch_ipex::tpp::env2int("PAGED_ATTENTION_SINGLE_QUERY_KERNEL", -1);
+  if (forced_single_query_kernel != -1) {
+    single_query_kernel_name = forced_single_query_kernel;
+  } else {
+    auto num_seqs = query.size(0);
+    auto num_heads = query.size(1);
+    auto head_size = query.size(2);
+    auto num_kv_heads = key_cache.size(1);
+    auto kv_head_group_size = num_heads / num_kv_heads;
+    int beam_size = deduce_beam_size(block_tables);
+    int batch_size = num_seqs / beam_size;
+    auto thread_numbers = omp_get_max_threads();
+    // heuristic to use vnni layout or not
+    bool disable_flash_decoding = num_heads * batch_size > thread_numbers * 2;
+    bool use_vnni = disable_flash_decoding && beam_size >= 4 &&
+        head_size % 2 == 0 && block_size % 2 == 0 && window_size <= 0 &&
+        key_cache.scalar_type() != at::ScalarType::Float8_e5m2;
+    single_query_kernel_name = use_vnni ? VNNI : single_query_kernel_name;
+  }
+
+  // dispatch kernel
+  if (single_query_kernel_name == VNNI) {
+    if (key_cache.scalar_type() == at::ScalarType::BFloat16 &&
+        out.scalar_type() == at::ScalarType::BFloat16) {
       single_query_cached_kv_attention_vnni_kernel<at::BFloat16, at::BFloat16>(
           out,
           query,
@@ -1859,6 +1901,23 @@ void single_query_cached_kv_attention_kernel_impl(
           block_size,
           max_context_len,
           alibi_slopes,
+          window_size,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (out.scalar_type() == at::ScalarType::Float) {
+      single_query_cached_kv_attention_vnni_kernel<float, float>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes,
+          window_size,
           k_scale,
           v_scale,
           softcap);
@@ -1874,82 +1933,86 @@ void single_query_cached_kv_attention_kernel_impl(
           block_size,
           max_context_len,
           alibi_slopes,
+          window_size,
           k_scale,
           v_scale,
           softcap);
     } else {
       TORCH_CHECK(
-          false, "Unsupported data type for single_query_cached_kv_attention");
+          false,
+          "Unsupported data type for single_query_cached_kv_attention_vnni_kernel");
     }
-  } else if (
-      key_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
-      out.scalar_type() == at::ScalarType::BFloat16) {
-    single_query_cached_kv_attention_kernel<at::BFloat16, at::Float8_e5m2>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes,
-        window_size,
-        k_scale,
-        v_scale,
-        softcap);
-  } else if (out.scalar_type() == at::ScalarType::Float) {
-    single_query_cached_kv_attention_kernel<float, float>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes,
-        window_size,
-        k_scale,
-        v_scale,
-        softcap);
-  } else if (out.scalar_type() == at::ScalarType::BFloat16) {
-    single_query_cached_kv_attention_kernel<at::BFloat16, at::BFloat16>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes,
-        window_size,
-        k_scale,
-        v_scale,
-        softcap);
-  } else if (out.scalar_type() == at::ScalarType::Half) {
-    single_query_cached_kv_attention_kernel<at::Half, at::Half>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes,
-        window_size,
-        k_scale,
-        v_scale,
-        softcap);
   } else {
-    TORCH_CHECK(
-        false, "Unsupported data type for single_query_cached_kv_attention");
+    if (key_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
+        out.scalar_type() == at::ScalarType::BFloat16) {
+      single_query_cached_kv_attention_fd_kernel<at::BFloat16, at::Float8_e5m2>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes,
+          window_size,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (out.scalar_type() == at::ScalarType::Float) {
+      single_query_cached_kv_attention_fd_kernel<float, float>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes,
+          window_size,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+      single_query_cached_kv_attention_fd_kernel<at::BFloat16, at::BFloat16>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes,
+          window_size,
+          k_scale,
+          v_scale,
+          softcap);
+    } else if (out.scalar_type() == at::ScalarType::Half) {
+      single_query_cached_kv_attention_fd_kernel<at::Half, at::Half>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes,
+          window_size,
+          k_scale,
+          v_scale,
+          softcap);
+    } else {
+      TORCH_CHECK(
+          false,
+          "Unsupported data type for single_query_cached_kv_attention_fd_kernel");
+    }
   }
 }
 

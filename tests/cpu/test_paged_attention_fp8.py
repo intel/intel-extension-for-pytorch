@@ -1,10 +1,12 @@
 import torch
 import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
+import os
 import unittest
 import random
 from typing import List, Optional, Tuple
 from itertools import product
+from test_paged_attention import SingleQueryKernels
 
 
 class PagedAttentionTest(TestCase):
@@ -235,6 +237,10 @@ class PagedAttentionTest(TestCase):
         assert torch.allclose(output, ref_output, atol=5e-3, rtol=1e-3)
 
     def test_paged_attention(self):
+        paged_attention_single_query_kernels = [
+            SingleQueryKernels.FLASH_DECODING,
+            # SingleQueryKernels.VNNI not supported for fp8
+        ]
         num_blocks = 128
         dtypes = [
             torch.bfloat16,
@@ -250,6 +256,7 @@ class PagedAttentionTest(TestCase):
         sliding_windows = [-1, 2, 512]
         seeds = [0]
         for (
+            kernel,
             num_seqs,
             num_head,
             head_size,
@@ -260,6 +267,7 @@ class PagedAttentionTest(TestCase):
             qtype,
             seed,
         ) in product(
+            paged_attention_single_query_kernels,
             num_gen_seqs,
             num_heads,
             head_sizes,
@@ -270,6 +278,7 @@ class PagedAttentionTest(TestCase):
             qtypes,
             seeds,
         ):
+            os.environ["PAGED_ATTENTION_SINGLE_QUERY_KERNEL"] = kernel
             self._test_paged_attention_func(
                 num_seqs,
                 num_head,
