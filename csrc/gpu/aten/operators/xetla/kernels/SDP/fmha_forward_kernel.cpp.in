@@ -199,7 +199,6 @@ INSTANTIATE_POLICY(fmha_policy_8x512x128);
 INSTANTIATE_POLICY(fmha_policy_32x128x128);
 #else
 INSTANTIATE_POLICY(fmha_policy_64x128x128);
-INSTANTIATE_POLICY(fmha_policy_256x128x128);
 #endif
 
 #if defined(GPU_ARCH_XeLpg)
