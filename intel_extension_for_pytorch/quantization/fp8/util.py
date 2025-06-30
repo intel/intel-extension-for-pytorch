@@ -43,7 +43,7 @@ def cast_from_fp8(
     )
 
 
-def convert(model, optimizer):
+def convert(model, optimizer, device="cpu"):
     from .linear import FP8Linear
 
     torch_modules = {
@@ -57,7 +57,7 @@ def convert(model, optimizer):
     for attr in module_attr:
         args.append(getattr(model, attr))
     new_m = torch_modules[model.__class__](
-        *args, bias=True if model.bias is not None else False
+        *args, bias=True if model.bias is not None else False, device=device
     )
 
     for k, v in model.__dict__.items():
@@ -69,17 +69,17 @@ def convert(model, optimizer):
     return new_m
 
 
-def convert_rec(m, optimizer):
-    new_m = convert(m, optimizer)
+def convert_rec(m, optimizer, device="cpu"):
+    new_m = convert(m, optimizer, device)
     for name, sub_m in m.named_children():
-        setattr(new_m, name, convert_rec(sub_m, optimizer)[0])
+        setattr(new_m, name, convert_rec(sub_m, optimizer, device)[0])
     return new_m, optimizer
 
 
-def prepare_fp8(m, optimizer=None):
+def prepare_fp8(m, optimizer=None, device="cpu"):
     """Convert modules to FP8 modules (e.g, convert nn.Linear to FP8Linear) in the model."""
     optimized_model, optimized_optimizer = _copy_model_and_optimizer(m, optimizer)
-    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer)
+    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer, device)
     if optimizer is None:
         return new_m
     return new_m, new_optimizer
