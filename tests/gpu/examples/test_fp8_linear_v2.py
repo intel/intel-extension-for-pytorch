@@ -65,12 +65,14 @@ def test_fp8_linear_v2(fp8_dtype, dtype, is_input_fp8, is_bias):
 @pytest.mark.parametrize("fp8_dtype", [torch.float8_e4m3fn, torch.float8_e5m2])
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
 @pytest.mark.parametrize("is_bias", [True, False])
-def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias):
+@pytest.mark.parametrize("is_nt", [True, False])
+def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias, is_nt):
     seed = 1234
     torch.manual_seed(seed)
 
     input = torch.randn([8, 2], dtype=dtype, device=torch.device("xpu")) / 10.0
     weight = torch.rand([3, 2], dtype=dtype).xpu() / 10.0
+
     gemm_ref = torch.nn.Linear(2, 3, bias=is_bias).xpu().to(dtype)
 
     scale_wei = (torch.ones(1) * 4).xpu()
@@ -86,6 +88,9 @@ def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias):
     )
     gemm_ref.weight.data = weight_dequant
     output_ref = gemm_ref(input)
+
+    if not is_nt:
+        weight_fp8 = weight_fp8.transpose(0, 1).contiguous().transpose(0, 1)
 
     fp8_linear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
         weight_fp8,

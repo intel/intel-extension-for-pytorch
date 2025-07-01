@@ -119,16 +119,18 @@ Tensor fp8_gemm_w8a16(
   std::vector<int64_t> result_shape;
   if (A.dim() == 2) {
     if (trans_B) {
-      B.transpose_(0, 1);
+      result_shape = {A.size(0), B.size(0)};
+    } else {
+      result_shape = {A.size(0), B.size(1)};
     }
-    result_shape = {A.size(0), B.size(1)};
     // src{m, k}, wei{k, n}, bias{n}, dst{m, n}
   } else if (A.dim() == 3) {
     if (B.dim() == 2) {
       if (trans_B) {
-        B.transpose_(0, 1);
+        result_shape = {A.size(0), A.size(1), B.size(0)};
+      } else {
+        result_shape = {A.size(0), A.size(1), B.size(1)};
       }
-      result_shape = {A.size(0), A.size(1), B.size(1)};
       // src{b, m, k}, wei{k, n}, bias{n}, dst{b, m, n}
     } else {
       TORCH_CHECK(false, "fp8_gemm only support 2D weight\n");
@@ -139,13 +141,21 @@ Tensor fp8_gemm_w8a16(
 
   at::Tensor result = at::empty(result_shape, A.options());
 
+  // check if nt format
+  bool is_nt = true;
+  if (trans_B) {
+    is_nt = B.strides()[B.dim() - 1] == 1;
+  } else {
+    is_nt = B.strides()[B.dim() - 2] == 1;
+  }
+
   at::Tensor B_scale = B_scale_.has_value()
       ? B_scale_.value()
       : at::ones({1}, B.options().dtype(A.dtype()));
 
 #ifdef USE_PRIMITIVE_CACHE
   torch_ipex::xpu::oneDNN::dnnl_matmul_w8a16_fp8(
-      result, A, B, !B.is_contiguous(), bias_, B_scale);
+      result, A, B, is_nt, bias_, B_scale);
 #else
   TORCH_CHECK(
       false,
