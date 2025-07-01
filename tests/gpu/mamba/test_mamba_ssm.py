@@ -97,12 +97,11 @@ def selective_scan_ref(u,
 @pytest.mark.parametrize('has_delta_bias', [True])
 @pytest.mark.parametrize('delta_softplus', [True])
 @pytest.mark.parametrize('has_z', [True])
-@pytest.mark.parametrize('has_D', [True])
 @pytest.mark.parametrize("varBC_groups", [1, 2])
 @pytest.mark.parametrize("is_variable_C", [True])
 @pytest.mark.parametrize("is_variable_B", [True])
 @pytest.mark.parametrize("scan_chunks", [1])
-def test_selective_scan(is_variable_B, is_variable_C, varBC_groups, has_D,
+def test_selective_scan(is_variable_B, is_variable_C, varBC_groups,
                         has_z, has_delta_bias, delta_softplus, seqlen, itype,
                         wtype, scan_chunks):
     if varBC_groups > 1 and (not is_variable_B or not is_variable_C):
@@ -142,7 +141,7 @@ def test_selective_scan(is_variable_B, is_variable_C, varBC_groups, has_D,
                     device=device,
                     dtype=wtype if not is_variable_C else itype)
     C_ref = C.clone()
-    D = torch.randn(dim, device=device, dtype=torch.float32) if has_D else None
+    D = torch.randn(dim, device=device, dtype=torch.float32)
     D_ref = D.clone()
     z = torch.randn(batch_size, dim, seqlen, device=device,
                     dtype=itype) if has_z else None
