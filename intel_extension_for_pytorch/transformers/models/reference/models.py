@@ -1309,6 +1309,7 @@ def OPTDecoder_forward(
     # embed positions
 
     if position_ids is None:
+        assert attention_mask is not None
         position_ids = torch.cumsum(attention_mask, dim=1)
         position_ids = (position_ids * attention_mask - 1).long()
         # cut positions if `past_key_values_length` is > 0
