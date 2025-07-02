@@ -15,8 +15,26 @@ from transformers.generation.utils import (
     SampleDecoderOnlyOutput,
 )
 from .common import _model_forward
+import os
+
+DISABLE_IPEX_SAMPLE = os.getenv("DISABLE_IPEX_SAMPLE", "0") == "1"
 
 SampleOutput = Union[SampleEncoderDecoderOutput, SampleDecoderOnlyOutput]
+
+
+# ref from vLLM:
+# https://github.com/vllm-project/vllm/blob/v0.9.1/vllm/model_executor/layers/sampler.py#L527
+@torch.compile(dynamic=True)
+def softmax_multinomial(
+    probs: torch.Tensor,
+    num_samples: int,
+) -> torch.Tensor:
+    probs = torch.nn.functional.softmax(probs, dim=-1)
+    if num_samples > 1:
+        probs = probs.repeat_interleave(num_samples, dim=0)
+    q = torch.empty_like(probs)
+    q.exponential_()
+    return probs.div_(q).argmax(dim=1).view(-1, num_samples)
 
 
 def _sample(
@@ -202,8 +220,13 @@ def _sample(
                 )
 
         # sample
-        probs = nn.functional.softmax(next_token_scores, dim=-1)
-        next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
+        if not DISABLE_IPEX_SAMPLE:
+            next_tokens = softmax_multinomial(next_token_scores, num_samples=1).squeeze(
+                1
+            )
+        else:
+            probs = nn.functional.softmax(next_token_scores, dim=-1)
+            next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
 
         # finished sentences should have their next token be a padding token
         if eos_token_id is not None:
