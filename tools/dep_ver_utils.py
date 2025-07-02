@@ -25,7 +25,7 @@ def process_file(file, key, value = None, write = False):
         assert value != 'None', "[ERROR] when modifying the json file, value can not be 'None'"
         _manipulate_result(result, keys, value)
         with open(file, 'w') as f:
-            json.dump(result, f)
+            json.dump(result, f, indent=2)
         return None
     else:
         return _manipulate_result(result, keys)

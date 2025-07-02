@@ -162,3 +162,6 @@ python3-div
 python3-venv
 gcc-12
 g++-12
+backoff
+torchaudio
+einops

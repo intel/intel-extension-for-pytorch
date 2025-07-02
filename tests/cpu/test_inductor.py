@@ -234,9 +234,9 @@ class TestIpexInductor(TestCase):
             reduced_sizes = [k]
             new_size = [m, n]
 
-            m = V.graph.sizevars.evaluate_static_shape(m)
-            n = V.graph.sizevars.evaluate_static_shape(n)
-            k = V.graph.sizevars.evaluate_static_shape(k)
+            m = V.graph.sizevars.guard_int(m)
+            n = V.graph.sizevars.guard_int(n)
+            k = V.graph.sizevars.guard_int(k)
 
             _a_loader = a.make_loader()
             _b_loader = b.make_loader()
