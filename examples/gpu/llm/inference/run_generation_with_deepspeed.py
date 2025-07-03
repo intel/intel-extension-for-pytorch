@@ -89,7 +89,6 @@ parser.add_argument('--max-new-tokens', default=32, type=int, nargs="+", help="o
 parser.add_argument('--input-tokens', default=32, type=str, nargs="+")
 parser.add_argument('--prompt', default=None, type=str)
 parser.add_argument('--ipex', action='store_true', help="ipex is not enabled now")
-parser.add_argument('--jit', action='store_true')
 parser.add_argument('--print-memory', action='store_true')
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--accuracy-only", action="store_true")
@@ -109,12 +108,6 @@ args = parser.parse_args()
 # import extension
 if args.ipex:
     import intel_extension_for_pytorch as ipex
-    try:
-        ipex._C.disable_jit_linear_repack()
-    except Exception:
-        pass
-if args.jit:
-    torch._C._jit_set_texpr_fuser_enabled(False)
 
 if args.cuda or args.device == "cuda":
     args.cuda = True
@@ -214,7 +207,7 @@ print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), 'auto')
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=args.use_hf_code)
-config = AutoConfig.from_pretrained(model_name, torchscript=args.jit, trust_remote_code=args.use_hf_code)
+config = AutoConfig.from_pretrained(model_name, trust_remote_code=args.use_hf_code)
 # Avoid deepspeed tp>=2 lm_head weight reload. Not affect the results.
 config.tie_word_embeddings = False
 #if not hasattr(config, "text_max_length") and args.prompt is None:
@@ -374,8 +367,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         generate_kwargs["cache_implementation"] = "static"
     if args.token_latency:
         generate_kwargs["token_latency"] = True
-    if args.jit:
-        generate_kwargs["jit"] = True
 
     inputs = input_sentences[: args.batch_size]
 

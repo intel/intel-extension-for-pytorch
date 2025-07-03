@@ -42,19 +42,6 @@ with torch.xpu.amp.autocast(dtype=torch.float16):
     y = model(x)
 ```
 
-### Inference with TorchScript Path
-
-`torch.xpu.amp.autocast` can be used with `torch.jit.trace` to apply graph optimization. Due to PyTorch limitation, only `torch.jit.trace` is supported.
-
-```python
-model = SimpleNet().to("xpu").eval()
-x = torch.rand(64, 64, 224, 224).to("xpu")
-with torch.xpu.amp.autocast(dtype=torch.float16):
-    model = torch.jit.trace(model, x)
-    model = torch.jit.freeze(model)
-    y = model(x)
-```
-
 ### Training Support
 
 `torch.xpu.amp.autocast` can be used in training to improve performance.

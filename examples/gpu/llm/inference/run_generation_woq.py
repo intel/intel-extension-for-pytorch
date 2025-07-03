@@ -77,7 +77,6 @@ parser.add_argument(
 )
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
-parser.add_argument("--jit", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--profile_name", type=str, default="", help="custom the profiling filename")
 parser.add_argument("--benchmark", action="store_true")
@@ -144,7 +143,7 @@ if args.woq_checkpoint_path:
     config = AutoConfig.from_pretrained(args.woq_checkpoint_path, use_cache=True, # to use kv cache.
                                         trust_remote_code=True)
 else:
-    config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=args.use_hf_code)
+    config = AutoConfig.from_pretrained(args.model_id, trust_remote_code=args.use_hf_code)
     tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=args.use_hf_code)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
@@ -157,7 +156,7 @@ if args.woq_checkpoint_path:
     model = model.to(memory_format=torch.channels_last)
     woq_quantization_config = getattr(model, "quantization_config", None)
 else:
-    # do quantization 
+    # do quantization
     if args.woq_algo == "RTN":
         woq_quantization_config = RtnConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
     else:
