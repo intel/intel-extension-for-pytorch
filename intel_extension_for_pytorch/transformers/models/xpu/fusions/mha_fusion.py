@@ -595,7 +595,7 @@ class _IPEXPagedAttentionXPU:
         if block_size * block_table_s.size(1) > max_seqlen_kv:
             max_block_per_seq = (max_seqlen_kv + block_size - 1) // block_size
             block_table_s = block_table_s[:, :max_block_per_seq].contiguous()
-        return torch.ops.torch_ipex.chunked_prefill(
+        torch.ops.torch_ipex.chunked_prefill(
             pad_query,
             pad_k_cache,
             pad_v_cache,
@@ -619,6 +619,7 @@ class _IPEXPagedAttentionXPU:
         )
         if head_dim % 64 != 0:
             output.copy_(pad_output[:, :, :head_dim])
+        return output
 
     @classmethod
     def swap_blocks(cls, src, dst, block_mapping):
