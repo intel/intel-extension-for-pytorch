@@ -510,6 +510,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         out,  # [total_q, num_head, head_size]
         seqlen_q,  # [batch_size + 1]
         seqlen_k,  # [batch_size + 1]
+        alibi_slopes,
         max_seqlen_q,
         max_seqlen_k,
         pdropout=0.0,
@@ -528,6 +529,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         assert window_size_left == -1, "ipex do not support window_size_left option"
         assert window_size_right == -1, "ipex do not support window_size_right option"
         assert softcap == -1.0, "ipex do not support softcap option"
+        assert alibi_slopes is None, "ipex do not support alibi_slopes"
 
         # Repeat kv if it is GQA.
         key = cls.repeat_kv(key, int(query.shape[1] / key.shape[1]))
@@ -600,6 +602,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         out,
         seqlen_q,
         seqlen_k,
+        alibi_slopes,
         max_seqlen_q,
         max_seqlen_k,
         pdropout,
@@ -619,6 +622,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             out,
             seqlen_q,
             seqlen_k,
+            alibi_slopes,
             max_seqlen_q,
             max_seqlen_k,
             pdropout,

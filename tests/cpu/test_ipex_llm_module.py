@@ -1425,6 +1425,93 @@ class TestLLMModules(TestCase):
             self.assertEqual(out_ref, out_ipex, rtol=rtol, atol=atol)
             self.assertEqual(state_ref, state_ipex, rtol=rtolw, atol=atolw)
 
+    @skipIfNoEINPOS
+    def test_varlen_fwd(self):
+        HEAD_DIM = [64, 70]
+        NUM_HEADS = [(32, 32), (32, 8)]
+        BATCH_SIZE = [1, 3, 8]
+        DTYPE = [torch.float16]
+        USE_ALIBI = [False]
+        SEQLEN_RANGE = [10]
+        IS_CAUSAL = [False, True]
+        WINDOW_SIZE = [(-1, -1)]
+
+        for (
+            head_dim,
+            num_heads,
+            batch_size,
+            dtype,
+            use_alibi,
+            seqlen_range,
+            is_causal,
+            window_size,
+        ) in itertools.product(
+            HEAD_DIM,
+            NUM_HEADS,
+            BATCH_SIZE,
+            DTYPE,
+            USE_ALIBI,
+            SEQLEN_RANGE,
+            IS_CAUSAL,
+            WINDOW_SIZE,
+        ):
+            torch.manual_seed(15)
+            seqlen_list = torch.randint(
+                1, seqlen_range, [batch_size], dtype=torch.int32
+            )
+            max_seqlen = torch.max(seqlen_list)
+            cu_seqlen = torch.cumsum(seqlen_list, dim=0)
+            num_heads_query, num_heads_kv = num_heads
+            cu_seqlen = (
+                torch.cat([torch.tensor([0]), cu_seqlen], dim=0)
+                .to(torch.int32)
+                .to("cpu")
+            )
+
+            query = torch.randn(
+                [cu_seqlen[-1], num_heads_query, head_dim], dtype=dtype, device="cpu"
+            )
+            key = torch.randn(
+                [cu_seqlen[-1], num_heads_kv, head_dim], dtype=dtype, device="cpu"
+            )
+            value = torch.randn(
+                [cu_seqlen[-1], num_heads_kv, head_dim], dtype=dtype, device="cpu"
+            )
+            alibi_slopes = None
+            softmax_scale = 1 / math.sqrt(head_dim)
+            if use_alibi:
+                alibi_slopes = torch.tensor(
+                    [2 ** (-1 - i) for i in range(num_heads_query)],
+                    dtype=torch.float,
+                    device="cpu",
+                )
+                alibi_slopes = (
+                    alibi_slopes.unsqueeze(0)
+                    .expand(batch_size, num_heads_query)
+                    .contiguous()
+                )
+            out = query.clone()
+
+            ipex.llm.functional.varlen_attention(
+                query,
+                key,
+                value,
+                out,
+                cu_seqlen,
+                cu_seqlen,
+                alibi_slopes,
+                max_seqlen,
+                max_seqlen,
+                0.0,
+                softmax_scale,
+                False,
+                is_causal,
+                False,
+                None,
+                window_size_left=window_size[0],
+                window_size_right=window_size[1],
+            )
+
 
 if __name__ == "__main__":
     test = unittest.main()

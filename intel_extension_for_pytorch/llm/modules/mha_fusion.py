@@ -362,6 +362,7 @@ class VarlenAttention(nn.Module):
         out: torch.Tensor,
         seqlen_q: torch.Tensor,
         seqlen_k: torch.Tensor,
+        alibi_slopes: torch.Tensor,
         max_seqlen_q: int,
         max_seqlen_k: int,
         pdropout: float,
@@ -383,6 +384,7 @@ class VarlenAttention(nn.Module):
             out,
             seqlen_q,
             seqlen_k,
+            alibi_slopes,
             max_seqlen_q,
             max_seqlen_k,
             pdropout,
@@ -404,6 +406,7 @@ class VarlenAttention(nn.Module):
         out: torch.Tensor,
         seqlen_q: torch.Tensor,
         seqlen_k: torch.Tensor,
+        alibi_slopes: torch.Tensor,
         max_seqlen_q: int,
         max_seqlen_k: int,
         pdropout: float,
@@ -412,6 +415,9 @@ class VarlenAttention(nn.Module):
         is_causal: bool,
         return_softmax: bool,
         gen_: torch.Generator,
+        window_size_left: int,
+        window_size_right: int,
+        softcap: float,
     ):
         runtime_module = self.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, True
@@ -423,6 +429,7 @@ class VarlenAttention(nn.Module):
             out,
             seqlen_q,
             seqlen_k,
+            alibi_slopes,
             max_seqlen_q,
             max_seqlen_k,
             pdropout,
@@ -431,6 +438,9 @@ class VarlenAttention(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            window_size_left,
+            window_size_right,
+            softcap,
         )
 
 
