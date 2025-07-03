@@ -62,7 +62,7 @@ types-dataclasses
 neural-compressor
 oneTBB
 oneCCL
-onednn-graph 
+onednn-graph
 oneDNN
 jemalloc
 click
@@ -118,7 +118,7 @@ pyyaml
 schema
 setuptools
 Triton
-urllib3 
+urllib3
 libcurl
 intel-media-va-driver-non-free
 libmfx1
@@ -165,3 +165,6 @@ g++-12
 backoff
 torchaudio
 einops
+torchao
+torchrec
+torchmetrics
