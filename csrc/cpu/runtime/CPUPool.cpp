@@ -144,29 +144,56 @@ std::vector<int32_t> init_process_available_cores() {
     // But this information makes no sense and shouldn't be used without preload
     // IOMP.
     // Step1: Get the main thread affinity
-    cpu_set_t main_thread_pre_set;
-    CPU_ZERO(&main_thread_pre_set);
-    if (sched_getaffinity(0, sizeof(cpu_set_t), &main_thread_pre_set) != 0) {
-      throw std::runtime_error("Fail to get the thread affinity information");
-    }
 
-    // Step2:
     // https://man7.org/linux/man-pages/man3/sysconf.3.html
     // Please note these value may not be standard.
     // _SC_NPROCESSORS_ONLN: processors available, may be less than
     // _SC_NPROCESSORS_CONF because processors may be offline.
     // _SC_NPROCESSORS_CONF: processors configured.
     int nproc_online = sysconf(_SC_NPROCESSORS_CONF);
-    for (int i = 0; i < nproc_online; i++) {
-      if (CPU_ISSET(i, &main_thread_pre_set)) {
-        available_cpu_cores_internal.emplace_back(i);
+    cpu_set_t main_thread_pre_set;
+    CPU_ZERO(&main_thread_pre_set);
+    if (sched_getaffinity(0, sizeof(cpu_set_t), &main_thread_pre_set) == 0) {
+      // Step2:
+      for (int i = 0; i < nproc_online; i++) {
+        if (CPU_ISSET(i, &main_thread_pre_set)) {
+          available_cpu_cores_internal.emplace_back(i);
+        }
       }
-    }
 
-    // Step3: restore main thread affinity
-    if (sched_setaffinity(0, sizeof(cpu_set_t), &main_thread_pre_set) != 0) {
-      throw std::runtime_error(
-          "Fail to restore the main thread affinity in step3.");
+      // Step3: restore main thread affinity
+      if (sched_setaffinity(0, sizeof(cpu_set_t), &main_thread_pre_set) != 0) {
+        throw std::runtime_error("Fail to restore the main thread affinity");
+      }
+    } else {
+      // sched_getaffinity() may fail because the Affinity
+      // mask is small for the system has more than 1024 CPUs.
+      // Allocate a mask large enough for more CPUs.
+      size_t setsize = CPU_ALLOC_SIZE(nproc_online);
+      cpu_set_t* dymain_thread_pre_set = CPU_ALLOC(nproc_online);
+      if (dymain_thread_pre_set == NULL) {
+        throw std::runtime_error("Failed to allocate CPU mask");
+      }
+
+      CPU_ZERO_S(setsize, dymain_thread_pre_set);
+      if (sched_getaffinity(0, setsize, dymain_thread_pre_set) != 0) {
+        CPU_FREE(dymain_thread_pre_set);
+        throw std::runtime_error("Fail to get the thread affinity information");
+      }
+
+      // Step2:
+      for (int i = 0; i < nproc_online; i++) {
+        if (CPU_ISSET_S(i, setsize, dymain_thread_pre_set)) {
+          available_cpu_cores_internal.emplace_back(i);
+        }
+      }
+
+      // Step3: restore main thread affinity
+      if (sched_setaffinity(0, setsize, dymain_thread_pre_set) != 0) {
+        CPU_FREE(dymain_thread_pre_set);
+        throw std::runtime_error("Fail to restore the main thread affinity");
+      }
+      CPU_FREE(dymain_thread_pre_set);
     }
 #endif
   }
