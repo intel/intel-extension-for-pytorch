@@ -195,10 +195,10 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
                 torch.ops.torch_ipex.topk_softmax(router_logits, top_k, False)
             )
 
-        # --------- fusion:  grouped topk sigmoid  -------------------
+        # --------- fusion:  grouped topk  -------------------
         elif use_grouped_topk:
             routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-                torch.ops.torch_ipex.grouped_topk_scoring(
+                torch.ops.torch_ipex.grouped_topk(
                     hidden_states,
                     router_logits,
                     top_k,
@@ -207,7 +207,6 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
                     topk_group,
                     scoring_func,
                     e_score_correction_bias,
-                    True,
                 )
             )
 

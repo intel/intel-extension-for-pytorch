@@ -166,18 +166,15 @@ class MixtralMoE(torch.nn.Module):
         scoring_func="sigmoid",
     ) -> torch.Tensor:
         if use_grouped_topk:
-            routing_weights, selected_experts, _, _ = (
-                torch.ops.torch_ipex.grouped_topk_scoring(
-                    hidden_states,
-                    router_logits,
-                    self.top_k,
-                    True,
-                    num_expert_group,
-                    topk_group,
-                    scoring_func,
-                    None,
-                    True,
-                )
+            routing_weights, selected_experts, _, _ = torch.ops.torch_ipex.grouped_topk(
+                hidden_states,
+                router_logits,
+                self.top_k,
+                True,
+                num_expert_group,
+                topk_group,
+                scoring_func,
+                None,
             )
             selected_experts = selected_experts.to(torch.int64)
         else:
