@@ -35,8 +35,8 @@
       "windows": "2025.1"
     },
     "mkl-dpcpp": {
-      "linux": "2025.1.0",
-      "windows": "2025.1.0"
+      "linux": "2025.1",
+      "windows": "2025.1"
     },
     "oneccl-devel": {
       "linux": "2021.15",

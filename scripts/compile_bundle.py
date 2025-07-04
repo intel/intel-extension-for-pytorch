@@ -747,22 +747,23 @@ if __name__ == '__main__':
         action = 'store_true',
     )
     parser.add_argument(
-        '--verbose',
-        help = 'Show more information for debugging compilation.',
-        action = 'store_true',
-    )
-    grp_dbg = parser.add_mutually_exclusive_group(required=True)
-    grp_dbg.add_argument(
         '--rel-with-deb-info',
         help = 'Build release version with debugging info.',
         action = 'store_true',
     )
-    grp_dbg.add_argument(
+    parser.add_argument(
         '--debug',
         help = 'Build with debug mode.',
         action = 'store_true',
     )
+    parser.add_argument(
+        '--verbose',
+        help = 'Show more information for debugging compilation.',
+        action = 'store_true',
+    )
     args = parser.parse_args()
+
+    assert not (args.rel_with_deb_info and args.debug), 'Arguments --rel-with-deb-info and --debug cannot be set at the same time.'
 
     utils_filepath = os.path.join(BASEDIR, UTILSFILENAME)
     if BASEDIR != SCRIPTDIR:
