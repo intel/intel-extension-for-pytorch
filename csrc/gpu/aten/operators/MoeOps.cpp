@@ -1,16 +1,14 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
-#include <CL/sycl.hpp>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <sycl/sycl.hpp>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 #include "utils/ComputeEngine.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
-
-#define MaxNumExperts 32
 
 namespace TopKSoftmaxImpl {
 // Each WI compute  one token
@@ -125,13 +123,14 @@ struct FusedTopkSoftmax {
             my_idx = other_idx;
           }
         }
-        if (!(my_val <= k_max)) {
+        if (my_val > k_max || (my_val == k_max && my_idx < k_max_idx)) {
           k_max = my_val;
           k_max_idx = my_idx;
 
           if (k_max_idx == local_idx[e]) {
             remove_ix = e; // Mark this index for removal
-          }
+          } else
+            remove_ix = -1;
         }
       }
       topk_weights_local[k] = k_max;
@@ -274,450 +273,417 @@ void fused_topk_softmax(
 namespace GroupedTopKImpl {
 
 enum class ScoringFunc {
-  Sigmoid,
-  Softmax,
+  DEFAULT = 0,
+  SOFTMAX = 1,
+  SIGMOID = 2,
 };
 
-template <typename T, int topk_group, int topk>
-struct FusedGroupedTopK {
-  static constexpr float kPosInfinity = INFINITY;
-  static constexpr float kNegInfinity = (-1) * kPosInfinity;
-  static constexpr int SgSize = 16;
-  using VECBIT = sycl::vec<uint8_t, MaxNumExperts / 8>;
-  FusedGroupedTopK(
-      const T* gating_output,
-      const T* bias,
+template <typename T, int MAX_EXPERT_GROUPS>
+struct Fused_Grouped_Topk {
+  static constexpr int sub_group_size = 32;
+  static constexpr int max_group_size = 1024;
+  static constexpr int malloc_per_item = MAX_EXPERT_GROUPS;
+  static constexpr float kNegInfinity = INFINITY * -1;
+
+  Fused_Grouped_Topk(
       float* topk_weights,
-      int* topk_indices,
-      float* score_buf,
-      float* max_buf,
+      int* topk_ids,
       int* rows_for_experts,
       int* offsets,
-      const int num_tokens,
-      const int num_experts,
-      const int num_expert_group,
-      const bool sorted,
+      const T* gating_output,
+      const T* e_score_correction_bias,
+      const ScoringFunc scoring_mode,
       const bool renormalize,
-      const ScoringFunc scoring_mode)
-      : gating_output(gating_output),
-        bias(bias),
-        topk_weights(topk_weights),
-        topk_indices(topk_indices),
-        score_buf(score_buf),
-        max_buf(max_buf),
+      const int tokens,
+      const int experts,
+      const int top_k,
+      const int num_expert_group,
+      const int topk_group)
+      : topk_weights(topk_weights),
+        topk_ids(topk_ids),
         rows_for_experts(rows_for_experts),
         offsets(offsets),
-        num_tokens(num_tokens),
-        num_experts(num_experts),
-        num_expert_group(num_expert_group),
-        chk_per_group(num_experts / num_expert_group),
-        sorted(sorted),
+        gating_output(gating_output),
+        e_score_correction_bias(e_score_correction_bias),
+        scoring_mode(scoring_mode),
         renormalize(renormalize),
-        scoring_mode(scoring_mode) {}
+        tokens(tokens),
+        experts(experts),
+        top_k(top_k),
+        num_expert_group(num_expert_group),
+        topk_group(topk_group) {}
 
-  static inline sycl::nd_range<1> get_nd_range(const int num_tokens) {
-    int total_sg = divup(num_tokens, SgSize) * SgSize;
-    int local_sg = SgSize;
-    sycl::range<1> local(local_sg);
-    sycl::range<1> global(total_sg);
-    return sycl::nd_range<1>(global, local);
+  static inline sycl::nd_range<3> get_nd_range(
+      const int tokens,
+      const int experts) {
+    int calc_per_item = (experts + sub_group_size - 1) / sub_group_size;
+    int group_size = (experts + calc_per_item - 1) / calc_per_item;
+    group_size = group_size < sub_group_size ? sub_group_size : group_size;
+    group_size = group_size < max_group_size ? group_size : max_group_size;
+    int sub_groups_per_group =
+        (group_size + sub_group_size - 1) / sub_group_size;
+    group_size = sub_groups_per_group * sub_group_size;
+    int global_size =
+        (tokens + sub_groups_per_group - 1) / sub_groups_per_group;
+
+    sycl::range<3> local(1, 1, group_size);
+    sycl::range<3> global(1, 1, global_size);
+    return sycl::nd_range<3>(global * local, local);
   }
 
-  inline static void bit_set(uint8_t& c, int b) {
-    c |= (1 << b);
+  static inline float Sigmoid(float x) {
+    return 1.0f / (1.0f + sycl::native::exp(-x));
   }
 
-  inline static void bit_clear(uint8_t& c, int b) {
-    c &= (~(1 << b));
-  }
+  [[sycl::reqd_sub_group_size(sub_group_size)]] void operator()(
+      sycl::nd_item<3> item) const {
+    int group_id = item.get_group_linear_id();
+    int local_range = item.get_local_range(2);
+    int sub_groups_per_group = local_range / sub_group_size;
+    int calc_per_item = (experts + sub_group_size - 1) / sub_group_size;
 
-  inline static int bit_test(uint8_t& c, int b) {
-    return (c & (1 << b)) ? 1 : 0;
-  }
+    int experts_per_group = experts / num_expert_group;
 
-  inline static int bit_wordaddr(int b) {
-    return b >> 3;
-  }
+    sycl::sub_group sg = item.get_sub_group();
+    int sg_id = sg.get_group_id();
+    int sg_local_id = sg.get_local_id();
 
-  inline static int bit_bitaddr(int b) {
-    return b & 7;
-  }
+    int tid = group_id * sub_groups_per_group + sg_id;
 
-  inline static void vec_set(VECBIT& mask, int i) {
-    bit_set(mask[bit_wordaddr(i)], bit_bitaddr(i));
-  }
-  inline static void vec_clear(VECBIT& mask, int i) {
-    bit_clear(mask[bit_wordaddr(i)], bit_bitaddr(i));
-  }
-
-  inline static int vec_test(VECBIT& mask, int i) {
-    return bit_test(mask[bit_wordaddr(i)], bit_bitaddr(i));
-  }
-
-  template <int n>
-  inline void get_topk_sort(float* val, int* idx, float* src, int dim) const {
-    for (int i = 0; i < n; ++i) {
-      val[i] = kNegInfinity;
-      for (int j = 0; j < dim; ++j) {
-        if (!(val[i] >= src[j])) {
-          idx[i] = j;
-          val[i] = src[j];
-        }
-      }
-      src[idx[i]] = kNegInfinity;
+    if (tid >= tokens) {
+      return; // Out of bounds
     }
-  }
 
-  template <int n>
-  inline int argmin(float* val) const {
-    float min_val = val[0];
-    int idx = 0;
-    for (int i = 1; i < n; ++i) {
-      if (min_val > val[i]) {
-        min_val = val[i];
-        idx = i;
+    T load_elems[malloc_per_item];
+    int local_idx[malloc_per_item];
+    T bias[malloc_per_item];
+
+    int start_offset = sg_local_id * calc_per_item;
+    int local_num = calc_per_item;
+
+    if (start_offset + local_num >= experts) {
+      local_num = experts - start_offset;
+      if (local_num < 0) {
+        local_num = 0; // No elements to process
       }
     }
-    return idx;
-  }
 
-  template <int n>
-  inline void get_topk_nosort(float* val, int* idx, float* src, int dim) const {
-    float min_val = src[0];
-    int min_idx = 0;
-    for (int i = 0; i < n; ++i) {
-      val[i] = src[i];
-      idx[i] = i;
-      if (src[i] < min_val) {
-        min_val = src[i];
-        min_idx = i;
-      }
+    for (int e = 0; e < calc_per_item; ++e) {
+      load_elems[e] = kNegInfinity;
+      local_idx[e] = -1;
+      bias[e] = 0.0f; // Initialize bias to zero
     }
-    for (int i = n; i < dim; ++i) {
-      if (src[i] > min_val) {
-        val[min_idx] = src[i];
-        idx[min_idx] = i;
-        int j = argmin<n>(val);
-        min_idx = j;
-        min_val = val[j];
-      }
-    }
-  }
 
-  void grouped_topk_kern(
-      const T* src,
-      float* topk_wgts,
-      int* topk_ids,
-      const T* bias,
-      float* max_buf,
-      float* score_buf,
-      int* rows_for_experts,
-      int* offsets,
-      const int64_t num_token,
-      const int64_t inner_dim,
-      const int64_t chk_per_group,
-      const int64_t num_expert_group,
-      const bool sorted) const {
-    // src num_token, inner_dim
-    // dst num_token, num_expert_group
-    // no support softmax
-    float one = 1.0f;
-    float max_val;
-    // sigmoid, addbias and max
-    if (scoring_mode == ScoringFunc::Sigmoid) {
-      for (int64_t i = 0; i < num_expert_group; ++i) {
-        max_val = kNegInfinity;
-        for (int64_t j = 0; j < chk_per_group; ++j) {
-          int64_t k = i * chk_per_group + j;
-          float t;
-          float s = src[k];
-          if (bias != nullptr) {
-            float b = bias[k];
-            t = one / (one + sycl::native::exp(-s)) + b;
-          } else {
-            t = one / (one + sycl::native::exp(-s));
-          }
-          score_buf[k] = t;
-          max_val = std::max(t, max_val);
-        }
-        max_buf[i] = max_val; // num_token, num_expert_group
-      }
-    } else if (scoring_mode == ScoringFunc::Softmax) {
+    for (int e = 0; e < local_num; ++e) {
+      load_elems[e] = gating_output[tid * experts + start_offset + e];
+    }
+
+    float local_elems[malloc_per_item];
+
+    for (int e = 0; e < local_num; ++e) {
+      local_elems[e] = load_elems[e];
+      local_idx[e] = start_offset + e;
+    }
+
+    if (scoring_mode == ScoringFunc::SOFTMAX) {
       float softmax_max = kNegInfinity;
+      for (int e = 0; e < local_num; ++e) {
+        softmax_max =
+            (softmax_max > local_elems[e]) ? softmax_max : local_elems[e];
+      }
+      for (int offset = sub_group_size / 2; offset > 0; offset /= 2) {
+        float other_val = sycl::permute_group_by_xor(sg, softmax_max, offset);
+        softmax_max = (softmax_max > other_val) ? softmax_max : other_val;
+      }
       float softmax_sum = 0.0f;
-      for (int64_t i = 0; i < num_expert_group; ++i) {
-        for (int64_t j = 0; j < chk_per_group; ++j) {
-          int64_t k = i * chk_per_group + j;
-          float s = src[k];
-          if (!(softmax_max >= s)) {
-            softmax_max = s;
-          }
-        }
+      for (int e = 0; e < local_num; ++e) {
+        float s = local_elems[e];
+        softmax_sum += sycl::native::exp(s - softmax_max);
       }
-      for (int64_t i = 0; i < num_expert_group; ++i) {
-        for (int64_t j = 0; j < chk_per_group; ++j) {
-          int64_t k = i * chk_per_group + j;
-          float s = src[k];
-          s = sycl::native::exp(s - softmax_max);
-          softmax_sum += s;
-          score_buf[k] = s;
-        }
+      for (int offset = sub_group_size / 2; offset > 0; offset /= 2) {
+        float other_val = sycl::permute_group_by_xor(sg, softmax_sum, offset);
+        softmax_sum += other_val;
       }
-      for (int64_t i = 0; i < num_expert_group; ++i) {
-        max_val = kNegInfinity;
-        for (int64_t j = 0; j < chk_per_group; ++j) {
-          int64_t k = i * chk_per_group + j;
-          float t;
-          float s = score_buf[k];
-          if (bias != nullptr) {
-            float b = bias[k];
-            t = s / softmax_sum + b;
-          } else {
-            t = s / softmax_sum;
-          }
-          score_buf[k] = t;
-          max_val = std::max(t, max_val);
-        }
-        max_buf[i] = max_val; // num_token, num_expert_group
+      for (int e = 0; e < local_num; ++e) {
+        float s = local_elems[e];
+        local_elems[e] = sycl::native::exp(s - softmax_max) / softmax_sum;
+      }
+    } else if (scoring_mode == ScoringFunc::SIGMOID) {
+      for (int e = 0; e < local_num; ++e) {
+        float s = load_elems[e];
+        load_elems[e] = Sigmoid(s);
+      }
+      for (int e = 0; e < local_num; ++e) {
+        local_elems[e] = load_elems[e];
       }
     }
-    // topk index only
-    float topk_group_data[topk_group];
-    int topk_group_idx[topk_group];
-    get_topk_nosort<topk_group>(
-        topk_group_data, topk_group_idx, max_buf, num_expert_group);
-    // reverse mask
-    VECBIT mask(0xff); // 32 max_expert_group, 8 for each uchar
-    for (int i = 0; i < topk_group; ++i) {
-      vec_clear(mask, topk_group_idx[i]);
+
+    bool has_bias = e_score_correction_bias != nullptr;
+    if (has_bias) {
+      for (int e = 0; e < local_num; ++e) {
+        bias[e] = e_score_correction_bias[start_offset + e];
+      }
     }
-    // fill with 0
+
+    // perform topk_group groups
+    // 1 calculate each group scores
+    float group_scores[malloc_per_item * 2];
+    for (int i = 0; i < num_expert_group * 2; ++i) {
+      group_scores[i] = kNegInfinity;
+    }
+    for (int i = 0; i < local_num; ++i) {
+      float b = bias[i];
+      float score = local_elems[i] + b;
+      int i_group = (calc_per_item * sg_local_id + i) / experts_per_group;
+      float group_max = group_scores[i_group];
+      float group_next_max = group_scores[num_expert_group + i_group];
+      if (score > group_max) {
+        group_next_max = group_max;
+        group_max = score;
+      } else if (score > group_next_max) {
+        group_next_max = score;
+      }
+      group_scores[i_group] = group_max;
+      group_scores[num_expert_group + i_group] = group_next_max;
+    }
     for (int i = 0; i < num_expert_group; ++i) {
-      if (vec_test(mask, i)) {
-        int s = i * chk_per_group;
-        for (int j = s; j < s + chk_per_group; ++j) {
-          score_buf[j] = 0.0f;
+      float group_max = group_scores[i];
+      float group_next_max = group_scores[num_expert_group + i];
+
+      float max1 = sycl::reduce_over_group(
+          sg, sycl::max(group_max, group_next_max), sycl::maximum<>());
+      float local_second =
+          (group_max < max1 && group_max > -INFINITY) ? group_max : -INFINITY;
+      local_second = (group_next_max < max1 && group_next_max > local_second)
+          ? group_next_max
+          : local_second;
+      float max2 = sycl::reduce_over_group(sg, local_second, sycl::maximum<>());
+      group_scores[i] = max1 + (has_bias ? max2 : 0.0f);
+    }
+
+    // 2 find topk_group groups as kNegInfinity
+    int group_topk_idx[malloc_per_item];
+    for (int k = 0; k < topk_group; ++k) {
+      float k_max = kNegInfinity;
+      int k_max_idx = -1;
+      for (int e = 0; e < num_expert_group; ++e) {
+        float score = group_scores[e];
+
+        if (score > k_max) {
+          k_max = score;
+          k_max_idx = e;
+        }
+      }
+      group_scores[k_max_idx] = kNegInfinity;
+      group_topk_idx[k] = k_max_idx;
+    }
+
+    // 3 mask no-topk_group groups
+    for (int i = 0; i < calc_per_item; ++i) {
+      bool is_masked = true;
+      for (int k = 0; k < topk_group; ++k) {
+        if ((local_idx[i] / experts_per_group) == group_topk_idx[k]) {
+          is_masked = false;
+          break;
+        }
+      }
+      if (is_masked) {
+        local_elems[i] = kNegInfinity;
+      }
+    }
+
+    // Perform top-k selection
+    float topk_weights_local[malloc_per_item];
+    int topk_ids_local[malloc_per_item];
+
+    for (int k = 0; k < top_k; ++k) {
+      float k_max = kNegInfinity;
+      int k_max_idx = -1;
+      int remove_ix = -1;
+      for (int e = 0; e < calc_per_item; ++e) {
+        float le = local_elems[e];
+        float b = bias[e];
+        float my_val = le + b;
+        int my_idx = local_idx[e];
+        for (int offset = sub_group_size / 2; offset > 0; offset /= 2) {
+          float other_val = sycl::permute_group_by_xor(sg, my_val, offset);
+          int other_idx = sycl::permute_group_by_xor(sg, my_idx, offset);
+          if (other_val > my_val ||
+              (other_val == my_val && other_idx < my_idx)) {
+            my_val = other_val;
+            my_idx = other_idx;
+          }
+        }
+        if (my_val > k_max || (my_val == k_max && my_idx < k_max_idx)) {
+          k_max = my_val;
+          k_max_idx = my_idx;
+
+          if (k_max_idx == local_idx[e]) {
+            remove_ix = e; // Mark this index for removal
+          } else
+            remove_ix = -1;
+        }
+      }
+
+      int select_item = k_max_idx / calc_per_item;
+      int select_elem = k_max_idx % calc_per_item;
+      k_max = local_elems[select_elem];
+      k_max = sycl::group_broadcast(sg, k_max, select_item);
+      if (remove_ix != -1) {
+        local_elems[remove_ix] =
+            kNegInfinity; // Reset the score to avoid re-selection
+        local_idx[remove_ix] = -1;
+        remove_ix = -1;
+      }
+
+      topk_weights_local[k] = k_max;
+      topk_ids_local[k] = k_max_idx;
+    }
+
+    if (renormalize) {
+      // Renormalize the top-k weights
+      float sum = 0;
+      for (int i = 0; i < top_k; ++i) {
+        sum += topk_weights_local[i];
+      }
+      if (sum > 0) {
+        for (int i = 0; i < top_k; ++i) {
+          topk_weights_local[i] /= sum;
         }
       }
     }
-    // final topk
-    float topk_data[topk];
-    int topk_idx[topk];
-    if (sorted) {
-      get_topk_sort<topk>(topk_data, topk_idx, score_buf, inner_dim);
-    } else {
-      get_topk_nosort<topk>(topk_data, topk_idx, score_buf, inner_dim);
-    }
 
-    float row_sum = 0.0f;
-    for (int i = 0; i < topk; ++i) {
-      row_sum += topk_data[i];
-    }
-    for (int i = 0; i < topk; ++i) {
-      if (renormalize) {
-        topk_wgts[i] = topk_data[i] / row_sum;
-      } else {
-        topk_wgts[i] = topk_data[i];
+    if (sg_local_id == 0) {
+      int offset = tid * top_k;
+      for (int i = 0; i < top_k; ++i) {
+        topk_weights[offset + i] = topk_weights_local[i];
+        if (!(topk_ids_local[i] >= 0 && topk_ids_local[i] < experts)) {
+          // Ensure valid index
+          topk_ids[offset + i] = 0;
+          offsets[offset + i] = 0;
+          continue;
+        }
+        topk_ids[offset + i] = topk_ids_local[i];
+        auto ref_num_tokens = sycl::atomic_ref<
+            int,
+            sycl::memory_order_relaxed,
+            sycl::memory_scope_device,
+            sycl::access::address_space::global_space>(
+            *(rows_for_experts + topk_ids_local[i]));
+        int old = ref_num_tokens.fetch_add(1);
+        offsets[offset + i] = old;
       }
-      topk_ids[i] = topk_idx[i];
-
-      // atomic add to rows_for_experts
-      auto ref_num_tokens = sycl::atomic_ref<
-          int,
-          sycl::memory_order_relaxed,
-          sycl::memory_scope_device,
-          sycl::access::address_space::global_space>(
-          *(rows_for_experts + topk_idx[i]));
-      int old = ref_num_tokens.fetch_add(1);
-      offsets[i] = old;
     }
   }
-
-  void operator()(sycl::nd_item<1> it) const {
-    int64_t token_id = it.get_global_id()[0];
-    int64_t i = token_id * num_experts;
-    int64_t j = token_id * num_expert_group;
-    int64_t k = token_id * topk;
-    if (token_id < num_tokens) {
-      grouped_topk_kern(
-          &gating_output[i],
-          &topk_weights[k],
-          &topk_indices[k],
-          bias,
-          &max_buf[j],
-          &score_buf[i],
-          rows_for_experts,
-          &offsets[k],
-          num_tokens,
-          num_experts,
-          chk_per_group,
-          num_expert_group,
-          sorted);
-    }
-  }
-
-  const T* gating_output;
-  const T* bias;
   float* topk_weights;
-  int* topk_indices;
-  float* score_buf;
-  float* max_buf;
+  int* topk_ids;
   int* rows_for_experts;
   int* offsets;
-  const int num_tokens;
-  const int num_experts;
-  const int num_expert_group;
-  const int64_t chk_per_group;
-  const bool sorted;
-  const bool renormalize;
+  const T* gating_output;
+  const T* e_score_correction_bias;
   const ScoringFunc scoring_mode;
+  const bool renormalize;
+  const int tokens;
+  const int experts;
+  const int top_k;
+  const int num_expert_group;
+  const int topk_group;
 };
 
-template <typename T, int topk, int topk_group>
-void launch_fused_grouped_topk_scoring(
+template <typename T, int MAX_EXPERT_GROUPS>
+void launch_fused_grouped_topk(
     sycl::queue& queue,
-    const T* gating_output,
-    const T* bias,
     float* topk_weights,
-    int* topk_indices,
-    float* score_buf,
-    float* max_buf,
+    int* topk_ids,
     int* rows_for_experts,
     int* offsets,
-    const int num_tokens,
-    const int num_experts,
-    const int num_expert_group,
-    const bool sorted,
+    const T* gating_output,
+    const T* e_score_correction_bias,
+    const ScoringFunc scoring_mode,
     const bool renormalize,
-    const ScoringFunc scoring_mode) {
-  using Kernel = FusedGroupedTopK<T, topk_group, topk>;
-  // int slm_size = Kernel::get_slm_size(num_tokens, num_experts);
-  auto range = Kernel::get_nd_range(num_tokens);
+    const int tokens,
+    const int experts,
+    const int top_k,
+    const int num_expert_group,
+    const int topk_group) {
+  using Kernel = Fused_Grouped_Topk<T, MAX_EXPERT_GROUPS>;
+  auto range = Kernel::get_nd_range(tokens, experts);
+
   auto cgf = DPCPP_Q_CGF(cgh) {
-    // sycl::local_accessor<T, 1> accessor(slm_size / sizeof(T), cgh);
     Kernel task(
-        // accessor,
-        gating_output,
-        bias,
         topk_weights,
-        topk_indices,
-        score_buf,
-        max_buf,
+        topk_ids,
         rows_for_experts,
         offsets,
-        num_tokens,
-        num_experts,
-        num_expert_group,
-        sorted,
+        gating_output,
+        e_score_correction_bias,
+        scoring_mode,
         renormalize,
-        scoring_mode);
+        tokens,
+        experts,
+        top_k,
+        num_expert_group,
+        topk_group);
     cgh.parallel_for(range, task);
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
 template <typename T>
-using LAUNCH_FUNC = void (*)(
-    sycl::queue&,
-    const T*,
-    const T*,
-    float*,
-    int*,
-    float*,
-    float*,
-    int*,
-    int*,
-    const int,
-    const int,
-    const int,
-    const bool,
-    const bool,
-    const ScoringFunc);
-
-#define DEFINE_GROUPED_TOPK_FUNC(T, a, b) \
-  &launch_fused_grouped_topk_scoring<T, a, b>
-
-template <typename T>
-void fused_grouped_topk_scoring(
-    const T* gating_output,
-    const T* bias,
+void fused_grouped_topk(
     float* topk_weights,
-    int* topk_indices,
-    float* score_buf,
-    float* max_buf,
+    int* topk_ids,
     int* rows_for_experts,
     int* offsets,
-    const int num_tokens,
-    const int num_experts,
-    const int num_expert_group,
-    const int topk,
-    const int topk_group,
-    const bool sorted,
+    const T* gating_output,
+    const T* e_score_correction_bias,
+    const ScoringFunc scoring_mode,
     const bool renormalize,
-    const ScoringFunc scoring_mode) {
+    const int tokens,
+    const int experts,
+    const int top_k,
+    const int num_expert_group,
+    const int topk_group) {
   auto& queue = dpcppGetCurrentQueue();
 
   TORCH_CHECK(
-      num_expert_group <= MaxNumExperts,
-      "num_experts must be less than or equal to 32");
-  TORCH_CHECK(
       topk_group <= num_expert_group,
       "topk_group must be less than or equal to num_expert_group");
-  constexpr std::array<int, 6> allowed_k = {1, 2, 4, 6, 8, 16};
-  int topk_idx = -1;
-  int topk_g_idx = -1;
-  for (int i = 0; i < allowed_k.size(); ++i) {
-    if (allowed_k[i] == topk) {
-      topk_idx = i;
-    }
-    if (allowed_k[i] == topk_group) {
-      topk_g_idx = i;
-    }
-  }
   TORCH_CHECK(
-      topk_idx >= 0 && topk_g_idx >= 0,
-      "wrong values for topk (%d) and topk_group (%d) up to %d\n",
-      topk,
-      topk_group,
-      16);
-  int funcIndex = topk_idx * allowed_k.size() + topk_g_idx;
-  static constexpr std::array<LAUNCH_FUNC<T>, 36> launch_funcs = {
-      DEFINE_GROUPED_TOPK_FUNC(T, 1, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 1, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 1, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 1, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 1, 8),  DEFINE_GROUPED_TOPK_FUNC(T, 1, 16),
-      DEFINE_GROUPED_TOPK_FUNC(T, 2, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 2, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 2, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 2, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 2, 8),  DEFINE_GROUPED_TOPK_FUNC(T, 2, 16),
-      DEFINE_GROUPED_TOPK_FUNC(T, 4, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 4, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 4, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 4, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 4, 8),  DEFINE_GROUPED_TOPK_FUNC(T, 4, 16),
-      DEFINE_GROUPED_TOPK_FUNC(T, 6, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 6, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 6, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 6, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 6, 8),  DEFINE_GROUPED_TOPK_FUNC(T, 6, 16),
-      DEFINE_GROUPED_TOPK_FUNC(T, 8, 1),  DEFINE_GROUPED_TOPK_FUNC(T, 8, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 8, 4),  DEFINE_GROUPED_TOPK_FUNC(T, 8, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 8, 8),  DEFINE_GROUPED_TOPK_FUNC(T, 8, 16),
-      DEFINE_GROUPED_TOPK_FUNC(T, 16, 1), DEFINE_GROUPED_TOPK_FUNC(T, 16, 2),
-      DEFINE_GROUPED_TOPK_FUNC(T, 16, 4), DEFINE_GROUPED_TOPK_FUNC(T, 16, 6),
-      DEFINE_GROUPED_TOPK_FUNC(T, 16, 8), DEFINE_GROUPED_TOPK_FUNC(T, 16, 16),
-  };
-
-  launch_funcs[funcIndex](
-      queue,
-      gating_output,
-      bias,
-      topk_weights,
-      topk_indices,
-      score_buf,
-      max_buf,
-      rows_for_experts,
-      offsets,
-      num_tokens,
-      num_experts,
+      experts % num_expert_group == 0,
+      "The number of experts (experts=",
+      experts,
+      ") must be divisible by num_expert_group (",
       num_expert_group,
-      sorted,
-      renormalize,
-      scoring_mode);
+      ").");
+
+  int max_expert_group = ((num_expert_group + 7) / 8) * 8;
+#define CASE_TOPK(K)                 \
+  case K:                            \
+    launch_fused_grouped_topk<T, K>( \
+        queue,                       \
+        topk_weights,                \
+        topk_ids,                    \
+        rows_for_experts,            \
+        offsets,                     \
+        gating_output,               \
+        e_score_correction_bias,     \
+        scoring_mode,                \
+        renormalize,                 \
+        tokens,                      \
+        experts,                     \
+        top_k,                       \
+        num_expert_group,            \
+        topk_group);                 \
+    break;
+  switch (max_expert_group) {
+    CASE_TOPK(8)
+    CASE_TOPK(16)
+    default:
+      TORCH_CHECK(
+          false, "error: not support num_expert_group=%d,\n", num_expert_group);
+  }
+#undef CASE_TOPK
 }
 
 }; // namespace GroupedTopKImpl
@@ -1577,8 +1543,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
  * @return A tuple of tensors (topk_weights, topk_indices, rows_for_experts,
  * offsets).
  */
-static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-grouped_topk_scoring(
+static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
     const Tensor& hidden_states,
     const Tensor& gating_output,
     const int64_t n_topk,
@@ -1586,8 +1551,7 @@ grouped_topk_scoring(
     const int64_t n_expert_group,
     const int64_t n_topk_group,
     const c10::string_view scoring_func,
-    const c10::optional<at::Tensor>& bias,
-    const bool sorted) {
+    const c10::optional<at::Tensor>& bias) {
   auto shape = gating_output.sizes().vec();
   TORCH_CHECK(
       hidden_states.sizes()[0] == gating_output.sizes()[0],
@@ -1611,88 +1575,73 @@ grouped_topk_scoring(
 
   GroupedTopKImpl::ScoringFunc scoring_mode;
   if (scoring_func == "sigmoid") {
-    scoring_mode = GroupedTopKImpl::ScoringFunc::Sigmoid;
+    scoring_mode = GroupedTopKImpl::ScoringFunc::SIGMOID;
   } else if (scoring_func == "softmax") {
-    scoring_mode = GroupedTopKImpl::ScoringFunc::Softmax;
+    scoring_mode = GroupedTopKImpl::ScoringFunc::SOFTMAX;
   } else {
-    TORCH_CHECK(
-        false,
-        "Unsupported scoring function: ",
-        scoring_func,
-        ". Supported functions are: sigmoid, softmax");
+    scoring_mode = GroupedTopKImpl::ScoringFunc::DEFAULT;
   }
 
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
-  auto score_buf = at::empty_like(gating_output, at::dtype(at::kFloat));
-  auto max_buf = at::empty(
-      {n_tokens, n_expert_group}, at::dtype(at::kFloat).device(at::kXPU));
   auto rows_for_experts =
       at::zeros({n_experts}, at::dtype(at::kInt).device(at::kXPU));
   auto offsets =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
+
   if (gating_output.scalar_type() == at::kBFloat16) {
     using scalar_t = sycl::ext::oneapi::bfloat16;
-    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk<scalar_t>(
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
+        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
-        reinterpret_cast<float*>(topk_weights.data_ptr()),
-        reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<float*>(score_buf.data_ptr()),
-        reinterpret_cast<float*>(max_buf.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
+        scoring_mode,
+        renormalize,
         n_tokens,
         n_experts,
-        n_expert_group,
         n_topk,
-        n_topk_group,
-        sorted,
-        renormalize,
-        scoring_mode);
+        n_expert_group,
+        n_topk_group, );
   } else if (gating_output.scalar_type() == at::kHalf) {
     using scalar_t = sycl::half;
-    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk<scalar_t>(
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
+        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
-        reinterpret_cast<float*>(topk_weights.data_ptr()),
-        reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<float*>(score_buf.data_ptr()),
-        reinterpret_cast<float*>(max_buf.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
+        scoring_mode,
+        renormalize,
         n_tokens,
         n_experts,
-        n_expert_group,
         n_topk,
-        n_topk_group,
-        sorted,
-        renormalize,
-        scoring_mode);
+        n_expert_group,
+        n_topk_group, );
   } else {
     using scalar_t = float;
-    GroupedTopKImpl::fused_grouped_topk_scoring<scalar_t>(
+    GroupedTopKImpl::fused_grouped_topk<scalar_t>(
+        reinterpret_cast<float*>(topk_weights.data_ptr()),
+        reinterpret_cast<int*>(topk_indices.data_ptr()),
+        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
+        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
-        reinterpret_cast<float*>(topk_weights.data_ptr()),
-        reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<float*>(score_buf.data_ptr()),
-        reinterpret_cast<float*>(max_buf.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
+        scoring_mode,
+        renormalize,
         n_tokens,
         n_experts,
-        n_expert_group,
         n_topk,
-        n_topk_group,
-        sorted,
-        renormalize,
-        scoring_mode);
+        n_expert_group,
+        n_topk_group, );
   }
   return std::make_tuple(topk_weights, topk_indices, rows_for_experts, offsets);
 }
@@ -1874,8 +1823,7 @@ static void moe_sum(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("topk_softmax.moe", at::AtenIpexTypeXPU::topk_softmax);
-  IPEX_OP_REGISTER(
-      "grouped_topk_scoring.moe", at::AtenIpexTypeXPU::grouped_topk_scoring);
+  IPEX_OP_REGISTER("grouped_topk.moe", at::AtenIpexTypeXPU::grouped_topk);
   IPEX_OP_REGISTER("moe_scatter.moe", at::AtenIpexTypeXPU::moe_scatter);
   IPEX_OP_REGISTER("moe_gather.moe", at::AtenIpexTypeXPU::moe_gather);
   IPEX_OP_REGISTER("moe_sum.moe", at::AtenIpexTypeXPU::moe_sum)
