@@ -253,7 +253,6 @@ def _build_installation_dependency():
     install_requires.append("psutil")
     install_requires.append("numpy")
     install_requires.append("packaging")
-    install_requires.append("ruamel.yaml")
     str_os = platform.system().lower()
     if _check_env_flag("ENABLE_ONEAPI_INTEGRATION", default="OFF"):
         for key, value in _get_basekit_rt().items():
@@ -991,13 +990,6 @@ def get_src_py_and_yaml_and_dst():
     ret = []
     generated_python_and_yaml_files = glob.glob(
         os.path.join(get_project_dir(), PACKAGE_NAME, "**/*.py"), recursive=True
-    )
-    generated_python_and_yaml_files += glob.glob(
-        os.path.join(
-            get_project_dir(),
-            PACKAGE_NAME,
-            "compatible_mode/yaml/register_support_api.yaml",
-        )
     )
     for src in generated_python_and_yaml_files:
         dst = os.path.join(
