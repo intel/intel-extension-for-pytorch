@@ -238,7 +238,7 @@ class DynamicQuantizedLinearLayer(_IPEXDynamicQuantizedLinear):
             LinearLayer = deepspeed_modules[1]
             _FLOAT_MODULE.extend([LinearLayer])
 
-        if len(deepspeed_modules) > 3:
+        if deepspeed_modules is not None and len(deepspeed_modules) > 3:
             for module in deepspeed_modules[3:]:
                 if issubclass(module, LinearLayer):
                     _FLOAT_MODULE.extend([module])
