@@ -9,12 +9,10 @@ This API currently supports for inference workloads of certain models.
 API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize),
 and supported model list can be found at [this page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list-for-inference).
 
-For LLM fine-tuning, please check the [LLM fine-tuning tutorial](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/fine-tuning).
-
 ## Pseudocode of Common Usage Scenarios
 
 The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLM models.
-Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/inference).
+Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.8/examples/cpu/llm/inference).
 
 ### FP32/BF16
 
@@ -59,7 +57,7 @@ model = ipex.llm.optimize(model, quantization_config=qconfig, low_precision_chec
 
 Distributed inference can be performed with `DeepSpeed`. Based on original Intel® Extension for PyTorch\* scripts, the following code changes are required.
 
-Check [LLM distributed inference examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/inference/distributed) for complete codes.
+Check [LLM distributed inference examples](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.8/examples/cpu/llm/inference/distributed) for complete codes.
 
 ``` python
 import torch
