@@ -21,4 +21,5 @@
 
 #include <experimental/group/gemm/common.hpp>
 #include <experimental/group/gemm/compute_policy.hpp>
+#include <experimental/group/gemm/impl/fp8_default_xmx_xe.hpp>
 #include <experimental/group/gemm/impl/int4_dequantize_xe.hpp>

@@ -1506,12 +1506,13 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
       "n_experts only support up to 128, but got ",
       n_experts);
 
+  int n_experts_aligned = (n_experts + 7) / 8 * 8; // align to 8
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
   auto rows_for_experts =
-      at::zeros({n_experts}, at::dtype(at::kInt).device(at::kXPU));
+      at::zeros({n_experts_aligned}, at::dtype(at::kInt).device(at::kXPU));
   auto offsets =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
@@ -1582,12 +1583,14 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
     scoring_mode = GroupedTopKImpl::ScoringFunc::DEFAULT;
   }
 
+  int n_experts_aligned = (n_experts + 7) / 8 * 8; // align to 8
+
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
   auto rows_for_experts =
-      at::zeros({n_experts}, at::dtype(at::kInt).device(at::kXPU));
+      at::zeros({n_experts_aligned}, at::dtype(at::kInt).device(at::kXPU));
   auto offsets =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
 

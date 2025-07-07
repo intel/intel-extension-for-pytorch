@@ -21,28 +21,17 @@ cgfs_t moe_gemm(
     const int problem_count) {
   using Policy = gpu::xetla::MoEGEMMPolicy;
 
-#define MoEKernelMicro(ExpertNum)                         \
-  return gpu::xetla::LaunchMoEGEMM<T, ExpertNum, Policy>( \
-      queue,                                              \
-      activations,                                        \
-      weights,                                            \
-      outputs,                                            \
-      total_m,                                            \
-      gemm_n,                                             \
-      gemm_k,                                             \
-      total_rows_for_experts,                             \
-      total_rows_for_experts_host);
-
-  switch (problem_count) {
-    case 8:
-      MoEKernelMicro(8);
-    case 16:
-      MoEKernelMicro(16);
-    default:
-      TORCH_CHECK(false, "unsupported expert number: ", problem_count);
-      return {};
-  }
-#undef MoEKernelMicro
+  return gpu::xetla::LaunchMoEGEMM<T, Policy>(
+      queue,
+      activations,
+      weights,
+      outputs,
+      total_m,
+      gemm_n,
+      gemm_k,
+      total_rows_for_experts,
+      total_rows_for_experts_host,
+      problem_count);
 }
 
 // generate the template instantiation for sycl::half and
@@ -63,6 +52,86 @@ template XETLA_KERNEL_API cgfs_t moe_gemm<sycl::ext::oneapi::bfloat16>(
     sycl::queue& queue,
     const sycl::ext::oneapi::bfloat16* activations,
     const sycl::ext::oneapi::bfloat16* weights,
+    sycl::ext::oneapi::bfloat16* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count);
+
+template <typename T>
+cgfs_t moe_gemm_fp8(
+    sycl::queue& queue,
+    const T* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
+    T* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count) {
+  using Policy = gpu::xetla::MoEGEMMFP8Policy;
+
+  switch (f_format) {
+    case fp8_format::E4M3:
+      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E4M3, Policy>(
+          queue,
+          activations,
+          weights,
+          scales,
+          outputs,
+          total_m,
+          gemm_n,
+          gemm_k,
+          total_rows_for_experts,
+          total_rows_for_experts_host,
+          problem_count);
+    case fp8_format::E5M2:
+      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E5M2, Policy>(
+          queue,
+          activations,
+          weights,
+          scales,
+          outputs,
+          total_m,
+          gemm_n,
+          gemm_k,
+          total_rows_for_experts,
+          total_rows_for_experts_host,
+          problem_count);
+    default:
+      TORCH_CHECK(
+          false,
+          "Error in moe_gemm_fp8: run into Unsupported fp8 format, only support FP8_E4M3 and FP8_E5M2 now. ");
+  }
+}
+
+// generate the template instantiation for sycl::half and
+// sycl::ext::oneapi::bfloat16
+template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::half>(
+    sycl::queue& queue,
+    const sycl::half* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
+    sycl::half* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count);
+
+template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::ext::oneapi::bfloat16>(
+    sycl::queue& queue,
+    const sycl::ext::oneapi::bfloat16* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
     sycl::ext::oneapi::bfloat16* outputs,
     const int total_m,
     const int gemm_n,

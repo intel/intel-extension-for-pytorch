@@ -20,5 +20,19 @@ XETLA_KERNEL_API cgfs_t moe_gemm(
     const int* total_rows_for_experts_host,
     const int problem_count);
 
+template <typename T>
+XETLA_KERNEL_API cgfs_t moe_gemm_fp8(
+    sycl::queue& queue,
+    const T* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
+    T* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count);
 } // namespace xetla
 } // namespace gpu

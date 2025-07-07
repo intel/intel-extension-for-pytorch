@@ -36,10 +36,8 @@ class TestTorchMethod:
     @pytest.mark.parametrize("gemm_k", [1024])
     @pytest.mark.parametrize("gemm_n", [1024])
     @pytest.mark.parametrize("n_experts", [8, 16, 32])
-    @pytest.mark.parametrize("is_fp8", [True, False])
-    def test_moe_gemm(
-        self, n_experts, gemm_k, gemm_n, total_m, is_fp8, dtype=torch.float16
-    ):
+    @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
+    def test_moe_gemm(self, n_experts, gemm_k, gemm_n, total_m, dtype):
 
         matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
         matrix_b = torch.randn(
@@ -52,48 +50,63 @@ class TestTorchMethod:
         self.init_rows_for_experts(total_m, rows_for_experts)
         rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
-        if not is_fp8:
-            output = torch.xpu.moe_gemm(
-                matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+        output = torch.xpu.moe_gemm(
+            matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+        )
+        ref_output = self.validata_moe_gemm(
+            matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+        )
+        torch.testing.assert_close(
+            output.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
+        )
+
+    @pytest.mark.parametrize("total_m", [1, 32, 1024])
+    @pytest.mark.parametrize("gemm_k", [1024])
+    @pytest.mark.parametrize("gemm_n", [1024])
+    @pytest.mark.parametrize("n_experts", [8, 16, 32])
+    @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
+    @pytest.mark.parametrize("fp8_dtype", [torch.float8_e5m2])
+    def test_moe_gemm_fp8(self, n_experts, gemm_k, gemm_n, total_m, dtype, fp8_dtype):
+
+        matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
+        matrix_b = torch.randn(
+            n_experts, gemm_k, gemm_n, dtype=dtype, device=dpcpp_device
+        )
+
+        rows_for_experts = torch.zeros(
+            n_experts, device=dpcpp_device, dtype=torch.int32
+        )
+        self.init_rows_for_experts(total_m, rows_for_experts)
+        rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
+
+        scale_shape = None
+        matrix_b_scale = torch.full((n_experts,), 4.0, device=dpcpp_device)
+        matrix_b_scale_inv = torch.full((n_experts,), 0.25, device=dpcpp_device)
+        matrix_b_fp8 = torch.empty_like(matrix_b, device=dpcpp_device, dtype=fp8_dtype)
+        matrix_b_dequant = torch.empty_like(matrix_b, device=dpcpp_device)
+        for i in range(n_experts):
+            matrix_b_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
+                matrix_b[i], matrix_b_scale[i], False, False, fp8_dtype, scale_shape
             )
-            ref_output = self.validata_moe_gemm(
-                matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+            matrix_b_dequant[i] = torch.ops.torch_ipex.cast_from_fp8(
+                matrix_b_fp8[i], matrix_b_scale_inv[i], dtype
             )
-            torch.testing.assert_close(
-                output.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
-            )
-        else:
-            fp8_dtype = torch.float8_e5m2
-            scale_shape = None
-            matrix_b_scale = torch.full((n_experts,), 2.0, device=dpcpp_device)
-            matrix_b_scale_inv = torch.full((n_experts,), 0.5, device=dpcpp_device)
-            matrix_b_fp8 = torch.empty_like(
-                matrix_b, device=dpcpp_device, dtype=fp8_dtype
-            )
-            matrix_b_dequant = torch.empty_like(matrix_b, device=dpcpp_device)
-            for i in range(n_experts):
-                matrix_b_fp8[i], _ = torch.ops.torch_ipex.cast_to_fp8(
-                    matrix_b[i], matrix_b_scale[i], False, False, fp8_dtype, scale_shape
-                )
-                matrix_b_dequant[i] = torch.ops.torch_ipex.cast_from_fp8(
-                    matrix_b_fp8[i], matrix_b_scale_inv[i], dtype
-                )
-            output_fp8 = torch.xpu.moe_gemm(
-                matrix_a,
-                matrix_b_fp8,
-                rows_for_experts,
-                rows_for_experts_cpu,
-                n_experts,
-                None,
-                matrix_b_scale_inv,
-            )
-            ref_output = self.validata_moe_gemm(
-                matrix_a,
-                matrix_b_dequant,
-                rows_for_experts,
-                rows_for_experts_cpu,
-                n_experts,
-            )
-            torch.testing.assert_close(
-                output_fp8.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
-            )
+        output_fp8 = torch.xpu.moe_gemm(
+            matrix_a,
+            matrix_b_fp8,
+            rows_for_experts,
+            rows_for_experts_cpu,
+            n_experts,
+            None,
+            matrix_b_scale_inv,
+        )
+        ref_output = self.validata_moe_gemm(
+            matrix_a,
+            matrix_b_dequant,
+            rows_for_experts,
+            rows_for_experts_cpu,
+            n_experts,
+        )
+        torch.testing.assert_close(
+            output_fp8.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
+        )

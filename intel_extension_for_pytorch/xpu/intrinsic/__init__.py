@@ -436,13 +436,17 @@ def moe_gemm(
     use_fused_kernel = (
         torch.xpu.has_2d_block_array()
         and torch.xpu.has_xmx()
-        and (n_experts == 8 or n_experts == 16)
+        and (n_experts <= 128)
         and matrix_a_scale_inv is None
-        and matrix_b_scale_inv is None
     )
     if use_fused_kernel:
         return torch.ops.torch_ipex.fused_moe_gemm(
-            matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+            matrix_a,
+            matrix_b,
+            matrix_b_scale_inv,
+            rows_for_experts,
+            rows_for_experts_cpu,
+            n_experts,
         )
     else:
         total_m = matrix_a.shape[0]

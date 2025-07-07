@@ -177,6 +177,137 @@ struct dequant_int4_weight_t {
   }
 };
 
+template <int N, fp8_format fmt>
+__XETLA_API typename std::
+    enable_if_t<fmt == fp8_format::E5M2, xetla_vector<sycl::half, N>>
+    fp8_to_fp16(xetla_vector<uint8_t, N> src) {
+  // Do not consider NAN
+  xetla_vector<uint16_t, N> bits_fp16 = src << 8;
+  return bits_fp16.template bit_cast_view<sycl::half>();
+}
+
+template <int N, fp8_format fmt>
+__XETLA_API typename std::
+    enable_if_t<fmt == fp8_format::E4M3, xetla_vector<sycl::half, N>>
+    fp8_to_fp16(xetla_vector<uint8_t, N> src) {
+  // Do not consider NAN or denormal
+  xetla_vector<uint8_t, N> s8 = src >> 7;
+  xetla_vector<uint8_t, N> e8 = ((src & 0x78) >> 3) + 8;
+  xetla_vector<uint8_t, N> m8 = src & 0x7;
+  auto is_zero = ((e8 == 0) & (m8 == 0));
+  e8.merge(xetla_vector<uint8_t, N>(0), is_zero);
+  xetla_vector<uint16_t, N> bits_fp16 = (s8 << 15) | (e8 << 10) | (m8 << 7);
+  return bits_fp16.template bit_cast_view<sycl::half>();
+}
+
+template <typename matB_acc_t, typename matB_t, fp8_format fp8_format>
+struct dequant_fp8_weight_t {
+  using dtype_dst = typename matB_acc_t::dtype;
+  using dtype_src = typename matB_t::dtype;
+
+  __XETLA_API KERNEL_FUNC void operator()(
+      matB_acc_t& dst,
+      matB_t& src,
+      float scale) {
+    constexpr uint32_t tile_size_y = matB_acc_t::tile_size_y;
+    constexpr uint32_t tile_size_x = matB_acc_t::tile_size_x;
+    constexpr uint32_t tile_elems = tile_size_y * tile_size_x;
+    constexpr uint32_t block_size_y = matB_acc_t::block_size_y;
+    constexpr uint32_t block_size_x = matB_acc_t::block_size_x;
+    constexpr uint32_t block_elems = block_size_y * block_size_x;
+    constexpr int32_t num_block_x = tile_size_x / block_size_x;
+    assert(typeid(dtype_src) == typeid(uint8_t));
+    constexpr uint32_t vnni_row_src = sizeof(uint32_t) / sizeof(uint8_t);
+    constexpr uint32_t vnni_row_dst = sizeof(uint32_t) / sizeof(dtype_dst);
+    constexpr int32_t vnni_row =
+        vnni_row_src > vnni_row_dst ? vnni_row_src : vnni_row_dst;
+    static_assert(block_size_y % vnni_row == 0);
+    static_assert(tile_size_y % vnni_row == 0);
+    constexpr int32_t move_elems = vnni_row * block_size_x;
+    xetla_vector<dtype_dst, tile_elems> reg_src =
+        xetla_cvt<dtype_dst, sycl::half, tile_elems>(
+            fp8_to_fp16<tile_elems, fp8_format>(src.reg));
+    if constexpr (sizeof(uint8_t) == sizeof(dtype_dst)) {
+      dst.reg = reg_src;
+      return;
+    }
+    xetla_vector<dtype_dst, tile_elems> reg_dst;
+    constexpr uint32_t scale_factor =
+        detail::gcd<vnni_row_src, vnni_row_dst>::value;
+    using move_dtype = get_uint_type_t<sizeof(dtype_dst) * scale_factor>;
+    constexpr uint32_t select_stride = vnni_row / scale_factor;
+#pragma unroll
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; j++) {
+        auto reg_src_blk = reg_src.xetla_select<block_elems, 1>(
+            (i * num_block_x + j) * block_elems);
+        auto reg_dst_blk = reg_dst.xetla_select<block_elems, 1>(
+            (i * num_block_x + j) * block_elems);
+        for (uint32_t row_i = 0; row_i < block_size_y; row_i += vnni_row) {
+          auto reg_src_move =
+              reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
+                  .xetla_format<native_type_t<move_dtype>>();
+          auto reg_dst_move =
+              reg_dst_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
+                  .xetla_format<native_type_t<move_dtype>>();
+#pragma unroll
+          for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
+            if constexpr (sizeof(dtype_dst) > sizeof(uint8_t)) {
+              reg_dst_move.xetla_select<block_size_x, 1>(
+                  move_i * block_size_x) =
+                  reg_src_move.xetla_select<block_size_x, select_stride>(
+                      move_i);
+            } else {
+              reg_dst_move.xetla_select<block_size_x, select_stride>(move_i) =
+                  reg_src_move.xetla_select<block_size_x, 1>(
+                      move_i * block_size_x);
+            }
+          }
+        }
+      }
+    }
+    // process the tail
+    if constexpr ((tile_size_y % block_size_y) != 0) {
+      constexpr int i = tile_size_y / block_size_y;
+      constexpr uint32_t remain_elems_start = i * block_size_y * tile_size_x;
+      constexpr uint32_t remain_size_y = tile_size_y % block_size_y;
+      constexpr uint32_t remain_block_elems = remain_size_y * block_size_x;
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; j++) {
+        auto reg_src_blk = reg_src.xetla_select<remain_block_elems, 1>(
+            remain_elems_start + j * remain_block_elems);
+        auto reg_dst_blk = reg_dst.xetla_select<remain_block_elems, 1>(
+            remain_elems_start + j * remain_block_elems);
+        // for mma, here we can guarantee that the remaining is a multiple of
+        // vnni_row
+        for (uint32_t row_i = 0; row_i < remain_size_y; row_i += vnni_row) {
+          auto reg_src_move =
+              reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
+                  .xetla_format<native_type_t<move_dtype>>();
+          auto reg_dst_move =
+              reg_dst_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
+                  .xetla_format<native_type_t<move_dtype>>();
+#pragma unroll
+          for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
+            if constexpr (sizeof(dtype_dst) > sizeof(uint8_t)) {
+              reg_dst_move.xetla_select<block_size_x, 1>(
+                  move_i * block_size_x) =
+                  reg_src_move.xetla_select<block_size_x, select_stride>(
+                      move_i);
+            } else {
+              reg_dst_move.xetla_select<block_size_x, select_stride>(move_i) =
+                  reg_src_move.xetla_select<block_size_x, 1>(
+                      move_i * block_size_x);
+            }
+          }
+        }
+      }
+    }
+    dst.reg = reg_dst;
+  }
+};
+
 /// @brief Is the element-wise relu op functor.
 /// Get the relu input from matAcc, update the relu output in place,
 /// Used in epilogue::tile_op or chained_tile_op.
@@ -329,8 +460,8 @@ struct gelu_fwd_op_t {
 /// @tparam arch_tag Is the hardware architecture tag.
 template <typename dtype_out, gpu_arch arch_tag, class enable = void>
 struct gelu_fwd_w_op_t {};
-/// @brief Is the element-wise gelu training forward op functor, specialized for
-/// Xe architecture.
+/// @brief Is the element-wise gelu training forward op functor, specialized
+/// for Xe architecture.
 template <typename dtype_out_, gpu_arch arch_tag>
 struct gelu_fwd_w_op_t<
     dtype_out_,
@@ -563,8 +694,8 @@ struct gelu_bwd_op_t<
 };
 
 /// @brief Is the bias_add op functor.
-/// Load the 1d bias data from memory and get the input from matAcc, update the
-/// output in place. Used in epilogue::tile_op or chained_tile_op.
+/// Load the 1d bias data from memory and get the input from matAcc, update
+/// the output in place. Used in epilogue::tile_op or chained_tile_op.
 /// @tparam dtype_bias Is the data type of bias buffer.
 /// @tparam arch_tag Is the hardware architecture tag.
 template <typename mem_desc_bias_t_, gpu_arch arch_tag, class enable = void>
@@ -672,7 +803,8 @@ template <
     gpu_arch arch_tag,
     class enable = void>
 struct scale_v_offset_v_op_t {};
-/// @brief Is the scale_v_offset_v op functor, specialized for Xe architecture.
+/// @brief Is the scale_v_offset_v op functor, specialized for Xe
+/// architecture.
 template <typename scale_dtype_, typename offset_dtype_, gpu_arch arch_tag>
 struct scale_v_offset_v_op_t<
     scale_dtype_,
@@ -1389,8 +1521,8 @@ struct scalar_mul_op_t<
 };
 
 /// @brief Is the linear_op functor.
-/// Multiply matAcc with a scalar, then add a bias, update the output in place.
-/// Used in epilogue::tile_op or chained_tile_op.
+/// Multiply matAcc with a scalar, then add a bias, update the output in
+/// place. Used in epilogue::tile_op or chained_tile_op.
 /// @tparam dtype_in Is the data type of multiplier buffer.
 /// @tparam arch_tag Is the hardware architecture tag.
 template <typename dtype_in, gpu_arch arch_tag, class enable = void>

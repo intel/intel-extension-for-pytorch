@@ -34,6 +34,7 @@ namespace AtenIpexTypeXPU {
 Tensor fused_moe_gemm(
     const Tensor& matrix_a, // [total_m, gemm_k]
     const Tensor& matrix_b, // [n_experts, gemm_k, gemm_n]
+    const c10::optional<at::Tensor>& matrix_b_scale_inv, // [n_experts]
     const Tensor& rows_for_experts, //[n_experts]
     const Tensor& rows_for_experts_host, //[n_experts]
     const int64_t n_experts) {
@@ -54,13 +55,65 @@ Tensor fused_moe_gemm(
   TORCH_CHECK(
       matrix_b_shape[0] == rows_for_experts.size(0),
       "rows_for_experts must have the same size as the first dimension of matrix_b");
+  TORCH_CHECK(
+      n_experts % 8 == 0,
+      "n_experts must be a multiple of 8 for the current implementation");
 
   auto output = at::empty({total_m, gemm_n}, matrix_a.options());
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
 
   auto queue = dpcppGetCurrentQueue();
 
-  if (matrix_a.scalar_type() == at::kHalf) {
+  bool is_fp8 = matrix_b_scale_inv.has_value();
+  if (is_fp8) {
+    auto fp8_dtype = matrix_b.scalar_type();
+    gpu::xetla::fp8_format f_format;
+    if (fp8_dtype == at::kFloat8_e4m3fn) {
+      f_format = gpu::xetla::fp8_format::E4M3;
+    } else if (fp8_dtype == at::kFloat8_e5m2) {
+      f_format = gpu::xetla::fp8_format::E5M2;
+    } else {
+      TORCH_CHECK(
+          false,
+          "Error in moegemm: run into Unsupported data type for matrix_b, only support float8_e4m3fn and float8_e5m2 now. ");
+    }
+
+    if (matrix_a.scalar_type() == at::kHalf) {
+      auto cgfs = gpu::xetla::moe_gemm_fp8<sycl::half>(
+          queue,
+          reinterpret_cast<sycl::half*>(matrix_a.data_ptr()),
+          reinterpret_cast<uint8_t*>(matrix_b.data_ptr()),
+          f_format,
+          reinterpret_cast<float*>(matrix_b_scale_inv->data_ptr()),
+          reinterpret_cast<sycl::half*>(output.data_ptr()),
+          total_m,
+          gemm_n,
+          gemm_k,
+          reinterpret_cast<int*>(rows_for_experts.data_ptr()),
+          reinterpret_cast<int*>(rows_for_experts_host.data_ptr()),
+          n_experts);
+      DPCPP_Q_SUBMIT_CGFS(queue, cgfs);
+    } else if (matrix_a.scalar_type() == at::kBFloat16) {
+      auto cgfs = gpu::xetla::moe_gemm_fp8<sycl::ext::oneapi::bfloat16>(
+          queue,
+          reinterpret_cast<sycl::ext::oneapi::bfloat16*>(matrix_a.data_ptr()),
+          reinterpret_cast<uint8_t*>(matrix_b.data_ptr()),
+          f_format,
+          reinterpret_cast<float*>(matrix_b_scale_inv->data_ptr()),
+          reinterpret_cast<sycl::ext::oneapi::bfloat16*>(output.data_ptr()),
+          total_m,
+          gemm_n,
+          gemm_k,
+          reinterpret_cast<int*>(rows_for_experts.data_ptr()),
+          reinterpret_cast<int*>(rows_for_experts_host.data_ptr()),
+          n_experts);
+      DPCPP_Q_SUBMIT_CGFS(queue, cgfs);
+    } else {
+      TORCH_CHECK(
+          false,
+          "Error in moegemm: run into Unsupported data type, only support half and bfloat16 now. ");
+    }
+  } else if (matrix_a.scalar_type() == at::kHalf) {
     auto cgfs = gpu::xetla::moe_gemm(
         queue,
         reinterpret_cast<sycl::half*>(matrix_a.data_ptr()),

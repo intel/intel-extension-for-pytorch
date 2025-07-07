@@ -57,4 +57,9 @@ struct quant_info {
   mem_layout weight_mem_layout;
 };
 
+enum class fp8_format : uint8_t {
+  E4M3 = 0,
+  E5M2 = 1,
+};
+
 } // namespace gpu::xetla

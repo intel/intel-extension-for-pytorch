@@ -144,4 +144,25 @@ struct compute_policy_int4_dequantize<
       block_bytes_y_b / sizeof(dtype_mma_b);
 };
 
+/// @brief Compute policy for unaligned shape and xmx engine.
+/// @tparam compute_attr_ Is compute-related attributes.
+/// @tparam perf_tuning_knob_ Is performance-related knobs.
+/// @tparam arch_tag_ Is the HW architecture.
+/// @brief Specialized for Xe architecture.
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    fp8_format fp8_format_,
+    gpu_arch arch_tag_>
+struct compute_policy_fp8_dequantize : public compute_policy_default_xmx<
+                                           compute_attr_,
+                                           perf_tuning_knob_,
+                                           arch_tag_> {
+  using compute_policy_default_xmx<
+      compute_attr_,
+      perf_tuning_knob_,
+      arch_tag_>::compute_policy_default_xmx;
+  static constexpr enum fp8_format fp8_format = fp8_format_;
+};
+
 } // namespace gpu::xetla::group

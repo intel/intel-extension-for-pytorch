@@ -42,6 +42,9 @@ __XETLA_API typename std::enable_if_t<
     !(is_internal_type<T_dst>::value) && !(is_internal_type<T_src>::value),
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
+  if constexpr (std::is_same<T_dst, T_src>::value) {
+    return src;
+  }
   xetla_vector<T_dst, N> dst = src;
   return dst;
 }
@@ -260,6 +263,19 @@ __XETLA_API typename std::enable_if_t<
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
   return src;
+}
+
+/// @brief xetla explicit data conversion, fp16->bf16.
+/// @tparam T_dst is the bfloat16 data type.
+/// @tparam T_src is the float16 data type.
+/// @tparam N is the element number in xetla_vector.
+template <typename T_dst, typename T_src, int N>
+__XETLA_API typename std::enable_if_t<
+    std::is_same<T_dst, bf16>::value && std::is_same<T_src, fp16>::value,
+    xetla_vector<T_dst, N>>
+xetla_cvt(xetla_vector<T_src, N> src) {
+  xetla_vector<T_dst, N> dst = src;
+  return dst;
 }
 
 /// @} xetla_core_conv
