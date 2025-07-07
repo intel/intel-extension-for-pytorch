@@ -57,6 +57,8 @@ struct fmha_forward_kernel_args_t {
   int32_t* block_tables = nullptr;
   uint32_t max_blocks_per_seq = 0;
   uint32_t block_size = 0;
+  uint32_t num_tokens = 0;
+  bool isPvc = false;
 };
 
 struct paged_attention_fwd_kernel_args_t {

@@ -6,9 +6,9 @@
 #include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
 #include <ATen/xpu/XPUGeneratorImpl.h>
-#include <CL/sycl.hpp>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
+#include <sycl/sycl.hpp>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include <utils/DPCPP.h>
@@ -1858,6 +1858,15 @@ Tensor chunked_prefill(
   constexpr const int partition_sizee = 512;
 
 #if defined(USE_XETLA)
+  using namespace sycl::ext;
+  using namespace sycl::ext::oneapi;
+
+  at::DeviceIndex device_id = at::xpu::current_device();
+  sycl::device& device = at::xpu::get_raw_device(device_id);
+
+  bool isPvc = device.get_info<experimental::info::device::architecture>() ==
+      experimental::architecture::intel_gpu_pvc;
+
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),
       "SDP kernel requires XMX, but the current platform has no XMX ...");
@@ -1911,7 +1920,9 @@ Tensor chunked_prefill(
          softcap,
          block_table.data_ptr<int32_t>(), // block_tables
          num_max_seq_block, // max_blocks_per_seq
-         block_size}); // block_size
+         block_size, // block_size
+         num_tokens, // num_tokens
+         isPvc}); // isPvc
     DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
   } else {
     constexpr const int partition_size = 512;

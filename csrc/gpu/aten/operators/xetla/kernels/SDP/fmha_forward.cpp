@@ -84,11 +84,14 @@ class fmha_forward_kernel_policy {
   template <typename fmha_policy>
   static cgfs_t chunked_prefill_wrapper(
       const fmha::dispatch_fmha_forward_args_t<T>& args) {
-    // std::cout << "block tables: " << (args.block_tables == nullptr)
-    // << std::endl;
+    // TODO: there should be more tuning here
+    static constexpr uint32_t max_qhead_kv = 8;
+    bool gqa_enabled = (args.num_queries == NUM_QUERIES_GREEDY) &&
+        _load_using_fmha_v3() && !args.isPvc &&
+        (args.num_kv_heads * max_qhead_kv >= args.num_heads);
     if (args.block_size == 64) {
       // std::cout << "block size 64" << std::endl;
-      if (args.num_queries == NUM_QUERIES_GREEDY && _load_using_fmha_v3()) {
+      if (gqa_enabled) {
         if (args.head_size <= HEAD_SIZE_LIMIT_0) {
           return kernel_call<fmha_policy_1x64x64>(args);
         } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
@@ -108,7 +111,7 @@ class fmha_forward_kernel_policy {
         return {};
       }
     } else if (args.block_size == 128) {
-      if (args.num_queries == NUM_QUERIES_GREEDY && _load_using_fmha_v3()) {
+      if (gqa_enabled) {
         if (args.head_size <= HEAD_SIZE_LIMIT_0) {
           return kernel_call<fmha_policy_1x128x64>(args);
         } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
