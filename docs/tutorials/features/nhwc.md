@@ -193,4 +193,4 @@ auto src_mem = memory(src_md, src_data_ptr, engine);
 ### b. Create Convolution Primitive
 
 * **NCHW** - create `memory::desc` with *any* card for 'input', 'output' and 'weight'; query proposed `memory::desc` from convolution primitive;
-* **NHWC** - create `memory::desc` with `format_tag::nhwc` for 'input' and 'output', use *any* for 'weight'; if we use `hwio` for 'weight' convolution primitive will be created with gemm rather jit avx512.
+* **NHWC** - create `memory::desc` with `format_tag::nhwc` for 'input' and 'output', use *any* for 'weight'; if we use `hwio` for 'weight' convolution primitive will be created with gemm rather avx512.

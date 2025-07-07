@@ -54,6 +54,10 @@ def need_to_disable_check_trace_for_XPU(*args, **kwargs):
 def jit_trace_wrapper(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
+        print(
+            "WARNING: Torchscript (JIT) mode is deprecated from Intel® Extension for PyTorch*. "
+            + "It will be removed in future releases. Please use torch.compile instead."
+        )
         prev = torch.is_autocast_cache_enabled()
         # For running CPU workload, disable autocast cache
         if torch.is_autocast_enabled("cpu"):

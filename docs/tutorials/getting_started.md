@@ -7,7 +7,6 @@ To start using the Intel® Extension for PyTorch\* in your code, you need to mak
 1. Import the extension with `import intel_extension_for_pytorch as ipex`.
 2. Move model and data to GPU with `to('xpu')`, if you want to run on GPU.
 3. Invoke the `optimize()` function to apply optimizations.
-3. For TorchScript, invoke `torch.jit.trace()` and `torch.jit.freeze()`.
 
 **Important:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
 
@@ -36,10 +35,7 @@ with torch.no_grad(), torch.cpu.amp.autocast():
 ##### BF16/FP16 on GPU #####
 with torch.no_grad(), torch.xpu.amp.autocast(enabled=True, dtype=dtype, cache_enabled=False):
 ############################
-  ###### Torchscript #######
-  model = torch.jit.trace(model, data)
-  model = torch.jit.freeze(model)
-  ###### Torchscript #######
+  model = torch.compile(model)
 
   model(data)
 ```

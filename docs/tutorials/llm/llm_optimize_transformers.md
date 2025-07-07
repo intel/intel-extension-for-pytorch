@@ -64,62 +64,8 @@ torch.quantization.convert(modelImpe, inplace=True)
 modelImpe(inference_data)
 ```
 
-#### TorchScript Mode
-
-``` python
-
-import torch
-import intel_extension_for_pytorch
-from torch.quantization.quantize_jit import (
-    convert_jit,
-    prepare_jit,
-)
-
-# Define model
-model = Model().to("xpu")
-model.eval()
-
-# Generate a ScriptModule
-modelJit = torch.jit.trace(model, example_input) # or torch.jit.script(model)
-
-# Defin QConfig
-qconfig = torch.quantization.QConfig(
-    activation=torch.quantization.observer.MinMaxObserver.with_args(
-        qscheme=qscheme,
-        reduce_range=False,
-        dtype=dtype
-    ),
-    weight=torch.quantization.default_weight_observer
-)
-
-# Prepare model for inserting observer
-modelJit = prepare_jit(modelJit, {'': qconfig}, inplace=True)
-
-# Calibration 
-for data in calib_dataset:
-    modelJit(data)
-
-# Convert model to quantized one
-modelJit = convert_jit(modelJit)
-
-# Warmup to fully trigger fusion patterns
-for i in range(5):
-    modelJit(warmup_data) 
-# Inference
-modelJit(inference_data)
-
-# Debug
-print(modelJit.graph_for(inference_dta))
-
-```
-
 ### Distributed Inference with DeepSpeed
 
 Distributed inference can be performed with `DeepSpeed`. Based on original Intel® Extension for PyTorch\* scripts, the following code changes are required.
 
-Check Distributed Examples in [LLM example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.10%2Bxpu/examples/gpu/llm/inference) for complete codes.
-
-
-
-
-
+Check Distributed Examples in [LLM example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.8.10%2Bxpu/examples/gpu/llm/inference) for complete codes.

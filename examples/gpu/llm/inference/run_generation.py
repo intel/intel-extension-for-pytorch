@@ -94,7 +94,6 @@ parser.add_argument(
 )
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
-parser.add_argument("--jit", action="store_true")
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--profile_name", type=str, default="", help="custom the profiling filename")
 parser.add_argument("--benchmark", action="store_true")
@@ -153,14 +152,6 @@ def get_memory_usage(name, args):
 # import ipex
 if args.ipex:
     import intel_extension_for_pytorch as ipex
-    '''
-    try:
-        ipex._C.disable_jit_linear_repack()
-    except Exception:
-        pass
-    '''
-#if args.jit:
-#    torch._C._jit_set_texpr_fuser_enabled(False)
 
 # dtype
 amp_enabled = True if args.dtype != "float32" and not args.disable_auto_cast else False
@@ -171,7 +162,7 @@ model_type = next(
     (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
 )
 model_class = MODEL_CLASSES[model_type]
-config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=args.use_hf_code)
+config = AutoConfig.from_pretrained(args.model_id, trust_remote_code=args.use_hf_code)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if amp_dtype == torch.float16 and args.woq and args.woq_checkpoint_path == "":
