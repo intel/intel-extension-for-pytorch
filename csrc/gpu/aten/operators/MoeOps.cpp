@@ -464,9 +464,9 @@ struct Fused_Grouped_Topk {
     // 2 find topk_group groups as kNegInfinity
     int group_topk_idx[malloc_per_item];
     for (int k = 0; k < topk_group; ++k) {
-      float k_max = kNegInfinity;
-      int k_max_idx = -1;
-      for (int e = 0; e < num_expert_group; ++e) {
+      float k_max = group_scores[0];
+      int k_max_idx = 0;
+      for (int e = 1; e < num_expert_group; ++e) {
         float score = group_scores[e];
 
         if (score > k_max) {
@@ -537,7 +537,7 @@ struct Fused_Grouped_Topk {
       }
 
       topk_weights_local[k] = k_max;
-      topk_ids_local[k] = k_max_idx;
+      topk_ids_local[k] = k_max_idx < 0 ? k : k_max_idx;
     }
 
     if (renormalize) {
