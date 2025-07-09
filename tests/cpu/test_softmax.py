@@ -208,9 +208,9 @@ class SoftmaxTester(JitTestCase):
             # outplace test, but should be aten::softmax due to non-contiguous input
             graph5 = model5.graph_for(test5)
             self.assertGraphContainsExactly(graph5, ATEN_SOFTMAX, 1)
-            # should be inplace and pass the checking in llga fusion group
+            # should be inplace
             graph6 = converted_model.graph_for(test3)
-            self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 1)
+            self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 2)
             # should be inplace
             graph7 = model7.graph_for(test7, torch.BoolTensor([True]))
             self.assertGraphContainsExactly(graph7, IPEX_SOFTMAX_, 1)
