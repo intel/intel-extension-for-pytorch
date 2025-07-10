@@ -36,9 +36,9 @@ at::Tensor qlinear_woq_pack(
     size_t block_k,
     int64_t lowp_mode,
     int64_t weight_format) {
-  TLA_ASSERT(qw.is_contiguous(), "qw must be contiguous");
   bool is_4bit_flag = is_4bit(qw_type);
   auto sizes = qw.sizes();
+  auto strides = qw.strides();
   auto N = sizes[0];
   auto K = is_4bit_flag ? sizes[1] * 2 : sizes[1];
   if (weight_format == GPTQ_WEIGHT_FORMAT) {
@@ -66,6 +66,7 @@ at::Tensor qlinear_woq_pack(
   const int Nc = N / block_n;
   const int Kc = K / block_k;
   if (is_4bit_flag) {
+    TORCH_CHECK(qw.is_contiguous(), "qw must be contiguous");
     auto result = at::empty(
         {Nc, Kc, block_k, block_n / 2}, qw.options().dtype(at::kByte));
     // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
@@ -228,7 +229,8 @@ at::Tensor qlinear_woq_pack(
     // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
     int8_t* src_data = (int8_t*)qw.data_ptr();
     int8_t* dst_data = (int8_t*)result.data_ptr();
-    auto psrc = GetVLAPtr<int8_t>(src_data, {block_n, Kc, block_k});
+    auto real_Kc = strides[0] / block_k;
+    auto psrc = GetVLAPtr<int8_t>(src_data, {block_n, real_Kc, block_k});
     auto pdst = GetVLAPtr<int8_t>(dst_data, {Kc, block_k, block_n});
     auto pack_loop =
         ThreadedLoop<3>({{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
