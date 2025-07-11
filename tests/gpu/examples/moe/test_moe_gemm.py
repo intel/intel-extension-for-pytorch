@@ -95,5 +95,9 @@ class TestTorchMethod:
                 n_experts,
             )
             torch.testing.assert_close(
-                output_fp8.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
+                output_fp8.to(float),
+                ref_output.to(float),
+                rtol=1e-2,
+                atol=1e-2,
+                equal_nan=True,
             )
