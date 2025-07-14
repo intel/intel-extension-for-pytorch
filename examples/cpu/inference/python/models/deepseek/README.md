@@ -17,7 +17,7 @@ git clone https://github.com/blzheng/sglang.git
 
 cd sglang
 
-git checkout llm_po
+git checkout llm_po_old
 
 pip install -e "python[all_cpu]"
 

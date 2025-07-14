@@ -1,8 +1,9 @@
 #!/bin/bash
 
-ARGS=""
+ARGS=" --trust-remote-code --device cpu --disable-overlap-schedule --prompt-filename prompt.json  --max-total-tokens 65536 --mem-fraction-static 0.8 "
 
 export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
+export SGLANG_USE_CPU_ENGINE=1
 
 FINETUNED_MODEL=${FINETUNED_MODEL:-"meta-llama/Llama-3.1-8B-Instruct"}
 NUMAS=`lscpu | grep 'NUMA node(s)' | awk '{print $3}'`
@@ -64,6 +65,10 @@ else
     exit 1
 fi
 
+if [ "${ATTN_BACKEND}" == "torch_native" ]; then
+    echo "Using torch native attention backend"
+    ARGS="$ARGS --attention-backend torch_native "
+fi
 
 if [ -z "${OUTPUT_TOKEN}" ]; then
     echo "The required environment variable OUTPUT_TOKEN has not been set, please set before running, e.g. export OUTPUT_TOKEN=32"
@@ -91,19 +96,34 @@ get_core_count() {
     echo "$total"
 }
 
-for ((i=1; i<NUMAS; i++)); do
-    echo "Launching task on NUMA node $i..."
+if [ -z "${ENABLE_TP}" ]; then
+    echo "Running without Tensor Parallelism"
+    for ((i=1; i<NUMAS; i++)); do
+        echo "Launching task on NUMA node $i..."
 
-    CPU_LIST=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
+        CPU_LIST=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
+        CORES_PER_INSTANCE=$(get_core_count "$CPU_LIST")
+        LOG_FILE="${OUTPUT_DIR}/${usecase}_${precision}_bs${BATCH_SIZE}_node${i}.log"
+        echo "SGLANG_CPU_OMP_THREADS_BIND=${CPU_LIST} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE} &"
+        SGLANG_CPU_OMP_THREADS_BIND=${CPU_LIST} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE} &
+    done
+    CPU_LIST=$(lscpu | grep "NUMA node0 CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
     CORES_PER_INSTANCE=$(get_core_count "$CPU_LIST")
-    LOG_FILE="${OUTPUT_DIR}/${usecase}_${precision}_bs${BATCH_SIZE}_node${i}.log"
-    echo "OMP_NUM_THREADS=${CORES_PER_INSTANCE} numactl -C ${CPU_LIST} -m ${i} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --disable-overlap-schedule --prompt-filename prompt.json 2>&1 | tee ${LOG_FILE} &"
-    OMP_NUM_THREADS=${CORES_PER_INSTANCE} numactl -C ${CPU_LIST} -m ${i} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --disable-overlap-schedule --prompt-filename prompt.json 2>&1 | tee ${LOG_FILE} &
-done
-CPU_LIST=$(lscpu | grep "NUMA node0 CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
-CORES_PER_INSTANCE=$(get_core_count "$CPU_LIST")
-LOG_FILE="${OUTPUT_DIR}/${usecase}_${precision}_bs${BATCH_SIZE}_node0.log"
-echo "OMP_NUM_THREADS=${CORES_PER_INSTANCE} numactl -C ${CPU_LIST} -m 0 python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --disable-overlap-schedule --prompt-filename prompt.json 2>&1 | tee ${LOG_FILE}"
-OMP_NUM_THREADS=${CORES_PER_INSTANCE} numactl -C ${CPU_LIST} -m 0 python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --disable-overlap-schedule --prompt-filename prompt.json 2>&1 | tee ${LOG_FILE}
+    LOG_FILE="${OUTPUT_DIR}/${usecase}_${precision}_bs${BATCH_SIZE}_node0.log"
+    echo "SGLANG_CPU_OMP_THREADS_BIND=${CPU_LIST} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE}"
+    SGLANG_CPU_OMP_THREADS_BIND=${CPU_LIST} python3 -m sglang.bench_one_batch ${ARGS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE}
 
-wait
+    wait
+else
+    echo "Running with Tensor Parallelism"
+    CPU_LIST=$(lscpu | grep "NUMA node0 CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
+    bind_str="${CPU_LIST}"
+    for ((i=1; i<NUMAS; i++)); do
+        CPU_LIST=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | sed 's/^ //g' | cut -d',' -f1 | tr -d ' ')
+        CORES_PER_INSTANCE=$(get_core_count "$CPU_LIST")
+        bind_str="${bind_str}|${CPU_LIST}"
+    done
+    LOG_FILE="${OUTPUT_DIR}/${usecase}_${precision}_bs${BATCH_SIZE}_tp${NUMAS}.log"
+    echo "SGLANG_CPU_OMP_THREADS_BIND=${bind_str} python3 -m sglang.bench_one_batch ${ARGS} --tp ${NUMAS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE}"
+    SGLANG_CPU_OMP_THREADS_BIND=${bind_str} python3 -m sglang.bench_one_batch ${ARGS} --tp ${NUMAS} --batch-size ${BATCH_SIZE} --model ${FINETUNED_MODEL} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN}  2>&1 | tee ${LOG_FILE}
+fi

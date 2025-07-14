@@ -23,14 +23,15 @@ pip install -e "python[all_cpu]"
 
 conda install -y libsqlite=3.48.0
 
-pip uninstall torch torchvision
-pip3 install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
+pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/  --force-reinstall
+pip install torchao --index-url https://download.pytorch.org/whl/nightly/ --force-reinstall
 
 # Build sgl-kernel
 conda install -y libnuma numactl
 
 cd sgl-kernel
-python setup.py install
+cp pyproject_cpu.toml pyproject.toml
+pip install -v .
 
 cd ..
 
@@ -51,13 +52,15 @@ wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscell
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
 | **TEST_MODE** (THROUGHPUT, REALTIME)              | `export TEST_MODE=THROUGHPUT`                  |
+| **ENABLE_TP**              | `export ENABLE_TP=1`                  |
 | **OUTPUT_DIR**               |                               `export OUTPUT_DIR=<path to an output directory>`                               |
-| **FINETUNED_MODEL**    | `# Test BF16/FP16: export FINETUNED_MODEL="meta-llama/Llama-3.1-8B-Instruct" <br> # Test INT8: export FINETUNED_MODEL="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8" <br> Test FP8: TODO`         |
+| **FINETUNED_MODEL**    | # Test BF16/FP16: `export FINETUNED_MODEL="meta-llama/Llama-3.1-8B-Instruct"` <br> # Test INT8: `export FINETUNED_MODEL="RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8"` <br> Test FP8: `export FINETUNED_MODEL="Intel/llama-3.1-8b-instruct-fp8"`         |
 | **PRECISION**     |                  `export PRECISION=bf16` (bf16, fp16, int8, fp8) |
 | **INPUT_TOKEN**    |    `export INPUT_TOKEN=32 (choice in [32 64 128 256 512 1024 2016 2048 4096 8192]`    |
 | **OUTPUT_TOKEN**    |   `export OUTPUT_TOKEN=32`      |
 | **MODEL_DIR**               |                               `export MODEL_DIR=$(pwd)`                               |
 | **BATCH_SIZE** (optional)    |                               `export BATCH_SIZE=256 (using BATCH_SIZE=1 for realtime mode, using BATCH_SIZE=N for throughput mode (N could be further tuned according to the testing host, by default using 1)`                                |
+| **ATTN_BACKEND** (optional) | # For the platforms that do not support Intel AMX: `export ATTN_BACKEND=torch_native` |
 2. Command lines
 ```
 bash run_model_with_sglang.sh
@@ -67,16 +70,16 @@ bash run_model_with_sglang.sh
 1. Server:
 ```
 # BF16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --context-length 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536
 
 # FP16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --context-length 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --max-total-tokens 65536
 
 # INT8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --context-length 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536
 
 # FP8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --context-length 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536
 
 ```
 
