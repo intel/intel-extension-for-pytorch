@@ -9,7 +9,7 @@ API documentation is available at [API Docs page](../api_doc.html#ipex.llm.optim
 
 ## Pseudocode of Common Usage Scenarios
 
-The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLMs. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.7.10%2Bxpu/examples/gpu/llm/inference).
+The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLMs. Complete examples can be found at [the Example directory](https://github.com/intel/intel-extension-for-pytorch/tree/v2.8.10%2Bxpu/examples/gpu/llm/inference).
 
 ### FP16
 

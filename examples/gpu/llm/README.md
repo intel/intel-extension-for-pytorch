@@ -3,7 +3,7 @@
 Here you can find examples for large language models (LLM) text generation. These scripts:
 
 > [!NOTE]  
-> New Llama models like Llama3.2-1B, Llama3.2-3B and Llama3.3-7B are also supported from release v2.7.10+xpu.
+> New Llama models like Llama3.2-1B, Llama3.2-3B and Llama3.3-7B are also supported from release v2.8.10+xpu.
 
 - Include both inference/finetuning(lora)/bitsandbytes(qlora-finetuning).
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
@@ -18,7 +18,7 @@ Here you can find examples for large language models (LLM) text generation. Thes
 # Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.7.10
+git checkout release/xpu/2.8.10
 git submodule sync
 git submodule update --init --recursive
 
@@ -38,14 +38,14 @@ call .\tools\env_activate.bat [inference|fine-tuning|bitsandbytes]
 ```
 ### Conda-based environment setup with prebuilt release wheel files
 
-Make sure the driver packages are installed. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.7.10%2Bxpu&os=linux%2Fwsl2&package=pip).
+Make sure the driver packages are installed. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.8.10%2Bxpu&os=linux%2Fwsl2&package=pip).
 
 ```bash
 
 # Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.7.10
+git checkout release/xpu/2.8.10
 git submodule sync
 git submodule update --init --recursive
 

@@ -136,7 +136,7 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
      - ✅
 
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.7.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.8.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
