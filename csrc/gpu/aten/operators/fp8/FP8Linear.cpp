@@ -139,7 +139,15 @@ Tensor fp8_gemm_w8a16(
     TORCH_CHECK(false, "linear only support for 2D and 3D tensors!\n");
   }
 
-  at::Tensor result = at::empty(result_shape, A.options());
+  // deal with input shape [m, b, k] stride [k, m * k, 1]
+  auto k = A.size(A.dim() - 1);
+  auto n = result_shape.back();
+  auto res_stride = A.strides().vec();
+  for (int i = 0; i < res_stride.size() - 1; i++) {
+    res_stride[i] = res_stride[i] / k * n;
+  }
+
+  at::Tensor result = at::empty_strided(result_shape, res_stride, A.options());
 
   // check if nt format
   bool is_nt = true;

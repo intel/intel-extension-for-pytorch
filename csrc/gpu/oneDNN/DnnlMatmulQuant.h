@@ -738,7 +738,7 @@ static inline void dnnl_matmul_w8a16_fp8(
 
   const int m = std::reduce(
       src_sz.begin(), src_sz.end() - 1, 1, std::multiplies<int64_t>());
-  const int n = o_sz[1]; // presume channel last format
+  const int n = o_sz.back(); // presume channel last format
   const int k = *(src_sz.end() - 1);
 
   // get device, engine, stream
@@ -791,11 +791,22 @@ static inline void dnnl_matmul_w8a16_fp8(
     tt = dnnl::trans_type_t::nt;
   }
 
-  int64_t lda = mat1.strides()[mat1.dim() - 2];
+  // get lda ldb and ldc
+  auto mat1_strides = mat1.strides();
+  int64_t leading_dim = -1;
+  if (mat1.dim() == 2) {
+    leading_dim = 0;
+  } else if (mat1.dim() == 3) {
+    leading_dim = mat1_strides[0] < mat1_strides[1] ? 0 : 1;
+  } else {
+    TORCH_CHECK(
+        false, "Unsupported input dimension for fp8 matmul: ", mat1.dim());
+  }
+  int64_t lda = mat1_strides[leading_dim];
   int64_t ldb = mat2.strides()[mat2.dim() - 1] == 1
       ? mat2.strides()[mat2.dim() - 2]
       : mat2.strides()[mat2.dim() - 1];
-  int64_t ldc = result.strides()[result.dim() - 2];
+  int64_t ldc = result.strides()[leading_dim];
 
   auto f_attr = [&](primitive_attr& pattr) {
 #ifdef USE_SCRATCHPAD_MODE

@@ -316,11 +316,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.double_quant_scale_dtype = double_quant_scale_dtype
         self.compute_dtype = compute_dtype
         self.compress_statistics = compress_statistics
-        self.blocksize = (
-            blocksize
-            if blocksize != -1 and blocksize < self.in_features
-            else self.in_features
-        )
+        self.blocksize = blocksize if blocksize != -1 else self.in_features
         self.scheme = scheme
         self.weight_dtype = weight_dtype
         self.device = device
