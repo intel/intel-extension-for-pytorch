@@ -29,19 +29,6 @@ rpn_nms_cpu_kernel_impl(
     const float threshold,
     const int max_output);
 
-std::tuple<
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>>
-box_head_nms_cpu_kernel_impl(
-    const std::vector<at::Tensor>& batch_bboxes,
-    const std::vector<at::Tensor>& batch_scores,
-    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
-    const float score_thresh,
-    const float threshold,
-    const int detections_per_img,
-    const int num_classes);
-
 } // namespace
 
 using nms_cpu_kernel_fn = at::Tensor (*)(
@@ -70,19 +57,6 @@ using rpn_nms_cpu_kernel_fn =
         const float,
         const int);
 IPEX_DECLARE_DISPATCH(rpn_nms_cpu_kernel_fn, rpn_nms_cpu_kernel_stub);
-
-using box_head_nms_cpu_kernel_fn = std::tuple<
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>> (*)(
-    const std::vector<at::Tensor>&,
-    const std::vector<at::Tensor>&,
-    const std::vector<std::tuple<int64_t, int64_t>>&,
-    const float,
-    const float,
-    const int,
-    const int);
-IPEX_DECLARE_DISPATCH(box_head_nms_cpu_kernel_fn, box_head_nms_cpu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex
@@ -155,42 +129,6 @@ std::tuple<std::vector<at::Tensor>, std::vector<at::Tensor>> rpn_nms(
     const int64_t min_size,
     const double threshold,
     const int64_t max_output);
-
-/// \brief Perform batch non-maximum suppression (NMS) for MaskRCNN box_head
-/// part.
-///
-/// C++ version of batch NMS for MaskRCNN box_head part.
-/// Refer to
-/// https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/modeling/roi_heads/box_head/inference.py#L79.
-///
-/// \param batch_bboxes: predicted loc in ltrb format, BS tensors in vector,
-/// and the size of each tensor: [number_boxes, 4]. \param batch_scores:
-/// predicted score, BS tensors in vector, and the size of each tensor:
-/// [number_boxes]. \param image_shapes: the shapes of images, BS tuples in
-/// vector. \param score_thresh: the threshold of score. \param threshold: IOU
-/// threshold(scalar) to suppress bboxs which has the IOU val larger than the
-/// threshold. \param detections_per_img: the max number of detections per
-/// image. \param num_classes: class number of objects.
-///
-/// \return result is a tuple. There are 3 vectors of tensors in the tuple:
-///   bboxes_out_: the selected out bboxes coordinate, BS tensors in vector,
-///   and the size of each tensor: [selected_box_number, 4]. scores_out_: the
-///   score of each selected out bboxes, BS tensors in vector, and the size of
-///   each tensor: [selected_box_number]. labels_out_: the label of each
-///   selected out bboxes, BS tensors in vector, and the size of each tensor:
-///   [selected_box_number].
-std::tuple<
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>,
-    std::vector<at::Tensor>>
-box_head_nms(
-    const std::vector<at::Tensor>& batch_bboxes,
-    const std::vector<at::Tensor>& batch_scores,
-    const std::vector<std::tuple<int64_t, int64_t>>& image_shapes,
-    const double score_thresh,
-    const double threshold,
-    const int64_t detections_per_img,
-    const int64_t num_classes);
 
 /// \brief Do scale and transform from xywh to ltrb for predicted loc and do
 /// Softmax along the last dim for predicted score.
