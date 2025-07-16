@@ -17,21 +17,31 @@ git clone https://github.com/blzheng/sglang.git
 
 cd sglang
 
-git checkout llm_po_old
+git checkout llm_po
 
 pip install -e "python[all_cpu]"
 
 conda install -y libsqlite=3.48.0
 
 pip uninstall torch torchvision
-pip3 install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
+
+git clone https://github.com/yanbing-j/pytorch -b yanbing/tf32_dev_branch_for_test
+cd pytorch
+git submodule sync
+git submodule update --init --recursive
+conda install cmake ninja
+pip install -r requirements.txt
+pip install mkl-static mkl-include
+export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMAKE_PREFIX_PATH}"
+python setup.py install
+cd ..
 
 # Build sgl-kernel
 conda install -y libnuma numactl
 
 cd sgl-kernel
-python setup.py install
-
+SGLANG_CPU_FP8_BRGEMM=1 uv build --wheel -Cbuild-dir=build . --color=always --no-build-isolation
+pip install dist/sgl_kernel-0.2.5-cp310-cp310-linux_x86_64.whl --force-reinstall
 cd ..
 
 conda install -y gperftools -c conda-forge
@@ -67,8 +77,7 @@ wget --no-proxy -O prompt.json http://mlpc.intel.com/downloads/LLM/prompt-qwen3-
 ##### 2.1 Bench one batch
 ```sh
 # TP = 6, 43 OpenMP threads of rank0 are bound on 0-42 CPU cores, and the OpenMP threads of rank1 are bound on 43-85 CPU cores, etc.
-# prompt file is needed for offline mode test, to activate MoE experts for different batches.
-SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.bench_one_batch --batch-size {BATCH_SIZE} --input {INPUT_TOKEN} --output {OUTPUT_TOKEN} --model  deepseek-ai/DeepSeek-R1  --trust-remote-code --device cpu --tp 6 --prompt-file prompt.json
+SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.bench_one_batch --batch-size {BATCH_SIZE} --input {INPUT_TOKEN} --output {OUTPUT_TOKEN} --model  deepseek-ai/DeepSeek-R1  --trust-remote-code --device cpu --tp 6  --prompt-file prompt.json
 ```
 
 
@@ -84,7 +93,7 @@ tar xf data.tar
 Server
 ```sh
 # R1 FP8
-SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.launch_server --model deepseek-ai/DeepSeek-R1 --trust-remote-code --device cpu --log-requests --log-requests-level 1 --disable-overlap-schedule --tp 6 --chunked-prefill-size 2048 --max-running-requests 8
+SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.launch_server --model deepseek-ai/DeepSeek-R1 --trust-remote-code --device cpu --log-requests --log-requests-level 1 --disable-overlap-schedule --tp 6 --chunked-prefill-size 2048 --max-running-requests 8
 ```
 
 Client
