@@ -66,11 +66,12 @@ def test_fp8_linear_v2(fp8_dtype, dtype, is_input_fp8, is_bias):
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
 @pytest.mark.parametrize("is_bias", [True, False])
 @pytest.mark.parametrize("is_nt", [True, False])
-def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias, is_nt):
+@pytest.mark.parametrize("is_mbk", [True, False])
+def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias, is_nt, is_mbk):
     seed = 1234
     torch.manual_seed(seed)
 
-    input = torch.randn([8, 2], dtype=dtype, device=torch.device("xpu")) / 10.0
+    input = torch.randn([1, 8, 2], dtype=dtype, device=torch.device("xpu")) / 10.0
     weight = torch.rand([3, 2], dtype=dtype).xpu() / 10.0
 
     gemm_ref = torch.nn.Linear(2, 3, bias=is_bias).xpu().to(dtype)
@@ -105,10 +106,14 @@ def test_fp8_linear_w8a16(fp8_dtype, dtype, is_bias, is_nt):
         ),
     )
 
+    if is_mbk:
+        input = input.transpose(0, 1)
+
     output_fp8 = fp8_linear(input, gemm_ref.bias.data.clone() if is_bias else None)
+    output_fp8 = output_fp8.transpose(0, 1) if is_mbk else output_fp8
 
     torch.testing.assert_close(output_fp8, output_ref, atol=1e-2, rtol=1e-2)
 
 
 if __name__ == "__main__":
-    test_fp8_linear_w8a16(torch.float8_e5m2, torch.float16, True)
+    test_fp8_linear_w8a16(torch.float8_e5m2, torch.float16, True, True, True)
