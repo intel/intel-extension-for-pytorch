@@ -6,6 +6,7 @@ from packaging import version
 from typing import Any, Dict, Callable, List, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
+import copy
 
 trans_version = transformers.__version__
 
@@ -634,3 +635,85 @@ def whisper_generate(
         outputs["segments"] = final_segments
 
     return outputs
+
+
+def is_torchdynamo_compiling():
+    try:
+        import torch
+
+        return torch.compiler.is_compiling()
+    except Exception:
+        try:
+            import torch._dynamo as dynamo  # noqa: F401
+
+            return dynamo.is_compiling()
+        except Exception:
+            return False
+
+
+def _prepare_generation_config(
+    self, generation_config, use_model_defaults=None, **kwargs: Dict
+):
+    """
+    Prepares the base generation config, then applies any generation configuration options from kwargs. This
+    function handles retrocompatibility with respect to configuration files.
+    """
+    # TODO joao: when we can detect `fullgraph=True` in `torch.compile` (https://github.com/pytorch/pytorch/pull/120400)
+    # replace `is_torchdynamo_compiling` by the corresponding check. As it is, we are being too restrictive with
+    # the parameterization in `fullgraph=False` so as to enable `fullgraph=True`.
+
+    # priority: `generation_config` argument > `model.generation_config` (the default generation config)
+    using_model_generation_config = False
+    if generation_config is None:
+        # legacy: users may modify the model configuration to control generation. To trigger this legacy behavior,
+        # the following conditions must be met
+        # 1) the generation config must have been created from the model config (`_from_model_config` field);
+        # 2) the generation config must have seen no modification since its creation (the hash is the same);
+        # 3) there are non-default generation parameters in the model config.
+        # 4) the user must have set new generation parameters in the model config.
+        # NOTE: `torch.compile` can't compile `hash`, this legacy support is disabled with compilation.
+        if (
+            not is_torchdynamo_compiling()
+            and self.generation_config._from_model_config  # 1)
+            and self.generation_config._original_object_hash
+            == hash(self.generation_config)  # 2)
+            and len(self.config._get_non_default_generation_parameters()) > 0  # 3)
+        ):
+            new_generation_config = transformers.generation.configuration_utils.GenerationConfig.from_model_config(
+                self.config
+            )
+            if new_generation_config != self.generation_config:  # 4)
+                warnings.warn(
+                    "You have modified the pretrained model configuration to control generation. This is a"
+                    " deprecated strategy to control generation and will be removed in v5."
+                    " Please use and modify the model generation configuration (see"
+                    " https://huggingface.co/docs/transformers/generation_strategies#default-text-generation-configuration )",
+                    UserWarning,
+                )
+                self.generation_config = new_generation_config
+
+        generation_config = self.generation_config
+        using_model_generation_config = True
+
+    # `torch.compile` can't compile `copy.deepcopy`, arguments in `kwargs` that are part of `generation_config`
+    # will mutate the object with `.update`. As such, passing these arguments through `kwargs` is disabled -- an
+    # exception will be raised in `_validate_model_kwargs`
+    if not is_torchdynamo_compiling():
+        generation_config = copy.deepcopy(generation_config)
+        model_kwargs = generation_config.update(**kwargs)
+        # If `generation_config` is provided, let's fallback ALL special tokens to the default values for the model
+        if not using_model_generation_config:
+            if generation_config.bos_token_id is None:
+                generation_config.bos_token_id = self.generation_config.bos_token_id
+            if generation_config.eos_token_id is None:
+                generation_config.eos_token_id = self.generation_config.eos_token_id
+            if generation_config.pad_token_id is None:
+                generation_config.pad_token_id = self.generation_config.pad_token_id
+            if generation_config.decoder_start_token_id is None:
+                generation_config.decoder_start_token_id = (
+                    self.generation_config.decoder_start_token_id
+                )
+    else:
+        model_kwargs = kwargs
+
+    return generation_config, model_kwargs

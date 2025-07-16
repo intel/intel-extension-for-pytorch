@@ -127,6 +127,7 @@ def model_convert_reference(_model):
         _beam_sample,
         _beam_sample_legacy,
         whisper_generate,
+        _prepare_generation_config,
     )
 
     # model wise optimization for MHA module
@@ -1068,6 +1069,9 @@ def model_convert_reference(_model):
                 _model, "_postprocess_outputs", _postprocess_outputs_whisper
             )
             convert_function(_model, "generate", whisper_generate)
+        convert_function(
+            _model, "_prepare_generation_config", _prepare_generation_config
+        )
         convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
         convert_function(_model.model, "forward", WhisperModel_forward)
         convert_function(_model.model.decoder, "forward", WhisperDecoderLayer_forward)
