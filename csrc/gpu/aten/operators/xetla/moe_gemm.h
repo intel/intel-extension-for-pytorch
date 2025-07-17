@@ -20,7 +20,7 @@ XETLA_KERNEL_API cgfs_t moe_gemm(
     const int* total_rows_for_experts_host,
     const int problem_count);
 
-template <typename T>
+template <typename T, bool vnni_t>
 XETLA_KERNEL_API cgfs_t moe_gemm_fp8(
     sycl::queue& queue,
     const T* activations,

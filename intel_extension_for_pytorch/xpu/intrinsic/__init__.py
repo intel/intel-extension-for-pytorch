@@ -417,6 +417,7 @@ def moe_gemm(
     n_experts,
     matrix_a_scale_inv=None,
     matrix_b_scale_inv=None,
+    is_vnni_transform=None,
 ):
     """
     Performs MoE (Mixture of Experts) GEMM operation.
@@ -444,6 +445,7 @@ def moe_gemm(
             matrix_a,
             matrix_b,
             matrix_b_scale_inv,
+            is_vnni_transform,
             rows_for_experts,
             rows_for_experts_cpu,
             n_experts,

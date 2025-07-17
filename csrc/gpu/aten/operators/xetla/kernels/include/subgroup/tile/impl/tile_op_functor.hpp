@@ -200,7 +200,11 @@ __XETLA_API typename std::
   return bits_fp16.template bit_cast_view<sycl::half>();
 }
 
-template <typename matB_acc_t, typename matB_t, fp8_format fp8_format>
+template <
+    typename matB_acc_t,
+    typename matB_t,
+    fp8_format fp8_format,
+    bool vnni_t>
 struct dequant_fp8_weight_t {
   using dtype_dst = typename matB_acc_t::dtype;
   using dtype_src = typename matB_t::dtype;
@@ -228,6 +232,10 @@ struct dequant_fp8_weight_t {
         xetla_cvt<dtype_dst, sycl::half, tile_elems>(
             fp8_to_fp16<tile_elems, fp8_format>(src.reg));
     if constexpr (sizeof(uint8_t) == sizeof(dtype_dst)) {
+      dst.reg = reg_src;
+      return;
+    }
+    if constexpr (vnni_t) {
       dst.reg = reg_src;
       return;
     }

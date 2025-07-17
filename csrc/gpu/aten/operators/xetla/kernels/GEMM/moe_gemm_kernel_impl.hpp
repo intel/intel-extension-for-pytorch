@@ -225,7 +225,12 @@ cgfs_t LaunchMoEGEMM(
   return {cgf};
 }
 
-template <typename T, typename Policy, fp8_format f_format, gpu_arch arch_tag>
+template <
+    typename T,
+    typename Policy,
+    fp8_format f_format,
+    bool vnni_t,
+    gpu_arch arch_tag>
 struct MoEGEMMFP8 {
   static constexpr int wg_tile_m = Policy::wg_tile_m;
   static constexpr int wg_tile_n = Policy::wg_tile_n;
@@ -251,6 +256,7 @@ struct MoEGEMMFP8 {
       compute_attr,
       perf_tuning_knob,
       f_format,
+      vnni_t,
       arch_tag>;
   using tile_shape =
       group::tile_shape_t<wg_tile_n, wg_tile_m, sg_tile_n, sg_tile_m>;
@@ -407,6 +413,7 @@ struct MoEGEMMFP8 {
 template <
     typename T,
     fp8_format f_format,
+    bool vnni_t,
     typename Policy,
     gpu_arch arch_tag = gpu_arch::XeHpc>
 cgfs_t LaunchMoEGEMMFP8(
@@ -421,7 +428,7 @@ cgfs_t LaunchMoEGEMMFP8(
     const int* total_rows_for_each_expert,
     const int* total_rows_for_each_expert_h,
     const int expert_num) {
-  using kernel = MoEGEMMFP8<T, Policy, f_format, arch_tag>;
+  using kernel = MoEGEMMFP8<T, Policy, f_format, vnni_t, arch_tag>;
   auto cgf = [=](sycl::handler& cgh) {
     kernel task(
         activation,

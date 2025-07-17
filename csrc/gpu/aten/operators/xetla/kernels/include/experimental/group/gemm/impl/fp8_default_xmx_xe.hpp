@@ -36,6 +36,7 @@ template <
     typename mem_desc_b_t_,
     typename pre_processing_t_,
     fp8_format fp8_format_,
+    bool vnni_t_,
     gpu_arch arch_tag_>
 class gemm_t<
     // compute_policy_default_xmx<compute_attr_, perf_tuning_knob_, arch_tag_>,
@@ -43,6 +44,7 @@ class gemm_t<
         compute_attr_,
         perf_tuning_knob_,
         fp8_format_,
+        vnni_t_,
         arch_tag_>,
     tile_shape_, // tile shape of workgroup-level gemm
     mem_desc_a_t_, // memory attribute of matA
@@ -61,6 +63,7 @@ class gemm_t<
       compute_attr_,
       perf_tuning_knob_,
       fp8_format_,
+      vnni_t_,
       arch_tag_>;
   static constexpr uint32_t k_stride = compute_policy::k_stride;
   static constexpr uint32_t sg_tile_m = tile_shape::sg_tile_size_y;
@@ -71,6 +74,7 @@ class gemm_t<
 
   constexpr static gpu_arch arch_tag = arch_tag_;
   static constexpr enum fp8_format fp8_format = compute_policy::fp8_format;
+  static constexpr bool vnni_t = compute_policy::vnni_t;
 
   static constexpr mem_layout mem_layout_a = mem_desc_a_t::layout;
   static constexpr mem_layout mem_layout_b = mem_desc_b_t::layout;
@@ -201,7 +205,7 @@ class gemm_t<
       mma_engine::xmx,
       arch_tag>;
   using dequantize_t =
-      subgroup::dequant_fp8_weight_t<matB_acc_t, matB_t, fp8_format>;
+      subgroup::dequant_fp8_weight_t<matB_acc_t, matB_t, fp8_format, vnni_t>;
   uint32_t wg_start_m = 0;
   uint32_t wg_start_n = 0;
   uint32_t wg_start_k = 0;

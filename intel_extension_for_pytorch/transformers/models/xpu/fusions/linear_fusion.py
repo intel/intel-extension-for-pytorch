@@ -115,10 +115,17 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         super().__init__()
         self.num_experts = W2.shape[0]
         if W3 is None:
-            self.W13 = torch.transpose(W13, 1, 2).contiguous()
+            self.W13 = torch.transpose(W13, 1, 2)
         else:
-            self.W13 = torch.transpose(torch.cat((W13, W3), dim=1), 1, 2).contiguous()
-        self.W2 = torch.transpose(W2, 1, 2).contiguous()
+            self.W13 = torch.transpose(torch.cat((W13, W3), dim=1), 1, 2)
+        self.W2 = torch.transpose(W2, 1, 2)
+
+        if self.W13.dtype is torch.float8_e5m2 or self.W13.dtype is torch.float8_e4m3fn:
+            self.W2 = self._weight_for_vnni(self.W2)
+            self.W13 = self._weight_for_vnni(self.W13)
+
+        self.W2 = self.W2.contiguous()
+        self.W13 = self.W13.contiguous()
 
         # delete original weight to avoid memory pressure
         W13.data = self.W13
@@ -132,6 +139,75 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         self.w2_input_scale_inv = a2_scale_inv if a2_scale_inv is not None else None
 
         torch.xpu.empty_cache()
+
+    def _weight_for_vnni(self, weight):
+        """
+
+        VNNI transform:
+        [0,4,8,12,       [0,1,4,5,
+        1,5,9,13,   -->   8,9,12,13,
+        2,6,10,14,        2,3,6,7,
+        3,7,11,15]        10,11,14,15]
+
+        Because xetla read data by tile load,
+        VNNI transform in xetla uses two steps:
+        [0,4,8,12,       [0,1,2,3,            [0,1,4,5,
+        1,5,9,13,   -->   4,5,6,7,     -->     8,9,12,13,
+        2,6,10,14,        8,9,10,11,           2,3,6,7,
+        3,7,11,15]        12,13,14,15]         10,11,14,15]
+
+        This function reformat weight to avoid second step instead of directly transforming to VNNI.
+        And only support activation dtype is bf16/fp16, weight dtype is fp8_e5m2 or fp8_e4m3fn.
+
+        Args:
+            weight (torch.Tensor): [experts, K, N].
+        Returns:
+            torch.Tensor: [experts, K, N]
+        """
+
+        E, K, N = weight.shape
+        vnni_row, block_size_x = 4, 16
+        stride = 2
+
+        assert K % vnni_row == 0, "K should be divisible by vnni_row"
+        assert N % block_size_x == 0, "N should be divisible by block_size_x"
+
+        weight = weight.reshape(
+            E, K // vnni_row, vnni_row, N // block_size_x, block_size_x
+        ).transpose(2, 3)
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride,
+            stride,
+            block_size_x,
+            1,
+        ).transpose(4, 5)
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride * block_size_x,
+            stride,
+        )
+
+        weight = torch.cat([weight[..., i::stride, :] for i in range(stride)], dim=-2)
+
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride,
+            block_size_x,
+            stride,
+            1,
+        ).transpose(4, 5)
+        weight = weight.reshape(
+            E, K // vnni_row, N // block_size_x, vnni_row, block_size_x
+        ).transpose(2, 3)
+        weight = weight.reshape(E, K, N)
+        return weight
 
     def linear_silu_mul(self, x):
         half = x.shape[-1] // 2
@@ -154,6 +230,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             self.num_experts,
             self.w13_input_scale_inv,
             self.w13_weight_scale_inv,
+            True,  # True means the input is already ready for VNNI format
         )
         hidden_states = self.linear_silu_mul(hidden_states)
         hidden_states = torch.xpu.moe_gemm(
@@ -164,6 +241,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             self.num_experts,
             self.w2_input_scale_inv,
             self.w2_weight_scale_inv,
+            True,  # True means the input is already ready for VNNI format
         )
         return hidden_states
 

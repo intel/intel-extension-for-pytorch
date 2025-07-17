@@ -153,6 +153,7 @@ template <
     typename compute_attr_,
     typename perf_tuning_knob_,
     fp8_format fp8_format_,
+    bool vnni_t_,
     gpu_arch arch_tag_>
 struct compute_policy_fp8_dequantize : public compute_policy_default_xmx<
                                            compute_attr_,
@@ -163,6 +164,7 @@ struct compute_policy_fp8_dequantize : public compute_policy_default_xmx<
       perf_tuning_knob_,
       arch_tag_>::compute_policy_default_xmx;
   static constexpr enum fp8_format fp8_format = fp8_format_;
+  static constexpr bool vnni_t = vnni_t_;
 };
 
 } // namespace gpu::xetla::group

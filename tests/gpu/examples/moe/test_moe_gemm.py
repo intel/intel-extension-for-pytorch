@@ -60,13 +60,61 @@ class TestTorchMethod:
             output.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
         )
 
+    def _weight_for_vnni(self, weight):
+        E, K, N = weight.shape
+        vnni_row, block_size_x = 4, 16
+        stride = 2
+
+        assert K % vnni_row == 0, "K should be divisible by vnni_row"
+        assert N % block_size_x == 0, "N should be divisible by block_size_x"
+
+        weight = weight.reshape(
+            E, K // vnni_row, vnni_row, N // block_size_x, block_size_x
+        ).transpose(2, 3)
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride,
+            stride,
+            block_size_x,
+            1,
+        ).transpose(4, 5)
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride * block_size_x,
+            stride,
+        )
+
+        weight = torch.cat([weight[..., i::stride, :] for i in range(stride)], dim=-2)
+
+        weight = weight.reshape(
+            E,
+            K // vnni_row,
+            N // block_size_x,
+            vnni_row // stride,
+            block_size_x,
+            stride,
+            1,
+        ).transpose(4, 5)
+        weight = weight.reshape(
+            E, K // vnni_row, N // block_size_x, vnni_row, block_size_x
+        ).transpose(2, 3)
+        weight = weight.reshape(E, K, N)
+        return weight
+
     @pytest.mark.parametrize("total_m", [1, 32, 1024])
     @pytest.mark.parametrize("gemm_k", [1024])
     @pytest.mark.parametrize("gemm_n", [1024])
     @pytest.mark.parametrize("n_experts", [8, 16, 32])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
     @pytest.mark.parametrize("fp8_dtype", [torch.float8_e5m2])
-    def test_moe_gemm_fp8(self, n_experts, gemm_k, gemm_n, total_m, dtype, fp8_dtype):
+    @pytest.mark.parametrize("vnni_t", [True, False])
+    def test_moe_gemm_fp8(
+        self, n_experts, gemm_k, gemm_n, total_m, dtype, fp8_dtype, vnni_t
+    ):
 
         matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
         matrix_b = torch.randn(
@@ -91,6 +139,8 @@ class TestTorchMethod:
             matrix_b_dequant[i] = torch.ops.torch_ipex.cast_from_fp8(
                 matrix_b_fp8[i], matrix_b_scale_inv[i], dtype
             )
+        if vnni_t:
+            matrix_b_fp8 = self._weight_for_vnni(matrix_b_fp8).contiguous()
         output_fp8 = torch.xpu.moe_gemm(
             matrix_a,
             matrix_b_fp8,
@@ -99,6 +149,7 @@ class TestTorchMethod:
             n_experts,
             None,
             matrix_b_scale_inv,
+            vnni_t,  # True means the input is already ready for VNNI format
         )
         ref_output = self.validata_moe_gemm(
             matrix_a,

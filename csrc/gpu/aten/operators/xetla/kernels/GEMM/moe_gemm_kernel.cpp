@@ -60,7 +60,7 @@ template XETLA_KERNEL_API cgfs_t moe_gemm<sycl::ext::oneapi::bfloat16>(
     const int* total_rows_for_experts_host,
     const int problem_count);
 
-template <typename T>
+template <typename T, bool vnni_t>
 cgfs_t moe_gemm_fp8(
     sycl::queue& queue,
     const T* activations,
@@ -78,7 +78,7 @@ cgfs_t moe_gemm_fp8(
 
   switch (f_format) {
     case fp8_format::E4M3:
-      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E4M3, Policy>(
+      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E4M3, vnni_t, Policy>(
           queue,
           activations,
           weights,
@@ -91,7 +91,7 @@ cgfs_t moe_gemm_fp8(
           total_rows_for_experts_host,
           problem_count);
     case fp8_format::E5M2:
-      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E5M2, Policy>(
+      return gpu::xetla::LaunchMoEGEMMFP8<T, fp8_format::E5M2, vnni_t, Policy>(
           queue,
           activations,
           weights,
@@ -112,7 +112,7 @@ cgfs_t moe_gemm_fp8(
 
 // generate the template instantiation for sycl::half and
 // sycl::ext::oneapi::bfloat16
-template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::half>(
+template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::half, true>(
     sycl::queue& queue,
     const sycl::half* activations,
     const uint8_t* weights,
@@ -126,7 +126,37 @@ template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::half>(
     const int* total_rows_for_experts_host,
     const int problem_count);
 
-template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::ext::oneapi::bfloat16>(
+template XETLA_KERNEL_API cgfs_t moe_gemm_fp8<sycl::half, false>(
+    sycl::queue& queue,
+    const sycl::half* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
+    sycl::half* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count);
+
+template XETLA_KERNEL_API cgfs_t
+moe_gemm_fp8<sycl::ext::oneapi::bfloat16, true>(
+    sycl::queue& queue,
+    const sycl::ext::oneapi::bfloat16* activations,
+    const uint8_t* weights,
+    const fp8_format f_format,
+    const float* scales,
+    sycl::ext::oneapi::bfloat16* outputs,
+    const int total_m,
+    const int gemm_n,
+    const int gemm_k,
+    const int* total_rows_for_experts,
+    const int* total_rows_for_experts_host,
+    const int problem_count);
+
+template XETLA_KERNEL_API cgfs_t
+moe_gemm_fp8<sycl::ext::oneapi::bfloat16, false>(
     sycl::queue& queue,
     const sycl::ext::oneapi::bfloat16* activations,
     const uint8_t* weights,
