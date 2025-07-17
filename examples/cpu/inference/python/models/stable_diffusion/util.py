@@ -19,33 +19,30 @@ add_dont_constant_fold(torch.ops.torchao.quantize_affine.default)
 
 
 class FP8QDQLinear(torch.nn.Module):
-    def __init__(self, in_features, out_features, dtype):
+    def __init__(self, in_features, out_features):
         super().__init__()
         self.qtype = torch.float8_e4m3fn
         self.weight = torch.randn((out_features, in_features)).to(self.qtype)
         self.weight_scale = 2.0
         self.scale = 2.0
         self.bias = None
-        self.dtype = dtype
 
     def forward(self, input):
         weight = torch.ops.torchao.dequantize_affine_float8(
             tensor=self.weight.data,
-            scale=torch.tensor(self.weight_scale),
+            scale=torch.tensor([self.weight_scale]),
             output_dtype=torch.float,
         )
-        weight = weight.to(self.dtype)
         q_input = torch.ops.torchao.quantize_affine_float8(
             tensor=input,
-            scale=torch.tensor(self.scale),
+            scale=torch.tensor([self.scale]),
             float8_dtype=self.qtype,
         )
         dq_input = torch.ops.torchao.dequantize_affine_float8(
             tensor=q_input,
-            scale=torch.tensor(self.scale),
+            scale=torch.tensor([self.scale]),
             output_dtype=torch.float,
         )
-        dq_input = dq_input.to(self.dtype)
         out = torch.nn.functional.linear(dq_input, weight, self.bias)
         return out
 
@@ -96,7 +93,7 @@ def generate_model_info(model):
     return parent_child_mod_dict
 
 
-def convert(model, dtype):
+def convert(model):
     with open("data.json", "r") as fp:
         data = json.load(fp)
     parent_child_mod_dict = generate_model_info(model)
@@ -122,7 +119,7 @@ def convert(model, dtype):
             scale = [i / torch.finfo(torch.float8_e4m3fn).max for i in data[name]]
             assert len(scale) == 1
             if mod_type_str == "Linear":
-                patched_mod = FP8QDQLinear(mod.in_features, mod.out_features, dtype)
+                patched_mod = FP8QDQLinear(mod.in_features, mod.out_features)
                 patched_mod.weight.data = q_param
                 patched_mod.weight_scale = weight_scale.item()
                 patched_mod.scale = scale[0]

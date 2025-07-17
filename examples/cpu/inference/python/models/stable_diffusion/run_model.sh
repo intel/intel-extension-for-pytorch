@@ -32,10 +32,8 @@ elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
         HOSTFILE=${HOSTFILE:-./hostfile}
         NUM_RANKS=$(( NNODES * SOCKETS ))
     fi
-elif [[ "${TEST_MODE}" == "REALTIME" ]]; then
-    echo "TEST_MODE set to REALTIME"
 else
-    echo "Please set TEST_MODE to THROUGHPUT or REALTIME or ACCURACY"
+    echo "Please set TEST_MODE to THROUGHPUT or ACCURACY"
     exit
 fi
 
@@ -147,19 +145,6 @@ elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
         ARGS_LAUNCH="$ARGS_LAUNCH --ninstances 1"
         ARGS="$ARGS --accuracy"
     fi
-else
-    CORES=`lscpu | grep Core | awk '{print $4}'`
-    SOCKETS=`lscpu | grep Socket | awk '{print $2}'`
-    NUMAS=`lscpu | grep 'NUMA node(s)' | awk '{print $3}'`
-    CORES_PER_NUMA=`expr $CORES \* $SOCKETS / $NUMAS`
-    CORES_PER_INSTANCE=4
-    export OMP_NUM_THREADS=$CORES_PER_INSTANCE
-    NUMBER_INSTANCE=`expr $CORES_PER_NUMA / $CORES_PER_INSTANCE`
-    LOG_PREFIX="stable_diffusion_${PRECISION}_inference_realtime"
-    ARGS_LAUNCH="$ARGS_LAUNCH --ninstances $NUMAS"
-    num_warmup=${num_warmup:-"1"}
-    num_iter=${num_iter:-"1"}
-    ARGS="$ARGS --benchmark -w ${num_warmup} -i ${num_iter} --weight-sharing --number-instance $NUMBER_INSTANCE"
 fi
 
 if [ "${MODE}" == "eager" ]; then
@@ -188,27 +173,7 @@ python -m torch.backends.xeon.run_cpu --disable-numactl --log-path ${OUTPUT_DIR}
 
 wait
 
-if [[ "${TEST_MODE}" == "REALTIME" ]]; then
-    TOTAL_CORES=`expr $CORES \* $SOCKETS`
-    INSTANCES=`expr $TOTAL_CORES / $CORES_PER_INSTANCE`
-    INSTANCES_PER_SOCKET=`expr $INSTANCES / $SOCKETS`
-
-    latency=$(grep 'Throughput:' ${OUTPUT_DIR}/${LOG_PREFIX}* |sed -e 's/.*Throughput//;s/[^0-9.]//g' |awk -v INSTANCES_PER_SOCKET=$INSTANCES_PER_SOCKET '
-    BEGIN {
-            sum = 0;
-            i = 0;
-        }
-        {
-            sum = sum + $1;
-            i++;
-        }
-    END   {
-            sum = sum / i * INSTANCES_PER_SOCKET;
-            printf("%.4f", sum);
-    }')
-    echo "--------------------------------Performance Summary per Instance --------------------------------"
-    echo ""stable_diffusion";"latency";${PRECISION};${latency}" | tee -a ${OUTPUT_DIR}/summary.log
-elif [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
+if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     throughput=$(grep 'Throughput:' ${OUTPUT_DIR}/${LOG_PREFIX}* |sed -e 's/.*Throughput//;s/[^0-9.]//g' |awk '
     BEGIN {
             sum = 0;

@@ -62,7 +62,7 @@ def parse_args():
         "--precision",
         type=str,
         default="fp32",
-        help="precision: fp32, bf32, bf16, fp16, int8-bf16, int8-fp32, fp8-bf16, fp8-fp32",
+        help="precision: fp32, bf16, fp16, int8-bf16, int8-fp32, fp8-bf16, fp8-fp32",
     )
     parser.add_argument(
         "--calibration",
@@ -191,9 +191,6 @@ def main():
     if args.precision == "fp32":
         print("Running fp32 ...")
         args.dtype = torch.float32
-    elif args.precision == "bf32":
-        print("Running bf32 ...")
-        args.dtype = torch.float32
     elif args.precision == "bf16":
         print("Running bf16 ...")
         args.dtype = torch.bfloat16
@@ -214,13 +211,14 @@ def main():
         args.dtype = torch.float32
     else:
         raise ValueError(
-            "--precision needs to be the following: fp32, bf32, bf16, fp16, int8-bf16, int8-fp32, fp8-bf16, fp8-fp32"
+            "--precision needs to be the following: fp32, bf16, fp16, int8-bf16, int8-fp32, fp8-bf16, fp8-fp32"
         )
 
     if args.compile_inductor:
         pipe.precision = torch.float32
     else:
         pipe.precision = args.dtype
+
     if args.model_name_or_path == "stabilityai/stable-diffusion-2-1":
         text_encoder_input = torch.ones((1, 77), dtype=torch.int64)
         input = (
@@ -363,7 +361,7 @@ def main():
             else:
                 from util import convert
 
-                pipe.unet = convert(pipe.unet.eval(), args.dtype)
+                pipe.unet = convert(pipe.unet.eval())
                 if args.precision == "fp8-bf16":
                     with torch.autocast("cpu"), torch.no_grad():
                         pipe.unet = torch.compile(pipe.unet)

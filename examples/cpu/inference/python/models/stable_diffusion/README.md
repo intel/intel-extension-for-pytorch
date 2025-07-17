@@ -22,7 +22,7 @@
     ```
     git clone https://github.com/shiyang-weng/ao.git
     cd ao
-    git checkout wengshiy/scaled_mm
+    git checkout wengshiy/qlinear
     python setup.py install
     ```
 3. Run setup.sh
@@ -57,7 +57,7 @@ bash download_dataset.sh
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
-| **TEST_MODE** (THROUGHPUT, ACCURACY, REALTIME)              | `export TEST_MODE=THROUGHPUT`                  |
+| **TEST_MODE** (THROUGHPUT, ACCURACY)              | `export TEST_MODE=THROUGHPUT`                  |
 | **DISTRIBUTED** (Only for ACCURACY)              | `export DISTRIBUTED=TRUE`                  |
 | **OUTPUT_DIR**               |                               `export OUTPUT_DIR=$(pwd)`                               |
 | **DATASET_DIR**       |          `export DATASET_DIR=<path_to_dataset_dir>`             |
