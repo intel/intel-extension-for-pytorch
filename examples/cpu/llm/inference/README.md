@@ -41,6 +41,8 @@ and the phenomenal high-quality reasoning model [DeepSeek-R1](#223-deepseek-r1-6
 |Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen3-14B | ✅ | ✅ | ✅ |   |
+|Qwen| Qwen/Qwen3-30B-A3B | ✅ | ✅ | ✅ | ✅ |
 |LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ | ✅ | ✅ |
 |GIT| microsoft/git-base | ✅ | ✅ | ✅ | ✅ |
 |Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ | ✅ |   |
@@ -52,6 +54,7 @@ and the phenomenal high-quality reasoning model [DeepSeek-R1](#223-deepseek-r1-6
 |Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ | ✅ |   |
 |Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ | ✅ |   |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ |
+|Whisper| openai/whisper-large-v3 | ✅ | ✅ | ✅ |   |
 |Maira| microsoft/maira-2 | ✅ | ✅ | ✅ | ✅ |
 |Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ | ✅ | ✅ |
 |DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ | ✅ | ✅ |
@@ -91,6 +94,8 @@ and the phenomenal high-quality reasoning model [DeepSeek-R1](#223-deepseek-r1-6
 |Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ |
 |Qwen| Qwen/Qwen2-7B | ✅ | ✅ |
 |Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ |
+|Qwen| Qwen/Qwen3-14B | ✅ | ✅ |
+|Qwen| Qwen/Qwen3-30B-A3B | ✅ | ✅ |
 |GIT| microsoft/git-base | ✅ | ✅ |
 |Phi| microsoft/phi-2 | ✅ | ✅ |
 |Phi| microsoft/Phi-3-mini-4k-instruct | ✅ | ✅ |
@@ -98,6 +103,7 @@ and the phenomenal high-quality reasoning model [DeepSeek-R1](#223-deepseek-r1-6
 |Phi| microsoft/Phi-3-medium-4k-instruct | ✅ | ✅ |
 |Phi| microsoft/Phi-3-medium-128k-instruct | ✅ | ✅ |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ |
+|Whisper| openai/whisper-large-v3 | ✅ | ✅ |
 |DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ |
 |DeepSeek| meituan/DeepSeek-R1-Channel-INT8 |   | ✅ |
 
@@ -474,7 +480,7 @@ Please add the `quantization_config` field to the end of the file as below.
 +    "bits": 8,
 +    "group_size": -1
 +  }
- }
+}
 ```
 
 - Use the following command to run the test.
@@ -509,6 +515,22 @@ There are some model-specific requirements to be aware of, as follows:
 - For Falcon models from remote hub, we need to modify the config.json to use the modeling_falcon.py in transformers. Therefore, in the following scripts, we need to pass an extra configuration file like "--config-file=model_config/tiiuae_falcon-40b_config.json". This is optional for FP32/BF16 but needed for quantizations.
 
 - For Llava models from remote hub, additional setup is required, i.e., `bash ./tools/prepare_llava.sh`.
+
+- For INT8 quantized Qwen/Qwen3-30B-A3B model, a `quantization_config` field needs to be added in `config.json`.
+
+  ```diff
+     "transformers_version": "4.46.3",
+     "use_cache": true,
+     "v_head_dim": 128,
+  -  "vocab_size": 129280
+  +  "vocab_size": 129280,
+  +  "quantization_config": {
+  +    "quant_method": "int8",
+  +    "bits": 8,
+  +    "group_size": -1
+  +  }
+  }
+  ```
 
 ## 2.3 Instructions for Running Multimodal LLMs
 

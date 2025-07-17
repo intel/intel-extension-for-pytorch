@@ -55,6 +55,8 @@ and the phenomenal high-quality reasoning model DeepSeek-R1.
 |Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen3-14B | ✅ | ✅ | ✅ |   |
+|Qwen| Qwen/Qwen3-30B-A3B | ✅ | ✅ | ✅ | ✅ |
 |LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ | ✅ | ✅ |
 |GIT| microsoft/git-base | ✅ | ✅ | ✅ | ✅ |
 |Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ | ✅ |   |
@@ -66,6 +68,7 @@ and the phenomenal high-quality reasoning model DeepSeek-R1.
 |Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ | ✅ |   |
 |Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ | ✅ |   |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ |
+|Whisper| openai/whisper-large-v3 | ✅ | ✅ | ✅ |   |
 |Maira| microsoft/maira-2 | ✅ | ✅ | ✅ | ✅ |
 |Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ | ✅ | ✅ |
 |DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ | ✅ | ✅ |
