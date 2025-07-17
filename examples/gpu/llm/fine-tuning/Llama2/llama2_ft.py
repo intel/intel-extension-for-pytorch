@@ -238,7 +238,8 @@ def train():
         model_args.model_name_or_path,
         cache_dir=custom_args.cache_dir,
         attn_implementation="sdpa" if model_args.use_flashattn else "eager",
-        use_safetensors=False
+        use_safetensors=False,
+        use_cache=False
         # num_hidden_layers=1, # set only 1 decoder layer
     )
 
