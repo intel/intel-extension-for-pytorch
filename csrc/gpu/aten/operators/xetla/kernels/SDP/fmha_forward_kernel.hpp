@@ -51,6 +51,7 @@ struct dispatch_fmha_forward_args_t {
   int32_t* block_tables;
   uint32_t max_blocks_per_seq;
   uint32_t block_size;
+  uint32_t num_tokens;
   dispatch_fmha_forward_args_t(const fmha_forward_kernel_args_t& args)
       : query(reinterpret_cast<T*>(args.query)),
         key(reinterpret_cast<T*>(args.key)),
@@ -87,10 +88,15 @@ struct dispatch_fmha_forward_args_t {
         offset_t(args.offset_t),
         block_tables(args.block_tables),
         max_blocks_per_seq(args.max_blocks_per_seq),
-        block_size(args.block_size){};
+        block_size(args.block_size),
+        num_tokens(args.num_tokens){};
 };
 
-template <typename fmha_forward_op_t, typename T, bool USE_V2 = false>
+template <
+    typename fmha_forward_op_t,
+    typename T,
+    bool USE_V2 = false,
+    bool USE_V4 = false>
 struct FmhaForwardKernelFunctor {
   KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
     fmha_forward_op_t fmha_fwd_op;
@@ -129,6 +135,38 @@ struct FmhaForwardKernelFunctor {
           .mask_head_step = 0,
           .out_batch_step = args.num_heads * args.head_size,
           .out_head_step = args.head_size,
+      };
+      fmha_fwd_op(item, op_args);
+    } else if constexpr (USE_V4) {
+      typename fmha_forward_op_t::arguments_t op_args = {
+          .query = args.query,
+          .key = args.key,
+          .value = args.value,
+          .output = args.out,
+
+          .num_batch = args.num_batches,
+          .num_heads = args.num_heads,
+          .num_kv_heads = args.num_kv_heads,
+          .num_keys = args.num_keys,
+
+          .sm_scale = args.softmax_scale,
+
+          .q_seq_step = args.num_heads * args.head_size,
+          .q_head_step = args.head_size,
+          .k_seq_step = args.num_kv_heads * args.head_size,
+          .k_head_step = args.head_size,
+          .v_seq_step = args.num_kv_heads * args.head_size,
+          .v_head_step = args.head_size,
+          .out_seq_step = args.num_heads * args.head_size,
+          .out_head_step = args.head_size,
+
+          .cu_seqlen_q = args.cu_seqlen_q,
+          .cu_seqlen_k = args.cu_seqlen_k,
+
+          .softcap = (accum_t)args.softmax_scale,
+          .block_tables = args.block_tables,
+          .max_blocks_per_seq = args.max_blocks_per_seq,
+          .block_size = args.block_size,
       };
       fmha_fwd_op(item, op_args);
     } else {

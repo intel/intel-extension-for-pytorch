@@ -6,9 +6,9 @@
 #include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
 #include <ATen/xpu/XPUGeneratorImpl.h>
-#include <CL/sycl.hpp>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
+#include <sycl/sycl.hpp>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include <utils/DPCPP.h>
@@ -1911,7 +1911,8 @@ Tensor chunked_prefill(
          softcap,
          block_table.data_ptr<int32_t>(), // block_tables
          num_max_seq_block, // max_blocks_per_seq
-         block_size}); // block_size
+         block_size, // block_size
+         num_tokens}); // num_tokens
     DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
   } else {
     constexpr const int partition_size = 512;

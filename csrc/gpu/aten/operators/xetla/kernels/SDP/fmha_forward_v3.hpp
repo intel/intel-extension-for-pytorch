@@ -264,7 +264,7 @@ class fmha_forward_v3_t {
     uint32_t sg_idx;
     uint32_t sg_idy;
     // nbarrier
-    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier;
+    xetla_nbarrier_t<wg_size_x, wg_size_x, gpu_arch::XeLpg> nbarrier;
     // softmax statistics
     std::array<xetla_vector<accum_t, kSgBr>, kHeadPerKv> softmax_m;
     std::array<xetla_vector<accum_t, kSgBr>, kHeadPerKv> softmax_l;
