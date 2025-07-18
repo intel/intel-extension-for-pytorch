@@ -40,6 +40,9 @@ cd ..
 conda install -y libnuma numactl
 
 cd sgl-kernel
+cp pyproject_cpu.toml pyproject.toml
+pip install uv
+pip install scikit-build-core
 SGLANG_CPU_FP8_BRGEMM=1 uv build --wheel -Cbuild-dir=build . --color=always --no-build-isolation
 pip install dist/sgl_kernel-0.2.5-cp310-cp310-linux_x86_64.whl --force-reinstall
 cd ..

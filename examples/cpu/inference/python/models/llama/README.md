@@ -23,7 +23,19 @@ pip install -e "python[all_cpu]"
 
 conda install -y libsqlite=3.48.0
 
-pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/  --force-reinstall
+pip uninstall torch torchvision
+git clone https://github.com/yanbing-j/pytorch -b yanbing/tf32_dev_branch_for_test
+cd pytorch
+git submodule sync
+git submodule update --init --recursive
+conda install cmake ninja
+pip install -r requirements.txt
+pip install mkl-static mkl-include
+export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMAKE_PREFIX_PATH}"
+python setup.py install
+cd ..
+
+pip install torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/  --force-reinstall
 pip install torchao --index-url https://download.pytorch.org/whl/nightly/ --force-reinstall
 
 # Build sgl-kernel
@@ -31,8 +43,10 @@ conda install -y libnuma numactl
 
 cd sgl-kernel
 cp pyproject_cpu.toml pyproject.toml
-pip install -v .
-
+pip install uv
+pip install scikit-build-core
+SGLANG_CPU_FP8_BRGEMM=1 uv build --wheel -Cbuild-dir=build . --color=always --no-build-isolation
+pip install dist/sgl_kernel-0.2.5-cp310-cp310-linux_x86_64.whl --force-reinstall
 cd ..
 
 conda install -y gperftools -c conda-forge
