@@ -1,10 +1,10 @@
-# Stable Diffusion Inference
+# Latent Consistency Models Inference
 
 ## Model Information
 
 | **Use Case** | **Framework** | **Model Repo** | **Branch/Commit/Tag** | **Optional Patch** |
 |:---:| :---: |:--------------:|:---------------------:|:------------------:|
-|  Inference   |    PyTorch    |       https://huggingface.co/stabilityai/stable-diffusion-2-1       |           -           |         -          |
+|  Inference   |    PyTorch    |       https://huggingface.co/SimianLuo/LCM_Dreamshaper_v7       |           -           |         -          |
 
 ## Benchmarking with TorchInductor
 ### Preparation
@@ -17,19 +17,12 @@
 2. Install PyTorch, Torchvision
     ```
     pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
-    ```
-3. Install TorchAO
-    ```
-    git clone https://github.com/shiyang-weng/ao.git
-    cd ao
-    git checkout wengshiy/qlinear
-    python setup.py install
-    ```
-4. Run setup.sh
+    ``` 
+3. Run setup.sh
     ```
     ./setup.sh
     ```
-5. Install Intel OpenMP and TCMalloc
+4. Install Intel OpenMP and TCMalloc
     ```
     pip install packaging intel-openmp accelerate
     conda install -y gperftools -c conda-forge
