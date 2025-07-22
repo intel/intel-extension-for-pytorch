@@ -388,9 +388,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
         reshaped_tensor = self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         self.qweight.as_strided_(reshaped_tensor.shape, reshaped_tensor.stride())
         self.qweight.copy_(reshaped_tensor)
-        self.scales.data = self.scales.contiguous().to(torch.float16)
+        self.scales.data = self.scales.contiguous()
         if self.bias is not None:
-            self.bias.data = self.bias.contiguous().to(torch.float16)
+            self.bias.data = self.bias.contiguous()
         if (
             self.scheme == "sym"
             and self.quant_method == 0
@@ -631,9 +631,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
         self.qweight = qweight
         if bias is not None:
-            self.bias = torch.nn.Parameter(
-                bias.contiguous().to(torch.float16), requires_grad=False
-            )
+            self.bias = torch.nn.Parameter(bias.contiguous(), requires_grad=False)
         if hasattr(self, "g_idx") and self.g_idx is not None and update_g_idx:
             # The prerequisite for this to work is that set_scales_zps_gidx is called first.
             assert self.qweight.data.dtype == torch.int32
