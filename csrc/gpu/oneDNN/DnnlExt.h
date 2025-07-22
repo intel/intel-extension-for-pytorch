@@ -95,7 +95,40 @@ enum class joint_dtypes_t {
 
 enum class trans_type_t { nn = 0, nt, tn, tt };
 
-enum class bias_type_t { none = 0, scalar, m, n, mn };
+enum class bias_shape_t : uint8_t {
+  none = 0,
+  scalar = 1,
+  m = 2,
+  n = 3,
+  mn = 4,
+};
+
+enum class bias_data_type_t : uint8_t {
+  none = 0,
+  f32 = 1,
+  f16 = 2,
+  bf16 = 3,
+  // extend as needed
+};
+
+// Packed enum
+enum class bias_type_t : uint16_t {};
+
+// Encode function (constexpr)
+constexpr bias_type_t make_bias_type(
+    bias_shape_t shape,
+    bias_data_type_t dtype) {
+  return static_cast<bias_type_t>((uint16_t(shape) << 8) | uint16_t(dtype));
+}
+
+// Decode helpers (constexpr)
+constexpr bias_shape_t get_shape(bias_type_t type) {
+  return static_cast<bias_shape_t>((static_cast<uint16_t>(type) >> 8) & 0xFF);
+}
+
+constexpr bias_data_type_t get_dtype(bias_type_t type) {
+  return static_cast<bias_data_type_t>(static_cast<uint16_t>(type) & 0xFF);
+}
 
 template <joint_dtypes_t Ts>
 struct onednn_types_mapper;
@@ -172,24 +205,50 @@ struct onednn_types_mapper<joint_dtypes_t::bf16_f8_e4m3> {
   }
 };
 
-// TODO: bias types maybe not right
-static inline dnnl::memory::dims get_bias_type(
-    bias_type_t b_dims,
+static inline dnnl::memory::dims get_bias_shape_type(
+    bias_type_t b_type,
     const int m,
     const int n) {
-  switch (b_dims) {
-    case bias_type_t::none:
+  bias_shape_t b_shape = get_shape(b_type);
+  switch (b_shape) {
+    case bias_shape_t::none:
       return {0};
-    case bias_type_t::scalar:
+    case bias_shape_t::scalar:
       return {1, 1};
-    case bias_type_t::m:
+    case bias_shape_t::m:
       return {m, 1};
-    case bias_type_t::n:
+    case bias_shape_t::n:
       return {1, n};
-    case bias_type_t::mn:
+    case bias_shape_t::mn:
       return {m, n};
     default:
-      throw std::runtime_error("unsupported bias type ...");
+      throw std::runtime_error("unsupported bias shape ...");
+  }
+}
+
+static inline dnnl::memory::data_type get_bias_data_type(bias_type_t b_type) {
+  bias_data_type_t b_dtype = get_dtype(b_type);
+  switch (b_dtype) {
+    case bias_data_type_t::none:
+      return dnnl::memory::data_type::undef;
+    case bias_data_type_t::f32:
+      return dnnl::memory::data_type::f32;
+    case bias_data_type_t::f16:
+      return dnnl::memory::data_type::f16;
+    case bias_data_type_t::bf16:
+      return dnnl::memory::data_type::bf16;
+    default:
+      throw std::runtime_error("unsupported bias dtype ...");
+  }
+}
+
+static inline dnnl::memory::format_tag get_bias_format_type(
+    bias_type_t b_type) {
+  bias_shape_t b_shape = get_shape(b_type);
+  if (b_shape == bias_shape_t::none) {
+    return dnnl::memory::format_tag::undef;
+  } else {
+    return dnnl::memory::format_tag::ab;
   }
 }
 
@@ -515,7 +574,7 @@ struct matmul_primitive_cache_t {
       const int64_t ldb,
       const int64_t ldc,
       const bias_type_t
-          b_dims, // for shapeless bias, not put it into template parameter
+          b_type, // for shapeless bias, not put it into template parameter
       const int device_id,
       F f_attr,
       const int scale_group_size,
@@ -529,7 +588,7 @@ struct matmul_primitive_cache_t {
         m,
         n,
         k,
-        int(b_dims),
+        int(b_type),
         scale_group_size,
         zp_group_size);
     auto iter = cached.find(pri_key);
@@ -546,11 +605,11 @@ struct matmul_primitive_cache_t {
                ? dnnl::memory::data_type::f16
                : src_dt);
       auto dst_md = memory::desc({m, n}, dst_dt, dst_strides);
-      auto bias_format = b_dims == bias_type_t::none
-          ? dnnl::memory::format_tag::undef
-          : dnnl::memory::format_tag::ab;
+
       auto bias_md = memory::desc(
-          get_bias_type(b_dims, m, n), dst_dt, bias_format); // {m, n} or {1, n}
+          get_bias_shape_type(b_type, m, n),
+          get_bias_data_type(b_type),
+          get_bias_format_type(b_type)); // {m, n} or {1, n}
 
       primitive_attr pattr;
       f_attr(pattr);
@@ -558,7 +617,7 @@ struct matmul_primitive_cache_t {
       dnnl::matmul::primitive_desc matmul_pd;
       at::Device curDevice = at::Device(at::kXPU, device_id);
       auto aengine = GpuEngineManager::Instance().get_engine(curDevice);
-      if (b_dims == bias_type_t::none) {
+      if (get_shape(b_type) == bias_shape_t::none) {
         matmul_pd = dnnl::matmul::primitive_desc(
             aengine, src_md, wei_md, dst_md, pattr);
       } else {
@@ -592,7 +651,7 @@ struct matmul_primitive_cache_t {
 template <joint_dtypes_t Ts, typename F>
 static inline primitive_ext& matmul_primitive_create_and_cache(
     const trans_type_t Tt,
-    const bias_type_t b_dims,
+    const bias_type_t b_type,
     const int m,
     const int n,
     const int k,
@@ -612,7 +671,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
           lda,
           ldb,
           ldc,
-          b_dims,
+          b_type,
           device_id,
           attr,
           scale_group_size,
@@ -625,7 +684,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
           lda,
           ldb,
           ldc,
-          b_dims,
+          b_type,
           device_id,
           attr,
           scale_group_size,
@@ -639,7 +698,7 @@ template <typename F>
 static inline primitive_ext& matmul_primitive_create_and_cache(
     const joint_dtypes_t Ts,
     const trans_type_t Tt,
-    const bias_type_t b_dims,
+    const bias_type_t b_type,
     const int m,
     const int n,
     const int k,
@@ -654,7 +713,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::f16_int4:
       return matmul_primitive_create_and_cache<joint_dtypes_t::f16_int4, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -668,7 +727,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::bf16_int4:
       return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_int4, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -682,7 +741,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::s8_int4:
       return matmul_primitive_create_and_cache<joint_dtypes_t::s8_int4, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -696,7 +755,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::u8_int4:
       return matmul_primitive_create_and_cache<joint_dtypes_t::u8_int4, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -710,7 +769,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::f16_f8_e5m2:
       return matmul_primitive_create_and_cache<joint_dtypes_t::f16_f8_e5m2, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -724,7 +783,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::bf16_f8_e5m2:
       return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_f8_e5m2, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -738,7 +797,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::f16_f8_e4m3:
       return matmul_primitive_create_and_cache<joint_dtypes_t::f16_f8_e4m3, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,
@@ -752,7 +811,7 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
     case joint_dtypes_t::bf16_f8_e4m3:
       return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_f8_e4m3, F>(
           Tt,
-          b_dims,
+          b_type,
           m,
           n,
           k,

@@ -25,6 +25,7 @@ namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline void set_quant_primitive_attr(
+    const Tensor& input,
     primitive_attr& pattr,
     const Tensor& scale,
     const Tensor& zp,
@@ -88,6 +89,15 @@ static inline void set_quant_primitive_attr(
   // so that int8 gemm can be used for acceleration
   if (act_quant_mode == static_cast<int64_t>(ActQuantScheme::UNQUANT_A))
     pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+
+  if (input.scalar_type() == at::ScalarType::BFloat16) {
+    pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
+  } else if (input.scalar_type() == at::ScalarType::Half) {
+    pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+  } else {
+    TORCH_INTERNAL_ASSERT(
+        false, "Unsupported data type for int4 matmul: ", input.scalar_type());
+  }
 }
 
 template <typename F>
@@ -169,28 +179,49 @@ static at::Tensor dnnl_matmul_w4a16_common(
         false, "Unsupported data type for int4 matmul: ", mat1.scalar_type());
   }
 
-  bias_type_t b_type;
+  bias_shape_t bias_shape;
+  bias_data_type_t bias_dtype;
   if (bias.has_value() && bias.value().defined()) {
     auto& b = bias.value();
     const auto nuelm = b.numel();
     if (nuelm == 1) {
-      b_type = bias_type_t::scalar;
+      bias_shape = bias_shape_t::scalar;
     } else if (nuelm == m * n) {
-      b_type = bias_type_t::mn;
+      bias_shape = bias_shape_t::mn;
     } else if (b.size(b.dim() - 1) == n && nuelm == n) {
-      b_type = bias_type_t::n;
+      bias_shape = bias_shape_t::n;
     } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
-      b_type = bias_type_t::m;
+      bias_shape = bias_shape_t::m;
     } else if (nuelm == 0) {
-      b_type = bias_type_t::none;
+      bias_shape = bias_shape_t::none;
     } else {
       TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
     }
+
+    switch (b.scalar_type()) {
+      case at::ScalarType::Float:
+        bias_dtype = bias_data_type_t::f32;
+        break;
+      case at::ScalarType::BFloat16:
+        bias_dtype = bias_data_type_t::bf16;
+        break;
+      case at::ScalarType::Half:
+        bias_dtype = bias_data_type_t::f16;
+        break;
+      default:
+        TORCH_CHECK(
+            false,
+            "Unsupported data type for bias in int4 matmul: ",
+            b.scalar_type());
+    }
   } else {
-    b_type = bias_type_t::none;
+    bias_shape = bias_shape_t::none;
+    bias_dtype = bias_data_type_t::none;
   }
 
   auto mat1_flat = mat1.flatten(0, -2);
+  bias_type_t b_type = make_bias_type(bias_shape, bias_dtype);
+
   const int64_t ldb = mat2.strides()[mat2.dim() - 1] * 8; // for int4 matmul
   const int64_t lda = mat1_flat.strides()[mat1_flat.dim() - 2];
   const int64_t ldc = result.strides()[result.dim() - 2];
@@ -352,7 +383,7 @@ static at::Tensor dnnl_matmul_w4a16(
 
   auto quant = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
   };
 
   result = dnnl_matmul_w4a16_common(
@@ -389,7 +420,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
 
   auto silu = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     pattr.set_post_ops(po);
@@ -431,7 +462,7 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
   auto res_flat = res.flatten(0, -2);
   auto resmul = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -473,7 +504,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
 
   auto bias_gelu = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     if (approximate == "none") {
       po.append_eltwise(algorithm::eltwise_gelu_erf, 1.f, 0.f);
@@ -524,7 +555,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
   auto res1_flat = res1.flatten(0, -2);
   auto bias_resadd_resadd = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     po.append_binary(algorithm::binary_add, get_onednn_md(res1_flat));
@@ -567,7 +598,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
   auto res_flat = res.flatten(0, -2);
   auto silu_mul = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -611,7 +642,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
   auto res_flat = res.flatten(0, -2);
   auto silu_mul_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -654,7 +685,7 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -696,7 +727,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -764,26 +795,47 @@ static inline void dnnl_matmul_w8a16_fp8(
   }
 
   // get bias type
-  bias_type_t b_type;
+  bias_shape_t bias_shape;
+  bias_data_type_t bias_dtype;
   if (bias.has_value() && bias.value().defined()) {
     auto& b = bias.value();
     const auto nuelm = b.numel();
     if (nuelm == 1) {
-      b_type = bias_type_t::scalar;
+      bias_shape = bias_shape_t::scalar;
     } else if (nuelm == m * n) {
-      b_type = bias_type_t::mn;
+      bias_shape = bias_shape_t::mn;
     } else if (b.size(b.dim() - 1) == n && nuelm == n) {
-      b_type = bias_type_t::n;
+      bias_shape = bias_shape_t::n;
     } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
-      b_type = bias_type_t::m;
+      bias_shape = bias_shape_t::m;
     } else if (nuelm == 0) {
-      b_type = bias_type_t::none;
+      bias_shape = bias_shape_t::none;
     } else {
       TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
     }
+
+    switch (b.scalar_type()) {
+      case at::ScalarType::Float:
+        bias_dtype = bias_data_type_t::f32;
+        break;
+      case at::ScalarType::BFloat16:
+        bias_dtype = bias_data_type_t::bf16;
+        break;
+      case at::ScalarType::Half:
+        bias_dtype = bias_data_type_t::f16;
+        break;
+      default:
+        TORCH_CHECK(
+            false,
+            "Unsupported data type for bias in int4 matmul: ",
+            b.scalar_type());
+    }
   } else {
-    b_type = bias_type_t::none;
+    bias_shape = bias_shape_t::none;
+    bias_dtype = bias_data_type_t::none;
   }
+
+  bias_type_t b_type = make_bias_type(bias_shape, bias_dtype);
 
   dnnl::trans_type_t tt = dnnl::trans_type_t::nn;
   if (trans_b) {
@@ -840,7 +892,7 @@ static inline void dnnl_matmul_w8a16_fp8(
   arg_handles.emplace_back(DNNL_ARG_SRC, mat1.data_ptr());
   arg_handles.emplace_back(DNNL_ARG_WEIGHTS, mat2.data_ptr());
   arg_handles.emplace_back(DNNL_ARG_DST, result.data_ptr());
-  if (b_type != bias_type_t::none) {
+  if (bias_shape != bias_shape_t::none) {
     arg_handles.emplace_back(DNNL_ARG_BIAS, bias.value().data_ptr());
   }
 
