@@ -1610,7 +1610,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
         n_experts,
         n_topk,
         n_expert_group,
-        n_topk_group, );
+        n_topk_group);
   } else if (gating_output.scalar_type() == at::kHalf) {
     using scalar_t = sycl::half;
     GroupedTopKImpl::fused_grouped_topk<scalar_t>(
@@ -1627,7 +1627,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
         n_experts,
         n_topk,
         n_expert_group,
-        n_topk_group, );
+        n_topk_group);
   } else {
     using scalar_t = float;
     GroupedTopKImpl::fused_grouped_topk<scalar_t>(
@@ -1644,7 +1644,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
         n_experts,
         n_topk,
         n_expert_group,
-        n_topk_group, );
+        n_topk_group);
   }
   return std::make_tuple(topk_weights, topk_indices, rows_for_experts, offsets);
 }
