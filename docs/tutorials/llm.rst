@@ -1,8 +1,8 @@
 Large Language Models (LLM) Optimizations Overview
 ==================================================
 
-In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. LLMs have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers. 
-The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. LLMs have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers.
+The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs.
 On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant is enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
 These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.llm.optimize()`. Check `ipex.llm.optimize <./llm/llm_optimize_transformers.md>`_ for more details.
@@ -53,8 +53,8 @@ LLM Inference
      - ✅
      - ✅
      - ✅
-   * - Qwen 
-     - Qwen/Qwen2-VL-7B-Instruct, Qwen/Qwen2.5-7B-Instruct
+   * - Qwen
+     - Qwen/Qwen2-VL-7B-Instruct, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen3-4B, Qwen/Qwen3-8B, thewimo/Qwen3-4B-AWQ, AlphaGaO/Qwen3-4B-GPTQ, Qwen/Qwen3-8B-AWQ
      - ✅
      - ✅
      - ✅
@@ -65,24 +65,24 @@ LLM Inference
      - ✅
      - ✅
      - ✅
-   * - Bloom 
+   * - Bloom
      - bigscience/bloom-7b1
      - ✅
      - ✅
      - ✅
-     - 
+     -
    * - Baichuan2
      - baichuan-inc/Baichuan2-13B-Chat
      - ✅
      - ✅
      - ✅
-     - 
-   * - OPT 
+     -
+   * - OPT
      - facebook/opt-6.7b, facebook/opt-30b
      - ✅
-     - 
+     -
      - ✅
-     - 
+     -
    * - Mixtral
      - mistralai/Mistral-7B-Instruct-v0.2
      - ✅
@@ -92,8 +92,8 @@ LLM Inference
 
 Platforms
 ~~~~~~~~~~~~~
-All above workloads are validated on Intel® Data Center Max 1550 GPU. 
-The WoQ (Weight Only Quantization) int4 workloads are also partially validated on Intel® Core™ Ultra series (Lunar Lake) with Intel® Arc™ Graphics. Refer to Weight Only Quantization INT4 section.
+All above workloads are validated on Intel® Data Center Max 1550 GPU.
+The WoQ (Weight Only Quantization) INT4 workloads are also partially validated on Intel® Core™ Ultra series (Arrow Lake-H, Lunar Lake) with Intel® Arc™ Graphics and Intel® Arc™ B-Series GPUs (code-named Battlemage). Refer to Weight Only Quantization INT4 section.
 
 *Note*: The above verified models (including other models in the same model family, like "meta-llama/Llama-2-7b-hf" from Llama family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
@@ -117,7 +117,7 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
    * - Llama2
      - meta-llama/Llama-2-70b-hf
      - ✅
-     - 
+     -
      - ✅
    * - Llama3
      - meta-llama/Meta-Llama-3-8B
@@ -207,9 +207,9 @@ for inference workloads.
 Weight Only Quantization INT4
 -----------------------------
 
-Large Language Models (LLMs) have shown remarkable performance in various natural language processing tasks. 
+Large Language Models (LLMs) have shown remarkable performance in various natural language processing tasks.
 
-However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements. 
+However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements.
 
 To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/neural-compressor/blob/master/docs/source/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WoQ), which only quantizes the weights statically. WoQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WoQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
 
