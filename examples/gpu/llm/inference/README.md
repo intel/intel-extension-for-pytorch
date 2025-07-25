@@ -2,7 +2,7 @@
 
 Here you can find the inference examples for large language models (LLM) text generation. These scripts:
 
-- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as GLM4-9B, Baichuan2-13B and Phi3-mini. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as GLM4-9B, Baichuan2-13B and Phi3-mini.
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
@@ -11,14 +11,14 @@ Here you can find the inference examples for large language models (LLM) text ge
 
 Currently, only support Transformers 4.48.3. Support for newer versions of Transformers and more models will be available in the future.
 
-| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) | 
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 |Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |✅| ✅|✅|✅|$✅^1$|
 |Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B", "meta-llama/Llama-3.2-1B", "meta-llama/Llama-3.2-3B", "meta-llama/Llama-3.3-70B-Instruct" |✅| ✅|✅|✅|$✅^2$|
 |Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct", "microsoft/Phi-3.5-mini-instruct" |✅| ✅|✅|✅|$✅^3$|
 |Mistral | "mistralai/Mistral-7B-Instruct-v0.2" | ✅| ✅| ✅ |✅ | |
 |GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅| |
-|Qwen|"Qwen/Qwen2-7B", "Qwen/Qwen2-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct" |✅ | ✅ |✅ | ✅| |
+|Qwen|"Qwen/Qwen2-7B", "Qwen/Qwen2-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen3-4B", "Qwen/Qwen3-8B" |✅ | ✅ |✅ | ✅| |
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ |  |✅ |  |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ |  |✅ | |
 |GLM4-9B|"THUDM/glm-4-9b"| ✅ |  |✅ |  |
@@ -27,16 +27,16 @@ Currently, only support Transformers 4.48.3. Support for newer versions of Trans
 - ✅ signifies that it is supported.
 
 - A blank signifies that it is not supported yet.
-  
+
 -  1: signifies that Llama-2-7b-hf is verified.
-  
+
 -  2: signifies that Meta-Llama-3-8B is verified.
-  
+
 -  3: signifies that Phi-3-mini-4k-instruct is verified.
 
 
 
-**Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 
+**Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above.
 
 ## Supported Platforms
 
@@ -148,9 +148,9 @@ tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 # Define the quantization configuration
 woq_quantization_config = RtnConfig(
-    compute_dtype="fp16", 
-    weight_dtype="int4_fullrange", 
-    scale_dtype="fp16", 
+    compute_dtype="fp16",
+    weight_dtype="int4_fullrange",
+    scale_dtype="fp16",
     group_size=64
 )
 # Load the model and apply quantization
@@ -167,9 +167,9 @@ model = model.to(memory_format=torch.channels_last)
 
 # Optimize the model with Intel Extension for PyTorch (IPEX)
 model = ipex.llm.optimize(
-    model.eval(), 
-    device="xpu", 
-    inplace=True, 
+    model.eval(),
+    device="xpu",
+    inplace=True,
     quantization_config=woq_quantization_config
 )
 
@@ -226,9 +226,9 @@ if os.path.exists(woq_checkpoint_path):
     print("Directly loading already quantized model")
     # Load the already quantized model
     model = AutoModelForCausalLM.from_pretrained(
-        woq_checkpoint_path, 
-        trust_remote_code=use_hf_code, 
-        device_map="xpu", 
+        woq_checkpoint_path,
+        trust_remote_code=use_hf_code,
+        device_map="xpu",
         torch_dtype=torch.float16
     )
     model = model.to(memory_format=torch.channels_last)
@@ -236,9 +236,9 @@ if os.path.exists(woq_checkpoint_path):
 else:
     # Define the quantization configuration
     woq_quantization_config = RtnConfig(
-        compute_dtype="fp16", 
-        weight_dtype="int4_fullrange", 
-        scale_dtype="fp16", 
+        compute_dtype="fp16",
+        weight_dtype="int4_fullrange",
+        scale_dtype="fp16",
         group_size=64
     )
     # Load the model and apply quantization
@@ -258,9 +258,9 @@ model = model.to(memory_format=torch.channels_last)
 
 # Optimize the model with Intel Extension for PyTorch (IPEX)
 model = ipex.llm.optimize(
-    model.eval(), 
-    device="xpu", 
-    inplace=True, 
+    model.eval(),
+    device="xpu",
+    inplace=True,
     quantization_config=woq_quantization_config
 )
 
@@ -316,9 +316,9 @@ if os.path.exists(woq_checkpoint_path):
     print("Directly loading already quantized model")
     # Load the quantized model
     model = AutoModelForCausalLM.from_pretrained(
-        woq_checkpoint_path, 
-        trust_remote_code=use_hf_code, 
-        device_map="xpu", 
+        woq_checkpoint_path,
+        trust_remote_code=use_hf_code,
+        device_map="xpu",
         torch_dtype=torch.float16
     )
     model = model.to(memory_format=torch.channels_last)
@@ -378,7 +378,7 @@ mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchma
 
 **Note**: Unset the variable before running.
 ```bash
-# Adding this variable to run multi-tile cases might cause an Out Of Memory (OOM) issue. 
+# Adding this variable to run multi-tile cases might cause an Out Of Memory (OOM) issue.
 unset TORCH_LLM_ALLREDUCE
 ```
 

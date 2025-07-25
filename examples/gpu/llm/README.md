@@ -2,12 +2,12 @@
 
 Here you can find examples for large language models (LLM) text generation. These scripts:
 
-> [!NOTE]  
-> New Llama models like Llama3.2-1B, Llama3.2-3B and Llama3.3-7B are also supported from release v2.8.10+xpu.
+> [!NOTE]
+> New Llama models like Qwen3-4B and Qwen3-8B are also supported from release v2.8.10+xpu.
 
 - Include both inference/finetuning(lora)/bitsandbytes(qlora-finetuning).
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
-- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as Baichuan2-13B and Phi3-mini. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as Baichuan2-13B and Phi3-mini.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 ## Environment Setup
@@ -124,7 +124,7 @@ where <br />
 
 
 <br />
- 
+
 ## How To Run LLM with ipex.llm
 
 Inference and fine-tuning are supported in individual directories.
