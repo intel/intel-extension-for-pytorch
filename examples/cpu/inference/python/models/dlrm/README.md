@@ -16,7 +16,7 @@ Install Pytorch, TorchVison and jeMalloc.
 ```
 git clone https://github.com/yanbing-j/pytorch.git
 cd pytorch
-git checkout yanbing/tf32_dev_branch_for_test/
+git checkout yanbing/tf32_dev_branch_for_test
 git submodule sync
 git submodule update --init --recursive
 conda install cmake ninja
@@ -25,12 +25,11 @@ pip install mkl-static mkl-include
 python setup.py install
 cd ..
 
-git clone https://github.com/shiyang-weng/ao.git
+git clone https://github.com/LifengWang/ao.git
 cd ao
-git checkout wengshiy/scaled_mm
+git checkout dlrm_v2
 git submodule sync
 git submodule update --init --recursive
-pip install -r requirements.txt
 python setup.py install
 cd ..
 
@@ -39,17 +38,17 @@ conda install jemalloc
 
 ### Model Specific Setup
 
-* Set Jemalloc and tcmalloc Preload for better performance
+* Set jemalloc Preload for better performance
 
-  The jemalloc and tcmalloc should be built from the [General setup](#general-setup) section.
+  The jemalloc should be built from the [General setup](#general-setup) section.
   ```
-  export LD_PRELOAD="<path to the jemalloc directory>/lib/libjemalloc.so":"path_to/tcmalloc/lib/libtcmalloc.so":$LD_PRELOAD
+  export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libjemalloc.so:$LD_PRELOAD
   export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
   ```
 * Set IOMP preload for better performance
   ```
   pip install packaging intel-openmp
-  export LD_PRELOAD=path/lib/libiomp5.so:$LD_PRELOAD
+  export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libiomp5.so:$LD_PRELOAD
   ```
 
 ## Datasets
@@ -89,12 +88,13 @@ https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorc
 |:---------------------------:|:------------------------------------------------------------------------------------:|
 | **TEST_MODE** (THROUGHPUT, ACCURACY)              | `export TEST_MODE=THROUGHPUT`                  |
 | **DATASET_DIR**             |                               `export DATASET_DIR=<multi-hot dataset dir>`                                  |
+| **EVAL_BATCH**             |                               `export EVAL_BATCH=300`                                  |
 | **WEIGHT_DIR** (ONLY FOR ACCURACY)     |                 `export WEIGHT_DIR=<offical released checkpoint>`        |
 | **PRECISION**    |                               `export PRECISION=int8 <specify the precision to run: int8, fp32, bf32, bf16 or tf32>`                             |
 | **OUTPUT_DIR**    |                               `export OUTPUT_DIR=$PWD`                               |
 | **BATCH_SIZE** (optional) |                               `export BATCH_SIZE=<set a value for batch size, else it will run with default batch size>`                                |
 | **TORCH_INDUCTOR** (optional) |                               `export TORCH_INDUCTOR=<0 or 1>`                                |
-| **FP8** (optional) |                               `export FP8=<0 or 1>`                                |
+| **FP8** (optional) |                               `export PRECISION="bf16" export FP8=1`                                |
 
 6. Run `run_model.sh`
 ## Output

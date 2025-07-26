@@ -79,7 +79,8 @@ if [[ "1" == ${TORCH_INDUCTOR} ]];then
     MANUALLY_LAUNCH=1
 fi
 
-export EVAL_BATCH=300
+EVAL_BATCH=${EVAL_BATCH:-300}
+echo "EVAL_BATCH: $EVAL_BATCH"
 
 if [[ $PRECISION == "bf16" ]]; then
     ARGS="$ARGS --dtype bf16"
@@ -140,7 +141,8 @@ if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     fi
     export OMP_NUM_THREADS=1
 else
-    COMMON_ARGS="${COMMON_ARGS} --limit_val_batches 100"
+    # Not set limit_val_batches and use full dataset for accuracy test
+    COMMON_ARGS="${COMMON_ARGS}"
 fi
 
 FP8=${FP8:-"0"}

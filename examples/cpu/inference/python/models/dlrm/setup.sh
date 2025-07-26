@@ -20,3 +20,4 @@ pip install fbgemm-gpu --index-url https://download.pytorch.org/whl/cpu
 pip install torchsnapshot
 pip install pyre_extensions
 pip install iopath
+pip install tensordict

@@ -73,11 +73,6 @@ ADAGRAD_INIT_ACC = 0
 ADAGRAD_EPS = 1e-8
 WEIGHT_DECAY = 0
 
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger: logging.Logger = logging.getLogger(__name__)
-
 
 def unpack(input) -> dict:
     output = {}
@@ -121,7 +116,7 @@ def print_memory(stage):
     import os
     import psutil
 
-    logger.info(
+    print(
         f"dlrmv2-memory-usage-log: {time.time()}, {stage}, {psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024 / 1024}"
     )
 
@@ -214,7 +209,7 @@ def convert_int8(args, model, dataloader):
         batch.sparse_features = unpack(batch.sparse_features)
         model(batch.dense_features, batch.sparse_features)
         model.save_qconf_summary(qconf_summary=args.int8_configure_dir)
-        logger.info("calibration done and save to %s", args.int8_configure_dir)
+        print(f"calibration done and save to {args.int8_configure_dir}")
         exit()
     else:
         model.load_qconf_summary(qconf_summary=args.int8_configure_dir)
@@ -376,7 +371,7 @@ def aot_inductor_benchmark(args, model, dtype, example_inputs):
     torch._export.aot_compile(
         model, example_inputs, options={"aot_inductor.output_path": model_dir}
     )
-    logger.info(f"AOTI model saved to : {model_dir}")
+    print(f"AOTI model saved to : {model_dir}")
     # save example inputs and loaded it in cpp later
     runner = torch._C._aoti.AOTIModelContainerRunnerCpu(model_dir, 1)  # type: ignore[call-arg]
     call_spec = runner.get_call_spec()  # type: ignore[attr-defined]
@@ -400,7 +395,7 @@ def aot_inductor_benchmark(args, model, dtype, example_inputs):
     module = TensorListModule(flat_inputs)
     # Save the module
     torch.jit.save(torch.jit.script(module), inputs_dir)
-    logger.info(f"example inputs saved to : {inputs_dir}")
+    print(f"example inputs saved to : {inputs_dir}")
     print(f"{tmp_dir}")
     exit()
     # gen/compile benchmark
@@ -416,7 +411,12 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
         from torch._inductor import config as inductor_config
         from torch._dynamo import config
 
-        config.error_on_recompile = True
+        # For benchmarking and profiling performance, we set error_on_recompile=True to ensure
+        # that any re-compilation triggers an error.
+        # This avoids silently including compilation overhead in performance measurements.
+        if not args.test_auroc:
+            config.error_on_recompile = True
+
         inductor_config.cpp_wrapper = True
         inductor_config.cpp.enable_kernel_profile = True
         if args.inference_only:
@@ -527,12 +527,6 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         "--limit_test_batches",
         type=int,
         default=None,
-        help="number of test batches",
-    )
-    parser.add_argument(
-        "--warmup_batches",
-        type=int,
-        default=100,
         help="number of test batches",
     )
     parser.add_argument(
@@ -892,10 +886,8 @@ def _evaluate(
     def eval_step(model, iterator, current_it):
         batch = fetch_next(iterator, current_it)
         with record_function("model forward"):
-            t1 = time.time()
             logits = model(batch.dense_features, batch.sparse_features)
-            t2 = time.time()
-        return logits, batch.labels, t2 - t1
+        return logits, batch.labels
 
     def gather_output(label, pred):
         my_rank = dist.get_rank()
@@ -921,7 +913,7 @@ def _evaluate(
         disable=not print_progress,
     )
 
-    logger.info(f"EVAL_START, EPOCH_NUM: {epoch_num}")
+    print(f"EVAL_START, EPOCH_NUM: {epoch_num}")
 
     if not (args.inductor and args.dtype == "int8"):
         eval_model.eval()
@@ -941,7 +933,6 @@ def _evaluate(
 
     auroc_computer = metrics.AUROC(task="binary").to(device)
 
-    total_t = 0
     it = 0
     ctx1 = torch.no_grad()
     ctx2 = torch.autocast("cpu", enabled=autocast_enabled, dtype=autocast_dtype)
@@ -957,29 +948,7 @@ def _evaluate(
             setattr(p, "_mode", "eval")  # noqa: B010
         while True:
             try:
-                logits, label, fw_t = eval_step(eval_model, iterator, it)
-                if it > args.warmup_batches:
-                    if enable_torch_profile:
-                        p.step()
-                    total_t += fw_t
-                    if (
-                        log_freq != 0
-                        and it % log_freq == 0
-                        and it > args.warmup_batches
-                    ):
-                        assert not args.distributed_training
-                        preds = [torch.cat(preds)]
-                        labels = [torch.cat(labels)]
-                        num_samples = (
-                            labels[0].shape[0] - args.warmup_batches * args.batch_size
-                        )
-                        auroc = auroc_computer(
-                            preds[0].squeeze().float(), labels[0].float()
-                        )
-
-                        logger.info(
-                            f"avg eval time per iter at ITER: {it}, {total_t/it} s, num_samples: {num_samples}, AUROC: {auroc}"
-                        )
+                logits, label = eval_step(eval_model, iterator, it)
                 pred = torch.sigmoid(logits)
                 preds.append(pred)
                 labels.append(label)
@@ -995,12 +964,11 @@ def _evaluate(
     labels = torch.cat(labels)
 
     if not args.distributed_training:
-        num_samples = labels.shape[0] - args.warmup_batches * args.batch_size
-        auroc = auroc = auroc_computer(preds.squeeze().float(), labels.float())
-        logger.info(f"AUROC over {stage} set: {auroc}.")
-        logger.info(f"Number of {stage} samples: {num_samples}")
-        logger.info(f"Throughput: {num_samples/total_t} fps")
-        logger.info(f"Final AUROC: {auroc} ")
+        num_samples = labels.shape[0]
+        auroc = auroc_computer(preds.squeeze().float(), labels.float())
+        print(f"AUROC over {stage} set: {auroc}.")
+        print(f"Number of {stage} samples: {num_samples}")
+        print(f"Final AUROC: {auroc} ")
     return auroc
 
 
@@ -1237,9 +1205,9 @@ def main(argv: List[str]) -> None:
 
     if args.multi_hot_sizes is not None:
         if args.in_memory_binary_criteo_path is None:
-            logger.info("use dummy data")
+            print("use dummy data")
         else:
-            logger.info("use one hot real data set to generate multi-hot data per iter")
+            print("use one hot real data set to generate multi-hot data per iter")
         assert (
             args.num_embeddings_per_feature is not None
             and len(args.multi_hot_sizes) == len(args.num_embeddings_per_feature)
@@ -1247,7 +1215,7 @@ def main(argv: List[str]) -> None:
             and len(args.multi_hot_sizes) == len(DEFAULT_CAT_NAMES)
         ), "--multi_hot_sizes must be a comma delimited list the same size as the number of embedding tables."
     if args.synthetic_multi_hot_criteo_path is not None:
-        logger.info("use multi-hot real data set")
+        print("use multi-hot real data set")
     assert (
         args.in_memory_binary_criteo_path is None
         or args.synthetic_multi_hot_criteo_path is None
@@ -1269,18 +1237,6 @@ def main(argv: List[str]) -> None:
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    # logger.event(
-    #     key=mllog_constants.GLOBAL_BATCH_SIZE,
-    #     value=dist.get_world_size() * args.batch_size,
-    # )
-    # logger.event(
-    #     key=mllog_constants.GRADIENT_ACCUMULATION_STEPS,
-    #     value=1,  # Gradient accumulation is not supported in the reference implementation
-    # )
-    # logger.event(
-    #     key=mllog_constants.SEED,
-    #     value=args.seed,  # Seeding model is not supported in the reference implementation
-    # )
 
     if args.num_embeddings_per_feature is not None:
         args.num_embeddings = None
@@ -1320,10 +1276,6 @@ def main(argv: List[str]) -> None:
     else:
         train_dataloader = get_dataloader(args, backend, "train")
 
-    # logger.event(
-    #     key=mllog_constants.TRAIN_SAMPLES,
-    #     value=dist.get_world_size() * len(train_dataloader) * args.batch_size,
-    # )
     if args.multi_hot_sizes is not None:
         print_memory("start to create Multihot")
         multihot = Multihot(
