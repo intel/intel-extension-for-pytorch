@@ -35,7 +35,6 @@ export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMA
 python setup.py install
 cd ..
 
-pip install torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/  --force-reinstall
 pip install torchao --index-url https://download.pytorch.org/whl/nightly/ --force-reinstall
 
 # Build sgl-kernel
@@ -83,6 +82,8 @@ bash run_model_with_sglang.sh
 ### Accuracy
 1. Server:
 ```
+export SGLANG_USE_CPU_ENGINE=1
+
 # BF16
 python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536
 
