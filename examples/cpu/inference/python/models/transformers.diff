@@ -1,5 +1,5 @@
 diff --git a/examples/legacy/question-answering/run_squad.py b/examples/legacy/question-answering/run_squad.py
-index 999752485b..731b14e9b2 100644
+index 999752485b..ec49f829af 100644
 --- a/examples/legacy/question-answering/run_squad.py
 +++ b/examples/legacy/question-answering/run_squad.py
 @@ -22,6 +22,9 @@ import logging
@@ -43,7 +43,7 @@ index 999752485b..731b14e9b2 100644
  try:
      from torch.utils.tensorboard import SummaryWriter
  except ImportError:
-@@ -265,10 +290,238 @@ def train(args, train_dataset, model, tokenizer):
+@@ -265,10 +290,239 @@ def train(args, train_dataset, model, tokenizer):
  
      return global_step, tr_loss / global_step
  
@@ -145,6 +145,7 @@ index 999752485b..731b14e9b2 100644
 +            from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import _int8_sdpa_init, custom_pass
 +            print('[Info] Running torch.compile() for INT8 quantization')
 +            print('[Info] Running int8_bf16 is: {}'.format(args.int8_bf16))
++            inductor_config.max_autotune = True
 +            with (
 +                torch.no_grad(),
 +                _disable_aten_to_metadata_assertions(),
@@ -282,7 +283,7 @@ index 999752485b..731b14e9b2 100644
      if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
          os.makedirs(args.output_dir)
  
-@@ -276,7 +529,9 @@ def evaluate(args, model, tokenizer, prefix=""):
+@@ -276,7 +530,9 @@ def evaluate(args, model, tokenizer, prefix=""):
  
      # Note that DistributedSampler samples randomly
      eval_sampler = SequentialSampler(dataset)
@@ -293,7 +294,7 @@ index 999752485b..731b14e9b2 100644
  
      # multi-gpu evaluate
      if args.n_gpu > 1 and not isinstance(model, torch.nn.DataParallel):
-@@ -286,12 +541,63 @@ def evaluate(args, model, tokenizer, prefix=""):
+@@ -286,12 +542,63 @@ def evaluate(args, model, tokenizer, prefix=""):
      logger.info("***** Running evaluation {} *****".format(prefix))
      logger.info("  Num examples = %d", len(dataset))
      logger.info("  Batch size = %d", args.eval_batch_size)
@@ -358,7 +359,7 @@ index 999752485b..731b14e9b2 100644
          batch = tuple(t.to(args.device) for t in batch)
  
          with torch.no_grad():
-@@ -314,13 +620,20 @@ def evaluate(args, model, tokenizer, prefix=""):
+@@ -314,13 +621,20 @@ def evaluate(args, model, tokenizer, prefix=""):
                      inputs.update(
                          {"langs": (torch.ones(batch[0].shape, dtype=torch.int64) * args.lang_id).to(args.device)}
                      )
@@ -381,7 +382,7 @@ index 999752485b..731b14e9b2 100644
  
              # Some models (XLNet, XLM) use 5 arguments for their predictions, while the other "simpler"
              # models only use two.
-@@ -419,7 +732,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
+@@ -419,7 +733,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
      # Init features and dataset from cache if it exists
      if os.path.exists(cached_features_file) and not args.overwrite_cache:
          logger.info("Loading features from cached file %s", cached_features_file)
@@ -390,7 +391,7 @@ index 999752485b..731b14e9b2 100644
          features, dataset, examples = (
              features_and_dataset["features"],
              features_and_dataset["dataset"],
-@@ -671,7 +984,69 @@ def main():
+@@ -671,7 +985,69 @@ def main():
      parser.add_argument("--server_port", type=str, default="", help="Can be used for distant debugging.")
  
      parser.add_argument("--threads", type=int, default=1, help="multiple threads for converting example to features")
@@ -460,7 +461,7 @@ index 999752485b..731b14e9b2 100644
  
      if args.doc_stride >= args.max_seq_length - args.max_query_length:
          logger.warning(
-@@ -718,6 +1093,7 @@ def main():
+@@ -718,6 +1094,7 @@ def main():
          datefmt="%m/%d/%Y %H:%M:%S",
          level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
      )
@@ -468,7 +469,7 @@ index 999752485b..731b14e9b2 100644
      logger.warning(
          "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
          args.local_rank,
-@@ -742,11 +1118,13 @@ def main():
+@@ -742,11 +1119,13 @@ def main():
      args.model_type = args.model_type.lower()
      config = AutoConfig.from_pretrained(
          args.config_name if args.config_name else args.model_name_or_path,
@@ -482,7 +483,7 @@ index 999752485b..731b14e9b2 100644
          cache_dir=args.cache_dir if args.cache_dir else None,
          use_fast=False,  # SquadDataset is not compatible with Fast tokenizers which have a smarter overflow handeling
      )
-@@ -824,7 +1202,7 @@ def main():
+@@ -824,7 +1203,7 @@ def main():
          for checkpoint in checkpoints:
              # Reload the model
              global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
@@ -1202,7 +1203,7 @@ index 734ccf6a9e..641814bf21 100644
          output_hidden_states: Optional[bool] = None,
          interpolate_pos_encoding: Optional[bool] = None,
 diff --git a/src/transformers/trainer.py b/src/transformers/trainer.py
-index a2436dadc1..0458137d8b 100755
+index a2436dadc1..440eaf9d60 100755
 --- a/src/transformers/trainer.py
 +++ b/src/transformers/trainer.py
 @@ -152,6 +152,31 @@ from .utils import (
@@ -1393,7 +1394,7 @@ index a2436dadc1..0458137d8b 100755
          if is_sagemaker_mp_enabled():
              # Wrapping the base model twice in a DistributedModel will raise an error.
              if isinstance(self.model_wrapped, smp.model.DistributedModel):
-@@ -1398,6 +1481,85 @@ class Trainer:
+@@ -1398,6 +1481,86 @@ class Trainer:
              model = self.torch_jit_model_eval(model, dataloader, training)
              self.jit_compilation_time = round(time.time() - start_time, 4)
  
@@ -1415,6 +1416,7 @@ index a2436dadc1..0458137d8b 100755
 +                from torch._export.utils import _disable_aten_to_metadata_assertions
 +                from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import _int8_sdpa_init, custom_pass
 +                print('[Info] Running torch.compile() INT8 quantization')
++                inductor_config.max_autotune = True
 +                with (
 +                    torch.no_grad(),
 +                    _disable_aten_to_metadata_assertions(),
@@ -1479,7 +1481,7 @@ index a2436dadc1..0458137d8b 100755
          # Note: in torch.distributed mode, there's no point in wrapping the model
          # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
          if not training:
-@@ -1517,6 +1679,11 @@ class Trainer:
+@@ -1517,6 +1680,11 @@ class Trainer:
                  kwargs["broadcast_buffers"] = self.args.ddp_broadcast_buffers
  
              self.accelerator.ddp_handler = DistributedDataParallelKwargs(**kwargs)
@@ -1491,7 +1493,7 @@ index a2436dadc1..0458137d8b 100755
  
          return model
  
-@@ -1759,7 +1926,9 @@ class Trainer:
+@@ -1759,7 +1927,9 @@ class Trainer:
          # as the model is wrapped, don't use `accelerator.prepare`
          # this is for unhandled cases such as
          # FSDP-XLA, SageMaker MP/DP, DataParallel, IPEX
@@ -1502,7 +1504,7 @@ index a2436dadc1..0458137d8b 100755
  
          if delay_optimizer_creation:
              if use_accelerator_prepare:
-@@ -2014,7 +2183,11 @@ class Trainer:
+@@ -2014,7 +2184,11 @@ class Trainer:
                              grad_norm = _grad_norm.item() if _grad_norm is not None else None
  
                      # Optimizer step
@@ -1515,7 +1517,7 @@ index a2436dadc1..0458137d8b 100755
                      optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
                      if optimizer_was_run:
                          # Delay optimizer scheduling until metrics are generated
-@@ -2867,7 +3040,7 @@ class Trainer:
+@@ -2867,7 +3041,7 @@ class Trainer:
          arguments, depending on the situation.
          """
          if self.use_cpu_amp:
@@ -1524,7 +1526,7 @@ index a2436dadc1..0458137d8b 100755
          else:
              ctx_manager = contextlib.nullcontext()
  
-@@ -2908,7 +3081,10 @@ class Trainer:
+@@ -2908,7 +3082,10 @@ class Trainer:
              with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                  scaled_loss.backward()
          else:
@@ -1536,7 +1538,7 @@ index a2436dadc1..0458137d8b 100755
  
          return loss.detach() / self.args.gradient_accumulation_steps
  
-@@ -3322,6 +3498,66 @@ class Trainer:
+@@ -3322,6 +3499,66 @@ class Trainer:
  
          return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
  
@@ -1603,7 +1605,7 @@ index a2436dadc1..0458137d8b 100755
      def evaluation_loop(
          self,
          dataloader: DataLoader,
-@@ -3380,7 +3616,12 @@ class Trainer:
+@@ -3380,7 +3617,12 @@ class Trainer:
              logger.info("  Num examples: Unknown")
          logger.info(f"  Batch size = {batch_size}")
  
@@ -1617,7 +1619,7 @@ index a2436dadc1..0458137d8b 100755
  
          self.callback_handler.eval_dataloader = dataloader
          # Do this before wrapping.
-@@ -3402,6 +3643,20 @@ class Trainer:
+@@ -3402,6 +3644,20 @@ class Trainer:
          all_labels = None
          all_inputs = None
          # Will be useful when we have an iterable dataset so don't know its length.
@@ -1819,5 +1821,4 @@ index 57b4e84041..992203eb03 100644
 +        _ = torch.autocast
      except AttributeError:
          return False
- 
  
