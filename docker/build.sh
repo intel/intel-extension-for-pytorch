@@ -18,7 +18,7 @@ if [[ ${IMAGE_TYPE} = "xpu" ]]; then
                  --build-arg TORCHVISION_VERSION=0.23.0+xpu \
                  --build-arg TORCHAUDIO_VERSION=2.8.0+xpu \
                  --build-arg ONECCL_BIND_PT_VERSION=2.8.0+xpu \
-                 --build-arg INDEX_WHL_URL=https://download.pytorch.org/whl/test/xpu  \
+                 --build-arg INDEX_WHL_URL=https://download.pytorch.org/whl/xpu  \
                  --build-arg IPEX_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
                  -t ${IMAGE_NAME} \
                  -f Dockerfile.prebuilt .
