@@ -1,0 +1,1822 @@
+diff --git a/examples/legacy/question-answering/run_squad.py b/examples/legacy/question-answering/run_squad.py
+index 999752485b..731b14e9b2 100644
+--- a/examples/legacy/question-answering/run_squad.py
++++ b/examples/legacy/question-answering/run_squad.py
+@@ -22,6 +22,9 @@ import logging
+ import os
+ import random
+ import timeit
++import time
++import sys
++import threading
+ 
+ import numpy as np
+ import torch
+@@ -48,7 +51,29 @@ from transformers.data.metrics.squad_metrics import (
+ from transformers.data.processors.squad import SquadResult, SquadV1Processor, SquadV2Processor
+ from transformers.trainer_utils import is_main_process
+ 
+-
++def trace_handler(prof):
++    print(prof.key_averages().table(
++        sort_by="self_cpu_time_total", row_limit=10))
++    import datetime
++    now = datetime.datetime.now()
++    log_path = os.path.join(os.getcwd(), "bert_profiling_{}_step_{}.json".format(now.strftime("%Y%m%d%H%M%S"), str(prof.step_num)))
++    prof.export_chrome_trace(log_path)
++profile_ctx = torch.profiler.profile(
++        activities=[
++            torch.profiler.ProfilerActivity.CPU,
++        ],
++        schedule=torch.profiler.schedule(
++            wait=0,
++            warmup=20,
++            active=20,
++            repeat=1),
++        on_trace_ready=trace_handler,
++        record_shapes=True,
++        profile_memory=True,
++        with_stack=True,
++        with_flops=True,
++        with_modules=True
++    )
+ try:
+     from torch.utils.tensorboard import SummaryWriter
+ except ImportError:
+@@ -265,10 +290,238 @@ def train(args, train_dataset, model, tokenizer):
+ 
+     return global_step, tr_loss / global_step
+ 
++def wrap_model(model, args, eval_dataloader):
++    for it, batch in enumerate(eval_dataloader):
++        break
++    torch_compile_inputs = {
++        "input_ids": batch[0],
++        "attention_mask": batch[1],
++        "token_type_ids": batch[2],
++    }
++    model.eval()
++    if args.ipex:
++        ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
++    else:
++        torch._C._jit_set_texpr_fuser_enabled(False)
++    dumpy_tensor = torch.ones((args.eval_batch_size, 384), dtype=torch.long) \
++                    if not args.use_multi_stream_module \
++                    else torch.ones((args.eval_batch_size//args.num_streams, 384), dtype=torch.long)
++    jit_inputs = (dumpy_tensor, dumpy_tensor, dumpy_tensor)
++    print(args)
++    if args.int8 and args.ipex and args.use_jit:
++        from intel_extension_for_pytorch.quantization import prepare, convert
++        from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
++        qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8), weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
++        prepared_model = prepare(model, qconfig, example_inputs=jit_inputs, inplace=False)
++        prepared_model.load_qconf_summary(qconf_summary = args.int8_config)
++
++        # convert model to trace model.
++        if args.int8_fp32:
++            model = convert(prepared_model)
++            model = torch.jit.trace(model, jit_inputs, strict=False)
++        elif args.int8_bf16:
++            with torch.autocast("cpu"):
++                model = convert(prepared_model)
++                model = torch.jit.trace(model, jit_inputs, strict=False)
++        model = torch.jit.freeze(model)
++        input = {
++                 "input_ids": dumpy_tensor,
++                 "attention_mask": dumpy_tensor,
++                 "token_type_ids": dumpy_tensor,
++         }
++        # enable fusion path work(need to run two interation).
++        with torch.no_grad():
++            y = model(dumpy_tensor, dumpy_tensor, dumpy_tensor)
++            y = model(dumpy_tensor, dumpy_tensor, dumpy_tensor)
++            #dumpy_tensor = torch.ones((128, 384), dtype=torch.long)
++            #y = model(dumpy_tensor, dumpy_tensor, dumpy_tensor)
++            #dumpy_tensor = torch.ones((81, 384), dtype=torch.long)
++            #y = model(dumpy_tensor, dumpy_tensor, dumpy_tensor)
++            #print("############################################")
++    elif args.bf16:
++        if args.ipex:
++            model = ipex.optimize(model, dtype=torch.bfloat16)
++        else:
++            torch._C._jit_set_autocast_mode(False)
++            model = model.to(torch.bfloat16)
++        with torch.autocast("cpu"),torch.no_grad():
++            if args.use_jit:
++                model = torch.jit.trace(model, jit_inputs, strict=False)
++                model = torch.jit.freeze(model)
++                #model = torch.jit._recursive.wrap_cpp_module(torch._C._freeze_module(model._c, preserveParameters=True))
++                # print(model.graph)
++    elif args.fp16_cpu:
++        if args.ipex:
++            model = ipex.optimize(model, dtype=torch.half, conv_bn_folding=False, auto_kernel_selection=True, weights_prepack=True)
++        else:
++            torch._C._jit_set_autocast_mode(False)
++            model = model.to(torch.half)
++        with torch.autocast("cpu", enabled=True, dtype=torch.half):
++            if args.use_jit:
++                model = torch.jit.trace(model, jit_inputs, strict=False)
++                model = torch.jit.freeze(model)
++    elif args.bf32:
++        ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
++        model = ipex.optimize(model, dtype=torch.float32, level="O1", auto_kernel_selection=True)
++        with torch.no_grad():
++             model = torch.jit.trace(model, jit_inputs, strict=False)
++        model = torch.jit.freeze(model)
++    elif args.fp8:
++        model= prepare_fp8(model)
++        if os.path.exists(args.fp8_config):
++            model.load_state_dict(torch.load(args.fp8_config))
++    elif args.use_jit: # fp32
++        model = ipex.optimize(model.eval(), dtype=torch.float32)# auto_kernel_selection=True)
++        with torch.no_grad():
++            model = torch.jit.trace(model, jit_inputs, strict=False)
++            model = torch.jit.freeze(model)
++    # torch.compile() path
++    if args.inductor:
++        from torch._inductor import config as inductor_config
++        inductor_config.cpp_wrapper = True
++        if args.int8:
++            from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
++            import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
++            from torch.ao.quantization.quantizer.x86_inductor_quantizer import X86InductorQuantizer
++            from torch.export import export_for_training
++            from torch._export.utils import _disable_aten_to_metadata_assertions
++            from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import _int8_sdpa_init, custom_pass
++            print('[Info] Running torch.compile() for INT8 quantization')
++            print('[Info] Running int8_bf16 is: {}'.format(args.int8_bf16))
++            with (
++                torch.no_grad(),
++                _disable_aten_to_metadata_assertions(),
++                inductor_config.patch(post_grad_custom_pre_pass=custom_pass),
++            ):
++                dynamic_shapes = None
++                if args.eval_batch_size != 1:
++                    dynamic_shapes = {
++                        "input_ids": {0: torch.export.Dim("dim", max=1024 * 1024)},
++                        "attention_mask": {0: torch.export.Dim("dim", max=1024 * 1024)},
++                        "token_type_ids": {0: torch.export.Dim("dim", max=1024 * 1024)}
++                    }
++                exported_model = export_for_training(
++                    model,
++                    (),
++                    kwargs=torch_compile_inputs,
++                    dynamic_shapes=dynamic_shapes,
++                    strict=True,
++                ).module()
++                _int8_sdpa_init()
++                quantizer = X86InductorQuantizer()
++                quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
++                quantizer.set_function_type_qconfig(
++                    torch.matmul, quantizer.get_global_quantization_config()
++                )
++                prepared_model = prepare_pt2e(exported_model, quantizer)
++                prepared_model(**torch_compile_inputs)
++                converted_model = convert_pt2e(prepared_model)
++                torch.ao.quantization.move_exported_model_to_eval(converted_model)
++                with torch.autocast("cpu", enabled=args.int8_bf16):
++                    if args.ipex:
++                        model = torch.compile(converted_model, backend="ipex")
++                    else:
++                        model = torch.compile(converted_model, dynamic=(args.eval_batch_size != 1))
++                    model(**torch_compile_inputs)
++                    model(**torch_compile_inputs)
++        else:
++            with torch.no_grad(), torch.autocast("cpu", enabled=args.bf16 or args.fp16_cpu, dtype=torch.half if args.fp16_cpu else torch.bfloat16):
++                if args.ipex:
++                    print('[Info] Running torch.compile() with IPEX backend')
++                    model = torch.compile(model, backend="ipex")
++                else:
++                    print('[Info] Running torch.compile() with default backend')
++                    model = torch.compile(model)
++                # warmup run before threading to compile the model
++                model(**torch_compile_inputs)
++                model(**torch_compile_inputs)
++
++    if args.use_multi_stream_module:
++        print("Use multi stream module on numa node:{0}, num of streams:{1}, batch per stream:{2}".format(args.instance_number, args.num_streams, args.eval_batch_size//args.num_streams))
++        input_hint_object = {"input_ids": 0, "attention_mask": 0, "token_type_ids": 0}
++        multi_stream_input_hint = ipex.cpu.runtime.MultiStreamModuleHint(**input_hint_object)
++        multi_stream_output_hint = ipex.cpu.runtime.MultiStreamModuleHint((0, 0))
++        cpu_pool = ipex.cpu.runtime.CPUPool(node_id=args.instance_number)
++        model = ipex.cpu.runtime.MultiStreamModule(model,
++                                                num_streams=args.num_streams,
++                                                cpu_pool=cpu_pool,
++                                                input_split_hint = multi_stream_input_hint,
++                                                output_concat_hint = multi_stream_output_hint)
++    return model
++
++def benchmark_evaluate(args, model, eval_dataloader):
++    steps_per_epoch = len(eval_dataloader)
++    total_steps = (args.perf_run_iters + args.perf_begin_iter)
++    test_epoches = int(total_steps / steps_per_epoch)
++    print('Evaluating BERT: Steps per Epoch {} total Steps {}'.format(steps_per_epoch, total_steps))
++    total_time = 0
++    i = 0
++    timeBuff = []
++    #with torch.profiler.profile(
++    #        activities=[
++    #            torch.profiler.ProfilerActivity.CPU],
++
++    #        schedule=torch.profiler.schedule(
++    #            wait=1,
++    #            warmup=9,
++    #            active=5),
++    #        #on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/bert_bf16'),#trace_handler
++    #        on_trace_ready=trace_handler#torch.profiler.tensorboard_trace_handler('./log/bert_bf16')
++    #        # used when outputting for tensorboard
++    #        ) as prof:
++
++    with tqdm(total=total_steps, desc="Evaluating") as pbar:
++        if args.profile:
++            prof = profile_ctx.__enter__()
++        for epoch in range(test_epoches + 1):
++            for it, batch in enumerate(eval_dataloader):
++                if epoch * steps_per_epoch + it >= total_steps:
++                    throughput = args.eval_batch_size * args.perf_run_iters / total_time
++                    timeBuff = np.asarray(timeBuff)
++                    p50 = np.percentile(timeBuff, 50) # return 50th percentile, e.g median.
++                    p90 = np.percentile(timeBuff, 90)
++                    p99 = np.percentile(timeBuff, 99)
++                    print('\n')
++                    print("P50_Latency: {:.2f} ms".format(p50*1000))
++                    print("P90_Latency: {:.2f} ms".format(p90*1000))
++                    print("P99_Latency: {:.2f} ms".format(p99*1000))
++                    print("Throughput: {:.3f} sentence/s".format(throughput))
++                    break
++                import contextlib
++                maybe_autocast = torch.autocast("cpu", enabled=args.bf16 or args.int8_bf16 or args.fp16_cpu, dtype=torch.half if args.fp16_cpu else torch.bfloat16) if args.inductor else contextlib.nullcontext()
++                with torch.no_grad(), maybe_autocast:
++                    inputs = {
++                        "input_ids": batch[0],
++                        "attention_mask": batch[1],
++                        "token_type_ids": batch[2],
++                    }
++                    #print("---------------**inputs is:{}".format(**inputs))
++                    time_start = time.time()
++                    #print("inputs type is: {}".format(type(inputs)))
++                    #print("inputs is: {}".format(inputs))
++
++                    outputs = model(**inputs)
++
++                    # print("outputs type is: {}".format(type(outputs)))
++                    # print("outputs len is: {}".format(len(outputs)))
++                    # print("output[0] size is: {}".format(outputs[0].size()))
++                    # print("output[1] size is: {}".format(outputs[1].size()))
++                    # print("outputs is: {}".format(outputs))
++                    if args.profile:
++                        prof.step()
++                    time_end = time.time()
++                    if epoch * steps_per_epoch + it > args.perf_begin_iter:
++                        total_time +=(time_end - time_start)
++                        timeBuff.append(time_end - time_start)
++                    pbar.update(1)
++        if args.profile:
++            profile_ctx.__exit__(None, None, None)
++
+ 
+ def evaluate(args, model, tokenizer, prefix=""):
+     dataset, examples, features = load_and_cache_examples(args, tokenizer, evaluate=True, output_examples=True)
+ 
++    args.output_dir = args.output_dir + "/" + str(threading.get_ident())
+     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
+         os.makedirs(args.output_dir)
+ 
+@@ -276,7 +529,9 @@ def evaluate(args, model, tokenizer, prefix=""):
+ 
+     # Note that DistributedSampler samples randomly
+     eval_sampler = SequentialSampler(dataset)
+-    eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
++    eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=args.eval_batch_size, drop_last=args.benchmark)
++
++    model = wrap_model(model, args, eval_dataloader)
+ 
+     # multi-gpu evaluate
+     if args.n_gpu > 1 and not isinstance(model, torch.nn.DataParallel):
+@@ -286,12 +541,63 @@ def evaluate(args, model, tokenizer, prefix=""):
+     logger.info("***** Running evaluation {} *****".format(prefix))
+     logger.info("  Num examples = %d", len(dataset))
+     logger.info("  Batch size = %d", args.eval_batch_size)
++    if args.do_calibration:
++        if args.fp8:
++            with fp8_autocast(enabled=False, calibrating=True, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3, amax_history_len=1024)):
++                for step, batch in enumerate(eval_dataloader):
++                    print("calibration step: {}".format(step))
++                    batch = {
++                        "input_ids": batch[0],
++                        "attention_mask": batch[1],
++                        "token_type_ids": batch[2],
++                    }
++
++                    _ = model(**batch)
++                    if step == args.calibration_iters -1:
++                        torch.save(model.state_dict(), args.fp8_config)
++                        print("calibration finished, FP8 quantization info saved on file {}".format(args.fp8_config))
++                        exit()
++        else:
++            import intel_extension_for_pytorch as ipex
++            from intel_extension_for_pytorch.quantization import prepare
++            from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
++            qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8), weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
++            dumpy_tensor = torch.ones((args.eval_batch_size, 384), dtype=torch.long)
++            jit_inputs=(dumpy_tensor, dumpy_tensor, dumpy_tensor)
++            ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
++            prepared_model = prepare(model, qconfig, example_inputs=jit_inputs, inplace=False)
++            for step, batch in enumerate(eval_dataloader):
++                print("calibration step: {}".format(step))
++                batch = {
++                    "input_ids": batch[0],
++                    "attention_mask": batch[1],
++                    "token_type_ids": batch[2],
++                }
++                prepared_model(**batch)
++                if step == args.calibration_iters -1:
++                    print("calibration finished, quantization info saved on file {}".format(args.int8_config))
++                    prepared_model.save_qconf_summary(qconf_summary = args.int8_config)
++                    exit()
++    if args.benchmark:
++        if args.use_share_weight:
++            threads = []
++            num_instances = args.total_cores // args.cores_per_instance
++            for i in range(0, num_instances):
++               t = threading.Thread(target=benchmark_evaluate, args=(args, model, eval_dataloader))
++               threads.append(t)
++               t.start()
++            for t in threads:
++                t.join()
++        else:
++            benchmark_evaluate(args, model, eval_dataloader)
++        exit()
+ 
+     all_results = []
+     start_time = timeit.default_timer()
+ 
+     for batch in tqdm(eval_dataloader, desc="Evaluating"):
+-        model.eval()
++        if not (args.inductor and args.int8):
++            model.eval()
+         batch = tuple(t.to(args.device) for t in batch)
+ 
+         with torch.no_grad():
+@@ -314,13 +620,20 @@ def evaluate(args, model, tokenizer, prefix=""):
+                     inputs.update(
+                         {"langs": (torch.ones(batch[0].shape, dtype=torch.int64) * args.lang_id).to(args.device)}
+                     )
+-            outputs = model(**inputs)
++            if args.inductor:
++                with torch.autocast("cpu", enabled=args.bf16 or args.int8_bf16 or args.fp16_cpu, dtype=torch.half if args.fp16_cpu else torch.bfloat16):
++                    outputs = model(**inputs)
++            elif args.fp8:
++                with fp8_autocast(enabled=True, calibrating=False, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3, amax_history_len=1024)):
++                    outputs = model(**inputs)
++            else:
++                outputs = model(**inputs)
+ 
+         for i, feature_index in enumerate(feature_indices):
+             eval_feature = features[feature_index.item()]
+             unique_id = int(eval_feature.unique_id)
+ 
+-            output = [to_list(output[i]) for output in outputs.to_tuple()]
++            output = [to_list(output[i]) for output in outputs]
+ 
+             # Some models (XLNet, XLM) use 5 arguments for their predictions, while the other "simpler"
+             # models only use two.
+@@ -419,7 +732,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
+     # Init features and dataset from cache if it exists
+     if os.path.exists(cached_features_file) and not args.overwrite_cache:
+         logger.info("Loading features from cached file %s", cached_features_file)
+-        features_and_dataset = torch.load(cached_features_file)
++        features_and_dataset = torch.load(cached_features_file, weights_only=False)
+         features, dataset, examples = (
+             features_and_dataset["features"],
+             features_and_dataset["dataset"],
+@@ -671,7 +984,69 @@ def main():
+     parser.add_argument("--server_port", type=str, default="", help="Can be used for distant debugging.")
+ 
+     parser.add_argument("--threads", type=int, default=1, help="multiple threads for converting example to features")
++    parser.add_argument(
++        "--fp16_cpu",
++        action="store_true",
++        help="Whether to use fp16 16-bit (mixed) precision  instead of 32-bit on cpu")
++    parser.add_argument(
++        "--bf16",
++        action="store_true",
++        help="Whether to use 16-bit (mixed) precision  instead of 32-bit")
++    parser.add_argument("--perf_begin_iter", type=int, default=15,
++                        help="Number iterations to warm up")
++    parser.add_argument("--perf_run_iters", type=int, default=100,
++                        help="Number iterations to collection performance data begin from perf_begin_iter")
++    parser.add_argument("--iter_num", type=int, default=40,
++                        help="Number iterations to collect time")
++    parser.add_argument("--benchmark", action='store_true',
++                        help="Bench the model speed")
++    parser.add_argument("--bf32", action='store_true', help="For enabling IPEX bf32")
++    parser.add_argument("--use_jit", action='store_true', help="For jit trace")
++    parser.add_argument('--int8', dest='int8', action='store_true',
++                        help='use llga int8 in pytorch jit model')
++    parser.add_argument('--int8_fp32', dest='int8_fp32', action='store_true',
++                        help='use int8 fp32 mix precision')
++    parser.add_argument('--int8_bf16', dest='int8_bf16', action='store_true',
++                        help='use int8 bf16 mix precision')
++    parser.add_argument("--int8_config", type=str, default="config.json",
++                        help="quantization config file for int8 mode")
++    parser.add_argument('--fp8', dest='fp8', action='store_true',
++                        help='use FP8')
++    parser.add_argument("--fp8_config", type=str, default="fp8_state_dict.pt",
++                        help="FP8 state file for FP8 mode")
++    parser.add_argument("--do_calibration", action='store_true',
++                        help="Enable calibration process")
++    parser.add_argument("--calibration_iters", type=int, default=100,
++                        help="Number iterations to do calibration")
++    parser.add_argument("--use_share_weight", action='store_true',
++                        help="Enable share weight mode")
++    parser.add_argument("--cores_per_instance", type=int, default=4,
++                        help="Number iterations to collect time")
++    parser.add_argument("--total_cores", type=int, default=28,
++                        help="Total cores used for this process, used for share_weight mode")
++    parser.add_argument('--use_multi_stream_module', dest='use_multi_stream_module', action='store_true',
++                        help='Whether use multi stream module for throughput mode')
++    parser.add_argument("--num_streams", type=int, default=1,
++                        help="The number of stream to use, used for multi stream module")
++    parser.add_argument("--instance_number", type=int, default=0,
++                        help="The socket to run multi stream module, used for multi stream module with multi sockets")
++    parser.add_argument("--ipex", action='store_true', default=False,
++                        help='use intel pytorch extension')
++    parser.add_argument('--inductor', action='store_true', default=False,
++                        help='using torch.compile() inductor backend')
++    parser.add_argument('--profile', action='store_true', default=False,
++                        help='profile')
+     args = parser.parse_args()
++    args.output_dir = args.output_dir + '/' + str(os.getpid())
++    if args.ipex:
++        import intel_extension_for_pytorch as ipex
++        from intel_extension_for_pytorch.quantization.fp8 import (
++            fp8_autocast,
++            DelayedScaling,
++            Format,
++            prepare_fp8,
++        )
++        global ipex, fp8_autocast, DelayedScaling, Format, prepare_fp8
+ 
+     if args.doc_stride >= args.max_seq_length - args.max_query_length:
+         logger.warning(
+@@ -718,6 +1093,7 @@ def main():
+         datefmt="%m/%d/%Y %H:%M:%S",
+         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
+     )
++    logger.setLevel(logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
+     logger.warning(
+         "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
+         args.local_rank,
+@@ -742,11 +1118,13 @@ def main():
+     args.model_type = args.model_type.lower()
+     config = AutoConfig.from_pretrained(
+         args.config_name if args.config_name else args.model_name_or_path,
++        return_dict=False,
+         cache_dir=args.cache_dir if args.cache_dir else None,
+     )
+     tokenizer = AutoTokenizer.from_pretrained(
+         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
+         do_lower_case=args.do_lower_case,
++        return_dict=False,
+         cache_dir=args.cache_dir if args.cache_dir else None,
+         use_fast=False,  # SquadDataset is not compatible with Fast tokenizers which have a smarter overflow handeling
+     )
+@@ -824,7 +1202,7 @@ def main():
+         for checkpoint in checkpoints:
+             # Reload the model
+             global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
+-            model = AutoModelForQuestionAnswering.from_pretrained(checkpoint)  # , force_download=True)
++            model = AutoModelForQuestionAnswering.from_pretrained(checkpoint, config=config)  # , force_download=True)
+             model.to(args.device)
+ 
+             # Evaluate
+diff --git a/examples/pytorch/image-classification/run_image_classification.py b/examples/pytorch/image-classification/run_image_classification.py
+index 27e9223b86..af831af202 100755
+--- a/examples/pytorch/image-classification/run_image_classification.py
++++ b/examples/pytorch/image-classification/run_image_classification.py
+@@ -250,40 +250,64 @@ def main():
+ 
+     # Set seed before initializing model.
+     set_seed(training_args.seed)
+-
+-    # Initialize our dataset and prepare it for the 'image-classification' task.
+-    if data_args.dataset_name is not None:
+-        dataset = load_dataset(
+-            data_args.dataset_name,
+-            data_args.dataset_config_name,
+-            cache_dir=model_args.cache_dir,
+-            token=model_args.token,
+-        )
++    if data_args.dataset_name is not None and data_args.dataset_name == "dummy":
++        from datasets import ClassLabel
++        class DummyImageDataset(torch.utils.data.Dataset):
++            def __init__(self, num_samples=1000, image_size=(3, 224, 224), num_classes=1000):
++                self.num_samples = num_samples
++                self.image_size = image_size
++                self.num_classes = num_classes
++                self.data = [torch.randn(*self.image_size) for i in range(self.num_samples)]
++                self.labels = [torch.randint(0, self.num_classes, (1,)).item() for i in range(self.num_samples)]
++
++            def __len__(self):
++                return self.num_samples
++
++            def __getitem__(self, idx):
++                return {"pixel_values": self.data[idx], "label": self.labels[idx]}
++
++            @property
++            def features(self):
++                return {"label": ClassLabel(names=[str(i) for i in range(self.num_classes)])}
++
++            def set_transform(self, transform=None):
++                pass
++        dataset = {'train': DummyImageDataset(),'validation': DummyImageDataset(training_args.per_device_eval_batch_size)}
+     else:
+-        data_files = {}
+-        if data_args.train_dir is not None:
+-            data_files["train"] = os.path.join(data_args.train_dir, "**")
+-        if data_args.validation_dir is not None:
+-            data_files["validation"] = os.path.join(data_args.validation_dir, "**")
+-        dataset = load_dataset(
+-            "imagefolder",
+-            data_files=data_files,
+-            cache_dir=model_args.cache_dir,
+-        )
++        # Initialize our dataset and prepare it for the 'image-classification' task.
++        if data_args.dataset_name is not None:
++            dataset = load_dataset(
++                data_args.dataset_name,
++                data_args.dataset_config_name,
++                cache_dir=model_args.cache_dir,
++                token=model_args.token,
++                revision="014711311cec8b5959350c373878a3311caeb764",
++            )
++        else:
++            data_files = {}
++            if data_args.train_dir is not None:
++                data_files["train"] = os.path.join(data_args.train_dir, "**")
++            if data_args.validation_dir is not None:
++                data_files["validation"] = os.path.join(data_args.validation_dir, "**")
++            dataset = load_dataset(
++                "imagefolder",
++                data_files=data_files,
++                cache_dir=model_args.cache_dir,
++            )
+ 
+-    dataset_column_names = dataset["train"].column_names if "train" in dataset else dataset["validation"].column_names
+-    if data_args.image_column_name not in dataset_column_names:
+-        raise ValueError(
+-            f"--image_column_name {data_args.image_column_name} not found in dataset '{data_args.dataset_name}'. "
+-            "Make sure to set `--image_column_name` to the correct audio column - one of "
+-            f"{', '.join(dataset_column_names)}."
+-        )
+-    if data_args.label_column_name not in dataset_column_names:
+-        raise ValueError(
+-            f"--label_column_name {data_args.label_column_name} not found in dataset '{data_args.dataset_name}'. "
+-            "Make sure to set `--label_column_name` to the correct text column - one of "
+-            f"{', '.join(dataset_column_names)}."
+-        )
++        dataset_column_names = dataset["train"].column_names if "train" in dataset else dataset["validation"].column_names
++        if data_args.image_column_name not in dataset_column_names:
++            raise ValueError(
++                f"--image_column_name {data_args.image_column_name} not found in dataset '{data_args.dataset_name}'. "
++                "Make sure to set `--image_column_name` to the correct audio column - one of "
++                f"{', '.join(dataset_column_names)}."
++            )
++        if data_args.label_column_name not in dataset_column_names:
++            raise ValueError(
++                f"--label_column_name {data_args.label_column_name} not found in dataset '{data_args.dataset_name}'. "
++                "Make sure to set `--label_column_name` to the correct text column - one of "
++                f"{', '.join(dataset_column_names)}."
++            )
+ 
+     def collate_fn(examples):
+         pixel_values = torch.stack([example["pixel_values"] for example in examples])
+@@ -321,6 +345,7 @@ def main():
+         id2label=id2label,
+         finetuning_task="image-classification",
+         cache_dir=model_args.cache_dir,
++        return_dict = False,
+         revision=model_args.model_revision,
+         token=model_args.token,
+         trust_remote_code=model_args.trust_remote_code,
+diff --git a/examples/pytorch/question-answering/run_qa.py b/examples/pytorch/question-answering/run_qa.py
+index 9edca7b130..f3fde52fa9 100755
+--- a/examples/pytorch/question-answering/run_qa.py
++++ b/examples/pytorch/question-answering/run_qa.py
+@@ -350,6 +350,7 @@ def main():
+         revision=model_args.model_revision,
+         token=model_args.token,
+         trust_remote_code=model_args.trust_remote_code,
++        return_dict=False,
+     )
+     tokenizer = AutoTokenizer.from_pretrained(
+         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+diff --git a/examples/pytorch/text-classification/run_glue.py b/examples/pytorch/text-classification/run_glue.py
+index 054fcd7766..4ad27e7a26 100755
+--- a/examples/pytorch/text-classification/run_glue.py
++++ b/examples/pytorch/text-classification/run_glue.py
+@@ -386,6 +386,7 @@ def main():
+         num_labels=num_labels,
+         finetuning_task=data_args.task_name,
+         cache_dir=model_args.cache_dir,
++        return_dict = False,
+         revision=model_args.model_revision,
+         token=model_args.token,
+         trust_remote_code=model_args.trust_remote_code,
+@@ -518,7 +519,12 @@ def main():
+     elif is_regression:
+         metric = evaluate.load("mse", cache_dir=model_args.cache_dir)
+     else:
+-        metric = evaluate.load("accuracy", cache_dir=model_args.cache_dir)
++        #metric = evaluate.load("accuracy", cache_dir=model_args.cache_dir)
++        curpath = os.path.abspath(os.path.dirname(__file__))
++        curpath  = curpath.replace("/transformers/examples/pytorch/text-classification", '')
++        accuracy_path = os.path.join( curpath, "accuracy.py")
++        metric =  datasets.load_metric(accuracy_path)
++        #evaluate.load(accuracy_path)
+ 
+     # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
+     # predictions and label_ids field) and has to return a dictionary string to float.
+@@ -601,6 +607,7 @@ def main():
+ 
+             trainer.log_metrics("eval", metrics)
+             trainer.save_metrics("eval", combined if task is not None and "mnli" in task else metrics)
++        exit(0)
+ 
+     if training_args.do_predict:
+         logger.info("*** Predict ***")
+diff --git a/src/transformers/activations.py b/src/transformers/activations.py
+index 22f5fe9b1b..12d20f226f 100644
+--- a/src/transformers/activations.py
++++ b/src/transformers/activations.py
+@@ -54,8 +54,7 @@ class NewGELUActivation(nn.Module):
+     """
+ 
+     def forward(self, input: Tensor) -> Tensor:
+-        return 0.5 * input * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (input + 0.044715 * torch.pow(input, 3.0))))
+-
++        return nn.functional.gelu(input, approximate='tanh')
+ 
+ class GELUActivation(nn.Module):
+     """
+diff --git a/src/transformers/generation/utils.py b/src/transformers/generation/utils.py
+index 08fde58507..0f71175f6f 100644
+--- a/src/transformers/generation/utils.py
++++ b/src/transformers/generation/utils.py
+@@ -16,6 +16,8 @@
+ 
+ import copy
+ import inspect
++import re
++import time
+ import warnings
+ from dataclasses import dataclass
+ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+@@ -629,6 +631,9 @@ class GenerationMixin:
+ 
+     def _extract_past_from_model_output(self, outputs: ModelOutput, standardize_cache_format: bool = False):
+         past_key_values = None
++        # To use torch.jit.trace, the output is no longer a Dict. outputs[1] corresponds to "past_key_values"
++        if self.jit == True:
++            past_key_values = outputs[1]
+         if "past_key_values" in outputs:
+             past_key_values = outputs.past_key_values
+         elif "mems" in outputs:
+@@ -1321,6 +1326,11 @@ class GenerationMixin:
+ 
+         # 1. Handle `generation_config` and kwargs that might update it, and validate the `.generate()` call
+         self._validate_model_class()
++        self.jit = kwargs.pop("jit", False)
++        self.quantized_model_path = kwargs.pop("quantized_model_path", None)
++        self.ipex_int8 = kwargs.pop("ipex_int8", False)
++        self.tp_number = kwargs.pop("TP_number", 1)
++        self.token_latency = kwargs.pop("token_latency", None)
+ 
+         # priority: `generation_config` argument > `model.generation_config` (the default generation config)
+         if generation_config is None:
+@@ -2341,6 +2351,7 @@ class GenerationMixin:
+         ["It might be possible to get a better understanding of the nature of the problem, but it's not"]
+         ```"""
+         # init values
++        latency_list = []
+         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
+         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+         if max_length is not None:
+@@ -2387,6 +2398,7 @@ class GenerationMixin:
+ 
+         this_peer_finished = False  # used by synced_gpus only
+         while True:
++            tic = time.time()
+             if synced_gpus:
+                 # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                 # The following logic allows an early break if all peers finished generating their sequence
+@@ -2399,19 +2411,95 @@ class GenerationMixin:
+ 
+             # prepare model inputs
+             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+-
+-            # forward pass to get next token
+-            outputs = self(
+-                **model_inputs,
+-                return_dict=True,
+-                output_attentions=output_attentions,
+-                output_hidden_states=output_hidden_states,
+-            )
+-
+-            if synced_gpus and this_peer_finished:
+-                continue  # don't waste resources running the code we don't need
+-
+-            next_token_logits = outputs.logits[:, -1, :]
++            if re.search("GPTJ", self.config.architectures[0]) or re.search("llama", self.config.architectures[0], re.IGNORECASE) or re.search("bloom", self.config.architectures[0], re.IGNORECASE) or re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
++                if self.jit == False:
++                    outputs = self(
++                        **model_inputs,
++                        return_dict=True,
++                        output_attentions=output_attentions,
++                        output_hidden_states=output_hidden_states,
++                        )
++                    if synced_gpus and this_peer_finished:
++                        cur_len = cur_len + 1
++                        continue  # don't waste resources running the code we don't need
++                    next_token_logits = outputs.logits[:, -1, :]
++                else:
++                    first_token = False
++                    input_bs = input_ids.size()[0]
++                    if model_inputs["past_key_values"] is None:
++                        first_token = True
++                    if first_token:
++                        seq_len = input_ids.size()[1]
++                        if re.search("GPTJ", self.config.architectures[0]):
++                            # beam_idx_tmp=torch.zeros(int(input_bs), dtype=torch.int)
++                            # model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), beam_idx_tmp) for i in range(self.config.n_layer)])
++                            model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)])) for i in range(self.config.n_layer)])
++                            model_inputs["position_ids"] = model_inputs["position_ids"][:1,:]
++                        elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
++                            model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)]), torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)])) for i in range(self.config.num_hidden_layers)])
++                            model_inputs["position_ids"] = model_inputs["position_ids"][:1,:]
++                        elif re.search("bloom", self.config.architectures[0], re.IGNORECASE):
++                            model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.hidden_size/self.config.n_head)]), torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.hidden_size/self.config.n_head)])) for i in range(self.config.n_layer)])
++                        elif re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
++                            model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)]), torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)])) for i in range(self.config.num_layers)])
++                            model_inputs["position_ids"] = model_inputs["position_ids"][:1,:]
++                        model_inputs["input_ids"] = model_inputs["input_ids"][:1,:]
++                        model_inputs["attention_mask"] = torch.cat([torch.zeros(1, 1), model_inputs["attention_mask"]], dim=-1)
++                    else:
++                        model_inputs["attention_mask"] = torch.cat([torch.zeros(input_bs, 1), model_inputs["attention_mask"]], dim=-1)
++                    model_inputs.pop("use_cache", None)
++                    model_inputs.pop("token_type_ids", None)
++
++                    if not hasattr(self, "trace_graph") and self.jit and self.ipex_int8:
++                        print("load_int8_model")
++                        self_jit = torch.jit.load(self.quantized_model_path)
++                        self_jit = torch.jit.freeze(self_jit.eval())
++                        setattr(self, "trace_graph", self_jit)
++                    if not hasattr(self,"trace_graph") and self.jit and not self.ipex_int8:
++                        if hasattr(self, "forward"):
++                            sig = inspect.signature(self.forward)
++                        else:
++                            sig = inspect.signature(self.call)
++                        example_inputs = tuple(model_inputs[key] for key in sig.parameters
++                            if model_inputs.get(key, None) is not None and not isinstance(model_inputs.get(key, None), bool))
++                        self_jit = torch.jit.trace(self, example_inputs, strict=False)
++                        self_jit = torch.jit.freeze(self_jit.eval())
++                        setattr(self, "trace_graph", self_jit)
++                    outputs = self.trace_graph(**model_inputs)
++                    if synced_gpus and this_peer_finished:
++                        cur_len = cur_len + 1
++                        continue  # don't waste resources running the code we don't need
++                    if first_token:
++                        outputs = list(outputs)
++                        outputs[0] = outputs[0].expand(input_bs, -1, -1)
++                        past_key_values = []
++                        for key, value in outputs[1]:
++                            key_dim = key.dim()
++                            value_dim = value.dim()
++                            key = key.expand(input_bs, -1, -1, -1).contiguous()
++                            value = value.expand(input_bs, -1, -1, -1).contiguous()
++                            if key_dim == 3:
++                                key = key.view(key.size(1) * key.size(0), key.size(2), key.size(3))
++                            if value_dim == 3:
++                                value = value.view(value.size(1) * value.size(0), value.size(2), value.size(3))
++                            past_key_values.append(tuple([key, value]))
++                        outputs[1] = tuple(past_key_values)
++                        outputs = tuple(outputs)
++                    if synced_gpus and this_peer_finished:
++                        cur_len = cur_len + 1
++                        continue  # don't waste resources running the code we don't need
++                    next_token_logits = outputs[0][:, -1, :]
++            else:
++                outputs = self(
++                    **model_inputs,
++                    return_dict=True,
++                    output_attentions=output_attentions,
++                    output_hidden_states=output_hidden_states,
++                    )
++                if synced_gpus and this_peer_finished:
++                    cur_len = cur_len + 1
++                    continue  # don't waste resources running the code we don't need
++                next_token_logits = outputs.logits[:, -1, :]
+ 
+             # pre-process distribution
+             next_tokens_scores = logits_processor(input_ids, next_token_logits)
+@@ -2463,6 +2551,8 @@ class GenerationMixin:
+                 if unfinished_sequences.max() == 0:
+                     this_peer_finished = True
+ 
++            latency_list.append(time.time() - tic)
++
+             # stop if we exceed the maximum length
+             if stopping_criteria(input_ids, scores):
+                 this_peer_finished = True
+@@ -2475,7 +2565,7 @@ class GenerationMixin:
+ 
+         if return_dict_in_generate:
+             if self.config.is_encoder_decoder:
+-                return GenerateEncoderDecoderOutput(
++                output_result = GenerateEncoderDecoderOutput(
+                     sequences=input_ids,
+                     scores=scores,
+                     logits=raw_logits,
+@@ -2487,7 +2577,7 @@ class GenerationMixin:
+                     past_key_values=model_kwargs.get("past_key_values"),
+                 )
+             else:
+-                return GenerateDecoderOnlyOutput(
++                output_result = GenerateDecoderOnlyOutput(
+                     sequences=input_ids,
+                     scores=scores,
+                     logits=raw_logits,
+@@ -2496,7 +2586,12 @@ class GenerationMixin:
+                     past_key_values=model_kwargs.get("past_key_values"),
+                 )
+         else:
+-            return input_ids
++            output_result = input_ids
++
++        if self.token_latency is not None:
++            return (output_result, latency_list)
++        else:
++            return output_result
+ 
+     def sample(
+         self,
+@@ -2950,6 +3045,7 @@ class GenerationMixin:
+         ['Wie alt bist du?']
+         ```"""
+         # init values
++        latency_list = []
+         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
+         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+         sequential = sequential if sequential is not None else self.generation_config.low_memory
+@@ -3017,6 +3113,7 @@ class GenerationMixin:
+ 
+         decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
+         while True:
++            tic = time.time()
+             if synced_gpus:
+                 # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                 # The following logic allows an early break if all peers finished generating their sequence
+@@ -3063,20 +3160,143 @@ class GenerationMixin:
+                 ]
+ 
+                 outputs = stack_model_outputs(outputs_per_sub_batch)
++                if synced_gpus and this_peer_finished:
++                    cur_len = cur_len + 1
++                    continue  # don't waste resources running the code we don't need
+ 
+-            else:  # Unchanged original behavior
+-                outputs = self(
+-                    **model_inputs,
+-                    return_dict=True,
+-                    output_attentions=output_attentions,
+-                    output_hidden_states=output_hidden_states,
+-                )
+-
+-            if synced_gpus and this_peer_finished:
+-                cur_len = cur_len + 1
+-                continue  # don't waste resources running the code we don't need
++                next_token_logits = outputs.logits[:, -1, :]
+ 
+-            next_token_logits = outputs.logits[:, -1, :]
++            else:  # Unchanged original behavior
++                if re.search("GPTJ", self.config.architectures[0]) or re.search("llama", self.config.architectures[0], re.IGNORECASE) or re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
++                    if self.jit == False:
++                        outputs = self(
++                            **model_inputs,
++                            return_dict=True,
++                            output_attentions=output_attentions,
++                            output_hidden_states=output_hidden_states,
++                            )
++                        if synced_gpus and this_peer_finished:
++                            cur_len = cur_len + 1
++                            continue  # don't waste resources running the code we don't need
++                        next_token_logits = outputs.logits[:, -1, :]
++                    else:
++                        first_token = False
++                        input_bs = input_ids.size()[0]
++                        if model_inputs["past_key_values"] is None:
++                            first_token = True
++                        if first_token:
++                            seq_len = input_ids.size()[1]
++                            if re.search("GPTJ", self.config.architectures[0]):
++                                # beam_idx_tmp=torch.zeros(int(batch_size * num_beams), dtype=torch.int)
++                                # model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), beam_idx_tmp) for i in range(self.config.n_layer)])
++                                model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)]), torch.zeros([1,int(self.config.n_head/self.tp_number),1,int(self.config.n_embd/self.config.n_head)])) for i in range(self.config.n_layer)])
++                            elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
++                                model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)]), torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)])) for i in range(self.config.num_hidden_layers)])
++                            elif re.search("chatglm", self.config.architectures[0], re.IGNORECASE):
++                                model_inputs["past_key_values"] = tuple([(torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)]), torch.zeros([1,int(self.config.num_attention_heads/self.tp_number),1,int(self.config.hidden_size/self.config.num_attention_heads)])) for i in range(self.config.num_layers)])
++
++                            model_inputs["attention_mask"] = model_inputs["attention_mask"][:1,:]
++                            model_inputs["input_ids"] = model_inputs["input_ids"][:1,:]
++                            model_inputs["position_ids"] = model_inputs["position_ids"][:1,:]
++                            model_inputs["attention_mask"] = torch.cat([torch.zeros(1, 1), model_inputs["attention_mask"]], dim=-1)
++                        else:
++                            model_inputs["attention_mask"] = torch.cat([torch.zeros(input_bs, 1), model_inputs["attention_mask"]], dim=-1)
++                        model_inputs.pop("use_cache", None)
++                        model_inputs.pop("token_type_ids", None)
++
++                        if not hasattr(self, "trace_graph") and self.jit and self.ipex_int8:
++                            print("load_int8_model")
++                            self_jit = torch.jit.load(self.quantized_model_path)
++                            self_jit = torch.jit.freeze(self_jit.eval())
++                            setattr(self, "trace_graph", self_jit)
++                        if not hasattr(self,"trace_graph") and self.jit and not self.ipex_int8:
++                            if hasattr(self, "forward"):
++                                sig = inspect.signature(self.forward)
++                            else:
++                                sig = inspect.signature(self.call)
++                            example_inputs = tuple(model_inputs[key] for key in sig.parameters
++                                if model_inputs.get(key, None) is not None and not isinstance(model_inputs.get(key, None), bool))
++                            self_jit = torch.jit.trace(self, example_inputs, strict=False)
++                            self_jit = torch.jit.freeze(self_jit.eval())
++                            setattr(self, "trace_graph", self_jit)
++                        outputs = self.trace_graph(**model_inputs)
++                        if synced_gpus and this_peer_finished:
++                            cur_len = cur_len + 1
++                            continue  # don't waste resources running the code we don't need
++                        if first_token:
++                            outputs = list(outputs)
++                            outputs[0] = outputs[0].expand(input_bs, -1, -1)
++                            past_key_values = []
++                            for key, value in outputs[1]:
++                                key_dim = key.dim()
++                                value_dim = value.dim()
++                                key = key.expand(input_bs, -1, -1, -1).contiguous()
++                                value = value.expand(input_bs, -1, -1, -1).contiguous()
++                                if key_dim == 3:
++                                    key = key.view(key.size(1) * key.size(0), key.size(2), key.size(3))
++                                if value_dim == 3:
++                                    value = value.view(value.size(1) * value.size(0), value.size(2), value.size(3))
++                                past_key_values.append(tuple([key, value]))
++                            outputs[1] = tuple(past_key_values)
++                            outputs = tuple(outputs)
++                        if synced_gpus and this_peer_finished:
++                            cur_len = cur_len + 1
++                            continue  # don't waste resources running the code we don't need
++                        next_token_logits = outputs[0][:, -1, :]
++                else:
++                    if model_inputs["past_key_values"] is None or self.jit == False:
++                        if re.search("T5", self.config.architectures[0]):
++                            first_token = False
++                        else:
++                            first_token = model_inputs["input_ids"].size()[1] != 1
++                        if first_token:
++                            input_bs = input_ids.size()[0]
++                            seq_len = input_ids.size()[1]
++                            model_inputs["attention_mask"] = model_inputs["attention_mask"][:1,:]
++                            model_inputs["input_ids"] = model_inputs["input_ids"][:1,:]
++                        outputs = self(
++                            **model_inputs,
++                            return_dict=True,
++                            output_attentions=output_attentions,
++                            output_hidden_states=output_hidden_states,
++                        )
++                        if first_token:
++                            outputs.logits = outputs.logits.expand(input_bs, seq_len, -1)
++                            past_key_values = []
++                            for key, value in outputs["past_key_values"]:
++                                key_dim = key.dim()
++                                value_dim = value.dim()
++                                key = key.expand(input_bs, -1, -1, -1).contiguous()
++                                value = value.expand(input_bs, -1, -1, -1).contiguous()
++                                if key_dim == 3:
++                                    key = key.view(key.size(1) * key.size(0), key.size(2), key.size(3))
++                                if value_dim == 3:
++                                    value = value.view(value.size(1) * value.size(0), value.size(2), value.size(3))
++                                past_key_values.append(tuple([key, value]))
++                            outputs.past_key_values = tuple(past_key_values)
++                        if synced_gpus and this_peer_finished:
++                            cur_len = cur_len + 1
++                            continue  # don't waste resources running the code we don't need
++                        next_token_logits = outputs.logits[:, -1, :]
++                    else:
++                        if hasattr(self, "forward"):
++                            sig = inspect.signature(self.forward)
++                        else:
++                            sig = inspect.signature(self.call)
++                        example_inputs = tuple(model_inputs[key] for key in sig.parameters
++                            if model_inputs.get(key, None) is not None and not isinstance(model_inputs.get(key, None), bool))
++                        if not hasattr(self,"trace_graph") and self.jit and not self.ipex_int8:
++                            self_jit = torch.jit.trace(self, example_inputs, strict=False)
++                            self_jit = torch.jit.freeze(self_jit.eval())
++                            setattr(self, "trace_graph", self_jit)
++
++                        outputs = self.trace_graph(*example_inputs)
++                        if synced_gpus and this_peer_finished:
++                            cur_len = cur_len + 1
++                            continue  # don't waste resources running the code we don't need
++                        next_token_logits = outputs[0][:, -1, :]
++            # hack: adjust tokens for Marian. For Marian we have to make sure that the `pad_token_id`
++            # cannot be generated both before and after the `nn.functional.log_softmax` operation.
+             next_token_scores = nn.functional.log_softmax(
+                 next_token_logits, dim=-1
+             )  # (batch_size * num_beams, vocab_size)
+@@ -3149,6 +3369,7 @@ class GenerationMixin:
+ 
+             # increase cur_len
+             cur_len = cur_len + 1
++            latency_list.append(time.time() - tic)
+ 
+             if beam_scorer.is_done or stopping_criteria(input_ids, scores):
+                 if not synced_gpus:
+@@ -3173,7 +3394,7 @@ class GenerationMixin:
+                 sequence_outputs["sequence_scores"] = None
+ 
+             if self.config.is_encoder_decoder:
+-                return GenerateBeamEncoderDecoderOutput(
++                output_result = GenerateBeamEncoderDecoderOutput(
+                     sequences=sequence_outputs["sequences"],
+                     sequences_scores=sequence_outputs["sequence_scores"],
+                     scores=scores,
+@@ -3187,7 +3408,7 @@ class GenerationMixin:
+                     past_key_values=model_kwargs.get("past_key_values"),
+                 )
+             else:
+-                return GenerateBeamDecoderOnlyOutput(
++                output_result = GenerateBeamDecoderOnlyOutput(
+                     sequences=sequence_outputs["sequences"],
+                     sequences_scores=sequence_outputs["sequence_scores"],
+                     scores=scores,
+@@ -3198,7 +3419,9 @@ class GenerationMixin:
+                     past_key_values=model_kwargs.get("past_key_values"),
+                 )
+         else:
+-            return sequence_outputs["sequences"]
++            output_result = sequence_outputs["sequences"]
++        # result
++        return (output_result, latency_list)
+ 
+     def beam_sample(
+         self,
+diff --git a/src/transformers/modeling_utils.py b/src/transformers/modeling_utils.py
+index b3102a37d3..a3d232b1d6 100644
+--- a/src/transformers/modeling_utils.py
++++ b/src/transformers/modeling_utils.py
+@@ -362,6 +362,7 @@ def shard_checkpoint(
+     total_size = 0
+     storage_id_to_block = {}
+ 
++    import io
+     for key, weight in state_dict.items():
+         # when bnb serialization is used the weights in the state dict can be strings
+         # check: https://github.com/huggingface/transformers/pull/24416 for more details
+@@ -376,7 +377,11 @@ def shard_checkpoint(
+             sharded_state_dicts[block_id][key] = weight
+             continue
+ 
+-        weight_size = weight.numel() * dtype_byte_size(weight.dtype)
++        if isinstance(weight, io.BytesIO):
++            # FP8 has extra state with io.BytesIO
++            weight_size = weight.seek(0, io.SEEK_END)
++        else:
++            weight_size = weight.numel() * dtype_byte_size(weight.dtype)
+ 
+         # If this weight is going to tip up over the maximal size, we split, but only if we have put at least one
+         # weight in the current shard.
+@@ -2438,7 +2443,10 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
+                 and is_main_process
+                 and reg.fullmatch(filename_no_suffix) is not None
+             ):
+-                os.remove(full_filename)
++                try:
++                    os.remove(full_filename)
++                except OSError as e:
++                    print(e)
+ 
+         # Save the model
+         for shard_file, shard in shards.items():
+diff --git a/src/transformers/models/bert/modeling_bert.py b/src/transformers/models/bert/modeling_bert.py
+index 4c068c4d4f..ca4c33cbfc 100755
+--- a/src/transformers/models/bert/modeling_bert.py
++++ b/src/transformers/models/bert/modeling_bert.py
+@@ -348,6 +348,8 @@ class BertSelfAttention(nn.Module):
+ 
+         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+         if attention_mask is not None:
++            if attention_mask.dtype != attention_scores.dtype:
++                attention_mask = attention_mask.to(attention_scores.dtype)
+             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+             attention_scores = attention_scores + attention_mask
+ 
+@@ -1056,6 +1058,7 @@ class BertForPreTraining(BertPreTrainedModel):
+ 
+         # Initialize weights and apply final processing
+         self.post_init()
++        self.dense_seq_output = config.dense_seq_output
+ 
+     def get_output_embeddings(self):
+         return self.cls.predictions.decoder
+@@ -1126,12 +1129,24 @@ class BertForPreTraining(BertPreTrainedModel):
+         )
+ 
+         sequence_output, pooled_output = outputs[:2]
++        if labels is not None and self.dense_seq_output:
++            batch_size = sequence_output.shape[0]
++            seq_len = sequence_output.shape[1]
++            hidden_dim = sequence_output.shape[2]
++            sequence_flattened = torch.index_select(sequence_output.view(-1,sequence_output.shape[-1]), 0, torch.nonzero(labels.view(-1) != -100, as_tuple=False).squeeze())
++            sequence_output = sequence_flattened
++
+         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
+ 
+         total_loss = None
+         if labels is not None and next_sentence_label is not None:
+             loss_fct = CrossEntropyLoss()
+-            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
++            if self.dense_seq_output:
++                labels_flat = labels.view(-1)
++                labels_dense = labels_flat[labels_flat != -100]
++                masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels_dense)
++            else:
++                masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+             next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2), next_sentence_label.view(-1))
+             total_loss = masked_lm_loss + next_sentence_loss
+ 
+diff --git a/src/transformers/models/distilbert/modeling_distilbert.py b/src/transformers/models/distilbert/modeling_distilbert.py
+index 481e4c4271..d2ac0b3aae 100755
+--- a/src/transformers/models/distilbert/modeling_distilbert.py
++++ b/src/transformers/models/distilbert/modeling_distilbert.py
+@@ -239,12 +239,11 @@ class MultiHeadSelfAttention(nn.Module):
+         k = shape(self.k_lin(key))  # (bs, n_heads, k_length, dim_per_head)
+         v = shape(self.v_lin(value))  # (bs, n_heads, k_length, dim_per_head)
+ 
+-        q = q / math.sqrt(dim_per_head)  # (bs, n_heads, q_length, dim_per_head)
++
+         scores = torch.matmul(q, k.transpose(2, 3))  # (bs, n_heads, q_length, k_length)
++        scores = scores / math.sqrt(dim_per_head)  # (bs, n_heads, q_length, dim_per_head)
+         mask = (mask == 0).view(mask_reshp).expand_as(scores)  # (bs, n_heads, q_length, k_length)
+-        scores = scores.masked_fill(
+-            mask, torch.tensor(torch.finfo(scores.dtype).min)
+-        )  # (bs, n_heads, q_length, k_length)
++        scores = scores.masked_fill(mask, -float("inf"))  # (bs, n_heads, q_length, k_length)
+ 
+         weights = nn.functional.softmax(scores, dim=-1)  # (bs, n_heads, q_length, k_length)
+         weights = self.dropout(weights)  # (bs, n_heads, q_length, k_length)
+@@ -982,11 +981,11 @@ class DistilBertForSequenceClassification(DistilBertPreTrainedModel):
+     )
+     def forward(
+         self,
++        labels: Optional[torch.LongTensor] = None,
+         input_ids: Optional[torch.Tensor] = None,
+         attention_mask: Optional[torch.Tensor] = None,
+         head_mask: Optional[torch.Tensor] = None,
+         inputs_embeds: Optional[torch.Tensor] = None,
+-        labels: Optional[torch.LongTensor] = None,
+         output_attentions: Optional[bool] = None,
+         output_hidden_states: Optional[bool] = None,
+         return_dict: Optional[bool] = None,
+diff --git a/src/transformers/models/vit/modeling_vit.py b/src/transformers/models/vit/modeling_vit.py
+index 734ccf6a9e..641814bf21 100644
+--- a/src/transformers/models/vit/modeling_vit.py
++++ b/src/transformers/models/vit/modeling_vit.py
+@@ -776,8 +776,8 @@ class ViTForImageClassification(ViTPreTrainedModel):
+     def forward(
+         self,
+         pixel_values: Optional[torch.Tensor] = None,
+-        head_mask: Optional[torch.Tensor] = None,
+         labels: Optional[torch.Tensor] = None,
++        head_mask: Optional[torch.Tensor] = None,
+         output_attentions: Optional[bool] = None,
+         output_hidden_states: Optional[bool] = None,
+         interpolate_pos_encoding: Optional[bool] = None,
+diff --git a/src/transformers/trainer.py b/src/transformers/trainer.py
+index a2436dadc1..0458137d8b 100755
+--- a/src/transformers/trainer.py
++++ b/src/transformers/trainer.py
+@@ -152,6 +152,31 @@ from .utils import (
+     strtobool,
+ )
+ from .utils.quantization_config import QuantizationMethod
++from tqdm import tqdm
++
++def trace_handler(prof):
++    print(prof.key_averages().table(
++        sort_by="self_cpu_time_total", row_limit=-1))
++    import datetime
++    now = datetime.datetime.now()
++    log_path = os.path.join(os.getcwd(), "vit_profiling_{}_step_{}.json".format(now.strftime("%Y%m%d%H%M%S"), str(prof.step_num)))
++    prof.export_chrome_trace(log_path)
++profile_ctx = torch.profiler.profile(
++        activities=[
++            torch.profiler.ProfilerActivity.CPU,
++        ],
++        schedule=torch.profiler.schedule(
++            wait=0,
++            warmup=20,
++            active=20,
++            repeat=1),
++        on_trace_ready=trace_handler,
++        record_shapes=True,
++        profile_memory=True,
++        with_stack=True,
++        with_flops=True,
++        with_modules=True
++    )
+ 
+ 
+ DEFAULT_CALLBACKS = [DefaultFlowCallback]
+@@ -366,6 +391,7 @@ class Trainer:
+ 
+         self.create_accelerator_and_postprocess()
+ 
++        self.fp16_scaler = None
+         # memory metrics - must set up as early as possible
+         self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+         self._memory_tracker.start()
+@@ -592,19 +618,19 @@ class Trainer:
+                         f"FP16 provided in SM_HP_MP_PARAMETERS is {smp.state.cfg.fp16}, "
+                         "but SageMaker Model Parallelism < 1.10 does not support FP16 in trainer."
+                     )
+-        if (args.fp16 or args.bf16) and args.half_precision_backend == "auto":
+-            if args.device == torch.device("cpu"):
++        if (args.fp16 or args.bf16 or args.fp16_cpu) and args.half_precision_backend == "auto":
++            if torch.device(args.device).type == torch.device("cpu").type:
+                 if args.fp16:
+                     raise ValueError("Tried to use `fp16` but it is not supported on cpu")
+                 else:
+                     args.half_precision_backend = "cpu_amp"
+             logger.info(f"Using {args.half_precision_backend} half precision backend")
+ 
+-        if (args.fp16 or args.bf16) and not (self.is_deepspeed_enabled or is_sagemaker_mp_enabled()):
++        if (args.fp16 or args.bf16 or args.fp16_cpu) and not (self.is_deepspeed_enabled or is_sagemaker_mp_enabled()):
+             # deepspeed and SageMaker Model Parallel manage their own half precision
+             if args.half_precision_backend == "cpu_amp":
+                 self.use_cpu_amp = True
+-                self.amp_dtype = torch.bfloat16
++                self.amp_dtype = torch.bfloat16 if not args.fp16_cpu else torch.half
+             elif args.half_precision_backend == "apex":
+                 if not is_apex_available():
+                     raise ImportError(
+@@ -642,7 +668,7 @@ class Trainer:
+         self._memory_tracker.stop_and_update_metrics()
+ 
+         # torch.compile
+-        if args.torch_compile and not is_torch_compile_available():
++        if args.inductor and not is_torch_compile_available():
+             raise RuntimeError("Using torch.compile requires PyTorch 2.0 or higher.")
+ 
+         self.is_fsdp_xla_v2_enabled = args.fsdp_config["xla_fsdp_v2"]
+@@ -1306,13 +1332,39 @@ class Trainer:
+         return model
+ 
+     def torch_jit_model_eval(self, model, dataloader, training=False):
++        print("[INFO] torch_jit_model_eval")
+         if not training:
+             if dataloader is None:
+                 logger.warning("failed to use PyTorch jit mode due to current dataloader is none.")
+                 return model
+             example_batch = next(iter(dataloader))
+             example_batch = self._prepare_inputs(example_batch)
++            int8_inputs=[]
++            if (self.args.int8 or self.args.do_calibration) and self.args.use_ipex:
++                import intel_extension_for_pytorch as ipex
++                from intel_extension_for_pytorch.quantization import prepare, convert
++                from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
++                qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_affine, dtype=torch.quint8), weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
++                #qconfig = ipex.quantization.default_static_qconfig
++                if self.args.smooth_quant:
++                    qconfig = ipex.quantization.get_smooth_quant_static_qconfig()
++                ipex.nn.utils._model_convert.replace_dropout_with_identity(model)
++                for key,value in example_batch.items():
++                    int8_inputs.append(value)
++                int8_inputs=tuple(int8_inputs)
++                prepared_model = prepare(model, qconfig, example_inputs=int8_inputs, inplace=False)
++                if self.args.do_calibration:
++                    for step, inputs in enumerate(dataloader):
++                        print("calibration step: {}".format(step))
++                        prepared_model(**inputs)
++                        if step == self.args.calibration_iters -1:
++                            prepared_model.save_qconf_summary(qconf_summary = self.args.int8_config)
++                            exit()
++                else:
++                    prepared_model.load_qconf_summary(qconf_summary = self.args.int8_config)
+             try:
++                if self.args.int8:
++                    model = prepared_model
+                 jit_model = copy.copy(model)
+                 jit_model.eval()
+                 original_forward = jit_model.__dict__.pop("_original_forward", None)
+@@ -1320,6 +1372,10 @@ class Trainer:
+                 if original_forward:
+                     jit_model.forward = original_forward
+                 with self.accelerator.autocast(cache_enabled=False), torch.no_grad():
++                    if self.args.int8 and self.args.use_ipex:
++                        jit_model = convert(jit_model)
++                        if self.args.smooth_quant:
++                            jit_model(*int8_inputs)
+                     if version.parse(version.parse(torch.__version__).base_version) >= version.parse("2.0.0"):
+                         if isinstance(example_batch, dict):
+                             jit_model = torch.jit.trace(jit_model, example_kwarg_inputs=example_batch, strict=False)
+@@ -1348,6 +1404,7 @@ class Trainer:
+         return model
+ 
+     def ipex_optimize_model(self, model, training=False, dtype=torch.float32):
++        print("[INFO] ipex_optimize_model")
+         if not is_ipex_available():
+             raise ImportError(
+                 "Using IPEX but IPEX is not installed or IPEX's version does not match current PyTorch, please refer"
+@@ -1359,22 +1416,48 @@ class Trainer:
+         if not training:
+             model.eval()
+             dtype = torch.bfloat16 if not self.is_in_train and self.args.bf16_full_eval else dtype
++            if self.args.bf32:
++                ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
+             # conv_bn_folding is disabled as it fails in symbolic tracing, resulting in ipex warnings
+-            model = ipex.optimize(model, dtype=dtype, level="O1", conv_bn_folding=False, inplace=not self.is_in_train)
++            ipex._C.disable_jit_concat_linear()
++            model = ipex.optimize(model, dtype=dtype, level="O1", conv_bn_folding=False, inplace=not self.is_in_train, auto_kernel_selection=True if self.args.bf32 else False)
+         else:
+             if not model.training:
+                 model.train()
+-            model, self.optimizer = ipex.optimize(
+-                model, dtype=dtype, optimizer=self.optimizer, inplace=True, level="O1"
+-            )
++
++            if self.args.bf32:
++                ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
++                model, self.optimizer = ipex.optimize(model, dtype=torch.float32, optimizer=self.optimizer, auto_kernel_selection=True, inplace=True)
++            elif self.args.fp16_cpu:
++                self.fp16_scaler = torch.cpu.amp.GradScaler()
++                model, self.optimizer = ipex.optimize(model, optimizer=self.optimizer, dtype=torch.half, level='O0', weights_prepack=True, inplace=True)
++            else:
++                model, self.optimizer = ipex.optimize(
++                    model, dtype=dtype, optimizer=self.optimizer, inplace=True, level="O1"
++                )
+ 
+         return model
+ 
+     def _wrap_model(self, model, training=True, dataloader=None):
+-        if self.args.use_ipex:
+-            dtype = torch.bfloat16 if self.use_cpu_amp else torch.float32
++        if hasattr(model, "vit"):
++            cvt_dtype = torch.float32
++            if self.args.bf16 or self.args.int8_bf16:
++                cvt_dtype = torch.bfloat16
++            elif self.args.fp16_cpu:
++                cvt_dtype = torch.half
++            model.vit.embeddings.cls_token=torch.nn.Parameter(model.vit.embeddings.cls_token.to(cvt_dtype))
++            model.vit.embeddings.position_embeddings=torch.nn.Parameter(model.vit.embeddings.position_embeddings.to(cvt_dtype))
++        if self.args.use_ipex and not self.args.int8 and not self.args.do_calibration:
++            dtype=torch.float32
++            if self.args.bf16:
++                dtype=torch.bfloat16
++            elif self.args.fp16_cpu:
++                dtype=torch.float16
++            elif self.args.bf32:
++                dtype=torch.float32
+             model = self.ipex_optimize_model(model, training, dtype=dtype)
+-
++        if (self.args.int8 or self.args.do_calibration) and self.args.use_ipex and not self.args.inductor:
++            self.args.jit_mode_eval = True
+         if is_sagemaker_mp_enabled():
+             # Wrapping the base model twice in a DistributedModel will raise an error.
+             if isinstance(self.model_wrapped, smp.model.DistributedModel):
+@@ -1398,6 +1481,85 @@ class Trainer:
+             model = self.torch_jit_model_eval(model, dataloader, training)
+             self.jit_compilation_time = round(time.time() - start_time, 4)
+ 
++        if self.args.inductor and not training:
++            from torch._inductor import config as inductor_config
++            inductor_config.cpp_wrapper = True
++            example_batch = next(iter(dataloader))
++            if 'pixel_values' in example_batch:
++                if self.args.fp16_cpu:
++                    example_batch['pixel_values'] = example_batch['pixel_values'].to(torch.half)
++                elif self.args.bf16 or self.args.int8_bf16:
++                    example_batch['pixel_values'] = example_batch['pixel_values'].to(torch.bfloat16)
++            example_batch = self._prepare_inputs(example_batch)
++            if self.args.int8:
++                from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
++                import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
++                from torch.ao.quantization.quantizer.x86_inductor_quantizer import X86InductorQuantizer
++                from torch.export import export_for_training
++                from torch._export.utils import _disable_aten_to_metadata_assertions
++                from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import _int8_sdpa_init, custom_pass
++                print('[Info] Running torch.compile() INT8 quantization')
++                with (
++                    torch.no_grad(),
++                    _disable_aten_to_metadata_assertions(),
++                    inductor_config.patch(post_grad_custom_pre_pass=custom_pass),
++                ):
++                    exported_model = export_for_training(
++                        model,
++                        (),
++                        kwargs=example_batch,
++                        strict=True,
++                    ).module()
++                    _int8_sdpa_init()
++                    quantizer = X86InductorQuantizer()
++                    quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
++                    quantizer.set_function_type_qconfig(
++                        torch.matmul, quantizer.get_global_quantization_config()
++                    )
++                    prepared_model = prepare_pt2e(exported_model, quantizer)
++                    prepared_model(**example_batch)
++                    converted_model = convert_pt2e(prepared_model)
++                    torch.ao.quantization.move_exported_model_to_eval(converted_model)
++                    with torch.autocast("cpu", enabled=(self.args.bf16 or self.args.int8_bf16)):
++                        if self.args.use_ipex:
++                            print('[Info] Running torch.compile() with IPEX backend')
++                            model = torch.compile(converted_model, backend="ipex")
++                        else:
++                            print('[Info] Running torch.compile() with default backend')
++                            model = torch.compile(converted_model)
++                        y = model(**example_batch)
++                        y = model(**example_batch)
++            elif self.args.bf16:
++                with torch.no_grad(), torch.autocast("cpu", dtype=torch.bfloat16):
++                    if self.args.use_ipex:
++                        print('[Info] Running torch.compile() Bfloat16 with IPEX backend')
++                        model = torch.compile(model, backend="ipex")
++                    else:
++                        print('[Info] Running torch.compile() Bfloat16 with default backend')
++                        model = torch.compile(model)
++                    y = model(**example_batch)
++                    y = model(**example_batch)
++            elif self.args.fp16_cpu:
++                with torch.no_grad(), torch.autocast("cpu", dtype=torch.half):
++                    if self.args.use_ipex:
++                        print('[Info] Running torch.compile() float16 with IPEX backend')
++                        model = torch.compile(model, backend="ipex")
++                    else:
++                        print('[Info] Running torch.compile() float16 with default backend')
++                        model = torch.compile(model)
++                    y = model(**example_batch)
++                    y = model(**example_batch)
++            else:
++                with torch.no_grad():
++                    if self.args.use_ipex:
++                        print('[Info] Running torch.compile() Float32 with IPEX backend')
++                        model = torch.compile(model, backend="ipex")
++                    else:
++                        print('[Info] Running torch.compile() Float32 with default backend')
++                        model = torch.compile(model)
++                    y = model(**example_batch)
++                    y = model(**example_batch)
++
+         # Note: in torch.distributed mode, there's no point in wrapping the model
+         # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
+         if not training:
+@@ -1517,6 +1679,11 @@ class Trainer:
+                 kwargs["broadcast_buffers"] = self.args.ddp_broadcast_buffers
+ 
+             self.accelerator.ddp_handler = DistributedDataParallelKwargs(**kwargs)
++        if self.args.inductor:
++            from torch._inductor import config as inductor_config
++            inductor_config.cpp_wrapper = True
++            with torch.autocast("cpu", enabled=self.args.bf16 or self.args.fp16_cpu, dtype=torch.half if self.args.fp16_cpu else torch.bfloat16):
++                model = torch.compile(model)
+ 
+         return model
+ 
+@@ -1759,7 +1926,9 @@ class Trainer:
+         # as the model is wrapped, don't use `accelerator.prepare`
+         # this is for unhandled cases such as
+         # FSDP-XLA, SageMaker MP/DP, DataParallel, IPEX
+-        use_accelerator_prepare = True if model is self.model else False
++
++        # disable accelerate if using IPEX
++        use_accelerator_prepare = False #True if model is self.model else False
+ 
+         if delay_optimizer_creation:
+             if use_accelerator_prepare:
+@@ -2014,7 +2183,11 @@ class Trainer:
+                             grad_norm = _grad_norm.item() if _grad_norm is not None else None
+ 
+                     # Optimizer step
+-                    self.optimizer.step()
++                    if self.args.fp16_cpu:
++                        self.fp16_scaler.step(self.optimizer)
++                        self.fp16_scaler.update()
++                    else:
++                        self.optimizer.step()
+                     optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
+                     if optimizer_was_run:
+                         # Delay optimizer scheduling until metrics are generated
+@@ -2867,7 +3040,7 @@ class Trainer:
+         arguments, depending on the situation.
+         """
+         if self.use_cpu_amp:
+-            ctx_manager = torch.cpu.amp.autocast(cache_enabled=cache_enabled, dtype=self.amp_dtype)
++            ctx_manager = torch.autocast("cpu", cache_enabled=cache_enabled, dtype=self.amp_dtype)
+         else:
+             ctx_manager = contextlib.nullcontext()
+ 
+@@ -2908,7 +3081,10 @@ class Trainer:
+             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                 scaled_loss.backward()
+         else:
+-            self.accelerator.backward(loss)
++            if self.args.fp16_cpu:
++                self.fp16_scaler.scale(loss).backward()
++            else:
++                self.accelerator.backward(loss)
+ 
+         return loss.detach() / self.args.gradient_accumulation_steps
+ 
+@@ -3322,6 +3498,66 @@ class Trainer:
+ 
+         return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
+ 
++    def benchmark_evaluate(self, model, dataloader):
++        steps_per_epoch = len(dataloader)
++        total_steps = (self.args.perf_run_iters + self.args.perf_begin_iter)
++        test_epoches = int(total_steps / steps_per_epoch)
++        print('Evaluating: Steps per Epoch {} total Steps {}'.format(steps_per_epoch, total_steps))
++        i = 0;
++        timeBuff = []
++        import time
++        if self.args.profile:
++            batch = next(iter(dataloader))
++            if 'pixel_values' in batch:
++                if self.args.fp16_cpu:
++                    batch['pixel_values'] = batch['pixel_values'].to(torch.half)
++                elif self.args.bf16 or self.args.int8_bf16:
++                    batch['pixel_values'] = batch['pixel_values'].to(torch.bfloat16)
++
++            prof = profile_ctx.__enter__()
++            with torch.no_grad():
++                for i in range(40):
++                    if (self.args.bf16 or self.args.int8_bf16 or self.args.fp16_cpu) and self.args.inductor:
++                        with torch.autocast("cpu", dtype=torch.half if self.args.fp16_cpu else torch.bfloat16):
++                            outputs = model(**batch)
++                    else:
++                        outputs = model(**batch)
++                    prof.step()
++            prof.__exit__(None, None, None)
++        with tqdm(total=total_steps, desc="Evaluating") as pbar:
++            for epoch in range(test_epoches + 1):
++                for it, batch in enumerate(dataloader):
++                    if 'pixel_values' in batch:
++                        if self.args.fp16_cpu:
++                            batch['pixel_values'] = batch['pixel_values'].to(torch.half)
++                        elif self.args.bf16 or self.args.int8_bf16:
++                            batch['pixel_values'] = batch['pixel_values'].to(torch.bfloat16)
++                    if epoch * steps_per_epoch + it >= total_steps:
++                        timeBuff = np.asarray(timeBuff)
++                        totalTime = np.sum(timeBuff)
++                        p50 = np.percentile(timeBuff, 50) # return 50th percentile, e.g median.
++                        p99 = np.percentile(timeBuff, 99)
++                        print("#############################")
++                        print("#############################")
++                        print('P50 Latency {:.2f} ms'.format(p50*1000))
++                        print('P99 Latency {:.2f} ms'.format(p99*1000))
++                        print('Throughput: {:.2f} sentences/s'.format(self.args.per_device_eval_batch_size*self.args.perf_run_iters/totalTime))
++                        print("#############################")
++                        break
++                    with torch.no_grad():
++                        if (self.args.bf16 or self.args.int8_bf16 or self.args.fp16_cpu) and self.args.inductor:
++                            with torch.autocast("cpu", dtype=torch.half if self.args.fp16_cpu else torch.bfloat16):
++                                start = time.time()
++                                outputs = model(**batch)
++                                end = time.time()
++                        else:
++                            start = time.time()
++                            outputs = model(**batch)
++                            end = time.time()
++                        if epoch * steps_per_epoch + it > self.args.perf_begin_iter:
++                            timeBuff.append(end-start)
++                        pbar.update(1)
++
+     def evaluation_loop(
+         self,
+         dataloader: DataLoader,
+@@ -3380,7 +3616,12 @@ class Trainer:
+             logger.info("  Num examples: Unknown")
+         logger.info(f"  Batch size = {batch_size}")
+ 
+-        model.eval()
++        # For PT2 Quantization model, we've called move_exported_model_to_eval on the model
++        # and the training attribute of the model is set to True after the call.
++        # Calling .eval() again here will change the training attribute to False, causing re-compilation
++        # which is not the expected behavior.
++        if not (self.args.inductor and self.args.int8):
++            model.eval()
+ 
+         self.callback_handler.eval_dataloader = dataloader
+         # Do this before wrapping.
+@@ -3402,6 +3643,20 @@ class Trainer:
+         all_labels = None
+         all_inputs = None
+         # Will be useful when we have an iterable dataset so don't know its length.
++        if args.benchmark:
++            if self.args.use_share_weight:
++                threads = []
++                import threading
++                num_instances = self.args.total_cores // self.args.cores_per_instance
++                for i in range(0, num_instances):
++                     t = threading.Thread(target=self.benchmark_evaluate, args=(model, dataloader))
++                     threads.append(t)
++                     t.start()
++                for t in threads:
++                    t.join()
++            else:
++                self.benchmark_evaluate(model, dataloader)
++            exit()
+ 
+         observed_num_examples = 0
+         # Main evaluation loop
+diff --git a/src/transformers/training_args.py b/src/transformers/training_args.py
+index 19ab24c205..b19eea0050 100644
+--- a/src/transformers/training_args.py
++++ b/src/transformers/training_args.py
+@@ -930,10 +930,121 @@ class TrainingArguments:
+             )
+         },
+     )
++    bf32: bool = field(
++        default=False,
++        metadata={
++            "help": (
++                "Whether to use bf32 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA"
++                " architecture or using CPU (no_cuda). This is an experimental API and it may change."
++            )
++        },
++    )
++
++    int8: bool = field(
++        default=False,
++        metadata={
++            "help": (
++                "Whether to use int8 (mixed) precision instead of 32-bit"
++            )
++        },
++    )
++    int8_fp32: bool = field(
++        default=False,
++        metadata={
++            "help": (
++                "Whether to use int8_fp32 (mixed) precision instead of 32-bit"
++            )
++        },
++    )
++    int8_bf16: bool = field(
++        default=False,
++        metadata={
++            "help": (
++                "Whether to use int8_bf16 (mixed) precision instead of 32-bit"
++            )
++        },
++    )
++    use_share_weight: bool = field(
++        default=False,
++        metadata={
++            "help": "Enable weight sharing for real time mode inference"
++        },
++    )
++    total_cores: int = field(
++        default=56,
++        metadata={
++            "help": "Total cores one socket for use_share_weight"
++        },
++    )
++    cores_per_instance: int = field(
++        default=4,
++        metadata={
++            "help": "cores per instance for use_share_weight"
++        },
++    )
++    do_calibration: bool = field(
++        default=False,
++        metadata={
++            "help": "Enable calibration process for ipex int8"
++        },
++    )
++    calibration_iters: int = field(
++        default=200,
++        metadata={
++            "help": "The iterations for calibration"
++        },
++    )
++    smooth_quant: bool = field(
++        default=False,
++        metadata={
++            "help": (
++                "Whether to use smoothQuant for int8 (mixed) precision"
++            )
++        },
++    )
++
++    int8_config:str = field(
++        default="",
++        metadata={
++            "help": "The calibration result for int8 config"
++        }
++    )
++    auto_kernel_selection: bool = field(
++        default=False,
++        metadata={
++            "help": "Enable mkldnn for ipex fp32"
++        },
++    )
++    benchmark: bool = field(
++        default=False,
++        metadata={
++            "help": "doing the customized benchmark process, getting P50, P99, THP"
++        },
++    )
++    perf_run_iters: int = field(
++        default=100,
++        metadata={
++            "help": "The iterations number for benchmark"
++        },
++    )
++    perf_begin_iter: int = field(
++        default=10,
++        metadata={
++            "help": "The iteration to start the benchmark iterations"
++        },
++    )
+     fp16: bool = field(
+         default=False,
+         metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit"},
+     )
++    fp16_cpu: bool = field(
++        default=False,
++        metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit on cpu using IPEX"},
++    )
++    inductor: bool = field(
++        default=False,
++        metadata={"help": "Whether to use torch.compile() inductor backend"},
++    )
+     fp16_opt_level: str = field(
+         default="O1",
+         metadata={
+@@ -1139,6 +1250,9 @@ class TrainingArguments:
+         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
+     )
+ 
++    profile: bool = field(
++        default=False, metadata={"help": "enable profile"}
++    )
+     default_optim = "adamw_torch"
+     # XXX: enable when pytorch==2.0.1 comes out - we want to give it time to get all the bugs sorted out
+     # if is_torch_available() and version.parse(version.parse(torch.__version__).base_version) >= version.parse("2.1.0"):
+@@ -1522,19 +1636,19 @@ class TrainingArguments:
+             if version.parse(version.parse(torch.__version__).base_version) == version.parse("2.0.0") and self.fp16:
+                 raise ValueError("--optim adamw_torch_fused with --fp16 requires PyTorch>2.0")
+ 
+-        if (
+-            self.framework == "pt"
+-            and is_torch_available()
+-            and (self.device.type != "cuda")
+-            and (self.device.type != "npu")
+-            and (self.device.type != "xpu")
+-            and (get_xla_device_type(self.device) != "GPU")
+-            and (self.fp16 or self.fp16_full_eval)
+-        ):
+-            raise ValueError(
+-                "FP16 Mixed precision training with AMP or APEX (`--fp16`) and FP16 half precision evaluation"
+-                " (`--fp16_full_eval`) can only be used on CUDA or NPU devices or certain XPU devices (with IPEX)."
+-            )
++        # if (
++        #     self.framework == "pt"
++        #     and is_torch_available()
++        #     and (self.device.type != "cuda")
++        #     and (self.device.type != "npu")
++        #     and (self.device.type != "xpu")
++        #     and (get_xla_device_type(self.device) != "GPU")
++        #     and (self.fp16 or self.fp16_full_eval)
++        # ):
++        #     raise ValueError(
++        #         "FP16 Mixed precision training with AMP or APEX (`--fp16`) and FP16 half precision evaluation"
++        #         " (`--fp16_full_eval`) can only be used on CUDA or NPU devices or certain XPU devices (with IPEX)."
++        #     )
+ 
+         if (
+             self.framework == "pt"
+diff --git a/src/transformers/utils/import_utils.py b/src/transformers/utils/import_utils.py
+index 57b4e84041..992203eb03 100644
+--- a/src/transformers/utils/import_utils.py
++++ b/src/transformers/utils/import_utils.py
+@@ -332,7 +332,7 @@ def is_torch_bf16_cpu_available():
+ 
+     try:
+         # multiple levels of AttributeError depending on the pytorch version so do them all in one check
+-        _ = torch.cpu.amp.autocast
++        _ = torch.autocast
+     except AttributeError:
+         return False
+ 
