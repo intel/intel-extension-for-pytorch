@@ -41,16 +41,31 @@ Vision Transformer inference best known configurations with PyTorch.
   ```
 
 # Inference
-1. Install PyTorch, Torchvision
+1. Install PyTorch
     ```
-    pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
+    # install torch from source
+    git clone https://github.com/yanbing-j/pytorch.git
+    cd pytorch
+    git checkout yanbing/tf32_dev_branch_for_test
+    git submodule sync
+    git submodule update --init --recursive
+    conda install cmake ninja
+    pip install -r requirements.txt
+    pip install mkl-static mkl-include
+    python setup.py install
+    cd ..
     ```
-2. `cd examples/cpu/inference/python/models/vit`
-3. Create virtual environment `venv` and activate it:
+2. Install TorchAO
     ```
-    python3 -m venv venv
-    . ./venv/bin/activate
+    git clone https://github.com/Valentine233/ao.git
+    cd ao
+    git checkout fp8
+    git submodule sync
+    git submodule update --init --recursive
+    USE_CPU_KERNELS=1 python setup.py install
+    cd ..
     ```
+3. `cd examples/cpu/inference/python/models/vit`
 4. Run `setup.sh`
     ```
     ./setup.sh
@@ -68,7 +83,7 @@ Vision Transformer inference best known configurations with PyTorch.
 | **TEST_MODE** (THROUGHPUT, ACCURACY, REALTIME)              | `export TEST_MODE=THROUGHPUT`                  |
 | **OUTPUT_DIR**               |                               `export OUTPUT_DIR=$(pwd)`                               |
 | **DATASET_DIR**          |  `export DATASET_DIR=<path to dataset imagenet>`    |
-| **PRECISION**     |                  `export PRECISION=bf16` (fp32, bf32, bf16, fp16, int8-fp32, int8-bf16) |
+| **PRECISION**     |                  `export PRECISION=bf16` (fp32, bf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16) |
 | **MODEL_DIR**               |                               `export MODEL_DIR=$(pwd)`                               |
 | **BATCH_SIZE** (optional)    |                               `export BATCH_SIZE=120`                                |
 | **DUMMY_INPUT**(optional)     |     `export DUMMY_INPUT=1` (This is optional; for performance collection)    |

@@ -79,9 +79,19 @@ then
     precision="int8-bf16"
     ARGS="$ARGS --bf16 --int8"
     echo "### running int8-bf16 mode"
+elif [[ "${PRECISION}" == "fp8-fp32" ]]
+then
+    precision="fp8-fp32"
+    ARGS="$ARGS --fp8 --fp8_config fp8_configure.json"
+    echo "### running fp8-fp32 mode"
+elif [[ "${PRECISION}" == "fp8-bf16" ]]
+then
+    precision="fp8-bf16"
+    ARGS="$ARGS --bf16 --fp8 --fp8_config fp8_configure.json"
+    echo "### running fp8-bf16 mode"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
-    echo "Supported precisions are: fp32, bf32, bf16, fp16, int8-fp32, int8-bf16"
+    echo "Supported precisions are: fp32, bf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16"
     exit 1
 fi
 

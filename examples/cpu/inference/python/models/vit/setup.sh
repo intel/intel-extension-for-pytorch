@@ -16,12 +16,6 @@
 # limitations under the License.
 #
 
-# install torchao from source
-rm -rf ao
-git clone https://github.com/pytorch/ao.git
-cd ao
-USE_CPU_KERNELS=1 python setup.py install
-cd ..
 
 # Clone the Transformers repo in the VIT Base inference directory
 rm -rf transformers
