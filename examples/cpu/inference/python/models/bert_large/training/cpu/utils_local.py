@@ -19,7 +19,6 @@ import random
 
 
 def convert_weight_names(names):
-
     extra_params = {
         "cls/predictions/bias": "cls/predictions/output_bias",
         "cls/seq_relationship/kernel": "cls/seq_relationship/output_weights",
@@ -27,7 +26,6 @@ def convert_weight_names(names):
     }
     new_names = []
     for name in names:
-
         name = (
             name.replace("layer.", "layer_")
             .replace(".", "/")

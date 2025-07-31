@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tokenization classes."""
+"""tokenization_local classes."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -33,14 +33,14 @@ FLAGS = flags.FLAGS
 flags.DEFINE_bool(
     "preserve_unused_tokens",
     False,
-    "If True, Wordpiece tokenization will not be applied to words in the vocab.",
+    "If True, Wordpiece tokenization_local will not be applied to words in the vocab.",
 )
 
 _UNUSED_TOKEN_RE = re.compile("^\\[unused\\d+\\]$")
 
 
 def preserve_token(token, vocab):
-    """Returns True if the token should forgo tokenization and be preserved."""
+    """Returns True if the token should forgo tokenization_local and be preserved."""
     if not FLAGS.preserve_unused_tokens:
         return False
     if token not in vocab:
@@ -214,14 +214,14 @@ class FullTokenizer(object):
 
 
 class BasicTokenizer(object):
-    """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""
+    """Runs basic tokenization_local (punctuation splitting, lower casing, etc.)."""
 
     def __init__(self, do_lower_case=True, vocab=tuple()):
         """Constructs a BasicTokenizer.
 
         Args:
           do_lower_case: Whether to lower case the input.
-          vocab: A container of tokens to not mutate during tokenization.
+          vocab: A container of tokens to not mutate during tokenization_local.
         """
         self.do_lower_case = do_lower_case
         self.vocab = vocab
@@ -346,7 +346,7 @@ class WordpieceTokenizer(object):
     def tokenize(self, text):
         """Tokenizes a piece of text into its word pieces.
 
-        This uses a greedy longest-match-first algorithm to perform tokenization
+        This uses a greedy longest-match-first algorithm to perform tokenization_local
         using the given vocabulary.
 
         For example:

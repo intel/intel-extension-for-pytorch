@@ -168,3 +168,6 @@ einops
 torchao
 torchrec
 torchmetrics
+h5py
+six
+tensorflow

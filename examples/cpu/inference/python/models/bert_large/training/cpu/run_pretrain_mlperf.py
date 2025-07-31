@@ -39,7 +39,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from schedulers import LinearWarmupPolyDecayScheduler
 
-import utils
+import utils_local
 
 
 from transformers import (
@@ -789,9 +789,13 @@ def main():
         print("parsed args:")
         print(args)
     # Prepare optimizer
-    model, optimizer, lr_scheduler, checkpoint, global_step = (
-        prepare_model_and_optimizer(args, device)
-    )
+    (
+        model,
+        optimizer,
+        lr_scheduler,
+        checkpoint,
+        global_step,
+    ) = prepare_model_and_optimizer(args, device)
     model.train()
     if args.bf32 and args.ipex:
         ipex.set_fp32_math_mode(mode=ipex.FP32MathMode.BF32, device="cpu")
@@ -817,7 +821,7 @@ def main():
     elif args.fp8 and args.ipex:
         model, optimizer = prepare_fp8(model, optimizer)
 
-    worker_seeds, shuffling_seeds = utils.setup_seeds(
+    worker_seeds, shuffling_seeds = utils_local.setup_seeds(
         args.seed, args.num_epochs_to_generate_seeds_for, device
     )
     worker_seed = worker_seeds[args.local_rank]
@@ -1200,7 +1204,7 @@ def main():
                             if args.target_mlm_accuracy:
                                 if eval_avg_mlm_accuracy >= args.target_mlm_accuracy:
                                     end_training, converged = True, True
-                                    if utils.is_main_process():
+                                    if utils_local.is_main_process():
                                         print(
                                             "%f > %f, Target MLM Accuracy reached at %d"
                                             % (
@@ -1309,7 +1313,7 @@ def main():
                         average_loss /= args.world_size
                         torch.distributed.all_reduce(average_loss)
                     final_loss = average_loss.item()
-                    if utils.is_main_process():
+                    if utils_local.is_main_process():
                         if args.train_mlm_accuracy_window_size > 0:
                             print(
                                 (
@@ -1336,7 +1340,7 @@ def main():
                     and samples_trained >= args.min_samples_to_start_checkpoints
                 ):
                     samples_trained_prev = samples_trained
-                    if utils.is_main_process() and not args.skip_checkpoint:
+                    if utils_local.is_main_process() and not args.skip_checkpoint:
                         # Save a trained model
                         model.save_pretrained(args.output_dir)
                         model.config.to_json_file(args.output_dir + "config.json")
