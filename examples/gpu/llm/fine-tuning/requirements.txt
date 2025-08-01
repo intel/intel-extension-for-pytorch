@@ -1,9 +1,9 @@
 peft
 rouge_score
 fire
-tokenizers>=0.13.3
+tokenizers
 wandb==0.17.5
 trl==0.9.4
-accelerate==1.1.1
+accelerate
 numpy<2
-transformers==4.51.3
+transformers
