@@ -18,8 +18,6 @@ from accelerate.utils import DistributedType
 import deepspeed
 
 import accelerate
-from packaging.version import parse
-accelerate.utils.versions.torch_version = parse('2.1.1')
 
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 

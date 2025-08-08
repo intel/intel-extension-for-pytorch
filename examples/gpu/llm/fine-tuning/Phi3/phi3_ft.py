@@ -134,7 +134,7 @@ def train():
     if version.parse(transformers.__version__) >= version.parse("4.37.0"):
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            trust_remote_code=True,
+            trust_remote_code=False,
             torch_dtype = torch.bfloat16 if training_args.custom_mp else torch.float32, 
             attn_implementation="sdpa" if model_args.use_flashattn else "eager")
     else:

@@ -70,34 +70,18 @@ label_column = "text_label"
 
 
 def preprocess_function(examples, tokenizer, max_length):
-    batch_size = len(examples[text_column])
-    inputs = [f"{text_column} : {x} Label : " for x in examples[text_column]]
-    targets = [str(x) for x in examples[label_column]]
-    model_inputs = tokenizer(inputs)
-    labels = tokenizer(targets, add_special_tokens=False)  # don't add bos token because we concatenate with inputs
-    for i in range(batch_size):
-        sample_input_ids = model_inputs["input_ids"][i]
-        label_input_ids = labels["input_ids"][i] + [tokenizer.eos_token_id]
-        # print(i, sample_input_ids, label_input_ids)
-        model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
-        labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
-        model_inputs["attention_mask"][i] = [1] * len(model_inputs["input_ids"][i])
-    # print(model_inputs)
-    for i in range(batch_size):
-        sample_input_ids = model_inputs["input_ids"][i]
-        label_input_ids = labels["input_ids"][i]
-        model_inputs["input_ids"][i] = [tokenizer.pad_token_id] * (
-                max_length - len(sample_input_ids)
-        ) + sample_input_ids
-        model_inputs["attention_mask"][i] = [0] * (max_length - len(sample_input_ids)) + model_inputs[
-            "attention_mask"
-        ][i]
-        labels["input_ids"][i] = [-100] * (max_length - len(sample_input_ids)) + label_input_ids
-        model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-        model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-        labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-    model_inputs["labels"] = labels["input_ids"]
+    texts = [f"{x} Label: {y}{tokenizer.eos_token}" for x, y in zip(examples[text_column], examples[label_column])]
+
+    model_inputs = tokenizer(
+        texts,
+        max_length=max_length,
+        truncation=True,
+        padding="max_length",
+        return_tensors="pt",
+    )
+    model_inputs["labels"] = model_inputs["input_ids"].clone()
     return model_inputs
+
 
 def print_trainable_parameters(model):
     """

@@ -266,10 +266,6 @@ def train():
         model=model,
     )
 
-    # torch adamw fuse only support devices of cuda, xpu, privateuseone
-    if training_args.optim == 'adamw_torch_fused':
-        model = model.to('xpu')
-    
     peft_config=None 
     if model_args.use_peft:
         peft_config = LoraConfig(
