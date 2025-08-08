@@ -152,7 +152,9 @@ struct MoEGEMM {
       break;
     }
 
-    const T* current_weights = weights + expert_id * gemm_n * gemm_k;
+    int64_t offset = static_cast<int64_t>(expert_id) *
+        static_cast<int64_t>(gemm_n) * static_cast<int64_t>(gemm_k);
+    const T* current_weights = weights + offset;
 
     mem_desc_t mem_desc_a, mem_desc_b, mem_desc_c;
     int start_x = group_n_id * wg_tile_n;
@@ -363,7 +365,9 @@ struct MoEGEMMFP8 {
       break;
     }
 
-    const uint8_t* current_weights = weights + expert_id * gemm_n * gemm_k;
+    int64_t offset = static_cast<int64_t>(expert_id) *
+        static_cast<int64_t>(gemm_n) * static_cast<int64_t>(gemm_k);
+    const uint8_t* current_weights = weights + offset;
     const float current_scale = scale[expert_id];
 
     mem_desc_A_t mem_desc_a, mem_desc_c;

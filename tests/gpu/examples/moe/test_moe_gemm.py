@@ -8,13 +8,12 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod:
 
-    def init_rows_for_experts(self, total_m, rows_for_experts):
-        n_experts = rows_for_experts.shape[0]
-        lower_bound = max(total_m // (n_experts * 2), 0)
-        upper_bound = max(total_m // n_experts, 1)
-        for i in range(n_experts - 1):
-            rows_for_experts[i] = torch.randint(lower_bound, upper_bound, (1,)).item()
-        rows_for_experts[n_experts - 1] = total_m - rows_for_experts.sum().item()
+    def init_rows_for_experts(self, tokens, topk, rows_for_experts):
+        n_experts = rows_for_experts.numel()
+        rand = torch.rand(tokens, n_experts, device=rows_for_experts.device)
+        topk_idx = torch.topk(rand, topk, dim=1).indices  # [tokens, topk]
+        flat_idx = topk_idx.flatten()
+        rows_for_experts += torch.bincount(flat_idx, minlength=n_experts)
 
     def validata_moe_gemm(
         self, matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
@@ -32,13 +31,15 @@ class TestTorchMethod:
 
         return output
 
-    @pytest.mark.parametrize("total_m", [1, 32, 1024])
-    @pytest.mark.parametrize("gemm_k", [1024])
-    @pytest.mark.parametrize("gemm_n", [1024])
-    @pytest.mark.parametrize("n_experts", [8, 16, 32])
+    @pytest.mark.parametrize("tokens", [1024])
+    @pytest.mark.parametrize("topk", [8])
+    @pytest.mark.parametrize("gemm_k", [1024, 4096])
+    @pytest.mark.parametrize("gemm_n", [1024, 16384])
+    @pytest.mark.parametrize("n_experts", [8, 16, 32, 64])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
-    def test_moe_gemm(self, n_experts, gemm_k, gemm_n, total_m, dtype):
+    def test_moe_gemm(self, n_experts, gemm_k, gemm_n, tokens, topk, dtype):
 
+        total_m = tokens * topk
         matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
         matrix_b = torch.randn(
             n_experts, gemm_k, gemm_n, dtype=dtype, device=dpcpp_device
@@ -47,7 +48,7 @@ class TestTorchMethod:
         rows_for_experts = torch.zeros(
             n_experts, device=dpcpp_device, dtype=torch.int32
         )
-        self.init_rows_for_experts(total_m, rows_for_experts)
+        self.init_rows_for_experts(tokens, topk, rows_for_experts)
         rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
         output = torch.xpu.moe_gemm(
@@ -105,17 +106,19 @@ class TestTorchMethod:
         weight = weight.reshape(E, K, N)
         return weight
 
-    @pytest.mark.parametrize("total_m", [1, 32, 1024])
-    @pytest.mark.parametrize("gemm_k", [1024])
-    @pytest.mark.parametrize("gemm_n", [1024])
-    @pytest.mark.parametrize("n_experts", [8, 16, 32])
+    @pytest.mark.parametrize("tokens", [1024])
+    @pytest.mark.parametrize("topk", [8])
+    @pytest.mark.parametrize("gemm_k", [1024, 4096])
+    @pytest.mark.parametrize("gemm_n", [1024, 16384])
+    @pytest.mark.parametrize("n_experts", [8, 16, 32, 64])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
     @pytest.mark.parametrize("fp8_dtype", [torch.float8_e5m2])
     @pytest.mark.parametrize("vnni_t", [True, False])
     def test_moe_gemm_fp8(
-        self, n_experts, gemm_k, gemm_n, total_m, dtype, fp8_dtype, vnni_t
+        self, n_experts, gemm_k, gemm_n, tokens, topk, dtype, fp8_dtype, vnni_t
     ):
 
+        total_m = tokens * topk
         matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
         matrix_b = torch.randn(
             n_experts, gemm_k, gemm_n, dtype=dtype, device=dpcpp_device
@@ -124,7 +127,7 @@ class TestTorchMethod:
         rows_for_experts = torch.zeros(
             n_experts, device=dpcpp_device, dtype=torch.int32
         )
-        self.init_rows_for_experts(total_m, rows_for_experts)
+        self.init_rows_for_experts(tokens, topk, rows_for_experts)
         rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
         scale_shape = None
