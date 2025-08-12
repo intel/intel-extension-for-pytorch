@@ -8,7 +8,7 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 # 2. Environment Setup
 
 **Note**: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.7.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup),
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.8.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup),
 in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
 
 ## 2.1 [Recommended] Docker-based environment setup with compilation from source
@@ -31,7 +31,6 @@ docker run --rm -it --net host --privileged -v /dev/shm:/dev/shm ipex-llm:main b
 cd llm
 
 # Activate environment variables
-# set bash script argument to "inference" or "fine-tuning" for different usages
 source ./tools/env_activate.sh inference
 ```
 
@@ -54,7 +53,6 @@ cd examples/cpu/llm
 bash ./tools/env_setup.sh 3
 
 # Activate environment variables
-# set bash script argument to "inference" or "fine-tuning" for different usages
 source ./tools/env_activate.sh inference
 ```
 

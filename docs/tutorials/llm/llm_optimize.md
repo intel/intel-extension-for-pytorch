@@ -9,8 +9,6 @@ This API currently supports for inference workloads of certain models.
 API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize),
 and supported model list can be found at [this page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list-for-inference).
 
-For LLM fine-tuning, please check the [LLM fine-tuning tutorial](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/fine-tuning).
-
 ## Pseudocode of Common Usage Scenarios
 
 The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLM models.

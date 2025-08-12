@@ -1,6 +1,33 @@
 Releases
 ========
 
+## 2.8.0
+
+We are excited to announce the release of Intel® Extension for PyTorch* 2.8.0+cpu which accompanies PyTorch* 2.8. This release mainly brings you new LLM model optimization including Qwen3 and Whisper large-v3, enhancement of API for multi-LoRA inference kernels and optimizations of LLM generation sampler. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions.
+
+Besides providing optimization in Intel® Extension for PyTorch*, over the past years, we have also upstreamed most of our features and optimizations for Intel® platforms into PyTorch\* and will continue to push the remaining ones into PyTorch\* in the future. Moving forward, we will change our working model to prioritize developing new features and optimizations directly in PyTorch\*, and de-prioritize development in Intel® Extension for PyTorch\*, effective after 2.8 release. We will continue to provide critical bug fixes and security patches if needed throughout the PyTorch\* 2.9 timeframe to ensure a smooth transition for our partners and the community.
+
+### Highlights
+
+* Qwen3 support
+
+[Qwen3](https://qwenlm.github.io/blog/qwen3/) has recently been released, the latest addition to the Qwen family of large language models. Intel® Extension for PyTorch* provides [support for Qwen3](https://www.intel.com/content/www/us/en/developer/articles/technical/accelerate-qwen3-large-language-models.html) since its launch date with early release version for MoE models like [Qwen3-30B](https://huggingface.co/Qwen/Qwen3-30B-A3B) and middle-size dense model like [Qwen3-14B](https://huggingface.co/Qwen/Qwen3-14B). Related optimizations have been included in this official release.
+
+* Whisper large-v3 support
+
+Intel® Extension for PyTorch* provides optimization for [whisper-large-v3](https://huggingface.co/openai/whisper-large-v3), a state-of-the-art model for automatic speech recognition (ASR) and speech translation. Key improvements include replacing the cross-attention mechanism with the Indirect Access Key-Value (IAKV) Cache kernel, bringing you well-performing experience with weight-only INT8 quantization on Intel® Xeon® processors.
+
+* General Large Language Model (LLM) optimization
+
+Intel® Extension for PyTorch* provides sgmv support in the API for multi-LoRA inference kernels for LLM serving frameworks and optimizes the LLM generation sampler. A full list of optimized models can be found at [LLM optimization](https://github.com/intel/intel-extension-for-pytorch/tree/v2.8.0+cpu/examples/cpu/llm/inference).
+
+* Bug fixing and other optimizations
+
+    - Optimized the performance of LLM [#3688](https://github.com/intel/intel-extension-for-pytorch/commit/9659e2e76c610c4a01d5579a9775c6a071679cb6) [#3708](https://github.com/intel/intel-extension-for-pytorch/commit/84834fbc1747458660b837491316b10e9a43e6d5) [#3754](https://github.com/intel/intel-extension-for-pytorch/commit/2978fd620fbdf347264a5e0d502cd019e1ab639b)
+    - Removed the dependency on torch-ccl and oneCCL [#3690](https://github.com/intel/intel-extension-for-pytorch/commit/4d00e5a49b38257f28d13b076f2c8564740afa71)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.7.0+cpu...v2.8.0+cpu
+
 ## 2.7.0
 
 We are excited to announce the release of Intel® Extension for PyTorch* 2.7.0+cpu which accompanies PyTorch 2.7. This release mainly brings you new LLM model optimization including DeepSeek-R1-671B and Phi-4, new APIs for LLM serving frameworks including sliding window and softcap support in PagedAttention APIs, MambaMixer API for Jamba and Mamba model and API for multi-LoRA inference kernels. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.

@@ -353,7 +353,7 @@ if __name__ == "__main__":
     if BASEDIR != SCRIPTDIR:
         assert (
             args.ver_ipex == ""
-        ), "Argument --ver-ipex cannot be set if you run the script from a exisiting source code directory."
+        ), "Argument --ver-ipex cannot be set if you run the script from a existing source code directory."
     else:
         assert (
             args.ver_ipex != ""

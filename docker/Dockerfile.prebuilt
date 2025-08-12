@@ -35,11 +35,10 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 100
 
 WORKDIR /root
 
-ARG IPEX_VERSION=2.7.0
-ARG TORCHCCL_VERSION=2.7.0
-ARG PYTORCH_VERSION=2.7.0
-ARG TORCHAUDIO_VERSION=2.7.0
-ARG TORCHVISION_VERSION=0.22.0
+ARG IPEX_VERSION=2.8.0
+ARG PYTORCH_VERSION=2.8.0
+ARG TORCHAUDIO_VERSION=2.8.0
+ARG TORCHVISION_VERSION=0.23.0
 RUN python -m venv venv && \
     . ./venv/bin/activate && \
     python -m pip --no-cache-dir install --upgrade \
@@ -49,7 +48,7 @@ RUN python -m venv venv && \
     python -m pip install --no-cache-dir \
     torch==${PYTORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION}+cpu torchaudio==${TORCHAUDIO_VERSION}+cpu --index-url https://download.pytorch.org/whl/cpu && \
     python -m pip install --no-cache-dir \
-    intel_extension_for_pytorch==${IPEX_VERSION} oneccl_bind_pt==${TORCHCCL_VERSION} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/ && \
+    intel_extension_for_pytorch==${IPEX_VERSION} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/ && \
     python -m pip install intel-openmp && \
     python -m pip cache purge
 
@@ -67,7 +66,6 @@ RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
     echo "CMD=\"\"; for i in \${!CMDS[@]}; do CMD=\"\${CMD} \${CMDS[\$i]}\"; done;" >> ${ENTRYPOINT} && \
     echo ". ~/venv/bin/activate" >> ${ENTRYPOINT} && \
     echo "TMP=\$(python -c \"import torch; import os; print(os.path.abspath(os.path.dirname(torch.__file__)))\")" >> ${ENTRYPOINT} && \
-    echo ". \${TMP}/../oneccl_bindings_for_pytorch/env/setvars.sh" >> ${ENTRYPOINT} && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ${ENTRYPOINT} && \
     echo "exec \${CMD}" >> ${ENTRYPOINT} && \
     chmod +x ${ENTRYPOINT}

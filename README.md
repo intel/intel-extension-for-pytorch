@@ -5,7 +5,7 @@ Intel® Extension for PyTorch\*
 
 </div>
 
-**CPU** [💻main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🌱Quick Start](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖Documentations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🏃Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=cpu&version=v2.7.0%2Bcpu)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[💻LLM Example](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm) <br>
+**CPU** [💻main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🌱Quick Start](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/getting_started.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖Documentations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🏃Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=cpu&version=v2.8.0%2Bcpu)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[💻LLM Example](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm) <br>
 **GPU** [💻main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🌱Quick Start](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/getting_started.html)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖Documentations](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[🏃Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[💻LLM Example](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main/examples/gpu/llm)<br>  
 
 Intel® Extension for PyTorch\* extends PyTorch\* with up-to-date features optimizations for an extra performance boost on Intel hardware. Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup> Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch* xpu device.
@@ -55,6 +55,8 @@ and the phenomenal high-quality reasoning model DeepSeek-R1.
 |Qwen| Qwen/Qwen-7B-Chat | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2-7B | ✅ | ✅ | ✅ | ✅ |
 |Qwen| Qwen/Qwen2.5-7B-Instruct | ✅ | ✅ | ✅ | ✅ |
+|Qwen| Qwen/Qwen3-14B | ✅ | ✅ | ✅ |   |
+|Qwen| Qwen/Qwen3-30B-A3B | ✅ | ✅ | ✅ | ✅ |
 |LLaVA| liuhaotian/llava-v1.5-7b | ✅ | ✅ | ✅ | ✅ |
 |GIT| microsoft/git-base | ✅ | ✅ | ✅ | ✅ |
 |Yuan| IEITYuan/Yuan2-102B-hf | ✅ | ✅ | ✅ |   |
@@ -66,6 +68,7 @@ and the phenomenal high-quality reasoning model DeepSeek-R1.
 |Phi| microsoft/Phi-4-mini-instruct | ✅ | ✅ | ✅ |   |
 |Phi| microsoft/Phi-4-multimodal-instruct | ✅ | ✅ | ✅ |   |
 |Whisper| openai/whisper-large-v2 | ✅ | ✅ | ✅ | ✅ |
+|Whisper| openai/whisper-large-v3 | ✅ | ✅ | ✅ |   |
 |Maira| microsoft/maira-2 | ✅ | ✅ | ✅ | ✅ |
 |Jamba| ai21labs/Jamba-v0.1 | ✅ | ✅ | ✅ | ✅ |
 |DeepSeek| deepseek-ai/DeepSeek-V2.5-1210 | ✅ | ✅ | ✅ | ✅ |
