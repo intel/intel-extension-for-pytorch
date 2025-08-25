@@ -1,6 +1,44 @@
 Releases
 =============
 
+We launched Intel® Extension for PyTorch\* in 2020 with the goal of extending the official PyTorch\* to simplify achieving high performance on Intel® CPU and GPU platforms. Over the years, we have successfully upstreamed most of our features and optimizations for Intel® platforms into PyTorch\*. Moving forward, our strategy is to focus on developing new features and supporting upcoming platform launches directly within PyTorch\*. We are discontinuing active development on Intel® Extension for PyTorch\*, effective immediately after 2.8 release. We will continue to provide critical bug fixes and security patches throughout the PyTorch\* 2.9 timeframe to ensure a smooth transition for our partners and the community.
+
+## 2.8.10+xpu
+
+Intel® Extension for PyTorch\* v2.8.10+xpu is the new release which supports Intel® GPU platforms (Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 Mobile Processors and Intel® Data Center GPU Max Series) based on PyTorch\* 2.8.0.
+
+### Highlights
+
+- Intel® oneDNN v3.8.1 integration
+- Intel® Deep Learning Essentials 2025.1.3 compatibility
+- Large Language Model (LLM) optimization
+
+   Intel® Extension for PyTorch\* optimizes the performance of Qwen3, along with other typical LLM models on Intel® GPU platforms，with the supported transformer version upgraded to [4.51.3](https://github.com/huggingface/transformers/releases/tag/v4.51.3). A full list of optimized LLM models is available in the [LLM Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html). Intel® Extension for PyTorch\* also adds the support for more custom kernels, such as `selective_scan_fn`, `causal_conv1d_fn` and `causal_conv1d_update`, for the functionality support of [Jamba](https://arxiv.org/abs/2403.19887) model.
+
+- PyTorch\* XCCL adoption for distributed scenarios
+
+  Intel® Extension for PyTorch\* adopts the PyTorch\* XCCL backend for distrubuted scenarios on the Intel® GPU platform. We observed that the scaling performance using PyTorch\* XCCL is on par with OneCCL Bindings for PyTorch\* (torch-ccl) for validated AI workloads. As a result, we will discontinue active development of torch-ccl immediately after the 2.8 release.
+
+  A pseudocode example illustrating the transition from torch-ccl to PyTorch\* XCCL at the model script level is shown below:
+
+    ```
+    import torch
+
+    if torch.distributed.is_xccl_available:
+      torch.distributed.init_process_group(backend='xccl')
+    else:
+      import oneccl_bindings_for_pytorch
+      torch.distributed.init_process_group(backend='ccl')      
+    ```
+
+- Redundant code removal
+
+  Intel® Extension for PyTorch\* no longer overrides the device allocator. It is recommended to use the allocator provided by PyTorch\* instead. Intel® Extension for PyTorch\* also removes all overridden oneMKL and oneDNN related operators except GEMM and SDPA.
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.7.10+xpu
 
 Intel® Extension for PyTorch\* v2.7.10+xpu is the new release which supports Intel® GPU platforms (Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 Mobile Processors and Intel® Data Center GPU Max Series) based on PyTorch\* 2.7.0.

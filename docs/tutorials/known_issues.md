@@ -81,26 +81,9 @@ Troubleshooting
   - **Cause**: Not activate C++ compiler. `torch.compile` need to find correct `cl.exe` path.
   - **Solution**: One could open "Developer Command Prompt for VS 2022" or follow [Visual Studio Developer Command Prompt and Developer PowerShell](https://learn.microsoft.com/en-us/visualstudio/ide/reference/command-prompt-powershell?view=vs-2022#developer-command-prompt) to activate visual studio environment.
 
-- **Problem**: LoweringException: ImportError: cannot import name 'intel' from 'triton._C.libtriton'
-  - **Cause**: Installing Triton causes pytorch-triton-xpu to stop working.
-  - **Solution**: Resolve the issue with following command:
-
-    ```bash
-    pip list | grep triton
-    # If triton related packages are listed, remove them
-    pip uninstall triton
-    pip uninstall pytorch-triton-xpu
-    # Reinstall correct version of pytorch-triton-xpu
-    pip install pytorch-triton-xpu==3.3.0 --index-url  https://download.pytorch.org/whl/xpu
-    ```
-
-- **Problem**: RuntimeError: oneCCL: ze_handle_manager.cpp:226 get_ptr: EXCEPTION: unknown memory type, when executing DLRMv2 BF16 training on 4 cards Intel® Data Center GPU Max platform. 
-  - **Cause**: Issue exists in the default sycl path of oneCCL 2021.14 which uses two IPC exchanges. 
-  - **Solution**: Use `export CCL_ATL_TRANSPORT=ofi` to work around.
- 
-- **Problem**: Segmentation fault, when executing LLaMa2-70B inference on Intel® Data Center GPU Max platform, base on online quantization.
-  - **Cause**: Issue exists Intel Neural Compressor (INC) v3.3: during the initial import of INC, the accelerator is cached with `lru_cache`. Subsequently, setting `INC_TARGET_DEVICE` in INC transformers-like API does not take effect. This results in two devices being present in the model, leading to memory-related errors as seen in the error messages.
-  - **Solution**: Run the workload `INC_TARGET_DEVICE="cpu" python` to work around, if using online quantization.
+- **Problem**: If you encounter a system hang issue when executing llama3-8b and phi3-mini FSDP fine-tuning cases based on XCCL backend on Intel® Data Center GPU Max platform, and the hang occurs after workload completion and before the process exits.
+  - **Cause**: Compatibility issue between accelerate v1.8.1 and transformers v4.51.3.
+  - **Solution**: Use torch-ccl to replace XCCL to workaround.
 
 ## Performance Issue
 
