@@ -5,16 +5,16 @@
   },
   "pytorch": {
     "index-url": "https://download.pytorch.org/whl/nightly/cpu",
-    "version": "2.9.0.dev20250819+cpu"
+    "version": "2.9.0.dev20250825+cpu"
   },
   "torchaudio": {
-    "version": "2.8.0.dev20250818+cpu"
+    "version": "2.8.0.dev20250824+cpu"
   },
   "torchvision": {
-    "version": "0.24.0.dev20250818+cpu"
+    "version": "0.24.0.dev20250824+cpu"
   },
   "deepspeed": {
-    "version": "0.17.4",
+    "version": "0.17.5",
     "commit": ""
   },
   "lm-evaluation-harness": {
