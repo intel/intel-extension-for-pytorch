@@ -76,6 +76,16 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
   
 - 3: signifies that Phi-3-mini-4k-instruct is verified.
 
+Above models are intended to allow users to examine and evaluate models and the associated performance of Intel technology solutions.
+The accuracy of computer models is a function of the relation between the data used to train them and the data that the models encounter after deployment.
+Models have been tested using datasets that may or may not be sufficient for use in production applications.
+Accordingly, while the model may serve as a strong foundation, Intel recommends and requests that those models be tested against data the models are likely to encounter in specific deployments.
+
+Intel is committed to respecting human rights and avoiding causing or contributing to adverse impacts on human rights. 
+See [Intel’s Global Human Rights Principles](https://www.intel.com/content/dam/www/central-libraries/us/en/documents/policy-human-rights.pdf). 
+Intel’s products and software are intended only to be used in applications that do not cause or contribute to adverse impacts on human rights.
+
+
 ## Support
 
 The team tracks bugs and enhancement requests using [GitHub issues](https://github.com/intel/intel-extension-for-pytorch/issues/). Before submitting a suggestion or bug report, search the existing GitHub issues to see if your issue has already been reported.
