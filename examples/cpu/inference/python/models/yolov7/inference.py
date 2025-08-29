@@ -290,6 +290,10 @@ def test(
         from torch._inductor import config as inductor_config
 
         inductor_config.cpp_wrapper = True
+        if not performance:
+            from torch._dynamo import config as dynamo_config
+
+            dynamo_config.use_recursive_dict_tags_for_guards = False
 
         if int8:
             from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
