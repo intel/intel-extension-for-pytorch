@@ -85,16 +85,16 @@ bash run_model_with_sglang.sh
 export SGLANG_USE_CPU_ENGINE=1
 
 # BF16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 # FP16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --max-total-tokens 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 # INT8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 # FP8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 ```
 
@@ -102,7 +102,7 @@ python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --
 ```
 cd sglang/benchmark/mmlu
 bash download_data.sh
-python bench_sglang.py
+python bench_sglang.py --parallel 1
 ```
 
 ## Benchmarking with TorchInductor
