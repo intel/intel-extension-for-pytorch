@@ -131,6 +131,7 @@ if args.profile:
 inductor_config.cpp_wrapper = True
 inductor_config.max_autotune = True
 inductor_config.max_autotune_gemm_backends = "CPP,ATEN"
+inductor_config.cpp.use_small_dequant_buffer = True
 torch._dynamo.config.allow_unspec_int_on_nn_module = True
 
 if args.dtype in ["fp32", "bf16", "fp16"]:
@@ -140,6 +141,7 @@ if args.dtype in ["fp32", "bf16", "fp16"]:
         inductor_config.cpp.enable_grouped_gemm_template = True
     elif not args.disable_concat_linear:
         inductor_config.cpp.enable_concat_linear = True
+        print("---- apply concat linear ----", flush=True)
     with torch.no_grad(), torch.autocast("cpu", enabled=amp_enabled, dtype=load_dtype):
         model.forward = torch.compile(model.forward)
 elif args.dtype in ["int8", "int8-bf16"]:
@@ -147,11 +149,14 @@ elif args.dtype in ["int8", "int8-bf16"]:
     from torchao.quantization import quant_api
     from torchao.utils import unwrap_tensor_subclass
 
+    if not args.disable_concat_linear:
+        inductor_config.cpp.enable_concat_linear = True
+        print("---- apply concat linear ----", flush=True)
+
     with torch.no_grad(), torch.autocast("cpu", enabled=True, dtype=torch.bfloat16):
         if args.weight_dtype == "INT8":
             if args.dtype == "int8-bf16":
                 print("---- apply torchao woq int8 api ----", flush=True)
-                inductor_config.cpp.enable_concat_linear = True
                 quant_api.quantize_(
                     model, quant_api.int8_weight_only(set_inductor_config=False)
                 )
@@ -341,7 +346,7 @@ if args.profile:
         schedule=torch.profiler.schedule(wait=1, warmup=1, active=1),
         on_trace_ready=trace_handler,
         record_shapes=True,
-    ) as prof:
+    ) as prof, torch.compiler.set_stance(skip_guard_eval_unsafe=True):
         with torch.no_grad(), torch.autocast(
             "cpu", enabled=amp_enabled, dtype=load_dtype
         ):
@@ -355,7 +360,14 @@ if args.profile:
 num_iter = args.num_iter - args.num_warmup
 total_time = 0.0
 total_list = []
-with torch.no_grad(), torch.autocast("cpu", enabled=amp_enabled, dtype=load_dtype):
+with (
+    torch.no_grad(),
+    torch.autocast("cpu", enabled=amp_enabled, dtype=load_dtype),
+    torch.compiler.set_stance(skip_guard_eval_unsafe=True),
+):
+    # Warm-up again. We found first run slow even with warm-up above.
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+    model.generate(input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs)
     for i in range(num_iter):
         tic = time.time()
         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
@@ -371,12 +383,12 @@ with torch.no_grad(), torch.autocast("cpu", enabled=amp_enabled, dtype=load_dtyp
 print(gen_text, flush=True)
 print("\n", "-" * 10, "Summary:", "-" * 10)
 latency = total_time / (num_iter)
-print("inference-latency: %.3f sec." % latency)
+print("inference-latency: %.6f sec." % latency)
 first_latency = np.mean([x[0] for x in total_list])
 next_latency_list = list(chain(*[x[1:] for x in total_list]))
 next_latency_list.sort()
 average_next_latency = np.mean(next_latency_list)
 p90_latency = np.percentile(next_latency_list, 90)
-print("first-token-latency: %.3f sec." % first_latency)
-print("rest-token-latency: %.3f sec." % average_next_latency)
-print("P90-rest-token-latency: %.3f sec." % p90_latency)
+print("first-token-latency: %.6f sec." % first_latency)
+print("rest-token-latency: %.6f sec." % average_next_latency)
+print("P90-rest-token-latency: %.6f sec." % p90_latency)
