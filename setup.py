@@ -596,16 +596,10 @@ def get_cpp_test_build_dir():
     return cpp_test_build_dir
 
 
+# PyBind11 ABI handling is internal to PyBind11; this will be removed after PyTorch 2.9.0"
+# Ref: https://github.com/pytorch/pytorch/blob/d5e0f4202ba14632e4d14862ace096609e763462/torch/utils/cpp_extension.py#L1709-L1711
 def get_pybind11_abi_compiler_flags():
-    pybind11_abi_flags = []
-    for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
-        pval = getattr(torch._C, f"_PYBIND11_{pname}")
-        if pval is not None:
-            pybind11_abi_flags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
-    cl_flags = ""
-    for flag in pybind11_abi_flags:
-        cl_flags += flag + " "
-    return cl_flags
+    return []
 
 
 def _gen_build_cfg_from_cmake(
