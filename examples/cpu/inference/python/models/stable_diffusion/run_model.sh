@@ -129,7 +129,7 @@ export KMP_AFFINITY=granularity=fine,compact,1,0
 
 if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     LOG_PREFIX="stable_diffusion_${PRECISION}_inference_throughput"
-    ARGS_LAUNCH="$ARGS_LAUNCH --throughput_mode"
+    ARGS_LAUNCH="$ARGS_LAUNCH --throughput_mode --skip-cross-node-cores"
     num_warmup=${num_warmup:-"1"}
     num_iter=${num_iter:-"10"}
     ARGS="$ARGS --benchmark -w ${num_warmup} -i ${num_iter}"

@@ -133,7 +133,7 @@ elif [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     BATCH_SIZE=${BATCH_SIZE:-`expr 4 \* $CORES`}
     echo "Running inference throughput with torch.compile inductor backend."
     export TORCHINDUCTOR_FREEZING=1
-    python -m torch.backends.xeon.run_cpu --disable-numactl --throughput-mode --enable_tcmalloc --log_path=${OUTPUT_DIR} \
+    python -m torch.backends.xeon.run_cpu --skip-cross-node-cores --disable-numactl --throughput-mode --enable_tcmalloc --log_path=${OUTPUT_DIR} \
         ${EVAL_SCRIPT} $ARGS \
         --inductor \
         --model_name_or_path   ${FINETUNED_MODEL} \

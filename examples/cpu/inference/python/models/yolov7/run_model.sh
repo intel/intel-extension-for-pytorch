@@ -95,7 +95,7 @@ if [[ "$TEST_MODE" == "THROUGHPUT" ]]; then
     rm -rf ${OUTPUT_DIR}/yolov7_throughput_log*
     ARGS="--checkpoint-dir $CHECKPOINT_DIR --weights yolov7.pt"
     ARGS="$ARGS --img 640 -e --performance --data data/coco.yaml --dataset-dir $DATASET_DIR --conf-thres 0.001 --iou 0.65 --device cpu --drop-last"
-    MODE_ARGS="--throughput-mode"
+    MODE_ARGS="--throughput-mode --skip-cross-node-cores"
     # default value, you can fine-tune it to get perfect performance.
     BATCH_SIZE=${BATCH_SIZE:-40}
     CORES=`lscpu | grep 'Core(s)' | awk '{print $4}'`

@@ -116,7 +116,7 @@ if [ -z "${BATCH_SIZE}" ]; then
   export BATCH_SIZE=512
 fi
 
-export launcher_cmd="-m torch.backends.xeon.run_cpu --disable-numactl --throughput-mode --enable-jemalloc"
+export launcher_cmd="-m torch.backends.xeon.run_cpu --skip-cross-node-cores --disable-numactl --throughput-mode --enable-jemalloc"
 
 if [[ $PLOTMEM == "true" ]]; then
 pip install memory_profiler matplotlib

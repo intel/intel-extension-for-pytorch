@@ -134,7 +134,7 @@ if [[ "$TEST_MODE" == "THROUGHPUT" ]]; then
     else
         echo "Running Bert_Large inference with torch.compile() indutor backend enabled."
         export TORCHINDUCTOR_FREEZING=1
-        python -m torch.backends.xeon.run_cpu --disable-numactl --throughput_mode --enable_jemalloc --log_path=${OUTPUT_DIR} ${EVAL_SCRIPT} $ARGS --model_type bert --model_name_or_path ${FINETUNED_MODEL} --tokenizer_name bert-large-uncased-whole-word-masking-finetuned-squad  --do_eval --do_lower_case --predict_file $EVAL_DATA_FILE --per_gpu_eval_batch_size $BATCH_SIZE --learning_rate 3e-5 --num_train_epochs 2.0 --max_seq_length 384 --doc_stride 128 --output_dir ./tmp --perf_begin_iter ${num_warmup} --inductor --perf_run_iters ${num_iter} --int8_config ${INT8_CONFIG} 2>&1 | tee ${OUTPUT_DIR}/throughput_log_${precision}.log
+        python -m torch.backends.xeon.run_cpu --skip-cross-node-cores --disable-numactl --throughput_mode --enable_jemalloc --log_path=${OUTPUT_DIR} ${EVAL_SCRIPT} $ARGS --model_type bert --model_name_or_path ${FINETUNED_MODEL} --tokenizer_name bert-large-uncased-whole-word-masking-finetuned-squad  --do_eval --do_lower_case --predict_file $EVAL_DATA_FILE --per_gpu_eval_batch_size $BATCH_SIZE --learning_rate 3e-5 --num_train_epochs 2.0 --max_seq_length 384 --doc_stride 128 --output_dir ./tmp --perf_begin_iter ${num_warmup} --inductor --perf_run_iters ${num_iter} --int8_config ${INT8_CONFIG} 2>&1 | tee ${OUTPUT_DIR}/throughput_log_${precision}.log
     fi
 elif [[ "$TEST_MODE" == "REALTIME" ]]; then
     if [[ "0" == ${TORCH_INDUCTOR} ]];then
@@ -146,7 +146,7 @@ elif [[ "$TEST_MODE" == "REALTIME" ]]; then
     else
         echo "Running Bert_Large inference with torch.compile() indutor backend enabled."
         export TORCHINDUCTOR_FREEZING=1
-        python -m torch.backends.xeon.run_cpu --disable-numactl --ninstances ${NUMAS} --log_path=${OUTPUT_DIR} ${EVAL_SCRIPT} $ARGS --model_type bert --model_name_or_path ${FINETUNED_MODEL} --tokenizer_name bert-large-uncased-whole-word-masking-finetuned-squad  --do_eval --do_lower_case --predict_file $EVAL_DATA_FILE  --per_gpu_eval_batch_size $BATCH_SIZE --learning_rate 3e-5 --num_train_epochs 2.0 --max_seq_length 384 --doc_stride 128 --output_dir ./tmp --perf_begin_iter ${num_warmup} --perf_run_iters ${num_iter} --inductor --int8_config ${INT8_CONFIG} --use_share_weight --total_cores ${CORES_PER_NUMA} 2>&1 | tee ${OUTPUT_DIR}/latency_log_${precision}.log
+        python -m torch.backends.xeon.run_cpu --skip-cross-node-cores --disable-numactl --ninstances ${NUMAS} --log_path=${OUTPUT_DIR} ${EVAL_SCRIPT} $ARGS --model_type bert --model_name_or_path ${FINETUNED_MODEL} --tokenizer_name bert-large-uncased-whole-word-masking-finetuned-squad  --do_eval --do_lower_case --predict_file $EVAL_DATA_FILE  --per_gpu_eval_batch_size $BATCH_SIZE --learning_rate 3e-5 --num_train_epochs 2.0 --max_seq_length 384 --doc_stride 128 --output_dir ./tmp --perf_begin_iter ${num_warmup} --perf_run_iters ${num_iter} --inductor --int8_config ${INT8_CONFIG} --use_share_weight --total_cores ${CORES_PER_NUMA} 2>&1 | tee ${OUTPUT_DIR}/latency_log_${precision}.log
     fi
     CORES_PER_INSTANCE=4
     TOTAL_CORES=`expr $CORES \* $SOCKETS`

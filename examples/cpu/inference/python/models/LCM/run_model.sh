@@ -145,7 +145,7 @@ fi
 
 rm -rf ${OUTPUT_DIR}/${LOG_PREFIX}*
 
-python -m torch.backends.xeon.run_cpu --disable-numactl --log-path ${OUTPUT_DIR} \
+python -m torch.backends.xeon.run_cpu --skip-cross-node-cores --disable-numactl --log-path ${OUTPUT_DIR} \
     --enable_tcmalloc \
     ${ARGS_LAUNCH} \
     --log_path=${OUTPUT_DIR} \
