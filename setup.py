@@ -571,18 +571,6 @@ def get_cpp_test_build_dir():
     return cpp_test_build_dir
 
 
-def get_pybind11_abi_compiler_flags():
-    pybind11_abi_flags = []
-    for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
-        pval = getattr(torch._C, f"_PYBIND11_{pname}")
-        if pval is not None:
-            pybind11_abi_flags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
-    cl_flags = ""
-    for flag in pybind11_abi_flags:
-        cl_flags += flag + " "
-    return cl_flags
-
-
 def _gen_build_cfg_from_cmake(
     cmake_exec,
     project_root_dir,
@@ -842,7 +830,6 @@ class IPEXCPPLibBuild(build_clib, object):
             build_option_python = {
                 **build_option_common,
                 "BUILD_MODULE_TYPE": "PYTHON",
-                "PYBIND11_CL_FLAGS": get_pybind11_abi_compiler_flags(),
             }
 
             cmake_args_python = []
