@@ -108,7 +108,7 @@ elif [[ "None" == ${DATASET_DIR} ]];then
 else
     DATASET_ARGS="--train_dir ${DATASET_DIR}/train --validation_dir ${DATASET_DIR}/val"
 fi
-EVAL_SCRIPT=${EVAL_SCRIPT:-"./transformers/examples/pytorch/image-classification/run_image_classification.py"}
+EVAL_SCRIPT=${EVAL_SCRIPT:-"./scripts/run_image_classification.py"}
 WORK_SPACE=${WORK_SPACE:-${OUTPUT_DIR}}
 
 rm -rf ${OUTPUT_DIR}/${LOG_PREFIX}*

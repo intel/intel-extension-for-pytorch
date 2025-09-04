@@ -37,6 +37,6 @@ git clone https://github.com/huggingface/transformers.git
 cd transformers
 git checkout v4.38.1
 git lfs pull
-git apply ../../../transformers.diff
+git apply ../../transformers.diff
 pip install -e ./
 cd ..
