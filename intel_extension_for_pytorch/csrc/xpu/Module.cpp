@@ -199,14 +199,14 @@ static PyObject* set_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
       "enabled must be a bool (got ",
       Py_TYPE(arg)->tp_name,
       ")");
-  at::autocast::set_xpu_enabled(arg == Py_True);
+  at::autocast::set_autocast_enabled(at::kXPU, arg == Py_True);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* is_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  if (at::autocast::is_xpu_enabled()) {
+  if (at::autocast::is_autocast_enabled(at::kXPU)) {
     Py_RETURN_TRUE;
   } else {
     Py_RETURN_FALSE;
@@ -222,14 +222,14 @@ static PyObject* set_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
       Py_TYPE(arg)->tp_name,
       ")");
   at::ScalarType targetType = reinterpret_cast<THPDtype*>(arg)->scalar_type;
-  at::autocast::set_autocast_xpu_dtype(targetType);
+  at::autocast::set_autocast_dtype(at::kXPU, targetType);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
 
 static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  at::ScalarType current_dtype = at::autocast::get_autocast_xpu_dtype();
+  at::ScalarType current_dtype = at::autocast::get_autocast_dtype(at::kXPU);
   auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
   Py_INCREF(dtype);
   return dtype;
