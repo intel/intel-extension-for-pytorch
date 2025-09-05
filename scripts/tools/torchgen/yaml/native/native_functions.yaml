@@ -92,7 +92,7 @@
 
 - func: _int_mm(Tensor self, Tensor mat2) -> Tensor
   dispatch:
-    XPU: _int_mm_xpu
+    XPU: _int_mm_xpu_ipex
 
 - func: pad_sequence(Tensor[] sequences, bool batch_first=False, float padding_value=0.0, str padding_side="right") -> Tensor
   python_module: nn

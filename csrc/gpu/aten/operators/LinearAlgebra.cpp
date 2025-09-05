@@ -624,7 +624,7 @@ Tensor& _int_mm_out_xpu(
 namespace at {
 namespace native {
 
-Tensor _int_mm_xpu(const Tensor& self, const Tensor& mat2) {
+Tensor _int_mm_xpu_ipex(const Tensor& self, const Tensor& mat2) {
   Tensor result =
       at::empty({self.size(0), mat2.size(1)}, self.options().dtype(at::kInt));
   return AtenIpexTypeXPU::_int_mm_out_xpu(self, mat2, result);
