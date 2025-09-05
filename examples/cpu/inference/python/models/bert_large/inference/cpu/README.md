@@ -69,7 +69,7 @@ Download the `config.json` and fine tuned model from huggingface and set the `FI
 ```
 mkdir bert_squad_model
 wget https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-uncased-whole-word-masking-finetuned-squad-config.json -O bert_squad_model/config.json
-wget https://cdn.huggingface.co/bert-large-uncased-whole-word-masking-finetuned-squad-pytorch_model.bin  -O bert_squad_model/pytorch_model.bin
+wget https://huggingface.co/google-bert/bert-large-uncased-whole-word-masking-finetuned-squad/resolve/main/pytorch_model.bin  -O bert_squad_model/pytorch_model.bin
 export FINETUNED_MODEL=$(pwd)/bert_squad_model
 ```
 
