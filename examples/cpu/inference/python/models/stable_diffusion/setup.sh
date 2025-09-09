@@ -15,14 +15,14 @@
 # limitations under the License.
 #
 
-pip install torchmetrics pycocotools transformers==4.38.1 peft==0.6.2
+pip install torchmetrics pycocotools transformers==4.53.0 peft==0.17.1
 pip install torch-fidelity --no-deps
 pip install scipy
 
 git clone https://github.com/huggingface/diffusers.git
 cd diffusers
-git checkout v0.23.1
+git checkout v0.35.1
 git apply ../diffusers.patch
 pip install -e .
 cd ..
-pip install huggingface_hub==0.25.2
+pip install huggingface_hub==0.34.4
