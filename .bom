@@ -171,3 +171,4 @@ torchmetrics
 h5py
 six
 tensorflow
+pandas
