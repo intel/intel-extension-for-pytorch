@@ -49,14 +49,15 @@ class RotaryEmbedding(nn.Module):
 
     [Direct function call] This module also provides a `.apply_function` function call
     to be used on query and key at the same time without initializing the module
-    (assume rotary embedding sin/cos values are provided).
+    (assume rotary embedding sin/cos values are provided). `key` is optional for `.apply_function` call.
 
     `apply_function()`
 
     Args:
-        query, key (torch.Tensor) : inputs to be applied with position embeddings, taking shape of
+        query (torch.Tensor), key (Optional[torch.Tensor]) : inputs to be applied with position embeddings, taking shape of
             [batch size, sequence length, num_head/num_kv_head, head_dim]
             or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).
+            `key` may be None, e.g. in case of cross-layer KV sharing.
         sin/cos (torch.Tensor): [num_tokens, rotary_dim] the sin/cos value tensor generated to be applied on query/key.
         rotary_ndims (int): the rotary dimension. e.g., 64 for GPTJ. head size for LLama.
         head_dim (int) : head dim from the input shape.
@@ -68,7 +69,7 @@ class RotaryEmbedding(nn.Module):
             for the input. The shape should be [batch size, sequence length].
 
     Return:
-        query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
+        query (torch.Tensor), key (Optional[torch.Tensor]): [batch size, sequence length, num_head/num_kv_head, head_dim]
         or [num_tokens, num_head/num_kv_head, head_dim].
 
     """
@@ -137,14 +138,17 @@ class RotaryEmbedding(nn.Module):
     def apply_function(
         cls,
         query: torch.Tensor,
-        key: torch.Tensor,
+        key: Optional[torch.Tensor],
         sin: torch.Tensor,
         cos: torch.Tensor,
         rotary_dim: int,
         rotary_half: bool,
         position_ids: torch.Tensor = None,
     ):
-        # query, key (in/out shape) torch.Tensor :
+        # query: torch.Tensor with in/out shape:
+        #    4D: [batch, seqlen, num_head/num_kv_head, head_dim]
+        #    3D: [num_tokens, num_head/num_kv_head, head_dim]
+        # key (optional) None or torch.Tensor with in/out shape:
         #    4D: [batch, seqlen, num_head/num_kv_head, head_dim]
         #    3D: [num_tokens, num_head/num_kv_head, head_dim]
         # sin, cos: torch.Tensor [num_tokens, rotary_dim]
