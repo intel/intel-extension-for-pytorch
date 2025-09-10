@@ -25,6 +25,7 @@ from transformers import (
 )
 
 import torch
+import sys
 
 
 def trace_handler(prof):
@@ -63,7 +64,12 @@ parser.add_argument(
 )
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--accuracy_only", action="store_true")
-parser.add_argument("--dataset", nargs="?", default="lambada", const="lambada")
+parser.add_argument(
+    "--dataset",
+    type=str,
+    choices=["lambada", "mmlu", "gsm8k_cot_llama"],
+    default="mmlu",
+)
 parser.add_argument("--disable-concat-linear", action="store_true")
 parser.add_argument("--disable-grouped-gemm", action="store_true")
 parser.add_argument(
@@ -80,11 +86,9 @@ parser.add_argument(
     help="use weight-only quantization",
 )
 parser.add_argument("--torchao", action="store_true")
-parser.add_argument("--lambada", action="store_true")
 parser.add_argument("--inductor", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
-parser.add_argument("--int8-qconfig", nargs="?", default="./qconfig.json")
 parser.add_argument(
     "--int8_bf16_mixed",
     action="store_true",
@@ -121,6 +125,8 @@ if attn_type == "paged_attention":
     model.generation_config.cache_implementation = "paged"
     model.config.page_size = args.page_size
 
+if not hasattr(model.config, "no_token_latency"):
+    model.config.no_token_latency = False
 
 from torch._inductor import config as inductor_config
 
@@ -206,7 +212,8 @@ elif args.dtype in ["int8", "int8-bf16"]:
 
         model.forward = torch.compile(model.forward)
 
-if args.accuracy_only:
+
+def run_accuracy_lambada(model, dataset):
     from torch.nn.functional import pad
     from datasets import load_dataset
     from torch.utils.data import DataLoader
@@ -284,7 +291,7 @@ if args.accuracy_only:
             lantecy = latency / len(self.dataset)
             return acc, lantecy
 
-    full_dataset = load_dataset(args.dataset)
+    full_dataset = load_dataset(dataset)
     dataset = full_dataset["validation"]
 
     evaluator = Evaluator(dataset, tokenizer, 1)
@@ -305,8 +312,66 @@ if args.accuracy_only:
     model.eval()
     with torch.autocast("cpu", enabled=amp_enabled, dtype=load_dtype):
         eval_func(model)
-    print("Acc test done, exit..")
-    exit(0)
+
+
+# Run LM eval accuracy check for MMLU and GSM8K
+def run_accuracy_lmeval(model, dataset):
+    from lm_eval import evaluator
+    from lm_eval.models.huggingface import HFLM
+    from lm_eval.utils import make_table
+    import os
+
+    # disable the output token latency for accuracy eval
+    model.config.no_token_latency = True
+
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    model.config.tie_word_embeddings = False
+
+    hfmodel = HFLM(
+        pretrained=model,
+        tokenizer=tokenizer,
+        batch_size=1,
+        device="cpu",
+    )
+
+    print(f"Running accuracy check for dataset: {dataset}")
+    if dataset == "gsm8k_cot_llama":
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=dataset,
+            fewshot_as_multiturn=True,
+            apply_chat_template=True,
+            batch_size=16,
+        )
+        print(results.get("results")["gsm8k_cot_llama"])
+        acc = float(
+            results.get("results")["gsm8k_cot_llama"]["exact_match,strict-match"]
+        )
+        print("Accuracy:", acc)
+
+    elif dataset == "mmlu":
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=dataset,
+            batch_size=16,
+            num_fewshot=5,
+        )
+        print(results.get("results")["mmlu"])
+        acc = results.get("results")["mmlu"]["acc,none"]
+        print("Accuracy:", acc)
+
+    print("========================================================")
+    print(make_table(results))
+    print("========================================================")
+
+
+if args.accuracy_only:
+    if args.dataset == "lambada":
+        run_accuracy_lambada(model, args.dataset)
+    else:
+        run_accuracy_lmeval(model, args.dataset)
+    print("Acc test done, exit...")
+    sys.exit(0)
 
 # greedy search
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=1)

@@ -123,10 +123,7 @@ pip install packaging intel-openmp accelerate
 conda install -y gperftools -c conda-forge
 
 # Set IOMP and tcmalloc Preload for better performance
-export LD_PRELOAD="<path_to>/tcmalloc/lib/libtcmalloc.so":"<path_to_iomp>/lib/libiomp5.so":$LD_PRELOAD
-
-# Set ENV to use fp16 AMX if you are using a supported platform
-export DNNL_MAX_CPU_ISA=AVX512_CORE_AMX_FP16
+export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libtcmalloc.so:${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libiomp5.so:$LD_PRELOAD
 
 ```
 
@@ -139,6 +136,7 @@ export DNNL_MAX_CPU_ISA=AVX512_CORE_AMX_FP16
 | **OUTPUT_DIR**               |                               `export OUTPUT_DIR=<path to an output directory>`                               |
 | **FINETUNED_MODEL**    | `export FINETUNED_MODEL="meta-llama/Llama-3.1-8B-Instruct"`         |
 | **PRECISION**     |                  `export PRECISION=bf16` (fp32, bf32, bf16, fp16, int8) |
+| **DATASET** |`export DATASET=mmlu` (For accuracy mode only. Supported datasets: mmlu, gsm8k_cot_llama, lambada)|
 | **INPUT_TOKEN**    |    `export INPUT_TOKEN=32 (choice in [32 64 128 256 512 1024 2016], we prefer to benchmark on 32 and 2016)`    |
 | **OUTPUT_TOKEN**    |   `export OUTPUT_TOKEN=32 (32 is preferred, while you could set any other length)`      |
 | **MODEL_DIR**               |                               `export MODEL_DIR=$(pwd)`                               |

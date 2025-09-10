@@ -55,7 +55,11 @@ elif [[ "$TEST_MODE" == "REALTIME" ]]; then
 elif [[ "$TEST_MODE" == "ACCURACY" ]]; then
     echo "TEST_MODE set to ACCURACY"
     export LOG_PREFIX="accuracy_log"
-    ARGS="$ARGS --accuracy_only  --lambada"
+    if [ -z "${DATASET}" ]; then
+        export DATASET="mmlu"
+    fi
+    echo "ACCURACY DATASET set to ${DATASET}"
+    ARGS="$ARGS --accuracy_only --dataset ${DATASET}"
     rm -rf ${OUTPUT_DIR}/*accuracy*
 else
     echo "Please set TEST_MODE to THROUGHPUT, REALTIME or ACCURACY"
@@ -95,12 +99,12 @@ then
 elif [[ "${PRECISION}" == "int8-fp32" ]]
 then
     precision="int8-fp32"
-    ARGS="$ARGS --dtype int8 --int8-qconfig   ${OUTPUT_DIR}/${MODEL_HF}-qconfig.json"
+    ARGS="$ARGS --dtype int8"
     echo "### running int8-fp32 mode"
 elif [[ "${PRECISION}" == "int8-bf16" ]] || [[ "${PRECISION}" == "int8" ]]
 then
     precision="int8-bf16"
-    ARGS="$ARGS --dtype int8-bf16 --int8_bf16_mixed --int8-qconfig ${OUTPUT_DIR}/${MODEL_HF}-qconfig.json"
+    ARGS="$ARGS --dtype int8-bf16 --int8_bf16_mixed"
     echo "### running int8-bf16 mode"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
