@@ -6,7 +6,9 @@
 
 # Pre-Requisite
 * Installation of PyTorch
+  ```
   pip install torch --index-url https://download.pytorch.org/whl/nightly/cpu/
+  ```
 * Set tcmalloc Preload for better performance
   ```
   conda install -y gperftools -c conda-forge
@@ -14,10 +16,10 @@
   export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
   ```
 * Set IOMP preload for better performance
-```
+  ```
   pip install packaging intel-openmp
   export LD_PRELOAD=path/lib/libiomp5.so:$LD_PRELOAD
-```
+  ```
 # About the Model:
 * Set SEQUENCE_LENGTH before running the model
   ```
@@ -77,10 +79,10 @@ export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
 1. `git clone https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu.git`
 2. `cd examples/cpu/inference/python/models/distilbert`
 3. Create virtual environment `venv` and activate it:
-    ```
-    python3 -m venv venv
-    . ./venv/bin/activate
-    ```
+  ```
+  python3 -m venv venv
+  . ./venv/bin/activate
+  ```
 4. Run setup scripts:
   ```
   ./setup.sh
