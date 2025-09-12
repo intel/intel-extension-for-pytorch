@@ -90,19 +90,19 @@ NUMAS=`lscpu | grep 'NUMA node(s)' | awk '{print $3}'`
 CORES_PER_NUMA=`expr $CORES \* $SOCKETS / $NUMAS`
 TOTAL_CORES=`expr $CORES \* $SOCKETS`
 
-ARGS_PYTORCH="$ARGS_PYTORCH --disable-numactl --enable-jemalloc --log_path="${OUTPUT_DIR}" --log_file_prefix="./${LOG_PREFIX}_${PRECISION}""
+ARGS_PYTORCH="$ARGS_PYTORCH --disable-numactl --enable-tcmalloc --log_path="${OUTPUT_DIR}" --log_file_prefix="./${LOG_PREFIX}_${PRECISION}""
 
 if [[ "$TEST_MODE" == "THROUGHPUT" ]]; then
     CORES_PER_INSTANCE=$CORES
     INSTANCES=`expr $TOTAL_CORES / $CORES_PER_INSTANCE`
     ARGS="$ARGS -e -a resnet50 ../ --dummy"
-    #ARGS_PYTORCH="$ARGS_PYTORCH --throughput_mode"
-    ARGS_PYTORCH="$ARGS_PYTORCH --ncores-per-instance ${CORES_PER_INSTANCE} --ninstances ${INSTANCES}"
+    ARGS_PYTORCH="$ARGS_PYTORCH --throughput-mode"
     BATCH_SIZE=${BATCH_SIZE:-112}
 elif [[ "$TEST_MODE" == "REALTIME" ]]; then
     CORES_PER_INSTANCE=4
-    NUMBER_INSTANCE=`expr $CORES_PER_NUMA / $CORES_PER_INSTANCE`
-    ARGS="$ARGS -e -a resnet50 ../ --dummy --weight-sharing --number-instance $NUMBER_INSTANCE"
+    INSTANCES=`expr $TOTAL_CORES / $CORES_PER_INSTANCE`
+    ARGS="$ARGS -e -a resnet50 ../ --dummy"
+    ARGS_PYTORCH="$ARGS_PYTORCH --latency-mode"
     BATCH_SIZE=${BATCH_SIZE:-1}
 elif [[ "$TEST_MODE" == "ACCURACY" ]]; then
     python ${MODEL_DIR}/common/hub_help.py \
