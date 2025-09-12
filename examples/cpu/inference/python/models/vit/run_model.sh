@@ -104,7 +104,7 @@ DATASET_ARGS=""
 if [[ "1" == ${DUMMY_INPUT} && "${TEST_MODE}" != "ACCURACY" ]];then
     DATASET_ARGS="--dataset_name dummy"
 elif [[ "None" == ${DATASET_DIR} ]];then
-    DATASET_ARGS="--dataset_name imagenet-1k"
+    DATASET_ARGS="--dataset_name ILSVRC/imagenet-1k"
 else
     DATASET_ARGS="--train_dir ${DATASET_DIR}/train --validation_dir ${DATASET_DIR}/val"
 fi

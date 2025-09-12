@@ -71,12 +71,17 @@ Vision Transformer inference best known configurations with PyTorch.
     ./setup.sh
     ```
 5. Prepare for downloading access
-    On https://huggingface.co/datasets/imagenet-1k, login your account, and click the aggreement and then generating {your huggingface token}
+    On https://huggingface.co/datasets/ILSVRC/imagenet-1k, login your account, and click the aggreement and then generating {your huggingface token}
 
     huggingface-cli login
     {your huggingface token}
-
-6. Setup required environment paramaters
+6. Download the dataset
+  ```
+   export DATASET_DIR=<path to dataset imagenet>
+   #Run "download_data.sh"
+   ./download_data.sh
+  ```
+7. Setup required environment paramaters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
@@ -88,7 +93,7 @@ Vision Transformer inference best known configurations with PyTorch.
 | **BATCH_SIZE** (optional)    |                               `export BATCH_SIZE=120`                                |
 | **DUMMY_INPUT**(optional)     |     `export DUMMY_INPUT=1` (This is optional; for performance collection)    |
 | **CORE_PER_INSTANCE** (required for REALTIME)    |                               `export CORE_PER_INSTANCE=4`                                |
-7. Run `run_model.sh`
+8. Run `run_model.sh`
     ```
     ./run_model.sh
     ```
