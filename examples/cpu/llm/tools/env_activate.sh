@@ -58,7 +58,7 @@ if [ ${MODE} == "inference" ]; then
     export PATH=${PATH}:${JAVA_HOME}/bin
     cd ${MODE}
 
-    python -m pip install -r requirements.txt
+    python -m pip install transformers==4.51.3
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi

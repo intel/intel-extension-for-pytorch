@@ -23,7 +23,6 @@ We provided inference examples for eager mode as well as graph mode, in which th
 Eager mode is the default execution mode in PyTorch, the codes are executed in a “define-by-run” paradigm, so it is flexible, interactive and easy to debug.
 On the other hand, in graph mode the codes are executed in “define-and-run” paradigm, which means the building of the entire computation graph is required before running the function.
 During the graph compilation process, optimizations like layer fusion and folding are applied, and the compiled graphs are more friendly for backend optimizations, leading to accelerated execution.
-TorchScript and TorchDynamo are the 2 graph compiling tools that PyTorch\* provides. 
 
 From numerical precision perspective, we provided inference examples for [BFloat16](#bfloat16) and [INT8 quantization](#int8) in addition to the default [Float32](#float32) precision.
 Low-precision approaches including [Automatic Mixed Precision (AMP)](https://pytorch.org/docs/stable/amp.html) and [quantization](https://pytorch.org/docs/stable/quantization.html) are commonly used in PyTorch\* to improve performance.
@@ -44,12 +43,6 @@ Running ResNet50 inference in eager mode:
 python resnet50_eager_mode_inference_fp32.py
 ```
 
-Running ResNet50 inference in TorchScript mode:
-
-```bash
-python resnet50_torchscript_mode_inference_fp32.py
-```
-
 Running ResNet50 inference in TorchDynamo mode:
 
 ```bash
@@ -60,12 +53,6 @@ Running BERT inference in eager mode:
 
 ```bash
 python bert_eager_mode_inference_fp32.py
-```
-
-Running BERT inference in TorchScript mode:
-
-```bash
-python bert_torchscript_mode_inference_fp32.py
 ```
 
 Running BERT inference in TorchDynamo mode:
@@ -82,12 +69,6 @@ Running ResNet50 inference in eager mode:
 python resnet50_eager_mode_inference_bf16.py
 ```
 
-Running ResNet50 inference in TorchScript mode:
-
-```bash
-python resnet50_torchscript_mode_inference_bf16.py
-```
-
 Running ResNet50 inference in TorchDynamo mode:
 
 ```bash
@@ -98,12 +79,6 @@ Running BERT inference in eager mode:
 
 ```bash
 python bert_eager_mode_inference_bf16.py
-```
-
-Running BERT inference in TorchScript mode:
-
-```bash
-python bert_torchscript_mode_inference_bf16.py
 ```
 
 Running BERT inference in TorchDynamo mode:
