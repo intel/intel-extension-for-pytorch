@@ -6,6 +6,6 @@ black[jupyter]
 datasets
 fire
 peft
-transformers==4.51.3
+transformers
 gradio
 sentencepiece
