@@ -88,7 +88,7 @@ Vision Transformer inference best known configurations with PyTorch.
 | **TEST_MODE** (THROUGHPUT, ACCURACY, REALTIME)              | `export TEST_MODE=THROUGHPUT`                  |
 | **OUTPUT_DIR**               |                               `export OUTPUT_DIR=$(pwd)`                               |
 | **DATASET_DIR**          |  `export DATASET_DIR=<path to dataset imagenet>`    |
-| **PRECISION**     |                  `export PRECISION=bf16` (fp32, bf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16) |
+| **PRECISION**     |                  `export PRECISION=bf16` (fp32, bf32, tf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16) |
 | **MODEL_DIR**               |                               `export MODEL_DIR=$(pwd)`                               |
 | **BATCH_SIZE** (optional)    |                               `export BATCH_SIZE=120`                                |
 | **DUMMY_INPUT**(optional)     |     `export DUMMY_INPUT=1` (This is optional; for performance collection)    |

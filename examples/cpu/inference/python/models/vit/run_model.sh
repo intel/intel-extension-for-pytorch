@@ -69,6 +69,15 @@ then
     precision="bf32"
     ARGS="$ARGS --bf32 --auto_kernel_selection"
     echo "### running bf32 mode"
+elif [[ "${PRECISION}" == "tf32" ]]
+then
+    precision="tf32"
+    ARGS="$ARGS --tf32"
+    echo "### running tf32 mode"
+    if [[ "${TEST_MODE}" != "ACCURACY" ]]; then
+        echo "Precision tf32 only supports ACCURACY mode."
+        exit 1
+    fi
 elif [[ "${PRECISION}" == "int8-fp32" ]]
 then
     precision="int8-fp32"
@@ -91,7 +100,7 @@ then
     echo "### running fp8-bf16 mode"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
-    echo "Supported precisions are: fp32, bf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16"
+    echo "Supported precisions are: fp32, bf32, tf32, bf16, fp16, int8-fp32, int8-bf16, fp8-fp32, fp8-bf16"
     exit 1
 fi
 

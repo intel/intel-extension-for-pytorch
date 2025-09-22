@@ -58,7 +58,6 @@ from transformers.utils import (
     is_torch_bf16_gpu_available,
     is_torch_neuroncore_available,
     is_torch_npu_available,
-    is_torch_tf32_available,
     # is_torch_tpu_available,
     is_torch_xpu_available,
     logging,
@@ -362,11 +361,6 @@ class TrainingArguments:
         fp16_full_eval (`bool`, *optional*, defaults to `False`):
             Whether to use full float16 evaluation instead of 32-bit. This will be faster and save memory but can harm
             metric values.
-        tf32 (`bool`, *optional*):
-            Whether to enable the TF32 mode, available in Ampere and newer GPU architectures. The default value depends
-            on PyTorch's version default of `torch.backends.cuda.matmul.allow_tf32`. For more details please refer to
-            the [TF32](https://huggingface.co/docs/transformers/performance#tf32) documentation. This is an
-            experimental API and it may change.
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
         ddp_backend (`str`, *optional*):
@@ -997,6 +991,15 @@ class TrainingArguments:
             )
         },
     )
+    tf32: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Whether to use tf32 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA"
+                " architecture or using CPU (no_cuda). This is an experimental API and it may change."
+            )
+        },
+    )
 
     int8: bool = field(
         default=False,
@@ -1121,15 +1124,6 @@ class TrainingArguments:
     fp16_full_eval: bool = field(
         default=False,
         metadata={"help": "Whether to use full float16 evaluation instead of 32-bit"},
-    )
-    tf32: Optional[bool] = field(
-        default=None,
-        metadata={
-            "help": (
-                "Whether to enable tf32 mode, available in Ampere and newer GPU architectures. This is an experimental"
-                " API and it may change."
-            )
-        },
     )
     local_rank: int = field(
         default=-1, metadata={"help": "For distributed training: local_rank"}
@@ -1867,34 +1861,6 @@ class TrainingArguments:
             os.environ[prefix + "BACKEND"] = self.torch_compile_backend
             if self.torch_compile_mode is not None:
                 os.environ[prefix + "MODE"] = self.torch_compile_mode
-
-        if self.framework == "pt" and is_torch_available() and self.torch_compile:
-            if is_torch_tf32_available():
-                if self.tf32 is None and not self.fp16 or self.bf16:
-                    logger.info(
-                        "Setting TF32 in CUDA backends to speedup torch compile, you won't see any improvement"
-                        " otherwise."
-                    )
-                    torch.backends.cuda.matmul.allow_tf32 = True
-                    torch.backends.cudnn.allow_tf32 = True
-            else:
-                logger.warning(
-                    "The speedups for torchdynamo mostly come wih GPU Ampere or higher and which is not detected here."
-                )
-        if self.framework == "pt" and is_torch_available() and self.tf32 is not None:
-            if self.tf32:
-                if is_torch_tf32_available():
-                    torch.backends.cuda.matmul.allow_tf32 = True
-                    torch.backends.cudnn.allow_tf32 = True
-                else:
-                    raise ValueError(
-                        "--tf32 requires Ampere or a newer GPU arch, cuda>=11 and torch>=1.7"
-                    )
-            else:
-                if is_torch_tf32_available():
-                    torch.backends.cuda.matmul.allow_tf32 = False
-                    torch.backends.cudnn.allow_tf32 = False
-                # no need to assert on else
 
         # if training args is specified, it will override the one specified in the accelerate config
         if self.half_precision_backend != "apex":

@@ -1745,6 +1745,16 @@ class Trainer:
                         model = torch.compile(model)
                     y = model(**example_batch)
                     y = model(**example_batch)
+            elif self.args.tf32:
+                torch.backends.mkldnn.matmul.fp32_precision = "tf32"
+                torch.backends.mkldnn.conv.fp32_precision = "tf32"
+                with torch.no_grad():
+                    print(
+                        "[Info] Running torch.compile() TensorFloat32 with default backend"
+                    )
+                    model = torch.compile(model)
+                    y = model(**example_batch)
+                    y = model(**example_batch)
             else:
                 with torch.no_grad():
                     if self.args.use_ipex:
