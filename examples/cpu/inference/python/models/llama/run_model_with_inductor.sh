@@ -106,9 +106,14 @@ then
     precision="int8-bf16"
     ARGS="$ARGS --dtype int8-bf16 --int8_bf16_mixed"
     echo "### running int8-bf16 mode"
+elif [[ "${PRECISION}" == "int8-int8" ]]
+then
+    precision="int8"
+    ARGS="$ARGS --dtype int8"
+    echo "### running int8-int8 mode"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
-    echo "Supported precisions are: fp32, bf32, bf16, fp16, int8-fp32, int8-bf16"
+    echo "Supported precisions are: fp32, bf32, bf16, fp16, int8-fp32, int8-bf16, int8-int8"
     exit 1
 fi
 
