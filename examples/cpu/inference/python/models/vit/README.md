@@ -11,16 +11,16 @@ Vision Transformer inference best known configurations with PyTorch.
 ## Bare Metal
 * Install Intel OpenMP
   ```
-  pip install packaging intel-openmp accelerate==0.34.1
+  pip install packaging intel-openmp
   ```
 * Set IOMP, jemalloc and tcmalloc Preload for better performance
   ```
   export LD_PRELOAD="<path to the jemalloc directory>/lib/libjemalloc.so":"<path_to>/tcmalloc/lib/libtcmalloc.so":"<path_to_iomp>/lib/libiomp5.so":$LD_PRELOAD
   ```
 
-* Install datasets
+* Install Transformers
   ```
-  pip install datasets
+  pip install transformers==4.53.0
   ```
 
 * Set CORE_PER_INSTANCE before running realtime mode
