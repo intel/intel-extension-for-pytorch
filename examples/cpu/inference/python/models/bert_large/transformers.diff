@@ -142,7 +142,7 @@ index 999752485b..ec49f829af 100644
 +            from torch.ao.quantization.quantizer.x86_inductor_quantizer import X86InductorQuantizer
 +            from torch.export import export_for_training
 +            from torch._export.utils import _disable_aten_to_metadata_assertions
-+            from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import _int8_sdpa_init, custom_pass
++            from torchao.prototype.inductor.fx_passes.qsdpa_fusion import _qsdpa_init, custom_pass
 +            print('[Info] Running torch.compile() for INT8 quantization')
 +            print('[Info] Running int8_bf16 is: {}'.format(args.int8_bf16))
 +            inductor_config.max_autotune = True
@@ -165,7 +165,7 @@ index 999752485b..ec49f829af 100644
 +                    dynamic_shapes=dynamic_shapes,
 +                    strict=True,
 +                ).module()
-+                _int8_sdpa_init()
++                _qsdpa_init()
 +                quantizer = X86InductorQuantizer()
 +                quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
 +                quantizer.set_function_type_qconfig(
