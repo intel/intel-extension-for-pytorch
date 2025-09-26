@@ -1645,15 +1645,15 @@ class Trainer:
                     )
             example_batch = self._prepare_inputs(example_batch)
             if self.args.int8:
-                from torch.ao.quantization.quantize_pt2e import (
-                    prepare_pt2e,
+                import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+                from torchao.quantization.pt2e.quantize_pt2e import (
                     convert_pt2e,
+                    prepare_pt2e,
                 )
-                import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-                from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
+                from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
                     X86InductorQuantizer,
                 )
-                from torch.export import export_for_training
+                from torchao.quantization.pt2e import move_exported_model_to_eval
                 from torch._export.utils import _disable_aten_to_metadata_assertions
                 from torchao.prototype.inductor.fx_passes.qsdpa_fusion import (
                     _qsdpa_init,
@@ -1664,10 +1664,13 @@ class Trainer:
                 inductor_config.max_autotune = True
                 with (
                     torch.no_grad(),
+                    torch.autocast(
+                        "cpu", enabled=(self.args.bf16 or self.args.int8_bf16)
+                    ),
                     _disable_aten_to_metadata_assertions(),
                     inductor_config.patch(post_grad_custom_pre_pass=custom_pass),
                 ):
-                    exported_model = export_for_training(
+                    exported_model = torch.export.export(
                         model,
                         (),
                         kwargs=example_batch,
@@ -1684,18 +1687,15 @@ class Trainer:
                     prepared_model = prepare_pt2e(exported_model, quantizer)
                     prepared_model(**example_batch)
                     converted_model = convert_pt2e(prepared_model)
-                    torch.ao.quantization.move_exported_model_to_eval(converted_model)
-                    with torch.autocast(
-                        "cpu", enabled=(self.args.bf16 or self.args.int8_bf16)
-                    ):
-                        if self.args.use_ipex:
-                            print("[Info] Running torch.compile() with IPEX backend")
-                            model = torch.compile(converted_model, backend="ipex")
-                        else:
-                            print("[Info] Running torch.compile() with default backend")
-                            model = torch.compile(converted_model)
-                        y = model(**example_batch)
-                        y = model(**example_batch)
+                    move_exported_model_to_eval(converted_model)
+                    if self.args.use_ipex:
+                        print("[Info] Running torch.compile() with IPEX backend")
+                        model = torch.compile(converted_model, backend="ipex")
+                    else:
+                        print("[Info] Running torch.compile() with default backend")
+                        model = torch.compile(converted_model)
+                    y = model(**example_batch)
+                    y = model(**example_batch)
             elif self.args.fp8:
                 from torchao.prototype.inductor.fx_passes.qsdpa_fusion import (
                     _qsdpa_init,

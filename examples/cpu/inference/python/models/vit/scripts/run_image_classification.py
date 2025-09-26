@@ -409,6 +409,10 @@ def main():
             predictions=np.argmax(p.predictions, axis=1), references=p.label_ids
         )
 
+    _attn_implementation = "sdpa"
+    if training_args.int8 or training_args.fp8:
+        # use the eager one to match int8/fp8 sdpa pattern during compiling
+        _attn_implementation = "eager"
     config = AutoConfig.from_pretrained(
         model_args.config_name or model_args.model_name_or_path,
         num_labels=len(labels),
@@ -420,6 +424,7 @@ def main():
         revision=model_args.model_revision,
         token=model_args.token,
         trust_remote_code=model_args.trust_remote_code,
+        _attn_implementation=_attn_implementation,
     )
     # prevent recompilation
     config.problem_type = "single_label_classification"
