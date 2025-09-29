@@ -922,7 +922,7 @@ def main():
         > 10000
     )
     print("Start Training.")
-    while global_step < args.max_steps and not end_training:
+    while args.do_train and global_step < args.max_steps and not end_training:
         if args.local_rank == 0 or args.local_rank == -1:
             now_time = time.time()
             print("epoch:", epoch)
@@ -945,8 +945,10 @@ def main():
 
         shared_file_list = {}
 
-        if torch.distributed.is_initialized() and args.world_size > num_files:
+        if args.world_size > num_files:
             remainder = args.world_size % num_files
+
+        if torch.distributed.is_initialized() and args.world_size > num_files:
             data_file = files[
                 (
                     f_start_id * args.world_size

@@ -455,14 +455,14 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.cuda:
         criterion = criterion.cuda(args.gpu)
 
-    if args.base_op.lower() == "sgd":
-        print("Creating SGD optimizer")
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            args.lr,
-            momentum=args.momentum,
-            weight_decay=args.weight_decay,
-        )
+    assert args.base_op.lower() == "sgd"
+    print("Creating SGD optimizer")
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        args.lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+    )
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -842,7 +842,7 @@ def train(
         print("running float16 training step\n")
     else:
         print("running fp32 training step\n")
-
+    end = time.time()
     for epoch in range(args.start_epoch, args.epochs):
 
         if args.distributed:

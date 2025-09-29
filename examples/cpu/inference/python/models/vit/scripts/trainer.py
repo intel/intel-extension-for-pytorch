@@ -5157,6 +5157,7 @@ class Trainer:
             self.repo.git_push()
 
     def create_accelerator_and_postprocess(self):
+        assert self.args.accelerator_config is not None
         grad_acc_kwargs = {}
         if (
             is_accelerate_available("0.28.0")
@@ -5206,6 +5207,7 @@ class Trainer:
                     "`non_blocking` is enabled but `dataloader_pin_memory` is not. "
                     "For the best performance, it's recommended to enable both."
                 )
+            assert dataloader_config is not None
             dataloader_config.non_blocking = non_blocking
         # this would have been updated above, no need for it anymore
         accelerator_config.pop("gradient_accumulation_kwargs")
@@ -5218,16 +5220,14 @@ class Trainer:
         else:
             args.update(accelerator_config)
         # create accelerator object
-        accelerator_kwargs = {}
-        if self.args.accelerator_config is not None:
-            accelerator_kwargs = self.args.accelerator_config
-            # dict and AcceleratorConfigs are parseable, json files are not
-            if isinstance(accelerator_kwargs, AcceleratorConfig):
-                accelerator_kwargs = accelerator_kwargs.to_dict()
-            elif isinstance(accelerator_kwargs, dict):
-                # Some values may need to go through non-accelerate aligned defaults
-                # and we need to run the `__post_init__` to set them
-                accelerator_kwargs = AcceleratorConfig(**accelerator_kwargs).to_dict()
+        accelerator_kwargs = self.args.accelerator_config
+        # dict and AcceleratorConfigs are parseable, json files are not
+        if isinstance(accelerator_kwargs, AcceleratorConfig):
+            accelerator_kwargs = accelerator_kwargs.to_dict()
+        elif isinstance(accelerator_kwargs, dict):
+            # Some values may need to go through non-accelerate aligned defaults
+            # and we need to run the `__post_init__` to set them
+            accelerator_kwargs = AcceleratorConfig(**accelerator_kwargs).to_dict()
         self.accelerator = Accelerator(**args)
 
         # some Trainer classes need to use `gather` instead of `gather_for_metrics`, thus we store a flag
