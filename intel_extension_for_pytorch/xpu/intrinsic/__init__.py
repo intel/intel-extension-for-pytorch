@@ -413,11 +413,9 @@ def moe_gemm(
     matrix_a,
     matrix_b,
     rows_for_experts,
-    rows_for_experts_cpu,
     n_experts,
     matrix_a_scale_inv=None,
     matrix_b_scale_inv=None,
-    is_vnni_transform=None,
 ):
     """
     Performs MoE (Mixture of Experts) GEMM operation.
@@ -425,7 +423,6 @@ def moe_gemm(
     @param matrix_a: 2D Tensor of shape [batch_size, hidden_dim], representing input data.
     @param matrix_b: 3D Tensor of shape [n_experts, hidden_dim, output_dim], representing weights for each expert.
     @param rows_for_experts: 2D Tensor of shape [n_experts], indicating rows belong to each expert.
-    @param rows_for_experts_cpu: 2D Tensor of shape [n_experts], same as rows_for_experts but on CPU for geting ndrange.
     @param n_experts: Integer, the number of experts used in the model.
     @param matrix_a_scale_inv: 1D Tensor of shape [n_experts], input scale.
     @param matrix_b_scale_inv: 1D Tensor of shape [n_experts], weights scale.
@@ -441,13 +438,11 @@ def moe_gemm(
         and matrix_a_scale_inv is None
     )
     if use_fused_kernel:
-        return torch.ops.torch_ipex.fused_moe_gemm(
+        return torch.ops.torch_ipex.fused_moe_gemm_persistent(
             matrix_a,
             matrix_b,
             matrix_b_scale_inv,
-            is_vnni_transform,
             rows_for_experts,
-            rows_for_experts_cpu,
             n_experts,
         )
     else:
@@ -457,6 +452,7 @@ def moe_gemm(
         output = torch.zeros(
             total_m, gemm_n, device=matrix_a.device, dtype=matrix_a.dtype
         )
+        rows_for_experts_cpu = rows_for_experts.to("cpu")
         start = 0
         for i in range(n_experts):
             end = start + rows_for_experts_cpu[i].item()

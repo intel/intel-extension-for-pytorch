@@ -139,7 +139,6 @@ class MixtralBlockSparseTop2MLP(nn.Module):
         self,
         hidden_states,
         rows_for_experts=None,
-        rows_for_experts_cpu=None,
         use_optimized=False,
         residual=None,
     ):
@@ -147,7 +146,6 @@ class MixtralBlockSparseTop2MLP(nn.Module):
             hidden_states,
             self.moe_w1.weight,
             rows_for_experts,
-            rows_for_experts_cpu,
             self.num_experts,
         )
         hidden_states = self.linear_silu_mul(hidden_states)
@@ -155,7 +153,6 @@ class MixtralBlockSparseTop2MLP(nn.Module):
             hidden_states,
             self.moe_w2.weight,
             rows_for_experts,
-            rows_for_experts_cpu,
             self.num_experts,
         )
         return hidden_states
@@ -230,12 +227,9 @@ class MixtralSparseMoeBlock(nn.Module):
         )
 
         # moe gemm
-        # TODO: remove this memcpy
-        rows_for_experts_cpu = rows_for_experts.to("cpu")
         reordered_moe_output = self.fused_moe_experts(
             reordered_hidden_states,
             rows_for_experts,
-            rows_for_experts_cpu,
             use_optimized=True,
         )
 

@@ -49,62 +49,15 @@ class TestTorchMethod:
             n_experts, device=dpcpp_device, dtype=torch.int32
         )
         self.init_rows_for_experts(tokens, topk, rows_for_experts)
-        rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
-        output = torch.xpu.moe_gemm(
-            matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
-        )
+        output = torch.xpu.moe_gemm(matrix_a, matrix_b, rows_for_experts, n_experts)
+        rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
         ref_output = self.validata_moe_gemm(
             matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
         )
         torch.testing.assert_close(
             output.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
         )
-
-    def _weight_for_vnni(self, weight):
-        E, K, N = weight.shape
-        vnni_row, block_size_x = 4, 16
-        stride = 2
-
-        assert K % vnni_row == 0, "K should be divisible by vnni_row"
-        assert N % block_size_x == 0, "N should be divisible by block_size_x"
-
-        weight = weight.reshape(
-            E, K // vnni_row, vnni_row, N // block_size_x, block_size_x
-        ).transpose(2, 3)
-        weight = weight.reshape(
-            E,
-            K // vnni_row,
-            N // block_size_x,
-            vnni_row // stride,
-            stride,
-            block_size_x,
-            1,
-        ).transpose(4, 5)
-        weight = weight.reshape(
-            E,
-            K // vnni_row,
-            N // block_size_x,
-            vnni_row // stride * block_size_x,
-            stride,
-        )
-
-        weight = torch.cat([weight[..., i::stride, :] for i in range(stride)], dim=-2)
-
-        weight = weight.reshape(
-            E,
-            K // vnni_row,
-            N // block_size_x,
-            vnni_row // stride,
-            block_size_x,
-            stride,
-            1,
-        ).transpose(4, 5)
-        weight = weight.reshape(
-            E, K // vnni_row, N // block_size_x, vnni_row, block_size_x
-        ).transpose(2, 3)
-        weight = weight.reshape(E, K, N)
-        return weight
 
     @pytest.mark.parametrize("tokens", [1024])
     @pytest.mark.parametrize("topk", [8])
@@ -113,9 +66,8 @@ class TestTorchMethod:
     @pytest.mark.parametrize("n_experts", [8, 16, 32, 64])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
     @pytest.mark.parametrize("fp8_dtype", [torch.float8_e5m2])
-    @pytest.mark.parametrize("vnni_t", [True, False])
     def test_moe_gemm_fp8(
-        self, n_experts, gemm_k, gemm_n, tokens, topk, dtype, fp8_dtype, vnni_t
+        self, n_experts, gemm_k, gemm_n, tokens, topk, dtype, fp8_dtype
     ):
 
         total_m = tokens * topk
@@ -128,7 +80,6 @@ class TestTorchMethod:
             n_experts, device=dpcpp_device, dtype=torch.int32
         )
         self.init_rows_for_experts(tokens, topk, rows_for_experts)
-        rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
         scale_shape = None
         matrix_b_scale = torch.full((n_experts,), 4.0, device=dpcpp_device)
@@ -142,18 +93,15 @@ class TestTorchMethod:
             matrix_b_dequant[i] = torch.ops.torch_ipex.cast_from_fp8(
                 matrix_b_fp8[i], matrix_b_scale_inv[i], dtype
             )
-        if vnni_t:
-            matrix_b_fp8 = self._weight_for_vnni(matrix_b_fp8).contiguous()
         output_fp8 = torch.xpu.moe_gemm(
             matrix_a,
             matrix_b_fp8,
             rows_for_experts,
-            rows_for_experts_cpu,
             n_experts,
             None,
             matrix_b_scale_inv,
-            vnni_t,  # True means the input is already ready for VNNI format
         )
+        rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
         ref_output = self.validata_moe_gemm(
             matrix_a,
             matrix_b_dequant,
