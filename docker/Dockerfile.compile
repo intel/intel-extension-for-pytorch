@@ -31,7 +31,8 @@ RUN apt update && \
     python3-venv \
     gcc-12 \
     g++-12 \
-    make
+    make \
+    libfmt-dev
 RUN apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
