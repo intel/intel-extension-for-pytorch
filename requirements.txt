@@ -6,6 +6,6 @@ psutil
 pytest
 pyyaml
 scipy>=1.8.0
-setuptools==72.1.0
+setuptools==78.1.1
 types-dataclasses
 typing_extensions

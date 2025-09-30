@@ -4,12 +4,12 @@ unzip
 datasets
 sentencepiece
 diffusers
-protobuf==3.20.3
+protobuf>=4.25.8
 lm_eval==0.4.2
 huggingface-hub==0.30.0
 py-cpuinfo
 bitsandbytes
-transformers==4.51.3
+transformers
 transformers_stream_generator
 einops
 hjson
