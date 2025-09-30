@@ -342,7 +342,7 @@ def main():
                 data_args.dataset_config_name,
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
-                revision="014711311cec8b5959350c373878a3311caeb764",
+                revision="4603483700ee984ea9debe3ddbfdeae86f6489eb",
             )
         else:
             data_files = {}

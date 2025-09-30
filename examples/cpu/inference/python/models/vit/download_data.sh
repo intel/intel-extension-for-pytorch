@@ -27,7 +27,7 @@ if [ -z "${DATASET_DIR}" ]; then
 fi
 
 mkdir ${OUT_DIR}
-huggingface-cli download ${DATASET_REPO} ${FILENAME_DATA} --repo-type dataset --local-dir ${OUT_DIR}
+huggingface-cli download ${DATASET_REPO} ${FILENAME_DATA} --repo-type dataset --revision 4603483700ee984ea9debe3ddbfdeae86f6489eb --local-dir ${OUT_DIR}
 
 
 val_images="${OUT_DIR}/${FILENAME_DATA}"
