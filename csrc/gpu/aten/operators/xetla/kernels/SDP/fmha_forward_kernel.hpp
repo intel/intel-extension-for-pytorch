@@ -19,6 +19,7 @@ struct dispatch_fmha_forward_args_t {
   T* key;
   T* value;
   T* alibi;
+  T* sink;
   T* attn_mask;
   uint8_t* dropout_mask;
   T* out;
@@ -57,6 +58,7 @@ struct dispatch_fmha_forward_args_t {
         key(reinterpret_cast<T*>(args.key)),
         value(reinterpret_cast<T*>(args.value)),
         alibi(reinterpret_cast<T*>(args.alibi)),
+        sink(reinterpret_cast<T*>(args.sink)),
         attn_mask(reinterpret_cast<T*>(args.attn_mask)),
         dropout_mask(reinterpret_cast<uint8_t*>(args.dropout)),
         out(reinterpret_cast<T*>(args.out)),
@@ -175,6 +177,7 @@ struct FmhaForwardKernelFunctor {
           args.key,
           args.value,
           args.alibi,
+          args.sink,
           args.attn_mask,
           args.dropout_mask,
           args.out,

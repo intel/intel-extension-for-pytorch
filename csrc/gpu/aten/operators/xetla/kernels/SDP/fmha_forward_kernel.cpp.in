@@ -10,7 +10,6 @@ This is an implementation of the Flash Attention algorithm
 #include "SDP/fmha_forward_kernel.hpp"
 #include "SDP/fmha_forward_v2.hpp"
 #include "SDP/fmha_forward_v3.hpp"
-#include "SDP/fmha_forward_v4.hpp"
 
 // clang-format off
 // macros to be filled in CMake
@@ -155,31 +154,6 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
           throw std::runtime_error("Unsupported kHeadPerKv value");
         }
       }
-    } else if constexpr (
-        std::is_same_v<fmha_policy, fmha_policy_v4_64> ||
-        std::is_same_v<fmha_policy, fmha_policy_v4_64>) {
-      auto kHeadPerKv = args.num_heads / args.num_kv_heads;
-      switch (kHeadPerKv) {
-        case 1:
-          LAUNCH_V4_KERNEL_IMPL(1);
-        case 2:
-          LAUNCH_V4_KERNEL_IMPL(2);
-        case 3:
-          LAUNCH_V4_KERNEL_IMPL(3);
-        case 4:
-          LAUNCH_V4_KERNEL_IMPL(4);
-        case 5:
-          LAUNCH_V4_KERNEL_IMPL(5);
-        case 6:
-          LAUNCH_V4_KERNEL_IMPL(6);
-        case 7:
-          LAUNCH_V4_KERNEL_IMPL(7);
-        case 8:
-          LAUNCH_V4_KERNEL_IMPL(8);
-        default: {
-          throw std::runtime_error("Unsupported kHeadPerKv value");
-        }
-      }
     } else {
       using fmha_forward_op_t = fmha_forward_t<
           fmha_policy,
@@ -240,8 +214,6 @@ INSTANTIATE_POLICY(fmha_policy_1x64x64);
 INSTANTIATE_POLICY(fmha_policy_1x64x128);
 INSTANTIATE_POLICY(fmha_policy_1x128x64);
 INSTANTIATE_POLICY(fmha_policy_1x128x128);
-INSTANTIATE_POLICY(fmha_policy_v4_64);
-INSTANTIATE_POLICY(fmha_policy_v4_128);
 INSTANTIATE_POLICY(fmha_policy_64x64x64);
 INSTANTIATE_POLICY(fmha_policy_64x64x128);
 INSTANTIATE_POLICY(fmha_policy_64x64x256);

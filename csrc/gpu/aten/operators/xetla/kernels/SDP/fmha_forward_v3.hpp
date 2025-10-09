@@ -35,13 +35,12 @@ class fmha_forward_v3_t {
 
   struct arguments_t {
     // Input tensors
-    scalar_t* Q_ptr; // [B, F, N, H] - query | [num_tokens, num_query_heads,
-                     // head_size]
-    scalar_t* K_ptr; // [B, T, N, H] - key   | [num_blocks, block_size,
-                     // num_kv_heads, head_size]
-    scalar_t* V_ptr; // [B, T, N, H] - value
+    scalar_t* Q_ptr; // [num_tokens, num_heads_query, head_size]
+    scalar_t* K_ptr; // [num_blocks, block_size, num_heads_kv, head_size]
+    scalar_t* V_ptr; // [num_blocks, block_size, num_heads_kv, head_size]
     scalar_t* A_ptr =
         nullptr; // [B, N, 1, T] - Alibi | [B, N] or [N] - alibi_slopes(float)
+    scalar_t* S_ptr; // [batch_size, num_heads_query] - attention bias
     scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
     // Output tensor
@@ -91,6 +90,7 @@ class fmha_forward_v3_t {
         scalar_t* key,
         scalar_t* value,
         scalar_t* alibi,
+        scalar_t* sink,
         scalar_t* bias,
         uint8_t* dropout,
         scalar_t* out,
@@ -128,6 +128,7 @@ class fmha_forward_v3_t {
           K_ptr(key),
           V_ptr(value),
           A_ptr(alibi),
+          S_ptr(sink),
           B_ptr(bias),
           Dp_ptr(dropout),
           O_ptr(out),
@@ -305,9 +306,6 @@ class fmha_forward_v3_t {
       sg_idy = sg_id / wg_size_x;
       // nbarrier
       nbarrier.init_nbarrier(sg_idy, nbarrier_role::producer_consumer);
-      // softmax statistics
-      softmax_m.fill(kNegInfinity);
-      softmax_l.fill(0.f);
 
       // mem desc variables
       gid = item.get_group(0);
@@ -322,6 +320,9 @@ class fmha_forward_v3_t {
           args.kv_strideT;
       kv_offset_x =
           args.kv_strideT > args.kv_strideN ? head_id_kv * args.kv_strideN : 0;
+
+      softmax_l.fill(0.f);
+      softmax_m.fill(kNegInfinity);
 
       if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
         // startF
@@ -768,6 +769,12 @@ class fmha_forward_v3_t {
       matAccOi_t& matAccOi,
       [[maybe_unused]] arguments_t& args,
       uint32_t iter) {
+    scalar_t sink = args.S_ptr != nullptr
+        ? reinterpret_cast<scalar_t*>(
+              args.S_ptr)[ctx.head_id_start * kHeadPerKv + iter]
+        : static_cast<scalar_t>(kNegInfinity);
+    ctx.softmax_l[iter] += xetla_exp<accum_t, kSgBr>(
+        static_cast<accum_t>(sink) - ctx.softmax_m[iter]);
     subgroup::tile_broadcast_op<subgroup::tile_mul, matAccOi_t>(
         matAccOi, 1 / ctx.softmax_l[iter]);
     using epilogue_t = group::epilogue_t<

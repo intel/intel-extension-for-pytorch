@@ -17,6 +17,7 @@ struct fmha_forward_kernel_args_t {
   void* key;
   void* value;
   void* alibi;
+  void* sink;
   void* attn_mask;
   void* dropout;
   void* out;

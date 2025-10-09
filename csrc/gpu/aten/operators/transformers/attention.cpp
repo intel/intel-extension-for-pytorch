@@ -116,6 +116,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        key_in.data_ptr(),
        value_in.data_ptr(),
        /* alibi */ nullptr,
+       /* sink*/ nullptr,
        attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
        dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
        output.data_ptr(),
@@ -1149,6 +1150,7 @@ Tensor varlen_fwd(
        value.data_ptr(),
        alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
                                  : (void*)nullptr,
+       /* sink */ nullptr,
        /* attn mask */ nullptr,
        /* dropout */ nullptr,
        out.data_ptr(),
@@ -1292,6 +1294,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        key_in.data_ptr(),
        value_in.data_ptr(),
        alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
+       /* sink */ nullptr,
        attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
        nullptr,
        output.data_ptr(),
@@ -1733,6 +1736,7 @@ Tensor chunked_prefill(
     const at::Tensor& block_table, // [batch, num_max_seq_block]
     const c10::optional<at::Tensor>&
         alibi_slopes_, // [num_heads] | [batch, num_heads]
+    const c10::optional<at::Tensor>& sink_, // [num_heads]
     int64_t max_seqlen_q,
     const int64_t max_seqlen_k,
     const double p_dropout,
@@ -1872,6 +1876,7 @@ Tensor chunked_prefill(
          value.data_ptr(),
          alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
                                    : (void*)nullptr,
+         sink_.has_value() ? sink_.value().data_ptr() : (void*)nullptr,
          nullptr,
          nullptr,
          out_.data_ptr(),

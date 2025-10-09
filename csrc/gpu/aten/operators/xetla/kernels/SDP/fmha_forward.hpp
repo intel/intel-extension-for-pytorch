@@ -40,7 +40,8 @@ class fmha_forward_t {
                      // num_kv_heads, head_size]
     scalar_t* V_ptr; // [B, T, N, H] - value
     scalar_t* A_ptr =
-        nullptr; // [B, N, 1, T] - Alibi | [B, N] or [N] - alibi_slopes(float)
+        nullptr; // [B, N, 1, T] - Alibi | [B, N or [N] - alibi_slopes(float)
+    scalar_t* S_ptr; // [batch_size, num_heads_query] - attention bias
     scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
     // Output tensor
@@ -90,6 +91,7 @@ class fmha_forward_t {
         scalar_t* key,
         scalar_t* value,
         scalar_t* alibi,
+        scalar_t* sink,
         scalar_t* bias,
         uint8_t* dropout,
         scalar_t* out,
@@ -127,6 +129,7 @@ class fmha_forward_t {
           K_ptr(key),
           V_ptr(value),
           A_ptr(alibi),
+          S_ptr(sink),
           B_ptr(bias),
           Dp_ptr(dropout),
           O_ptr(out),
@@ -304,7 +307,6 @@ class fmha_forward_t {
       // nbarrier
       nbarrier.init_nbarrier(sg_idy, nbarrier_role::producer_consumer);
       // softmax statistics
-      softmax_m = kNegInfinity;
       softmax_l = 0.f;
 
       // mem desc variables
@@ -312,6 +314,8 @@ class fmha_forward_t {
       batch_id = gid / args.uN; // get batch idx
       head_id = gid % args.uN; // get head idx
       head_id_kv = head_id / (args.uN / args.uNkv); // get head idx for kv
+
+      softmax_m = kNegInfinity;
 
       kv_offset_y =
           (batch_id * args.kv_strideB + head_id_kv * args.kv_strideN) /
@@ -838,6 +842,11 @@ class fmha_forward_t {
   inline void rescale_then_store_Oi(
       matAccOi_t& matAccOi,
       [[maybe_unused]] arguments_t& args) {
+    scalar_t sink = args.S_ptr != nullptr
+        ? reinterpret_cast<scalar_t*>(args.S_ptr)[ctx.head_id]
+        : static_cast<scalar_t>(kNegInfinity);
+    ctx.softmax_l +=
+        xetla_exp<accum_t, kSgBr>(static_cast<accum_t>(sink) - ctx.softmax_m);
     subgroup::tile_broadcast_op<subgroup::tile_mul, matAccOi_t>(
         matAccOi, 1 / ctx.softmax_l);
     using epilogue_t = group::epilogue_t<

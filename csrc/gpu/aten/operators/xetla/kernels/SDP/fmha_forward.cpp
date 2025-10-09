@@ -91,17 +91,6 @@ class fmha_forward_kernel_policy {
     bool gqa_enabled = (args.num_queries == NUM_QUERIES_GREEDY) &&
         _load_using_fmha_v3() &&
         (args.num_kv_heads * max_qhead_kv >= args.num_heads);
-    bool v4_enabled = gqa_enabled &&
-        (args.num_keys > NUM_KEYS_LIMIT_2 ||
-         args.num_kv_heads <= kv_heads_limit) &&
-        (args.head_size <= HEAD_SIZE_LIMIT_1);
-    if (v4_enabled) {
-      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
-        return kernel_call<fmha_policy_v4_64>(args);
-      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
-        return kernel_call<fmha_policy_v4_128>(args);
-      }
-    }
     if (args.block_size == 64) {
       // std::cout << "block size 64" << std::endl;
       if (gqa_enabled) {

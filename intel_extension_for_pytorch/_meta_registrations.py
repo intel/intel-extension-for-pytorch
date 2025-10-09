@@ -171,6 +171,7 @@ def meta_flash_attn_varlen_func(
     is_causal,
     block_table,
     alibi_slopes,
+    sink,
     window_size_left,
     window_size_right,
     kv_cache_dtype,
