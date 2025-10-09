@@ -31,10 +31,10 @@ class TestTorchMethod:
 
         return output
 
-    @pytest.mark.parametrize("tokens", [1024])
+    @pytest.mark.parametrize("tokens", [4, 32, 128, 1024, 2048])
     @pytest.mark.parametrize("topk", [8])
     @pytest.mark.parametrize("gemm_k", [1024, 4096])
-    @pytest.mark.parametrize("gemm_n", [1024, 16384])
+    @pytest.mark.parametrize("gemm_n", [1024, 2880, 16384])
     @pytest.mark.parametrize("n_experts", [8, 16, 32, 64])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
     def test_moe_gemm(self, n_experts, gemm_k, gemm_n, tokens, topk, dtype):
@@ -59,10 +59,10 @@ class TestTorchMethod:
             output.to(float), ref_output.to(float), rtol=1e-2, atol=1e-2
         )
 
-    @pytest.mark.parametrize("tokens", [1024])
+    @pytest.mark.parametrize("tokens", [4, 32, 128, 1024, 2048])
     @pytest.mark.parametrize("topk", [8])
     @pytest.mark.parametrize("gemm_k", [1024, 4096])
-    @pytest.mark.parametrize("gemm_n", [1024, 16384])
+    @pytest.mark.parametrize("gemm_n", [1024, 2880, 16384])
     @pytest.mark.parametrize("n_experts", [8, 16, 32, 64])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16])
     @pytest.mark.parametrize("fp8_dtype", [torch.float8_e5m2])
@@ -100,6 +100,7 @@ class TestTorchMethod:
             n_experts,
             None,
             matrix_b_scale_inv,
+            is_fp8=True,
         )
         rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
         ref_output = self.validata_moe_gemm(

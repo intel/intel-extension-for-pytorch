@@ -416,6 +416,10 @@ def moe_gemm(
     n_experts,
     matrix_a_scale_inv=None,
     matrix_b_scale_inv=None,
+    bias=None,
+    is_mxfp4=False,
+    is_fp8=False,
+    use_native=False,
 ):
     """
     Performs MoE (Mixture of Experts) GEMM operation.
@@ -432,12 +436,29 @@ def moe_gemm(
           Additional instances can be added in the future as needed.
     """
     use_fused_kernel = (
-        torch.xpu.has_2d_block_array()
-        and torch.xpu.has_xmx()
-        and (n_experts <= 128)
-        and matrix_a_scale_inv is None
+        torch.xpu.has_2d_block_array() and torch.xpu.has_xmx() and use_native is False
     )
+    assert matrix_a_scale_inv is None, "matrix_a_scale_inv is not supported now"
     if use_fused_kernel:
+        if is_mxfp4:
+            total_m = matrix_a.shape[0]
+            gemm_k = matrix_a.shape[1]
+            gemm_n = matrix_b.shape[2]
+            group_size = gemm_k // matrix_b_scale_inv.shape[1]
+            assert group_size == 32, "mxfp4 only support group size 32"
+            group_marlin_output = torch.empty(
+                total_m, gemm_n, dtype=matrix_a.dtype, device=matrix_a.device
+            )
+            torch.ops.torch_ipex.group_mm_mxfp4_out_marlin(
+                group_marlin_output,
+                matrix_a,
+                matrix_b,
+                matrix_b_scale_inv,
+                bias,
+                rows_for_experts,
+                group_size,
+            )
+            return group_marlin_output
         return torch.ops.torch_ipex.fused_moe_gemm_persistent(
             matrix_a,
             matrix_b,
@@ -449,18 +470,21 @@ def moe_gemm(
         total_m = matrix_a.shape[0]
         gemm_k = matrix_a.shape[1]
         gemm_n = matrix_b.shape[2]
-        output = torch.zeros(
+        output = torch.empty(
             total_m, gemm_n, device=matrix_a.device, dtype=matrix_a.dtype
         )
         rows_for_experts_cpu = rows_for_experts.to("cpu")
+        if is_mxfp4:
+            group_size = gemm_k // matrix_b_scale_inv.shape[1]
+            assert group_size == 32, "mxfp4 only support group size 32"
         start = 0
         for i in range(n_experts):
             end = start + rows_for_experts_cpu[i].item()
             if start == end:
                 continue
-            if matrix_a_scale_inv is None and matrix_b_scale_inv is None:
+            if not is_fp8 and not is_mxfp4:
                 output[start:end] = torch.mm(matrix_a[start:end], matrix_b[i])
-            else:
+            elif is_fp8:
                 assert matrix_a_scale_inv is None
                 output[start:end] = torch.ops.torch_ipex.fp8_gemm(
                     matrix_a[start:end],
@@ -474,6 +498,16 @@ def moe_gemm(
                     None,
                     False,
                 )
+            else:  # is_mxfp4
+                torch.ops.torch_ipex.mm_mxfp4_out_marlin(
+                    output[start:end],
+                    matrix_a[start:end],
+                    matrix_b[i],
+                    matrix_b_scale_inv[i],
+                    group_size,
+                )
+            if bias is not None:
+                output[start:end] += bias[i]
             start = end
 
         return output

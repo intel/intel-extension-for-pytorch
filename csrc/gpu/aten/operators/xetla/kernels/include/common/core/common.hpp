@@ -272,6 +272,16 @@ enum class reduce_op : uint8_t {
   max = 3, // performance reduce_max
 };
 
+inline void SW_BARRIER() {
+#if __INTEL_LLVM_COMPILER >= 20250000
+#if defined(__SYCL_DEVICE_ONLY__)
+  __asm__ volatile("fence_sw" : : :);
+#endif // __SYCL_DEVICE_ONLY__
+#else
+  __ESIMD_NS::fence<__ESIMD_NS::fence_mask::sw_barrier>();
+#endif // __INTEL_LLVM_COMPILER >= 20250000
+}
+
 __XETLA_API void xetla_wait(uint16_t val) {
   __ESIMD_ENS::wait(__ESIMD_NS::simd<uint16_t, 1>(val));
 }

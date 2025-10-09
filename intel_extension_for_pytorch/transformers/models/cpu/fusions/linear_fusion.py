@@ -544,6 +544,10 @@ class _IPEXGatedMLPMOECPU(nn.Module):
         w2_scale_inv=None,
         a1_scale_inv=None,
         a2_scale_inv=None,
+        w13_bias=None,
+        w2_bias=None,
+        is_mxfp4=False,
+        is_fp8=False,
     ):
         super().__init__()
 
@@ -610,6 +614,7 @@ class _IPEXGatedMLPMOECPU(nn.Module):
         num_expert_group: int = 0,
         topk_group: int = 0,
         scoring_func: str = "softmax",
+        activation: Optional[str] = "silu",
         e_score_correction_bias: Optional[torch.Tensor] = None,
     ):
 

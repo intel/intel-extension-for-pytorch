@@ -457,6 +457,10 @@ class GatedMLPMOE(nn.Module):
         w2_scale_inv=None,
         a1_scale_inv=None,
         a2_scale_inv=None,
+        w13_bias=None,
+        w2_bias=None,
+        is_mxfp4=False,
+        is_fp8=False,
     ):
         super().__init__()
         self.W13 = W13
@@ -465,6 +469,10 @@ class GatedMLPMOE(nn.Module):
         self.w2_scale_inv = w2_scale_inv
         self.a1_scale_inv = a1_scale_inv
         self.a2_scale_inv = a2_scale_inv
+        self.w13_bias = w13_bias
+        self.w2_bias = w2_bias
+        self.is_mxfp4 = is_mxfp4
+        self.is_fp8 = is_fp8
         self.W3 = W3
         self.use_prepack = use_prepack
         self.linear_fusion = None
@@ -484,6 +492,10 @@ class GatedMLPMOE(nn.Module):
             self.w2_scale_inv,
             self.a1_scale_inv,
             self.a2_scale_inv,
+            self.w13_bias,
+            self.w2_bias,
+            self.is_mxfp4,
+            self.is_fp8,
         )
 
     def forward(
@@ -497,6 +509,7 @@ class GatedMLPMOE(nn.Module):
         num_expert_group: Optional[int] = None,
         custom_routing_function: Optional[Callable] = None,
         scoring_func: str = "softmax",
+        activation: Optional[str] = "silu",
         e_score_correction_bias: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.device_type != hidden_states.device.type:
@@ -512,5 +525,6 @@ class GatedMLPMOE(nn.Module):
             num_expert_group,
             custom_routing_function,
             scoring_func,
+            activation,
             e_score_correction_bias,
         )

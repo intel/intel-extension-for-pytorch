@@ -519,7 +519,8 @@ struct PesistantMoEGEMM {
 
   void operator()(sycl::nd_item<3> item) const SYCL_ESIMD_KERNEL {
     int group_id = item.get_group_linear_id();
-    int group_m_id = (group_id * wg_tile_n) / gemm_n;
+    int gemm_n_pad = (gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n;
+    int group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
     int group_range = item.get_group_range(1);
 
     int local_id = item.get_local_linear_id();
@@ -586,7 +587,7 @@ struct PesistantMoEGEMM {
         const T* current_weights = weights + offset;
 
         mem_desc_t mem_desc_a, mem_desc_b, mem_desc_c;
-        int start_x = (group_id * wg_tile_n) % gemm_n;
+        int start_x = (group_id * wg_tile_n) % gemm_n_pad;
         int start_y = skip_m + expert_m_id * wg_tile_m;
         mem_desc_a.init(
             (T*)activation,
@@ -626,7 +627,7 @@ struct PesistantMoEGEMM {
         item.barrier(sycl::access::fence_space::local_space);
         group_id = __ESIMD_NS::slm_block_load<int, 1>(gemm_slm_size)[0];
         group_id += group_range;
-        group_m_id = (group_id * wg_tile_n) / gemm_n;
+        group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
       }
       pre_rows = cumsum_rows_for_experts[load_expert_num - 1];
       pre_tiles = cumsum_tiles_for_experts[load_expert_num - 1];
@@ -748,7 +749,8 @@ struct PesistantMoEGEMMFP8 {
 
   void operator()(sycl::nd_item<3> item) const SYCL_ESIMD_KERNEL {
     int group_id = item.get_group_linear_id();
-    int group_m_id = (group_id * wg_tile_n) / gemm_n;
+    int gemm_n_pad = (gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n;
+    int group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
     int group_range = item.get_group_range(1);
 
     int local_id = item.get_local_linear_id();
@@ -818,7 +820,7 @@ struct PesistantMoEGEMMFP8 {
         mem_desc_A_t mem_desc_a, mem_desc_c;
         mem_desc_B_t mem_desc_b;
 
-        int start_x = (group_id * wg_tile_n) % gemm_n;
+        int start_x = (group_id * wg_tile_n) % gemm_n_pad;
         int start_y = skip_m + expert_m_id * wg_tile_m;
         mem_desc_a.init(
             (T*)activation,
@@ -859,7 +861,7 @@ struct PesistantMoEGEMMFP8 {
         item.barrier(sycl::access::fence_space::local_space);
         group_id = __ESIMD_NS::slm_block_load<int, 1>(gemm_slm_size)[0];
         group_id += group_range;
-        group_m_id = (group_id * wg_tile_n) / gemm_n;
+        group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
       }
       pre_rows = cumsum_rows_for_experts[load_expert_num - 1];
       pre_tiles = cumsum_tiles_for_experts[load_expert_num - 1];

@@ -167,4 +167,55 @@ struct compute_policy_fp8_dequantize : public compute_policy_default_xmx<
   static constexpr bool vnni_t = vnni_t_;
 };
 
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    typename dtype_scale_,
+    int dequant_s_,
+    DequantMode dequant = DequantMode::FastInterleaved,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
+struct compute_policy_mxfp4_dequantize {};
+
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    typename dtype_scale_,
+    int dequant_s_,
+    DequantMode dequant_mode_>
+struct compute_policy_mxfp4_dequantize<
+    compute_attr_,
+    perf_tuning_knob_,
+    dtype_scale_,
+    dequant_s_,
+    dequant_mode_,
+    gpu_arch::XeHpc> {
+  using compute_attr = compute_attr_;
+  using perf_tuning_knob = perf_tuning_knob_;
+  static constexpr DequantMode dequant_mode = dequant_mode_;
+  static constexpr int k_stride = perf_tuning_knob::k_stride;
+  static constexpr int stages = perf_tuning_knob::stages;
+  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+  using dtype_mma_acc = typename compute_attr::dtype_acc;
+  // both dtype_mma_a and dtype_mma_b should be the same
+  using dtype_mma_a = bf16;
+  using dtype_mma_b = bf16;
+
+  static constexpr uint32_t block_bytes_x_a = 32;
+  static constexpr uint32_t block_size_x_a =
+      block_bytes_x_a / sizeof(dtype_mma_a);
+  static constexpr uint32_t block_size_y_a = 16;
+
+  static constexpr uint32_t block_size_x_b = 16;
+  static constexpr uint32_t block_bytes_y_b = 32;
+  static constexpr uint32_t block_size_y_b =
+      block_bytes_y_b / sizeof(dtype_mma_b);
+  static_assert(
+      block_size_x_a == block_size_y_b,
+      "mat_a x need to match with mat_b y");
+
+  using dtype_scale = dtype_scale_;
+  static constexpr uint32_t dequant_s = dequant_s_;
+};
+
 } // namespace gpu::xetla::group

@@ -34,6 +34,28 @@ class SiluAndMul(nn.Module):
         return ret.to(dtype)
 
 
+class SwigluOAIAndMul(nn.Module):
+    def __init__(self, alpha: float = 1.702, limit: float = 7.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.alpha = alpha
+        self.limit = limit
+
+    def naive_forward(self, x: torch.Tensor) -> torch.Tensor:
+        gate, up = x[..., ::2], x[..., 1::2]
+        gate = gate.clamp(min=None, max=self.limit).to(torch.float32)
+        up = up.clamp(min=-self.limit, max=self.limit).to(torch.float32)
+        glu = gate * torch.sigmoid(gate * self.alpha)
+        gated_output = (up + 1) * glu
+        return gated_output.to(x.dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        d = x.shape[-1] // 2
+        output_shape = x.shape[:-1] + (d,)
+        out = torch.empty(output_shape, dtype=x.dtype, device=x.device)
+        torch.ops.torch_ipex.swigluoai_and_mul(out, x, self.alpha, self.limit)
+        return out
+
+
 class GeluAndMul(nn.Module):
     def __init__(self, approximate: str) -> None:
         super().__init__()
@@ -259,7 +281,7 @@ class RotaryEmbedding(nn.Module):
         return query, key
 
 
-@pytest.mark.parametrize("activation", ["silu", "gelu", "gelu_tanh"])
+@pytest.mark.parametrize("activation", ["silu", "gelu", "gelu_tanh", "swiglu_oai"])
 @pytest.mark.parametrize("num_tokens", NUM_TOKENS)
 @pytest.mark.parametrize("d", D)
 @pytest.mark.parametrize("dtype", DTYPES)
@@ -285,6 +307,8 @@ def test_act_and_mul(
         op = GeluAndMul(approximate="none")
     elif activation == "gelu_tanh":
         op = GeluAndMul(approximate="tanh")
+    elif activation == "swiglu_oai":
+        op = SwigluOAIAndMul()
     out = op(x)
     ref_out = op.naive_forward(x)
 

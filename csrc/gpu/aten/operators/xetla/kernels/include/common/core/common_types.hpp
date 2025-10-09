@@ -51,6 +51,13 @@ enum class quant_mode : uint8_t {
   I4_ASYM_FP_ZERO = 2
 };
 
+// for marlin dequantization
+enum class DequantMode : uint8_t {
+  Basic = 0,
+  FastInterleaved = 1,
+  FastInterleavedWithScaleMerge = 2
+};
+
 struct quant_info {
   quant_mode quant_mode;
   uint32_t dequant_s;
