@@ -420,7 +420,6 @@ def main():
         id2label=id2label,
         finetuning_task="image-classification",
         cache_dir=model_args.cache_dir,
-        return_dict=False,
         revision=model_args.model_revision,
         token=model_args.token,
         trust_remote_code=model_args.trust_remote_code,
