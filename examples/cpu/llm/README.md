@@ -7,7 +7,7 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 
 # 2. Environment Setup
 
-**Note**: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
+**Note**: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**.
 If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.8.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup),
 in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
 
@@ -32,6 +32,7 @@ cd llm
 
 # Activate environment variables
 source ./tools/env_activate.sh inference
+pip install transformers==4.51.3
 ```
 
 ## 2.2 Conda-based environment setup with compilation from source
@@ -54,6 +55,7 @@ bash ./tools/env_setup.sh 3
 
 # Activate environment variables
 source ./tools/env_activate.sh inference
+pip install transformers==4.51.3
 ```
 
 ## 2.3 [Optional] Setup for Running Jupyter Notebooks
@@ -72,7 +74,7 @@ jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
 
 1. Open up a web browser with the given URL and token.
 2. Open the notebook.
-3. Run all cells. 
+3. Run all cells.
 
 ### 2.3.2 Jupyter Notebooks for Conda-based Environments
 
@@ -90,7 +92,7 @@ jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
 1. Open up a web browser with the given URL and token.
 2. Open the notebook.
 3. Change your Jupyter Notebook kernel to IPEX-LLM.
-4. Run all cells. 
+4. Run all cells.
 
 <br>
 

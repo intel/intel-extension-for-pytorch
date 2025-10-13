@@ -1,7 +1,4 @@
-# BERT Large Training
-
-BERT Large training best known configurations with Intel® Extension for PyTorch.
-
+# BERT Large Inference
 ## Model Information
 
 | **Use Case** | **Framework** | **Model Repo** | **Branch/Commit/Tag** | **Optional Patch** |
@@ -9,37 +6,32 @@ BERT Large training best known configurations with Intel® Extension for PyTorch
 |  Training   |    PyTorch    |       https://github.com/huggingface/transformers/tree/main/src/transformers/models/bert        |           -           |         -          |
 
 # Pre-Requisite
-* Installation of PyTorch and [Intel Extension for PyTorch](https://intel.github.io/intel-extension-for-pytorch/#installation)
-
-## Bare Metal
-### General setup
-
-Follow [link]((https://github.com/IntelAI/models/blob/master/docs/general/pytorch/BareMetalSetup.md)) to install Pytorch, IPEX, TorchVison, Miniforge, Jemalloc and TCMalloc.
-
+* Create conda environment `bert` and activate it:
+  ```
+  conda create -n bert python=3.10 -y
+  conda activate bert
+  ```
+* Installation of PyTorch
+  ```
+  pip install torch --index-url https://download.pytorch.org/whl/nightly/cpu/
+  ```
 ### Model Specific Setup
 
-* Set Jemalloc and tcmalloc Preload for better performance
-
-  The jemalloc should be built from the [General setup](#general-setup) section.
+* Set tcmalloc Preload for better performance
   ```
-  export LD_PRELOAD="<path to the jemalloc directory>/lib/libjemalloc.so":"path_to/tcmalloc/lib/libtcmalloc.so":$LD_PRELOAD
+  conda install -y gperftools -c conda-forge
+  export LD_PRELOAD="path_to/tcmalloc/lib/libtcmalloc.so":$LD_PRELOAD
   export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
   ```
 * Set IOMP preload for better performance
-```
+  ```
   pip install packaging intel-openmp
   export LD_PRELOAD=path/lib/libiomp5.so:$LD_PRELOAD
-```
+  ```
 * Install dependencies
-```
-pip install protobuf==3.20.3 numpy==1.20
-```
-
-* Set ENV to use fp16 AMX if you are using a supported platform
-```
-  export DNNL_MAX_CPU_ISA=AVX512_CORE_AMX_FP16
-```
-
+  ```
+  conda install -c conda-forge protobuf=3.20.3 numpy=1.20
+  ```
 * Set ENV to use multi-nodes distributed training (no need for single-node multi-sockets)
 
   In this case, we use data-parallel distributed training and every rank will hold same model replica. The NNODES is the number of ip in the HOSTFILE. To use multi-nodes distributed training you should firstly setup the passwordless login (you can refer to [link](https://linuxize.com/post/how-to-setup-passwordless-ssh-login/)) between these nodes.
@@ -49,9 +41,9 @@ pip install protobuf==3.20.3 numpy==1.20
   ```
 
 * [optional] Compile model with PyTorch Inductor backend (support fp32/bf16/fp16)
-```shell
+  ```shell
   export TORCH_INDUCTOR=1
-```
+  ```
 
 
 ## Datasets
@@ -147,20 +139,13 @@ you can use "SHARD_NUM" to control the shard files number. the default "SHARD_NU
 ```
 
 # Training
-1. `git clone https://github.com/intel/intel-extension-for-pytorch`
+1. `git clone https://github.com/intel/intel-extension-for-pytorch.git`
 2. `cd intel-extension-for-pytorch/examples/cpu/inference/python/models/bert_large/training/cpu`
-3. Create virtual environment `venv` and activate it:
-    ```
-    python3 -m venv venv
-    . ./venv/bin/activate
-    ```
-4. Run setup.sh
-    ```
-    ./setup.sh
-    ```
-5. Install the latest CPU versions of [torch, torchvision and intel_extension_for_pytorch](https://intel.github.io/intel-extension-for-pytorch/index.html#installation)
-
-6. Setup required environment paramaters
+3. Run setup scripts:
+  ```
+  ./setup.sh
+  ```
+4. Setup required environment paramaters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
@@ -176,7 +161,7 @@ you can use "SHARD_NUM" to control the shard files number. the default "SHARD_NU
 | **MODEL_DIR**               |                               `export MODEL_DIR=$(pwd)`                               |
 | **BATCH_SIZE** (optional)    |                               `export BATCH_SIZE=256`                                |
 
-7. Run `run_model.sh`
+5. Run `run_model.sh`
 
 ## Output
 
