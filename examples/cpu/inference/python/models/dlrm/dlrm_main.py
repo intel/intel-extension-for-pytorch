@@ -441,7 +441,7 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
                     model,
                     example_inputs,
                     strict=True,
-                ).module()
+                ).module(check_guards=False)
                 quantizer = X86InductorQuantizer()
                 quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
                 prepared_model = prepare_pt2e(exported_model, quantizer)
