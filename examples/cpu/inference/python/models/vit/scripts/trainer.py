@@ -1697,6 +1697,7 @@ class Trainer:
                     y = model(**example_batch)
                     y = model(**example_batch)
             elif self.args.fp8:
+                import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
                 from torchao.prototype.inductor.fx_passes.qsdpa_fusion import (
                     _qsdpa_init,
                     custom_pass,

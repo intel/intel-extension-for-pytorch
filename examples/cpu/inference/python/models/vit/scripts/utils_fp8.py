@@ -6,18 +6,22 @@ import torch.ao.quantization.fx._decomposed
 from collections import namedtuple
 import transformers
 
-quantize_affine_float8 = torch.ops.torchao.quantize_affine_float8.default
-dequantize_affine_float8 = torch.ops.torchao.dequantize_affine_float8.default
+quantize_affine_float8_non_decomposed = (
+    torch.ops.torchao.quantize_affine_float8_non_decomposed.default
+)
+dequantize_affine_float8_non_decomposed = (
+    torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+)
 
 
 def qdq(input, scale):
     dtype = input.dtype
-    q_input = quantize_affine_float8(
+    q_input = quantize_affine_float8_non_decomposed(
         input,
         torch.tensor([scale]),
         torch.float8_e4m3fn,
     )
-    dq_input = dequantize_affine_float8(
+    dq_input = dequantize_affine_float8_non_decomposed(
         q_input,
         torch.tensor([scale]),
         dtype,
@@ -38,19 +42,19 @@ class FP8QDQLinear(torch.nn.Module):
 
     def forward(self, input):
         dtype = input.dtype
-        weight = dequantize_affine_float8(
+        weight = dequantize_affine_float8_non_decomposed(
             self.weight.data,
             torch.tensor([self.weight_scale]),
             torch.float,
         )
         weight = weight.to(dtype)
 
-        q_input = quantize_affine_float8(
+        q_input = quantize_affine_float8_non_decomposed(
             input,
             torch.tensor([self.scale]),
             self.qtype,
         )
-        dq_input = dequantize_affine_float8(
+        dq_input = dequantize_affine_float8_non_decomposed(
             q_input,
             torch.tensor([self.scale]),
             torch.float,
