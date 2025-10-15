@@ -20,7 +20,7 @@ Vision Transformer inference best known configurations with PyTorch.
 
 * Install Transformers
   ```
-  pip install transformers==4.53.0
+  pip install transformers==4.57.0
   ```
 
 * Set CORE_PER_INSTANCE before running realtime mode

@@ -45,10 +45,10 @@ except Exception:
         return False
 
 
+from functools import cached_property
 from transformers.utils import (
     ACCELERATE_MIN_VERSION,
     ExplicitEnum,
-    cached_property,
     is_accelerate_available,
     is_safetensors_available,
     is_sagemaker_dp_enabled,
