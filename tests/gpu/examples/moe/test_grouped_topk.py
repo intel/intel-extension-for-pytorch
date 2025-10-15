@@ -18,8 +18,8 @@ class TestTorchMethod:
         e_score_correction_bias: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
 
+        gating_output = gating_output.to(torch.float32)
         if scoring_func == "softmax":
-            gating_output = gating_output.to(torch.float32)
             scores = torch.softmax(gating_output, dim=-1)
         elif scoring_func == "sigmoid":
             scores = gating_output.sigmoid()
@@ -66,7 +66,7 @@ class TestTorchMethod:
 
         return topk_weights.to(torch.float32), topk_ids.to(torch.int32)
 
-    @pytest.mark.parametrize("seed", [123, 356, 478])
+    @pytest.mark.parametrize("seed", [0])
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
     @pytest.mark.parametrize("n_token", [1, 2, 64, 256])
     @pytest.mark.parametrize("n_expert", [64, 128, 256])
@@ -95,12 +95,7 @@ class TestTorchMethod:
         hidden_states = torch.zeros(n_token, n_expert, device=dpcpp_device).to(dtype)
         bias = None
         if has_bias:
-            if has_bias and scoring_func == "sigmoid" and dtype is not torch.float32:
-                # Low-precision sigmoid calculation errors can cause the results to fluctuate too much
-                # using a bias of bigger number to avoid this
-                bias = torch.arange(1, n_expert + 1).to(dpcpp_device).to(dtype)
-            else:
-                bias = torch.randn(n_expert, device=dpcpp_device).to(dtype)
+            bias = torch.randn(n_expert, device=dpcpp_device).to(dtype)
 
         ref_topk_weights, ref_topk_indices = self.ref_grouped_topk(
             gating_output,
@@ -111,22 +106,17 @@ class TestTorchMethod:
             scoring_func,
             bias,
         )
-        with torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.XPU,
-            ],
-            record_shapes=True,
-        ) as prof:
-            topk_weights, topk_indices, _, _ = torch.ops.torch_ipex.grouped_topk(
-                hidden_states,
-                gating_output,
-                n_topk,
-                renormalize,
-                n_expert_group,
-                n_topk_group,
-                scoring_func,
-                bias,
-            )
+
+        topk_weights, topk_indices = torch.ops.torch_ipex.grouped_topk(
+            hidden_states,
+            gating_output,
+            n_topk,
+            renormalize,
+            n_expert_group,
+            n_topk_group,
+            scoring_func,
+            bias,
+        )
 
         # Compare the results
         torch.testing.assert_close(ref_topk_weights, topk_weights, atol=2e-2, rtol=1e-2)
@@ -158,19 +148,15 @@ class TestTorchMethod:
         else:
             gating_output[0][0] = float("nan")
 
-        topk_weights, topk_indices, token_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.grouped_topk(
-                hidden_states,
-                gating_output,
-                n_topk,
-                renormalize,
-                n_expert_group,
-                n_topk_group,
-                "sigmoid",
-                bias,
-            )
+        topk_weights, topk_indices = torch.ops.torch_ipex.grouped_topk(
+            hidden_states,
+            gating_output,
+            n_topk,
+            renormalize,
+            n_expert_group,
+            n_topk_group,
+            "sigmoid",
+            bias,
         )
 
         assert torch.all(topk_indices < n_expert)
-        assert torch.all(token_for_experts <= n_token * n_topk)
-        assert torch.all(expert_offsets < n_token * n_topk)

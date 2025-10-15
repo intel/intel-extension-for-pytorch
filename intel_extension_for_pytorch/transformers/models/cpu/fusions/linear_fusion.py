@@ -548,6 +548,7 @@ class _IPEXGatedMLPMOECPU(nn.Module):
         w2_bias=None,
         is_mxfp4=False,
         is_fp8=False,
+        experts_start_id=0,
     ):
         super().__init__()
 

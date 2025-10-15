@@ -22,8 +22,6 @@ struct FusedTopkSoftmax {
   FusedTopkSoftmax(
       float* topk_weights,
       int* topk_ids,
-      int* rows_for_experts,
-      int* offsets,
       const T* gating_output,
       const bool renormalize,
       const int tokens,
@@ -31,8 +29,6 @@ struct FusedTopkSoftmax {
       const int top_k)
       : topk_weights(topk_weights),
         topk_ids(topk_ids),
-        rows_for_experts(rows_for_experts),
-        offsets(offsets),
         gating_output(gating_output),
         renormalize(renormalize),
         tokens(tokens),
@@ -186,25 +182,14 @@ struct FusedTopkSoftmax {
         if (topk_ids_local[i] < 0 || topk_ids_local[i] >= experts) {
           // Ensure valid index
           topk_ids[offset + i] = 0;
-          offsets[offset + i] = 0;
           continue;
         }
         topk_ids[offset + i] = topk_ids_local[i];
-        auto ref_num_tokens = sycl::atomic_ref<
-            int,
-            sycl::memory_order_relaxed,
-            sycl::memory_scope_device,
-            sycl::access::address_space::global_space>(
-            *(rows_for_experts + topk_ids_local[i]));
-        int old = ref_num_tokens.fetch_add(1);
-        offsets[offset + i] = old;
       }
     }
   }
   float* topk_weights;
   int* topk_ids;
-  int* rows_for_experts;
-  int* offsets;
   const T* gating_output;
   const bool renormalize;
   const int tokens;
@@ -218,8 +203,6 @@ void launch_fused_topk_softmax(
     const T* gating_output,
     float* topk_weights,
     int* topk_indices,
-    int* rows_for_experts,
-    int* offsets,
     const bool renormalize,
     const int top_k,
     const int num_tokens,
@@ -231,8 +214,6 @@ void launch_fused_topk_softmax(
     Kernel task(
         topk_weights,
         topk_indices,
-        rows_for_experts,
-        offsets,
         gating_output,
         renormalize,
         num_tokens,
@@ -248,8 +229,6 @@ void fused_topk_softmax(
     const T* gating_output,
     float* topk_weights,
     int* topk_indices,
-    int* rows_for_experts,
-    int* offsets,
     const bool renormalize,
     const int num_tokens,
     const int num_experts,
@@ -261,8 +240,6 @@ void fused_topk_softmax(
       gating_output,
       topk_weights,
       topk_indices,
-      rows_for_experts,
-      offsets,
       renormalize,
       topk,
       num_tokens,
@@ -288,8 +265,6 @@ struct Fused_Grouped_Topk {
   Fused_Grouped_Topk(
       float* topk_weights,
       int* topk_ids,
-      int* rows_for_experts,
-      int* offsets,
       const T* gating_output,
       const T* e_score_correction_bias,
       const ScoringFunc scoring_mode,
@@ -301,8 +276,6 @@ struct Fused_Grouped_Topk {
       const int topk_group)
       : topk_weights(topk_weights),
         topk_ids(topk_ids),
-        rows_for_experts(rows_for_experts),
-        offsets(offsets),
         gating_output(gating_output),
         e_score_correction_bias(e_score_correction_bias),
         scoring_mode(scoring_mode),
@@ -411,10 +384,7 @@ struct Fused_Grouped_Topk {
     } else if (scoring_mode == ScoringFunc::SIGMOID) {
       for (int e = 0; e < local_num; ++e) {
         float s = load_elems[e];
-        load_elems[e] = Sigmoid(s);
-      }
-      for (int e = 0; e < local_num; ++e) {
-        local_elems[e] = load_elems[e];
+        local_elems[e] = Sigmoid(s);
       }
     }
 
@@ -560,25 +530,14 @@ struct Fused_Grouped_Topk {
         if (!(topk_ids_local[i] >= 0 && topk_ids_local[i] < experts)) {
           // Ensure valid index
           topk_ids[offset + i] = 0;
-          offsets[offset + i] = 0;
           continue;
         }
         topk_ids[offset + i] = topk_ids_local[i];
-        auto ref_num_tokens = sycl::atomic_ref<
-            int,
-            sycl::memory_order_relaxed,
-            sycl::memory_scope_device,
-            sycl::access::address_space::global_space>(
-            *(rows_for_experts + topk_ids_local[i]));
-        int old = ref_num_tokens.fetch_add(1);
-        offsets[offset + i] = old;
       }
     }
   }
   float* topk_weights;
   int* topk_ids;
-  int* rows_for_experts;
-  int* offsets;
   const T* gating_output;
   const T* e_score_correction_bias;
   const ScoringFunc scoring_mode;
@@ -595,8 +554,6 @@ void launch_fused_grouped_topk(
     sycl::queue& queue,
     float* topk_weights,
     int* topk_ids,
-    int* rows_for_experts,
-    int* offsets,
     const T* gating_output,
     const T* e_score_correction_bias,
     const ScoringFunc scoring_mode,
@@ -613,8 +570,6 @@ void launch_fused_grouped_topk(
     Kernel task(
         topk_weights,
         topk_ids,
-        rows_for_experts,
-        offsets,
         gating_output,
         e_score_correction_bias,
         scoring_mode,
@@ -633,8 +588,6 @@ template <typename T>
 void fused_grouped_topk(
     float* topk_weights,
     int* topk_ids,
-    int* rows_for_experts,
-    int* offsets,
     const T* gating_output,
     const T* e_score_correction_bias,
     const ScoringFunc scoring_mode,
@@ -664,8 +617,6 @@ void fused_grouped_topk(
         queue,                       \
         topk_weights,                \
         topk_ids,                    \
-        rows_for_experts,            \
-        offsets,                     \
         gating_output,               \
         e_score_correction_bias,     \
         scoring_mode,                \
@@ -763,7 +714,8 @@ struct MoEScatter {
       T* reordered_activation,
       int* mapped_slot,
       const int n_tokens,
-      const int n_experts,
+      const int experts_offset,
+      const int n_experts_local,
       const int n_channels)
       : activations(activations),
         rows_for_experts(rows_for_experts),
@@ -772,7 +724,8 @@ struct MoEScatter {
         reordered_activation(reordered_activation),
         mapped_slot(mapped_slot),
         n_tokens(n_tokens),
-        n_experts(n_experts),
+        experts_offset(experts_offset),
+        n_experts_local(n_experts_local),
         n_channels(n_channels) {}
 
   /**
@@ -805,15 +758,15 @@ struct MoEScatter {
     auto& expert_cumsum_ptr = *expert_cumsum;
 
     int expert_val = 0;
-    if (local_id < n_experts)
+    if (local_id < n_experts_local)
       expert_val = rows_for_experts[local_id];
 
-    if (n_experts <= SgSize)
+    if (n_experts_local <= SgSize)
       expert_val = sub_group_inclusive_scan<int, SgSize>(item, expert_val);
     else
       expert_val = group_inclusive_scan<int, NumSg, SgSize>(item, expert_val);
 
-    if (local_id < n_experts)
+    if (local_id < n_experts_local)
       expert_cumsum_ptr[local_id] = expert_val;
     item.barrier(sycl::access::fence_space::local_space);
 
@@ -825,7 +778,11 @@ struct MoEScatter {
 
     int expert_row_offset[TopK];
     for (int i = 0; i < TopK; ++i) {
-      int expert_id = indices[i];
+      if (expert_local_offset[i] == -1) {
+        expert_row_offset[i] = -1;
+        continue;
+      }
+      int expert_id = indices[i] - experts_offset;
       int start_offset = expert_id == 0 ? 0 : expert_cumsum_ptr[expert_id - 1];
       expert_row_offset[i] = start_offset + expert_local_offset[i];
     }
@@ -834,8 +791,12 @@ struct MoEScatter {
         activations + token_id * n_channels + local_id * ElemsPerItem;
     T* reordered_activation_bases[TopK];
     for (int i = 0; i < TopK; ++i) {
-      reordered_activation_bases[i] = reordered_activation +
-          expert_row_offset[i] * n_channels + local_id * ElemsPerItem;
+      if (expert_local_offset[i] == -1) {
+        reordered_activation_bases[i] = nullptr;
+      } else {
+        reordered_activation_bases[i] = reordered_activation +
+            expert_row_offset[i] * n_channels + local_id * ElemsPerItem;
+      }
     }
 
     constexpr int stride = GroupWorkItem * ElemsPerItem;
@@ -848,6 +809,8 @@ struct MoEScatter {
         data = *(reinterpret_cast<const load_type*>(
             activation_base + loop * stride));
         for (int i = 0; i < TopK; ++i) {
+          if (expert_local_offset[i] == -1)
+            continue;
           *(reinterpret_cast<load_type*>(
               reordered_activation_bases[i] + loop * stride)) = data;
         }
@@ -866,7 +829,8 @@ struct MoEScatter {
   T* reordered_activation;
   int* mapped_slot; // [n_tokens, num_top_k]
   const int n_tokens;
-  const int n_experts;
+  const int experts_offset;
+  const int n_experts_local;
   const int n_channels;
 };
 
@@ -877,6 +841,7 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
   static constexpr int SgSize = 16;
   static constexpr int NumSg = GroupWorkItem / SgSize;
   static constexpr int ElemsPerItem = sizeof(float) * 4 / sizeof(T);
+
   MoEScatter(
       const T* activations,
       const int* rows_for_experts,
@@ -885,7 +850,8 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
       T* reordered_activation,
       int* mapped_slot,
       const int n_tokens,
-      const int n_experts,
+      const int experts_offset,
+      const int n_experts_local,
       const int n_channels)
       : activations(activations),
         rows_for_experts(rows_for_experts),
@@ -894,7 +860,8 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
         reordered_activation(reordered_activation),
         mapped_slot(mapped_slot),
         n_tokens(n_tokens),
-        n_experts(n_experts),
+        experts_offset(experts_offset),
+        n_experts_local(n_experts_local),
         n_channels(n_channels) {}
 
   /**
@@ -927,15 +894,15 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
     auto& expert_cumsum_ptr = *expert_cumsum;
 
     int expert_val = 0;
-    if (local_id < n_experts)
+    if (local_id < n_experts_local)
       expert_val = rows_for_experts[local_id];
 
-    if (n_experts <= SgSize)
+    if (n_experts_local <= SgSize)
       expert_val = sub_group_inclusive_scan<int, SgSize>(item, expert_val);
     else
       expert_val = group_inclusive_scan<int, NumSg, SgSize>(item, expert_val);
 
-    if (local_id < n_experts)
+    if (local_id < n_experts_local)
       expert_cumsum_ptr[local_id] = expert_val;
     item.barrier(sycl::access::fence_space::local_space);
 
@@ -947,7 +914,11 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
 
     int expert_row_offset[TopK];
     for (int i = 0; i < TopK; ++i) {
-      int expert_id = indices[i];
+      if (expert_local_offset[i] == -1) {
+        expert_row_offset[i] = -1;
+        continue;
+      }
+      int expert_id = indices[i] - experts_offset;
       int start_offset = expert_id == 0 ? 0 : expert_cumsum_ptr[expert_id - 1];
       expert_row_offset[i] = start_offset + expert_local_offset[i];
     }
@@ -956,26 +927,28 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
         activations + token_id * n_channels + local_id * ElemsPerItem;
     T* reordered_activation_bases[TopK];
     for (int i = 0; i < TopK; ++i) {
-      reordered_activation_bases[i] = reordered_activation +
-          expert_row_offset[i] * n_channels + local_id * ElemsPerItem;
+      if (expert_local_offset[i] == -1) {
+        reordered_activation_bases[i] = nullptr;
+      } else {
+        reordered_activation_bases[i] = reordered_activation +
+            expert_row_offset[i] * n_channels + local_id * ElemsPerItem;
+      }
     }
 
     constexpr int stride = GroupWorkItem * ElemsPerItem;
     const int loop_count = (n_channels + stride - 1) / stride;
 
     for (int loop = 0; loop < loop_count; ++loop) {
+      using load_type = sycl::vec<T, ElemsPerItem>;
+      load_type data;
       if (loop * stride + local_id * ElemsPerItem < n_channels) {
-        T data[ElemsPerItem];
-#pragma unroll
-        for (int j = 0; j < ElemsPerItem; ++j) {
-          data[j] = *(activation_base + loop * stride + j);
-        }
-#pragma unroll
+        data = *(reinterpret_cast<const load_type*>(
+            activation_base + loop * stride));
         for (int i = 0; i < TopK; ++i) {
-#pragma unroll
-          for (int j = 0; j < ElemsPerItem; ++j) {
-            *(reordered_activation_bases[i] + loop * stride + j) = data[j];
-          }
+          if (expert_local_offset[i] == -1)
+            continue;
+          *(reinterpret_cast<load_type*>(
+              reordered_activation_bases[i] + loop * stride)) = data;
         }
       }
     }
@@ -985,7 +958,6 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
       }
     }
   }
-
   const T* activations; // [n_tokens, n_channels]
   const int* rows_for_experts; // [n_experts]
   const int* topk_indices; // [n_tokens, num_top_k]
@@ -993,7 +965,8 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
   T* reordered_activation;
   int* mapped_slot; // [n_tokens, num_top_k]
   const int n_tokens;
-  const int n_experts;
+  const int experts_offset;
+  const int n_experts_local;
   const int n_channels;
 };
 
@@ -1006,12 +979,13 @@ void launch_moe_scatter(
     T* reordered_activation,
     int* mapped_slot,
     const int n_tokens,
-    const int n_experts,
+    const int experts_offset,
+    const int n_experts_local,
     const int n_channels) {
   using Kernel = MoEScatter<TopK, T>;
   // TODO: maybe add template for GroupWorkItem in the future
   TORCH_CHECK(
-      Kernel::GroupWorkItem >= n_experts,
+      Kernel::GroupWorkItem >= n_experts_local,
       "MoEScatter::GroupWorkItem is expected to be larger than num_expert");
   TORCH_CHECK(
       n_channels % Kernel::ElemsPerItem == 0,
@@ -1029,7 +1003,8 @@ void launch_moe_scatter(
         reordered_activation,
         mapped_slot,
         n_tokens,
-        n_experts,
+        experts_offset,
+        n_experts_local,
         n_channels);
     cgh.parallel_for(range, task);
   };
@@ -1045,7 +1020,8 @@ void moe_scatter(
     T* reordered_activation,
     int* mapped_slot,
     const int n_tokens,
-    const int n_experts,
+    const int experts_offset,
+    const int n_experts_local,
     const int n_channels,
     const int n_topk) {
 #define CASE_TOPK(K)          \
@@ -1058,7 +1034,8 @@ void moe_scatter(
         reordered_activation, \
         mapped_slot,          \
         n_tokens,             \
-        n_experts,            \
+        experts_offset,       \
+        n_experts_local,      \
         n_channels);          \
     break;
   switch (n_topk) {
@@ -1148,6 +1125,8 @@ struct MoEGather {
     const T* moe_output_bases[TopK];
 #pragma unroll
     for (int i = 0; i < TopK; i++) {
+      if (token_mapped_slots[i] == -1)
+        continue;
       moe_output_bases[i] =
           moe_output + token_mapped_slots[i] * n_channels + channel_offset;
     }
@@ -1165,6 +1144,8 @@ struct MoEGather {
 
 #pragma unroll
         for (int j = 0; j < TopK; j++) {
+          if (token_mapped_slots[j] == -1)
+            continue;
           sycl::vec<T, ElemsPerItem> reg_buffer;
           reg_buffer = *(reinterpret_cast<const sycl::vec<T, ElemsPerItem>*>(
               moe_output_bases[j] + i * Stride));
@@ -1270,6 +1251,8 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
     const T* moe_output_bases[TopK];
 #pragma unroll
     for (int i = 0; i < TopK; i++) {
+      if (token_mapped_slots[i] == -1)
+        continue;
       moe_output_bases[i] =
           moe_output + token_mapped_slots[i] * n_channels + channel_offset;
     }
@@ -1287,11 +1270,11 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
 
 #pragma unroll
         for (int j = 0; j < TopK; j++) {
-          T reg_buffer[ElemsPerItem];
-#pragma unroll
-          for (int k = 0; k < ElemsPerItem; ++k) {
-            reg_buffer[k] = *(moe_output_bases[j] + i * Stride + k);
-          }
+          if (token_mapped_slots[j] == -1)
+            continue;
+          sycl::vec<T, ElemsPerItem> reg_buffer;
+          reg_buffer = *(reinterpret_cast<const sycl::vec<T, ElemsPerItem>*>(
+              moe_output_bases[j] + i * Stride));
 
 #pragma unroll
           for (int k = 0; k < ElemsPerItem; k++) {
@@ -1300,14 +1283,13 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
           }
         }
 
-        T store_buffer[ElemsPerItem];
+        sycl::vec<T, ElemsPerItem> store_buffer;
+#pragma unroll
         for (int j = 0; j < ElemsPerItem; j++) {
           store_buffer[j] = static_cast<T>(accum_buffer[j]);
         }
-#pragma unroll
-        for (int j = 0; j < ElemsPerItem; j++) {
-          layer_output_base[i * Stride + j] = store_buffer[j];
-        }
+        *(reinterpret_cast<sycl::vec<T, ElemsPerItem>*>(
+            layer_output_base + i * Stride)) = store_buffer;
       }
     }
   }
@@ -1488,7 +1470,7 @@ void moe_sum(
  * @return A tuple of tensors (topk_weights, topk_indices, rows_for_experts,
  * offsets).
  */
-static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
+static std::tuple<at::Tensor, at::Tensor> topk_softmax(
     const Tensor& gating_output,
     const int64_t n_topk,
     const bool renormalize) {
@@ -1506,15 +1488,11 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
       "n_experts only support up to 128, but got ",
       n_experts);
 
-  int n_experts_aligned = (n_experts + 7) / 8 * 8; // align to 8
   auto topk_weights =
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
-  auto rows_for_experts =
-      at::zeros({n_experts_aligned}, at::dtype(at::kInt).device(at::kXPU));
-  auto offsets =
-      at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
+
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::kBFloat16,
       at::kHalf,
@@ -1525,15 +1503,13 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
             reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
             reinterpret_cast<float*>(topk_weights.data_ptr()),
             reinterpret_cast<int*>(topk_indices.data_ptr()),
-            reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-            reinterpret_cast<int*>(offsets.data_ptr()),
             renormalize,
             n_tokens,
             n_experts,
             n_topk);
       });
 
-  return std::make_tuple(topk_weights, topk_indices, rows_for_experts, offsets);
+  return std::make_tuple(topk_weights, topk_indices);
 }
 
 /**
@@ -1544,7 +1520,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> topk_softmax(
  * @return A tuple of tensors (topk_weights, topk_indices, rows_for_experts,
  * offsets).
  */
-static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
+static std::tuple<at::Tensor, at::Tensor> grouped_topk(
     const Tensor& hidden_states,
     const Tensor& gating_output,
     const int64_t n_topk,
@@ -1589,18 +1565,12 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
       at::empty({n_tokens, n_topk}, at::dtype(at::kFloat).device(at::kXPU));
   auto topk_indices =
       at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
-  auto rows_for_experts =
-      at::zeros({n_experts_aligned}, at::dtype(at::kInt).device(at::kXPU));
-  auto offsets =
-      at::empty({n_tokens, n_topk}, at::dtype(at::kInt).device(at::kXPU));
 
   if (gating_output.scalar_type() == at::kBFloat16) {
     using scalar_t = sycl::ext::oneapi::bfloat16;
     GroupedTopKImpl::fused_grouped_topk<scalar_t>(
         reinterpret_cast<float*>(topk_weights.data_ptr()),
         reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1616,8 +1586,6 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
     GroupedTopKImpl::fused_grouped_topk<scalar_t>(
         reinterpret_cast<float*>(topk_weights.data_ptr()),
         reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1633,8 +1601,6 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
     GroupedTopKImpl::fused_grouped_topk<scalar_t>(
         reinterpret_cast<float*>(topk_weights.data_ptr()),
         reinterpret_cast<int*>(topk_indices.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
-        reinterpret_cast<int*>(offsets.data_ptr()),
         reinterpret_cast<scalar_t*>(gating_output.data_ptr()),
         bias.has_value() ? reinterpret_cast<scalar_t*>(bias->data_ptr())
                          : nullptr,
@@ -1646,7 +1612,7 @@ static std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> grouped_topk(
         n_expert_group,
         n_topk_group);
   }
-  return std::make_tuple(topk_weights, topk_indices, rows_for_experts, offsets);
+  return std::make_tuple(topk_weights, topk_indices);
 }
 
 /**
@@ -1668,7 +1634,8 @@ static std::tuple<at::Tensor, at::Tensor> moe_scatter(
     const Tensor& rows_for_experts, // [n_experts]
     const Tensor& topk_indices, //[n_tokens, n_topk]
     const Tensor& expert_offsets, //[n_tokens, n_topk]
-    const int64_t n_experts,
+    const int64_t experts_offset,
+    const int64_t n_experts_local,
     const int64_t n_topk) {
   auto shape = activation.sizes().vec();
   TORCH_CHECK(
@@ -1693,7 +1660,8 @@ static std::tuple<at::Tensor, at::Tensor> moe_scatter(
         reinterpret_cast<sycl::half*>(reordered_activation.data_ptr()),
         reinterpret_cast<int*>(mapped_slot.data_ptr()),
         n_tokens,
-        n_experts,
+        experts_offset,
+        n_experts_local,
         n_channels,
         n_topk);
   } else if (activation.scalar_type() == at::kBFloat16) {
@@ -1706,7 +1674,8 @@ static std::tuple<at::Tensor, at::Tensor> moe_scatter(
             reordered_activation.data_ptr()),
         reinterpret_cast<int*>(mapped_slot.data_ptr()),
         n_tokens,
-        n_experts,
+        experts_offset,
+        n_experts_local,
         n_channels,
         n_topk);
   } else {
@@ -1720,7 +1689,8 @@ static std::tuple<at::Tensor, at::Tensor> moe_scatter(
               reinterpret_cast<scalar_t*>(reordered_activation.data_ptr()),
               reinterpret_cast<int*>(mapped_slot.data_ptr()),
               n_tokens,
-              n_experts,
+              experts_offset,
+              n_experts_local,
               n_channels,
               n_topk);
         });
@@ -1829,6 +1799,6 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("grouped_topk.moe", at::AtenIpexTypeXPU::grouped_topk);
   IPEX_OP_REGISTER("moe_scatter.moe", at::AtenIpexTypeXPU::moe_scatter);
   IPEX_OP_REGISTER("moe_gather.moe", at::AtenIpexTypeXPU::moe_gather);
-  IPEX_OP_REGISTER("moe_sum.moe", at::AtenIpexTypeXPU::moe_sum)
+  IPEX_OP_REGISTER("moe_sum.moe", at::AtenIpexTypeXPU::moe_sum);
 }
 } // namespace

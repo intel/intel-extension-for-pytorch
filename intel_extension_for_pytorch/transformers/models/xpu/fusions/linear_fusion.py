@@ -117,6 +117,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         w2_bias=None,
         is_mxfp4=False,
         is_fp8=False,
+        experts_start_id=0,
     ):
         super().__init__()
         self.num_experts = W2.shape[0]
@@ -139,6 +140,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
 
         self.is_mxfp4 = is_mxfp4
         self.is_fp8 = is_fp8
+        self.experts_start_id = experts_start_id
 
         self.moe_gemm_using_native_impl = (
             os.environ.get("IPEX_MOE_GEMM_NATIVE", "0") == "1"
@@ -281,39 +283,42 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         """
 
         num_tokens, hidden_dim = hidden_states.shape
-        # --------- fusion:  topk softmax  -------------------
-        if not use_grouped_topk:
-            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-                torch.ops.torch_ipex.topk_softmax(router_logits, top_k, False)
-            )
-
-        # --------- fusion:  grouped topk  -------------------
-        elif use_grouped_topk:
-            routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-                torch.ops.torch_ipex.grouped_topk(
-                    hidden_states,
-                    router_logits,
-                    top_k,
-                    False,  # renormalize will be handled in moe_gather
-                    num_expert_group,
-                    topk_group,
-                    scoring_func,
-                    e_score_correction_bias,
-                )
-            )
 
         if custom_routing_function is not None:
-            # Ipex doesn't have op that can calculate rows_for_experts, expert_offsets.
-            # Different funcs should have same TopK and different softmax methods,
-            # so here uses softmax weights from custom_routing_function
-            # and selected_experts, rows_for_experts, expert_offsets from routine topk
-            routing_weights, _ = custom_routing_function(
+            routing_weights, selected_experts = custom_routing_function(
                 hidden_states=hidden_states,
                 gating_output=router_logits,
                 topk=top_k,
                 renormalize=False,  # renormalize will be handled in moe_gather
             )
             routing_weights = routing_weights.to(torch.float)
+            selected_experts = selected_experts.to(torch.int32)
+        # --------- fusion:  topk softmax  -------------------
+        elif not use_grouped_topk:
+            routing_weights, selected_experts = torch.ops.torch_ipex.topk_softmax(
+                router_logits, top_k, False
+            )
+
+        # --------- fusion:  grouped topk  -------------------
+        elif use_grouped_topk:
+            routing_weights, selected_experts = torch.ops.torch_ipex.grouped_topk(
+                hidden_states,
+                router_logits,
+                top_k,
+                False,  # renormalize will be handled in moe_gather
+                num_expert_group,
+                topk_group,
+                scoring_func,
+                e_score_correction_bias,
+            )
+        else:
+            raise ValueError(
+                "Either custom_routing_function or use_grouped_topk should be set."
+            )
+
+        rows_for_experts, expert_offsets = torch.ops.torch_ipex.moe_rows_counts(
+            selected_experts, self.experts_start_id, self.num_experts
+        )
 
         # --------- fusion: scatter + moegemm + gather -------------------
         # scatter hidden_states such that the token stride for each expert's input is contiguous
@@ -322,6 +327,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             rows_for_experts,
             selected_experts,
             expert_offsets,
+            self.experts_start_id,
             self.num_experts,
             top_k,
         )

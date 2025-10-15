@@ -211,8 +211,12 @@ class MixtralSparseMoeBlock(nn.Module):
         router_logits = self.moe_gate(hidden_states)
 
         # --------- fusion:  topk softmax  -------------------
-        routing_weights, selected_experts, rows_for_experts, expert_offsets = (
-            torch.ops.torch_ipex.topk_softmax(router_logits, self.top_k, False)
+        routing_weights, selected_experts = torch.ops.torch_ipex.topk_softmax(
+            router_logits, self.top_k, False
+        )
+
+        rows_for_experts, expert_offsets = torch.ops.torch_ipex.moe_rows_counts(
+            selected_experts, 0, self.num_experts
         )
 
         # --------- fusion: scatter + moegemm + gather -------------------
@@ -222,6 +226,7 @@ class MixtralSparseMoeBlock(nn.Module):
             rows_for_experts,
             selected_experts,
             expert_offsets,
+            0,
             self.num_experts,
             self.top_k,
         )

@@ -249,7 +249,7 @@ class MoELayerMxfp4(torch.nn.Module):
         scoring_func="sigmoid",
     ) -> torch.Tensor:
         if use_grouped_topk:
-            routing_weights, selected_experts, _, _ = torch.ops.torch_ipex.grouped_topk(
+            routing_weights, selected_experts = torch.ops.torch_ipex.grouped_topk(
                 hidden_states,
                 router_logits,
                 self.top_k,
@@ -261,7 +261,7 @@ class MoELayerMxfp4(torch.nn.Module):
             )
             selected_experts = selected_experts.to(torch.int64)
         else:
-            routing_weights, selected_experts, _, _ = torch.ops.torch_ipex.topk_softmax(
+            routing_weights, selected_experts = torch.ops.torch_ipex.topk_softmax(
                 router_logits, self.top_k, False
             )
             routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
