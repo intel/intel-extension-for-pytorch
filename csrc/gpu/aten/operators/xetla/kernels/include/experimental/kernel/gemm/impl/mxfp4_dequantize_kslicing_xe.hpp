@@ -490,6 +490,7 @@ class persistent_mxfp4_group_gemm_universal_t {
     /// @brief Is the size of the n dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_n;
+    uint32_t matrix_n_pad;
     /// @brief Is the base address of matrix A.
     matA_base_t matA_base;
     /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
@@ -560,6 +561,7 @@ class persistent_mxfp4_group_gemm_universal_t {
           expert_num(expert_num_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
+          matrix_n_pad((matrix_n_ + wg_tile_n - 1) / wg_tile_n * wg_tile_n),
           matA_base(matA_base_),
           matA_ld(matA_ld_),
           matB_base(matB_base_),
@@ -576,6 +578,7 @@ class persistent_mxfp4_group_gemm_universal_t {
           expert_num(args.expert_num),
           matrix_k(args.matrix_k),
           matrix_n(args.matrix_n),
+          matrix_n_pad(args.matrix_n_pad),
           matA_base(args.matA_base),
           matA_ld(args.matA_ld),
           matB_base(args.matB_base),
@@ -595,6 +598,7 @@ class persistent_mxfp4_group_gemm_universal_t {
       this->expert_num = args.expert_num;
       this->matrix_k = args.matrix_k;
       this->matrix_n = args.matrix_n;
+      this->matrix_n_pad = args.matrix_n_pad;
       this->matA_base = args.matA_base;
       this->matA_ld = args.matA_ld;
       this->matB_base = args.matB_base;
@@ -708,9 +712,8 @@ class persistent_mxfp4_group_gemm_universal_t {
 
     int atomic_slm_offset = gemm_slm_size + epilogue_slm_size;
 
-    int matrix_n_pad = (args.matrix_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n;
-    int start_n = (group_id * wg_tile_n) % matrix_n_pad;
-    int group_m_id = (group_id * wg_tile_n) / matrix_n_pad;
+    int start_n = (group_id * wg_tile_n) % args.matrix_n_pad;
+    int group_m_id = (group_id * wg_tile_n) / args.matrix_n_pad;
 
     int expert_id = 0;
     int expert_m_id = group_m_id;
@@ -881,8 +884,8 @@ class persistent_mxfp4_group_gemm_universal_t {
         item.barrier(sycl::access::fence_space::local_space);
         group_id = __ESIMD_NS::slm_block_load<int, 1>(atomic_slm_offset)[0];
         group_id += group_range;
-        start_n = (group_id * wg_tile_n) % matrix_n_pad;
-        group_m_id = (group_id * wg_tile_n) / matrix_n_pad;
+        start_n = (group_id * wg_tile_n) % args.matrix_n_pad;
+        group_m_id = (group_id * wg_tile_n) / args.matrix_n_pad;
       }
       pre_rows = cumsum_rows_for_experts[load_expert_num - 1];
       pre_tiles = cumsum_tiles_for_experts[load_expert_num - 1];

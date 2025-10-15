@@ -503,6 +503,7 @@ struct PesistantMoEGEMM {
         weights(weights),
         outputs(outputs),
         gemm_n(gemm_n),
+        gemm_n_pad((gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n),
         gemm_k(gemm_k),
         total_rows_for_each_expert(total_rows_for_each_expert),
         atomic_buffer(atomic_buffer),
@@ -519,7 +520,6 @@ struct PesistantMoEGEMM {
 
   void operator()(sycl::nd_item<3> item) const SYCL_ESIMD_KERNEL {
     int group_id = item.get_group_linear_id();
-    int gemm_n_pad = (gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n;
     int group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
     int group_range = item.get_group_range(1);
 
@@ -638,6 +638,7 @@ struct PesistantMoEGEMM {
   const T* weights;
   T* outputs;
   const int gemm_n;
+  const int gemm_n_pad;
   const int gemm_k;
   const int* total_rows_for_each_expert;
   int* atomic_buffer;
@@ -733,6 +734,7 @@ struct PesistantMoEGEMMFP8 {
         scale(scale),
         outputs(outputs),
         gemm_n(gemm_n),
+        gemm_n_pad((gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n),
         gemm_k(gemm_k),
         total_rows_for_each_expert(total_rows_for_each_expert),
         atomic_buffer(atomic_buffer),
@@ -749,7 +751,6 @@ struct PesistantMoEGEMMFP8 {
 
   void operator()(sycl::nd_item<3> item) const SYCL_ESIMD_KERNEL {
     int group_id = item.get_group_linear_id();
-    int gemm_n_pad = (gemm_n + wg_tile_n - 1) / wg_tile_n * wg_tile_n;
     int group_m_id = (group_id * wg_tile_n) / gemm_n_pad;
     int group_range = item.get_group_range(1);
 
@@ -873,6 +874,7 @@ struct PesistantMoEGEMMFP8 {
   const float* scale;
   T* outputs;
   const int gemm_n;
+  const int gemm_n_pad;
   const int gemm_k;
   const int* total_rows_for_each_expert;
   int* atomic_buffer;
