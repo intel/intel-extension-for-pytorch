@@ -35,8 +35,6 @@ export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMA
 python setup.py install
 cd ..
 
-pip install torchao --index-url https://download.pytorch.org/whl/nightly/ --force-reinstall
-
 # Build sgl-kernel
 conda install -y libnuma numactl
 
@@ -94,7 +92,7 @@ python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --
 python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 # FP8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
+SGLANG_LLAMA_BRGEMM_FP8A8=1 python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
 
 ```
 

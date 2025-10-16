@@ -58,6 +58,7 @@ then
 elif [[ "${PRECISION}" == "fp8" ]]
 then
     precision="fp8"
+    export SGLANG_LLAMA_BRGEMM_FP8A8=1
     echo "### running fp8 mode"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
