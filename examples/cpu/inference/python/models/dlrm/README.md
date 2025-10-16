@@ -25,12 +25,11 @@ pip install mkl-static mkl-include
 python setup.py install
 cd ..
 
-git clone https://github.com/LifengWang/ao.git
+git clone https://github.com/pytorch/ao.git
 cd ao
-git checkout dlrm_v2
 git submodule sync
 git submodule update --init --recursive
-python setup.py install
+USE_CPU_KERNELS=1 python setup.py install
 cd ..
 
 conda install jemalloc

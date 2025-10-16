@@ -1,24 +1,28 @@
 import torch
 import torchao  # noqa: F401
-from torch.nn import functional as F
+
+quantize_affine_float8_non_decomposed = (
+    torch.ops.torchao.quantize_affine_float8_non_decomposed.default
+)
+dequantize_affine_float8_non_decomposed = (
+    torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+)
 
 
 def inc_convert(model, dtype):
     def dequantize_per_tensor(
         tensor: torch.Tensor, scale: float, output_dtype: torch.dtype
     ) -> torch.Tensor:
-        res = torch.ops.torchao.dequantize_affine_float8(
+        res = dequantize_affine_float8_non_decomposed(
             tensor=tensor, scale=torch.tensor([scale]), output_dtype=torch.float
         )
-        if output_dtype != torch.float:
-            res = res.to(output_dtype)
         return res
 
     def quantize_per_tensor(
         tensor: torch.Tensor,
         scale: float,
     ) -> torch.Tensor:
-        return torch.ops.torchao.quantize_affine_float8(
+        return quantize_affine_float8_non_decomposed(
             tensor=tensor,
             scale=torch.tensor([scale]),
             float8_dtype=torch.float8_e4m3fn,
@@ -27,6 +31,7 @@ def inc_convert(model, dtype):
     class FP8QDQLinear(torch.nn.Module):
         def __init__(self, in_features, out_features):
             super().__init__()
+            self.qtype = torch.float8_e4m3fn
             self.weight = torch.empty(
                 (out_features, in_features),
             )
@@ -35,20 +40,27 @@ def inc_convert(model, dtype):
             self.bias = None
 
         def forward(self, input):
-            weight = dequantize_per_tensor(
-                tensor=self.weight.data, scale=self.weight_scale, output_dtype=dtype
+            dtype = input.dtype
+            weight = dequantize_affine_float8_non_decomposed(
+                self.weight.data,
+                torch.tensor([self.weight_scale]),
+                torch.float,
             )
+            weight = weight.to(dtype)
 
-            q_input = quantize_per_tensor(
-                tensor=input,
-                scale=self.scale,
+            q_input = quantize_affine_float8_non_decomposed(
+                input,
+                torch.tensor([self.scale]),
+                self.qtype,
             )
-            dq_input = dequantize_per_tensor(
-                tensor=q_input, scale=self.scale, output_dtype=dtype
+            dq_input = dequantize_affine_float8_non_decomposed(
+                q_input,
+                torch.tensor([self.scale]),
+                torch.float,
             )
+            dq_input = dq_input.to(dtype)
 
             out = torch.nn.functional.linear(dq_input, weight, self.bias)
-
             return out
 
     class FP8QDQEmbeddingBag(torch.nn.Module):
@@ -81,24 +93,14 @@ def inc_convert(model, dtype):
             offsets=None,
             per_sample_weights=None,
         ):
-            weight = dequantize_per_tensor(
-                tensor=self.weight.data,
-                scale=self.weight_scale,
-                output_dtype=dtype,
-            )
-
-            return F.embedding_bag(
+            return torch.ops.torchao._scaled_embedding_bag(
+                self.weight.data,
                 input,
-                weight,
                 offsets,
-                self.max_norm,
-                self.norm_type,
-                self.scale_grad_by_freq,
-                self.mode,
-                self.sparse,
-                per_sample_weights,
-                self.include_last_offset,
-                self.padding_idx,
+                torch.tensor([self.weight_scale]),
+                1.0,
+                0,
+                True,
             )
 
     hook_handles = []
@@ -124,17 +126,19 @@ def inc_convert(model, dtype):
     with torch.no_grad():
         for name, mod in model.model.named_modules():
             mod_type_str = mod.__class__.__name__
-            print(mod_type_str)
-            # QEmbeddingBag not support yet
             if mod_type_str not in [
                 "Linear",
+                "EmbeddingBag",
             ]:
                 continue
             if name not in data:
                 continue
             print(mod_type_str, name)
             param = mod.weight
-            xmax = torch.max(param)
+            if mod_type_str == "Linear":
+                xmax = torch.max(param)
+            else:
+                xmax = torch.max(torch.abs(param))
             weight_scale = xmax / torch.finfo(torch.float8_e4m3fn).max
             mod.weight_scale = weight_scale
             q_param = torch.clamp(
@@ -146,7 +150,6 @@ def inc_convert(model, dtype):
             if mod_type_str in ["Linear"]:
                 scale = [i / torch.finfo(torch.float8_e4m3fn).max for i in data[name]]
                 assert len(scale) == 1
-                # setattr(mod, "scale", scale[0])
                 patched_mod = FP8QDQLinear(mod.in_features, mod.out_features)
                 patched_mod.bias = mod.bias
                 patched_mod.scale = scale[0]
