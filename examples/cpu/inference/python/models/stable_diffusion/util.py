@@ -28,17 +28,17 @@ class FP8QDQLinear(torch.nn.Module):
         self.bias = None
 
     def forward(self, input):
-        weight = torch.ops.torchao.dequantize_affine_float8(
+        weight = torch.ops.torchao.dequantize_affine_float8_non_decomposed.default(
             tensor=self.weight.data,
             scale=torch.tensor([self.weight_scale]),
             output_dtype=torch.float,
         )
-        q_input = torch.ops.torchao.quantize_affine_float8(
+        q_input = torch.ops.torchao.quantize_affine_float8_non_decomposed.default(
             tensor=input,
             scale=torch.tensor([self.scale]),
             float8_dtype=self.qtype,
         )
-        dq_input = torch.ops.torchao.dequantize_affine_float8(
+        dq_input = torch.ops.torchao.dequantize_affine_float8_non_decomposed.default(
             tensor=q_input,
             scale=torch.tensor([self.scale]),
             output_dtype=torch.float,

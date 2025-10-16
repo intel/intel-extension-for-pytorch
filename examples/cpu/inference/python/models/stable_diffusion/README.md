@@ -20,9 +20,8 @@
     ```
 3. Install TorchAO
     ```
-    git clone https://github.com/shiyang-weng/ao.git
+    git clone https://github.com/pytorch/ao.git
     cd ao
-    git checkout wengshiy/qlinear
     python setup.py install
     ```
 4. Run setup.sh
