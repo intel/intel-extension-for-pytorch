@@ -69,6 +69,28 @@ struct paged_attention_fwd_kernel_args_t {
   void* query;
   void* key_cache;
   void* value_cache;
+  void* sinks;
+  void* alibi_slopes;
+  void* block_tables;
+  void* context_lens;
+  uint32_t num_queries_per_tokens;
+  float sm_scale;
+  uint32_t num_seqs;
+  uint32_t num_heads;
+  uint32_t num_kv_heads;
+  uint32_t head_size;
+  uint32_t block_size;
+  uint32_t max_blocks_per_seq;
+  uint32_t max_context_len;
+  float softcap = -1.;
+};
+
+struct paged_attention_loop_fwd_kernel_args_t {
+  void* out;
+  void* query;
+  void* key_cache;
+  void* value_cache;
+  void* sinks;
   void* alibi_slopes;
   void* block_tables;
   void* context_lens;
@@ -190,6 +212,16 @@ XETLA_KERNEL_API cgfs_t paged_attention_v2(
     gpu_arch arch_tag,
     XetlaType xeType,
     paged_attention_fwd_kernel_args_t args);
+
+XETLA_KERNEL_API cgfs_t paged_attention_vllm(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    paged_attention_fwd_kernel_args_t args);
+
+XETLA_KERNEL_API cgfs_t paged_attention_loop_vllm(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    paged_attention_loop_fwd_kernel_args_t args);
 
 XETLA_KERNEL_API cgfs_t chunked_prefill_slice_kv(
     gpu_arch arch_tag,

@@ -20,7 +20,9 @@
 #include "blocked_attention_kernel.hpp"
 #include "blocked_attention_policy.hpp"
 #include "paged_attention_kernel.hpp"
+#include "paged_attention_kernel_vllm.hpp"
 #include "paged_attention_policy.hpp"
+#include "paged_attention_policy_vllm.hpp"
 #include "xetla.hpp"
 
 namespace gpu::xetla {

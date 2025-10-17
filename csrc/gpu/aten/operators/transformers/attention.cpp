@@ -25,6 +25,8 @@
 #include <ATen/DeviceGuard.h>
 #include <ATen/core/op_registration/adaption.h>
 
+#include <iostream>
+
 using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -1504,6 +1506,7 @@ Tensor xetla_paged_attention_impl_v1(
        reinterpret_cast<void*>(query.data_ptr()),
        reinterpret_cast<void*>(key_cache.data_ptr()),
        reinterpret_cast<void*>(value_cache.data_ptr()),
+       nullptr,
        alibi_slopes.has_value() ? alibi_slopes.value().data_ptr()
                                 : (void*)nullptr,
        reinterpret_cast<void*>(block_tables.data_ptr()),
@@ -1607,6 +1610,7 @@ Tensor xetla_paged_attention_impl_v2(
        reinterpret_cast<void*>(query.data_ptr()),
        reinterpret_cast<void*>(key_cache.data_ptr()),
        reinterpret_cast<void*>(value_cache.data_ptr()),
+       nullptr,
        alibi_slopes.has_value() ? alibi_slopes.value().data_ptr()
                                 : (void*)nullptr,
        reinterpret_cast<void*>(block_tables.data_ptr()),
@@ -1859,7 +1863,7 @@ Tensor chunked_prefill(
       at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
 
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
-  constexpr const int partition_sizee = 512;
+  constexpr const int partition_size = 512;
 
 #if defined(USE_XETLA)
   TORCH_CHECK(
@@ -1867,7 +1871,84 @@ Tensor chunked_prefill(
       "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
-  if (block_size >= 64) {
+  // decode path, we may use 4k as threshold
+  uint32_t num_queries_per_token = num_heads_q / num_heads_k;
+  if (max_seqlen_q == 1 && block_size == 64 &&
+      (head_dim == 128 || head_dim == 64) && num_queries_per_token <= 8 &&
+      !alibi_slopes_.has_value() && softcap <= 0.0 && window_size_left < 0 &&
+      window_size_right < 0) {
+    constexpr const uint32_t long_context_decode = 4096;
+    const float softmax_scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+    int32_t wg_size = head_dim / 16;
+    int32_t seq_partition_size = block_size * wg_size;
+    int32_t num_partitions =
+        (max_seqlen_k + seq_partition_size - 1) / seq_partition_size;
+    // use long context decode kernel
+    if ((max_seqlen_k >= long_context_decode || num_tokens < 16 ||
+         num_heads_k < 2) &&
+        max_seqlen_k > seq_partition_size) {
+      // create helper tensors
+
+      Tensor tmp_out = at::empty(
+          {num_tokens, num_heads_q, num_partitions, head_dim},
+          query.options().dtype(query.scalar_type()).device(query.device()));
+      Tensor max_logits = at::empty(
+          {num_tokens, num_heads_q, num_partitions},
+          query.options().dtype(at::kFloat).device(query.device()));
+      Tensor exp_sums = at::empty(
+          {num_tokens, num_heads_q, num_partitions},
+          query.options().dtype(at::kFloat).device(query.device()));
+
+      auto cgfs = gpu::xetla::paged_attention_vllm(
+          arch_tag,
+          xeType,
+          {max_logits.data_ptr<float>(),
+           exp_sums.data_ptr<float>(),
+           reinterpret_cast<void*>(tmp_out.data_ptr()),
+           reinterpret_cast<void*>(out_.data_ptr()),
+           reinterpret_cast<void*>(query.data_ptr()),
+           reinterpret_cast<void*>(key.data_ptr()),
+           reinterpret_cast<void*>(value.data_ptr()),
+           sink_.has_value() ? sink_.value().data_ptr() : (void*)nullptr,
+           (void*)nullptr,
+           reinterpret_cast<void*>(block_table.data_ptr()),
+           reinterpret_cast<void*>(cu_seqlens_k.data_ptr()),
+           num_queries_per_token,
+           softmax_scale,
+           num_tokens,
+           num_heads_q,
+           num_heads_k,
+           head_dim,
+           block_size,
+           num_max_seq_block,
+           max_seqlen_k,
+           -1});
+      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+    } else {
+      auto cgfs = gpu::xetla::paged_attention_loop_vllm(
+          arch_tag,
+          xeType,
+          {reinterpret_cast<void*>(out_.data_ptr()),
+           reinterpret_cast<void*>(query.data_ptr()),
+           reinterpret_cast<void*>(key.data_ptr()),
+           reinterpret_cast<void*>(value.data_ptr()),
+           sink_.has_value() ? sink_.value().data_ptr() : (void*)nullptr,
+           (void*)nullptr,
+           reinterpret_cast<void*>(block_table.data_ptr()),
+           reinterpret_cast<void*>(cu_seqlens_k.data_ptr()),
+           num_queries_per_token,
+           softmax_scale,
+           num_tokens,
+           num_heads_q,
+           num_heads_k,
+           head_dim,
+           block_size,
+           num_max_seq_block,
+           max_seqlen_k,
+           -1});
+      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+    }
+  } else if (block_size >= 64) {
     auto cgfs = gpu::xetla::fmha_forward_kernel(
         arch_tag,
         xeType,
@@ -1920,7 +2001,7 @@ Tensor chunked_prefill(
          num_tokens}); // num_tokens
     DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
   } else {
-    constexpr const int partition_size = 512;
+    // constexpr const int partition_size = 512;
     int32_t num_partitions =
         (max_seqlen_k + partition_size - 1) / partition_size;
     if (max_seqlen_k > partition_size) {

@@ -5,7 +5,7 @@
 #include "include/common/core/arch_config.hpp"
 
 static const std::array ptl_device_list = {0xB0B0, 0xB082};
-static const std::array bmg_device_list = {0xE221};
+static const std::array bmg_device_list = {0xE221, 0xE222, 0xE223};
 
 namespace gpu::xetla {
 static inline gpu_arch get_device_gpu_arch() {

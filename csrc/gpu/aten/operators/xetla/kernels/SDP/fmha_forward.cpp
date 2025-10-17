@@ -87,7 +87,7 @@ class fmha_forward_kernel_policy {
       const fmha::dispatch_fmha_forward_args_t<T>& args) {
     // TODO: there should be more tuning here
     static constexpr uint32_t max_qhead_kv = 8;
-    static constexpr uint32_t kv_heads_limit = 2;
+    static constexpr uint32_t kv_heads_limit = 1;
     bool gqa_enabled = (args.num_queries == NUM_QUERIES_GREEDY) &&
         _load_using_fmha_v3() &&
         (args.num_kv_heads * max_qhead_kv >= args.num_heads);
