@@ -16,7 +16,7 @@ class TestTorchMethod:
 
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.parametrize("n_token", [2, 32, 4096])
-    @pytest.mark.parametrize("n_expert", [8, 32])
+    @pytest.mark.parametrize("n_expert", [8, 32, 512])
     @pytest.mark.parametrize("n_topk", [1, 2, 4, 8])
     def test_topk_softmax(self, dtype, n_token, n_topk, n_expert):
         gating_logits = torch.randn(n_token, n_expert, device=dpcpp_device)
@@ -24,15 +24,23 @@ class TestTorchMethod:
         ref_token_weights, ref_topk_indices = self.ref_topk_softmax(
             gating_logits, n_topk
         )
-        topk_weights, topk_indices = torch.ops.torch_ipex.topk_softmax(
-            gating_logits, n_topk, False
+
+        topk_weights = torch.empty(
+            n_token, n_topk, dtype=torch.float32, device=dpcpp_device
+        )
+        topk_ids = torch.empty(n_token, n_topk, dtype=torch.int32, device=dpcpp_device)
+        token_expert_indices = torch.empty(
+            n_token, n_topk, dtype=torch.int32, device=dpcpp_device
+        )
+        torch.ops.torch_ipex.topk_softmax(
+            topk_weights, topk_ids, token_expert_indices, gating_logits, False
         )
 
         # Compare the results
         torch.testing.assert_close(
             ref_token_weights, topk_weights, atol=1e-2, rtol=1e-2
         )
-        assert torch.equal(ref_topk_indices, topk_indices)
+        assert torch.equal(ref_topk_indices, topk_ids)
 
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
     @pytest.mark.parametrize("full_nan", [True, False])
@@ -55,9 +63,17 @@ class TestTorchMethod:
             )
             gating_logits[0][0] = float("nan")
 
-        topk_weights, topk_indices = torch.ops.torch_ipex.topk_softmax(
-            gating_logits, n_topk, False
+        topk_weights = torch.empty(
+            n_token, n_topk, dtype=torch.float32, device=dpcpp_device
+        )
+        topk_ids = torch.empty(n_token, n_topk, dtype=torch.int32, device=dpcpp_device)
+        token_expert_indices = torch.empty(
+            n_token, n_topk, dtype=torch.int32, device=dpcpp_device
         )
 
-        assert torch.all(topk_indices < n_expert)
-        assert torch.all(topk_indices >= 0)
+        torch.ops.torch_ipex.topk_softmax(
+            topk_weights, topk_ids, token_expert_indices, gating_logits, False
+        )
+
+        assert torch.all(topk_ids < n_expert)
+        assert torch.all(topk_ids >= 0)

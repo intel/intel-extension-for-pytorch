@@ -211,8 +211,22 @@ class MixtralSparseMoeBlock(nn.Module):
         router_logits = self.moe_gate(hidden_states)
 
         # --------- fusion:  topk softmax  -------------------
-        routing_weights, selected_experts = torch.ops.torch_ipex.topk_softmax(
-            router_logits, self.top_k, False
+        num_tokens = batch_size * sequence_length
+        routing_weights = torch.empty(
+            num_tokens, self.top_k, dtype=torch.float32, device=router_logits.device
+        )
+        selected_experts = torch.empty(
+            num_tokens, self.top_k, dtype=torch.int32, device=router_logits.device
+        )
+        token_expert_indices = torch.empty(
+            num_tokens, self.top_k, dtype=torch.int32, device=router_logits.device
+        )
+        torch.ops.torch_ipex.topk_softmax(
+            routing_weights,
+            selected_experts,
+            token_expert_indices,
+            router_logits,
+            False,
         )
 
         rows_for_experts, expert_offsets = torch.ops.torch_ipex.moe_rows_counts(

@@ -295,8 +295,21 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             selected_experts = selected_experts.to(torch.int32)
         # --------- fusion:  topk softmax  -------------------
         elif not use_grouped_topk:
-            routing_weights, selected_experts = torch.ops.torch_ipex.topk_softmax(
-                router_logits, top_k, False
+            routing_weights = torch.empty(
+                num_tokens, top_k, dtype=torch.float32, device=router_logits.device
+            )
+            selected_experts = torch.empty(
+                num_tokens, top_k, dtype=torch.int32, device=router_logits.device
+            )
+            token_expert_indices = torch.empty(
+                num_tokens, top_k, dtype=torch.int32, device=router_logits.device
+            )
+            torch.ops.torch_ipex.topk_softmax(
+                routing_weights,
+                selected_experts,
+                token_expert_indices,
+                router_logits,
+                False,
             )
 
         # --------- fusion:  grouped topk  -------------------
