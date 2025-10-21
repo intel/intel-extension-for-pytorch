@@ -133,7 +133,7 @@ class TestChunkedPrefill(TestCase):
         key = key[:, :max_seqlen_k, :, :]
         value = value[:, :max_seqlen_k, :, :]
 
-        seqlen_k = cu_seqlen_k[1:] - cu_seqlen_k[:-1]
+        seqlen_k = cu_seqlen_k
         seqlen_q = cu_seqlen_q[1:] - cu_seqlen_q[:-1]
         seqlen_q = seqlen_q.view(-1, 1)
         seqlen_k = seqlen_k.view(-1, 1)
@@ -322,7 +322,7 @@ class TestChunkedPrefill(TestCase):
         context_lens = [random.randint(1, max_seqlen) for _ in range(num_seqs)]
 
         max_seqlen_k = max(context_lens)
-        context_lens = [0] + context_lens
+        context_lens = context_lens
         context_lens = torch.tensor(context_lens, dtype=torch.int, device="cpu")
 
         # Create the block tables.NUM_PREFILL_SEQS
@@ -335,8 +335,8 @@ class TestChunkedPrefill(TestCase):
             ]
             block_tables.append(block_table)
         block_tables = torch.tensor(block_tables, dtype=torch.int, device="cpu")
-        cu_seqlen_k = torch.cumsum(context_lens, 0)
-        q_lens = context_lens[1:] if version == "chunked_prefill" else [1] * num_seqs
+        cu_seqlen_k = context_lens
+        q_lens = context_lens if version == "chunked_prefill" else [1] * num_seqs
         q_lens = [random.randint(1, max_lens) for max_lens in q_lens]
         max_seqlen_q = max(q_lens)
         q_lens = [0] + q_lens
@@ -434,7 +434,7 @@ class TestChunkedPrefill(TestCase):
         context_lens = [random.randint(1, max_seqlen) for _ in range(num_seqs)]
 
         max_seqlen_k = max(context_lens)
-        context_lens = [0] + context_lens
+        context_lens = context_lens
         context_lens = torch.tensor(context_lens, dtype=torch.int, device="cpu")
 
         # Create the block tables.NUM_PREFILL_SEQS
@@ -447,8 +447,8 @@ class TestChunkedPrefill(TestCase):
             ]
             block_tables.append(block_table)
         block_tables = torch.tensor(block_tables, dtype=torch.int, device="cpu")
-        cu_seqlen_k = torch.cumsum(context_lens, 0)
-        q_lens = context_lens[1:] if version == "chunked_prefill" else [1] * num_seqs
+        cu_seqlen_k = context_lens
+        q_lens = context_lens if version == "chunked_prefill" else [1] * num_seqs
         q_lens = [random.randint(1, max_lens) for max_lens in q_lens]
         max_seqlen_q = max(q_lens)
         q_lens = [0] + q_lens

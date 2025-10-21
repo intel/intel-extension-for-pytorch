@@ -1735,7 +1735,7 @@ Tensor chunked_prefill(
     const at::Tensor& value, // [num_blocks, block_size, key_heads, head_dim]
     Tensor& out_, // same as query
     const at::Tensor& cu_seqlens_q, // [batch + 1]
-    const at::Tensor& cu_seqlens_k, // [batch + 1]
+    const at::Tensor& cu_seqlens_k, // [batch]
     const c10::optional<at::Tensor>& seqused_k, // [batch]
     const at::Tensor& block_table, // [batch, num_max_seq_block]
     const c10::optional<at::Tensor>&

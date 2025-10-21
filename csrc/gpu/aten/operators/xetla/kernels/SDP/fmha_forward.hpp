@@ -358,14 +358,19 @@ class fmha_forward_t {
         mem_desc_Oi.init(
             args.O_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
 
+        // get current location for kv
+        kv_offset_y = 0;
+        for (int32_t i = 0; i <= static_cast<int32_t>(batch_id) - 1; ++i) {
+          kv_offset_y = kv_offset_y + args.cu_seqlen_k[i];
+        }
+
         // for local attention
         if constexpr (kIsLocal) {
           if constexpr (kIsCausal) {
             args.w_right = 0;
           }
           int32_t startF = item.get_group(1) * kBr;
-          uint32_t real_T =
-              args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+          uint32_t real_T = args.cu_seqlen_k[batch_id];
           uint32_t real_F =
               args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
           uint32_t seq_diff = real_T - real_F;
@@ -448,15 +453,14 @@ class fmha_forward_t {
                   [batch_id * args.max_blocks_per_seq + block_slot_offset];
           start_x = start_x_offset * args.block_size;
           // end_x = start_x + args.block_size;
-          int32_t seqlen =
-              args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+          int32_t seqlen = args.cu_seqlen_k[batch_id];
           int32_t remain_T = seqlen - startT;
           remain_T = remain_T < args.block_size ? remain_T : args.block_size;
           end_x = start_x + remain_T;
         } else {
-          start_x = startT + args.cu_seqlen_k[batch_id];
+          start_x = startT + kv_offset_y;
           end_x = start_x + kBc;
-          int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
+          int32_t limit_x = kv_offset_y + args.cu_seqlen_k[batch_id];
           end_x = end_x < limit_x ? end_x : limit_x;
         }
         int32_t start_acc = head_id * args.uNkv / args.uN * args.uH;
@@ -697,8 +701,7 @@ class fmha_forward_t {
     }
     uint32_t real_T = args.uT;
     if constexpr (kVarlen) {
-      real_T =
-          args.cu_seqlen_k[ctx.batch_id + 1] - args.cu_seqlen_k[ctx.batch_id];
+      real_T = args.cu_seqlen_k[ctx.batch_id];
     }
     uint32_t remainT = std::max(int(real_T) - int(sg_startT), 0);
     if constexpr (kIsLocal) {
@@ -1063,8 +1066,7 @@ class fmha_forward_t {
     int32_t actual_seqlen_k = 0;
     int32_t seqlen_diff = 0;
     if constexpr (kVarlen) {
-      actual_seqlen_k =
-          args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+      actual_seqlen_k = args.cu_seqlen_k[batch_id];
       seqlen_diff = actual_seqlen_k - actual_seqlen_q;
     }
 

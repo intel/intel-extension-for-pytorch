@@ -60,7 +60,7 @@ class paged_attention_kernel_vllm {
 
     // Index
     index_t* block_tables; // [num_seqs, max_blocks_per_seq]
-    index_t* context_lens; // [num_seqs + 1]
+    index_t* context_lens; // [num_seqs]
 
     // Softmax scale
     accum_t sm_scale;
@@ -204,7 +204,7 @@ class paged_attention_kernel_vllm {
         }
       }
 
-      context_len = args.context_lens[seq_id + 1] - args.context_lens[seq_id];
+      context_len = args.context_lens[seq_id];
       block_table = args.block_tables + seq_id * args.max_blocks_per_seq;
       num_blocks_per_sg = 0;
 
@@ -673,7 +673,7 @@ class paged_attention_reduce_vllm {
     scalar_t* tmp_out; // [num_seqs, num_heads, max_num_partitions, head_size]
     accum_t* max_logits; // [num_seqs, num_heads, max_num_partitions]
     accum_t* exp_sums; // [num_seqs, num_heads, max_num_partitions]
-    index_t* context_lens; // [num_seqs + 1]
+    index_t* context_lens; // [num_seqs]
 
     uint32_t num_seqs;
     uint32_t num_heads;
@@ -757,7 +757,7 @@ class paged_attention_reduce_vllm {
       sg_id = item.get_local_linear_id();
       seq_id = item.get_group(0);
       head_id = item.get_group(1);
-      context_len = args.context_lens[seq_id + 1] - args.context_lens[seq_id];
+      context_len = args.context_lens[seq_id];
 
       num_partitions = DIVIDE_ROUND_UP(context_len, partition_size);
       wg_partition_stride = wg_size * partition_stride;
@@ -1136,7 +1136,7 @@ class paged_attention_loop_kernel {
 
     // Index
     index_t* block_tables; // [num_seqs, max_blocks_per_seq]
-    index_t* context_lens; // [num_seqs + 1]
+    index_t* context_lens; // [num_seqs]
 
     // Softmax scale
     accum_t sm_scale;
@@ -1292,7 +1292,7 @@ class paged_attention_loop_kernel {
       kv_block_stride = args.num_kv_heads * max_head_size * block_size;
       kv_head_stride = max_head_size * kv_head_id;
 
-      context_len = args.context_lens[seq_id + 1] - args.context_lens[seq_id];
+      context_len = args.context_lens[seq_id];
       max_num_partitions = DIVIDE_ROUND_UP(context_len, partition_size);
       max_num_blocks = DIVIDE_ROUND_UP(context_len, block_size);
       num_blocks_per_wg =
