@@ -20,7 +20,7 @@ ARGS=""
 if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     echo "TEST_MODE set to THROUGHPUT"
     num_warmup=${num_warmup:-"10"}
-    num_iter=${num_iter:-"100"}
+    num_iter=${num_iter:-"30"}
     ARGS="$ARGS --benchmark --perf_begin_iter ${num_warmup} --perf_run_iters ${num_iter}"
     LOG_PREFIX="throughput_log"
 elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
@@ -28,8 +28,8 @@ elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
     LOG_PREFIX="accuracy_log"
 elif [[ "${TEST_MODE}" == "REALTIME" ]]; then
     echo "TEST_MODE set to REALTIME"
-    num_warmup=${num_warmup:-"10"}
-    num_iter=${num_iter:-"100"}
+    num_warmup=${num_warmup:-"200"}
+    num_iter=${num_iter:-"800"}
     ARGS="$ARGS --benchmark --perf_begin_iter ${num_warmup} --perf_run_iters ${num_iter} "
     LOG_PREFIX="realtime_log"
     if [[ -z "${CORE_PER_INSTANCE}" ]]; then

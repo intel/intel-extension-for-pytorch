@@ -4063,32 +4063,6 @@ class Trainer:
         timeBuff = []
         import time
 
-        if self.args.profile:
-            batch = next(iter(dataloader))
-            if "pixel_values" in batch and self.args.benchmark:
-                if self.args.fp16_cpu:
-                    batch["pixel_values"] = batch["pixel_values"].to(torch.half)
-                elif self.args.bf16 or self.args.int8_bf16 or self.args.fp8_bf16:
-                    batch["pixel_values"] = batch["pixel_values"].to(torch.bfloat16)
-
-            prof = profile_ctx.__enter__()
-            with torch.no_grad():
-                for i in range(40):
-                    if (
-                        self.args.bf16
-                        or self.args.int8_bf16
-                        or self.args.fp8_bf16
-                        or self.args.fp16_cpu
-                    ) and self.args.inductor:
-                        with torch.autocast(
-                            "cpu",
-                            dtype=torch.half if self.args.fp16_cpu else torch.bfloat16,
-                        ):
-                            outputs = model(**batch)
-                    else:
-                        outputs = model(**batch)
-                    prof.step()
-            prof.__exit__(None, None, None)
         with tqdm(total=total_steps, desc="Evaluating") as pbar:
             for epoch in range(test_epoches + 1):
                 for it, batch in enumerate(dataloader):
@@ -4144,6 +4118,33 @@ class Trainer:
                         if epoch * steps_per_epoch + it > self.args.perf_begin_iter:
                             timeBuff.append(end - start)
                         pbar.update(1)
+
+        if self.args.profile:
+            batch = next(iter(dataloader))
+            if "pixel_values" in batch and self.args.benchmark:
+                if self.args.fp16_cpu:
+                    batch["pixel_values"] = batch["pixel_values"].to(torch.half)
+                elif self.args.bf16 or self.args.int8_bf16 or self.args.fp8_bf16:
+                    batch["pixel_values"] = batch["pixel_values"].to(torch.bfloat16)
+
+            prof = profile_ctx.__enter__()
+            with torch.no_grad():
+                for i in range(40):
+                    if (
+                        self.args.bf16
+                        or self.args.int8_bf16
+                        or self.args.fp8_bf16
+                        or self.args.fp16_cpu
+                    ) and self.args.inductor:
+                        with torch.autocast(
+                            "cpu",
+                            dtype=torch.half if self.args.fp16_cpu else torch.bfloat16,
+                        ):
+                            outputs = model(**batch)
+                    else:
+                        outputs = model(**batch)
+                    prof.step()
+            prof.__exit__(None, None, None)
 
     def evaluation_loop(
         self,
