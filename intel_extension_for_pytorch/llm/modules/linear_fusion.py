@@ -461,6 +461,7 @@ class GatedMLPMOE(nn.Module):
         w2_bias=None,
         is_mxfp4=False,
         is_fp8=False,
+        is_int4=False,
         experts_start_id=0,
     ):
         super().__init__()
@@ -474,6 +475,7 @@ class GatedMLPMOE(nn.Module):
         self.w2_bias = w2_bias
         self.is_mxfp4 = is_mxfp4
         self.is_fp8 = is_fp8
+        self.is_int4 = is_int4
         self.experts_start_id = experts_start_id
         self.W3 = W3
         self.use_prepack = use_prepack
@@ -498,6 +500,7 @@ class GatedMLPMOE(nn.Module):
             self.w2_bias,
             self.is_mxfp4,
             self.is_fp8,
+            self.is_int4,
             self.experts_start_id,
         )
 

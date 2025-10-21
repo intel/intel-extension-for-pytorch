@@ -117,6 +117,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         w2_bias=None,
         is_mxfp4=False,
         is_fp8=False,
+        is_int4=False,
         experts_start_id=0,
     ):
         super().__init__()
@@ -140,13 +141,14 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
 
         self.is_mxfp4 = is_mxfp4
         self.is_fp8 = is_fp8
+        self.is_int4 = is_int4
         self.experts_start_id = experts_start_id
 
         self.moe_gemm_using_native_impl = (
             os.environ.get("IPEX_MOE_GEMM_NATIVE", "0") == "1"
         )
 
-        if self.is_mxfp4:
+        if self.is_mxfp4 or self.is_int4:
             self.W13 = self.marlin_shuffle_weight(self.W13)
             self.W2 = self.marlin_shuffle_weight(self.W2)
             self.w13_weight_scale_inv.data = torch.transpose(
@@ -243,6 +245,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             bias=self.w13_bias,
             is_mxfp4=self.is_mxfp4,
             is_fp8=self.is_fp8,
+            is_int4=self.is_int4,
             use_native=self.moe_gemm_using_native_impl,
         )
         hidden_states = self.linear_activaion(hidden_states, activation)
@@ -256,6 +259,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             bias=self.w2_bias,
             is_mxfp4=self.is_mxfp4,
             is_fp8=self.is_fp8,
+            is_int4=self.is_int4,
             use_native=self.moe_gemm_using_native_impl,
         )
         return hidden_states

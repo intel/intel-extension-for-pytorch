@@ -1,3 +1,5 @@
+#pragma once
+
 #include "xetla.hpp"
 
 namespace gpu::xetla::subgroup {

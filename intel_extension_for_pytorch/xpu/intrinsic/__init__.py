@@ -419,6 +419,7 @@ def moe_gemm(
     bias=None,
     is_mxfp4=False,
     is_fp8=False,
+    is_int4=False,
     use_native=False,
 ):
     """
@@ -456,6 +457,25 @@ def moe_gemm(
                 matrix_b_scale_inv,
                 bias,
                 rows_for_experts,
+                group_size,
+            )
+            return group_marlin_output
+        elif is_int4:
+            total_m = matrix_a.shape[0]
+            gemm_k = matrix_a.shape[1]
+            gemm_n = matrix_b.shape[2]
+            group_size = gemm_k // matrix_b_scale_inv.shape[1]
+            group_marlin_output = torch.empty(
+                total_m, gemm_n, dtype=matrix_a.dtype, device=matrix_a.device
+            )
+            torch.ops.torch_ipex.group_mm_int4_out_marlin(
+                group_marlin_output,
+                matrix_a,
+                matrix_b,
+                matrix_b_scale_inv,
+                bias,
+                rows_for_experts,
+                None,
                 group_size,
             )
             return group_marlin_output

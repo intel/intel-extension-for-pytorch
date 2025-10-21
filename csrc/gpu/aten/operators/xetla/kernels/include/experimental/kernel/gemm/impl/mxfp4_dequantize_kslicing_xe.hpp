@@ -400,12 +400,12 @@ class mxfp4_gemm_universal_t {
 };
 
 template <typename T, int N, int Start>
-inline typename std::enable_if_t<(N == Start), xetla_vector<T, N>>
+static inline typename std::enable_if_t<(N == Start), xetla_vector<T, N>>
 inclusive_prefix_sum(xetla_vector<T, N> src) {
   return src;
 }
 template <typename T, int N, int Start>
-inline typename std::enable_if_t<(Start != N), xetla_vector<T, N>>
+static inline typename std::enable_if_t<(Start != N), xetla_vector<T, N>>
 inclusive_prefix_sum(xetla_vector<T, N> src) {
   // assert N is a power of 2
   static_assert((N & (N - 1)) == 0, "N is expected to be power of 2");
