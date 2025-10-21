@@ -8,10 +8,10 @@
     "version": "2.10.0.dev20251019+cpu"
   },
   "torchaudio": {
-    "version": "2.10.0.dev20251018+cpu"
+    "version": "2.10.0.dev20251019+cpu"
   },
   "torchvision": {
-    "version": "0.25.0.dev20251018+cpu"
+    "version": "0.25.0.dev20251019+cpu"
   },
   "deepspeed": {
     "version": "0.18.0",
