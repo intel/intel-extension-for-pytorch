@@ -164,7 +164,7 @@ elif args.dtype in ["int8", "int8-bf16"]:
             if args.dtype == "int8-bf16":
                 print("---- apply torchao woq int8 api ----", flush=True)
                 quant_api.quantize_(
-                    model, quant_api.int8_weight_only(set_inductor_config=False)
+                    model, quant_api.Int8WeightOnlyConfig(set_inductor_config=False)
                 )
                 unwrap_tensor_subclass(model)
             elif args.dtype == "int8":
@@ -174,7 +174,7 @@ elif args.dtype in ["int8", "int8-bf16"]:
                 )
                 quant_api.quantize_(
                     model,
-                    quant_api.int8_dynamic_activation_int8_weight(
+                    quant_api.Int8DynamicActivationInt8WeightConfig(
                         set_inductor_config=False
                     ),
                 )
@@ -185,10 +185,11 @@ elif args.dtype in ["int8", "int8-bf16"]:
                 print("---- apply torchao a16w4 api ----", flush=True)
                 quant_api.quantize_(
                     model,
-                    quant_api.int4_weight_only(
+                    quant_api.Int4WeightOnlyConfig(
                         group_size=args.group_size,
                         layout=Int4CPULayout(),
                         set_inductor_config=False,
+                        version=1,
                     ),
                 )
                 unwrap_tensor_subclass(model)
