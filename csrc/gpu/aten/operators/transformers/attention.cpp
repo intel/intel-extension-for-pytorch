@@ -43,6 +43,33 @@ bool is_fmha_supported_tensor(const Tensor& input, bool seq_last = false) {
   return false;
 }
 
+std::tuple<at::Tensor, int64_t, int64_t> pad_last_dim_to_multiple(
+    const at::Tensor& x,
+    int64_t multiple = 64,
+    double value = 0.0) {
+  TORCH_CHECK(x.dim() >= 1, "Input tensor must have at least one dimension.");
+
+  int64_t curr_size = x.size(-1);
+  int64_t remainder = curr_size % multiple;
+  int64_t pad_right = remainder == 0 ? 0 : multiple - remainder;
+
+  // Pad format for at::constant_pad_nd: (pad_left, pad_right)
+  // Since we only pad the last dim on the right, pad = {0, pad_right}
+  at::Tensor padded = at::constant_pad_nd(x, {0, pad_right}, value);
+
+  return std::make_tuple(padded, curr_size, pad_right);
+}
+
+// Unpads tensor on the last dimension to restore the original size
+at::Tensor unpad_last_dim(const at::Tensor& x, int64_t original_size) {
+  TORCH_CHECK(x.dim() >= 1, "Input tensor must have at least one dimension.");
+  TORCH_CHECK(
+      original_size <= x.size(-1),
+      "Original size cannot exceed current tensor size.");
+
+  return x.narrow(/*dim=*/-1, /*start=*/0, /*length=*/original_size);
+}
+
 std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
     const Tensor& grad_out,
     const Tensor& query,
@@ -99,6 +126,17 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   } else
     value_in = value;
 
+  // pad tensor to multiple of 64 on last dim
+  auto [query_padded, query_orig_size, query_pad_right] =
+      pad_last_dim_to_multiple(query_in, 64, 0.0);
+  auto [key_padded, key_orig_size, key_pad_right] =
+      pad_last_dim_to_multiple(key_in, 64, 0.0);
+  auto [value_padded, value_orig_size, value_pad_right] =
+      pad_last_dim_to_multiple(value_in, 64, 0.0);
+  query_in = query_padded;
+  key_in = key_padded;
+  value_in = value_padded;
+
   // create strided output
   // size [bs, num_head, qsize, head_size]
   // layout [bs, qsize, num_head, head_size]
@@ -106,7 +144,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   auto dpcpp_queue = dpcppGetCurrentQueue();
 
   const double softmax_scale =
-      scale.has_value() ? scale.value() : (1.0 / std::sqrt(query_in.size(-1)));
+      scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
   auto xeType = sdp::aten_to_Xetla_dtype(query_in);
@@ -157,6 +195,8 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
                             : -1});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+  auto output_unpad = unpad_last_dim(output, query_orig_size);
+  output = output_unpad;
 
   return output;
 #else
@@ -1239,6 +1279,17 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   } else
     value_in = value;
 
+  // pad tensor to multiple of 64 on last dim
+  auto [query_padded, query_orig_size, query_pad_right] =
+      pad_last_dim_to_multiple(query_in, 64, 0.0);
+  auto [key_padded, key_orig_size, key_pad_right] =
+      pad_last_dim_to_multiple(key_in, 64, 0.0);
+  auto [value_padded, value_orig_size, value_pad_right] =
+      pad_last_dim_to_multiple(value_in, 64, 0.0);
+  query_in = query_padded;
+  key_in = key_padded;
+  value_in = value_padded;
+
   int64_t B = query_in.size(0);
   int64_t num_heads_q = query_in.size(1);
   int64_t num_heads_k = key_in.size(1);
@@ -1337,6 +1388,8 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif
+  auto output_unpad = unpad_last_dim(output, query_orig_size);
+  output = output_unpad;
   return output;
 }
 
