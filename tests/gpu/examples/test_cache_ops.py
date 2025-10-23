@@ -375,8 +375,8 @@ def test_reshape_and_cache_fp8(
         v_scale = 1.0
         qtype_str = "fp8_e5m2"
     else:
-        k_scale = 2.0
-        v_scale = 2.0
+        k_scale = 1.0
+        v_scale = 1.0
         qtype_str = "fp8_e4m3"
 
     # Create a random slot mapping.

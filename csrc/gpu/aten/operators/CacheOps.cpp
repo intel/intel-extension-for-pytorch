@@ -324,6 +324,78 @@ struct ReshapeAndCache {
   const float v_scale;
 };
 
+template <typename scalar_t>
+struct alignas(8) vec4_t {
+  scalar_t x;
+  scalar_t y;
+  scalar_t z;
+  scalar_t w;
+};
+
+template <typename dtype_t>
+struct alignas(4) dtypex4_t {
+  static_assert(std::is_same_v<dtype_t, float> ||
+                    std::is_same_v<dtype_t, at::Half> ||
+                    std::is_same_v<dtype_t, at::BFloat16> ||
+                    std::is_same_v<dtype_t, at::Float8_e4m3fn> ||
+                    std::is_same_v<dtype_t, at::Float8_e5m2>,
+                "Unsupported cache type for dtypex4_t");
+  dtype_t x;
+  dtype_t y;
+  dtype_t z;
+  dtype_t w;
+};
+
+// Used by vectorization_utils to copy/convert one element
+template <typename OutT, typename InT, Fp8KVCacheDataType kv_dt>
+struct CopyWithScaleOp {
+  float scale;
+
+  inline void operator()(OutT& dst, const InT src) const {
+    if constexpr (kv_dt == Fp8KVCacheDataType::kAuto) {
+      dst = static_cast<OutT>(src);
+    } else {
+      float x = (float)src / scale;
+      if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E4M3) {
+        dst = static_cast<at::Float8_e4m3fn>(x);
+      } else if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E5M2) {
+        dst = static_cast<at::Float8_e5m2>(x);
+      }
+    }
+  }
+};
+
+// The vector width is fixed at 4 to avoid excessive branching in the kernel,
+// which could degrade performance.
+template <typename scalar_t, typename dtype_t, typename ScaOp>
+void scaled_convert_vec(const scalar_t* src, dtype_t* dst, int num_elems,
+                        int local_idx, int local_range, ScaOp&& scalar_op) {
+  using srcx4_t = vec4_t<scalar_t>;
+  using distx4_t = dtypex4_t<dtype_t>;
+
+  int64_t const num_vec_elems = num_elems >> 2;
+
+  auto const* vectorized_in = reinterpret_cast<srcx4_t const*>(src);
+  auto* vectorized_out = reinterpret_cast<distx4_t*>(dst);
+
+#pragma unroll 4
+  for (int64_t i = local_idx; i < num_vec_elems; i += local_range) {
+    srcx4_t in_vec = vectorized_in[i];
+    distx4_t out_vec;
+    scalar_op(out_vec.x, in_vec.x);
+    scalar_op(out_vec.y, in_vec.y);
+    scalar_op(out_vec.z, in_vec.z);
+    scalar_op(out_vec.w, in_vec.w);
+    vectorized_out[i] = out_vec;
+  }
+
+  // Handle the remaining elements if num_elems is not divisible by 4
+  for (int64_t i = num_vec_elems * 4 + local_idx; i < num_elems;
+       i += local_range) {
+    scalar_op(dst[i], src[i]);
+  }
+}
+
 template <
     typename scalar_t,
     typename cache_t,
@@ -371,28 +443,24 @@ struct ReshapeAndCacheFlash {
     const int block_idx = slot_idx / block_size_;
     const int block_offset = slot_idx % block_size_;
     const int n = num_head_ * head_size_;
-    for (int i = local_idx; i < n; i += local_range) {
-      const int src_key_idx = group_idx * key_stride_ + i;
-      const int src_value_idx = group_idx * value_stride_ + i;
-      const int head_idx = i / head_size_;
-      const int head_offset = i % head_size_;
-      const int dst_idx = block_idx * block_stride_ + block_offset * n +
-          head_idx * head_size_ + head_offset;
-      scalar_t tgt_key = key_[src_key_idx];
-      scalar_t tgt_value = value_[src_value_idx];
-      if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E4M3) {
-        key_cache_[dst_idx] = static_cast<at::Float8_e4m3fn>(tgt_key * k_scale);
-        value_cache_[dst_idx] =
-            static_cast<at::Float8_e4m3fn>(tgt_value * v_scale);
-      } else if constexpr (kv_dt == Fp8KVCacheDataType::kFp8E5M2) {
-        key_cache_[dst_idx] = static_cast<at::Float8_e5m2>(tgt_key * k_scale);
-        value_cache_[dst_idx] =
-            static_cast<at::Float8_e5m2>(tgt_value * v_scale);
-      } else {
-        key_cache_[dst_idx] = tgt_key;
-        value_cache_[dst_idx] = tgt_value;
-      }
-    }
+    // pointers to the beginning of the source row for this token.
+    const scalar_t* __restrict__ key_src = key_ + group_idx * key_stride_;
+    const scalar_t* __restrict__ value_src = value_ + group_idx * value_stride_;
+
+    // find the start position inside the kv-cache for this token.
+    cache_t* __restrict__ key_dst =
+        key_cache_ + block_idx * block_stride_ + block_offset * n;
+    cache_t* __restrict__ value_dst =
+        value_cache_ + block_idx * block_stride_ + block_offset * n;
+
+    float k_scale_val = (kv_dt == Fp8KVCacheDataType::kAuto) ? 0.f : k_scale;
+    float v_scale_val = (kv_dt == Fp8KVCacheDataType::kAuto) ? 0.f : v_scale;
+
+    CopyWithScaleOp<cache_t, scalar_t, kv_dt> k_op{k_scale_val};
+    CopyWithScaleOp<cache_t, scalar_t, kv_dt> v_op{v_scale_val};
+    scaled_convert_vec(key_src, key_dst, n, local_idx, local_range, k_op);
+    scaled_convert_vec(value_src, value_dst, n, local_idx, local_range,
+                            v_op);
   }
 
  private:
