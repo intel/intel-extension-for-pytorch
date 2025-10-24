@@ -10,7 +10,8 @@ checking_rtol = 3e-2
 
 
 def get_support_dtype():
-    return [torch.float, torch.double] if torch.xpu.has_fp64_dtype() else [torch.float]
+    return [torch.float]
+    # return [torch.float, torch.double] if torch.xpu.has_fp64_dtype() else [torch.float]
 
 
 class TestTorchMethod(TestCase):

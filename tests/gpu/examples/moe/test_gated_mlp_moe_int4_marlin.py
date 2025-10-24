@@ -225,7 +225,7 @@ class MoELayerInt4(torch.nn.Module):
         scoring_func="sigmoid",
     ) -> torch.Tensor:
         if use_grouped_topk:
-            routing_weights, selected_experts, _, _ = torch.ops.torch_ipex.grouped_topk(
+            routing_weights, selected_experts = torch.ops.torch_ipex.grouped_topk(
                 hidden_states,
                 router_logits,
                 self.top_k,
@@ -237,8 +237,22 @@ class MoELayerInt4(torch.nn.Module):
             )
             selected_experts = selected_experts.to(torch.int64)
         else:
-            routing_weights, selected_experts, _, _ = torch.ops.torch_ipex.topk_softmax(
-                router_logits, self.top_k, False
+            num_tokens, hidden_dim = hidden_states.shape
+            routing_weights = torch.empty(
+                num_tokens, self.top_k, dtype=torch.float32, device=router_logits.device
+            )
+            selected_experts = torch.empty(
+                num_tokens, self.top_k, dtype=torch.int32, device=router_logits.device
+            )
+            token_expert_indices = torch.empty(
+                num_tokens, self.top_k, dtype=torch.int32, device=router_logits.device
+            )
+            torch.ops.torch_ipex.topk_softmax(
+                routing_weights,
+                selected_experts,
+                token_expert_indices,
+                router_logits,
+                False,
             )
             routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         num_tokens, hidden_dim = hidden_states.shape
