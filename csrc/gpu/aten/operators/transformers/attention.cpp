@@ -31,12 +31,21 @@ using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-bool is_fmha_supported_tensor(const Tensor& input, bool seq_last = false) {
+bool is_fmha_supported_qkv(
+    const Tensor& q,
+    const Tensor& k,
+    const Tensor& v,
+    bool seq_last = false) {
   // Normal tensors are in BNFH format
   // In addition, BFNH format tensor is also supported
   // If seq_last is true, the tensor could be in FBNH format
-  if (input.is_contiguous() || input.transpose(1, 2).is_contiguous() ||
-      (seq_last && input.permute({2, 0, 1, 3}).is_contiguous())) {
+  // QKV should have same format
+  if ((q.is_contiguous() && k.is_contiguous() && v.is_contiguous()) ||
+      (q.transpose(1, 2).is_contiguous() && k.transpose(1, 2).is_contiguous() &&
+       v.transpose(1, 2).is_contiguous()) ||
+      (seq_last && q.permute({2, 0, 1, 3}).is_contiguous() &&
+       k.permute({2, 0, 1, 3}).is_contiguous() &&
+       v.permute({2, 0, 1, 3}).is_contiguous())) {
     return true;
   }
 
@@ -111,20 +120,15 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   Tensor key_in;
   Tensor value_in;
 
-  if (!is_fmha_supported_tensor(query)) {
+  if (!is_fmha_supported_qkv(query, key, value)) {
     query_in = query.contiguous();
-  } else
-    query_in = query;
-
-  if (!is_fmha_supported_tensor(key)) {
     key_in = key.contiguous();
-  } else
-    key_in = key;
-
-  if (!is_fmha_supported_tensor(value)) {
     value_in = value.contiguous();
-  } else
+  } else {
+    query_in = query;
+    key_in = key;
     value_in = value;
+  }
 
   // pad tensor to multiple of 64 on last dim
   auto [query_padded, query_orig_size, query_pad_right] =
@@ -1264,20 +1268,15 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   Tensor key_in;
   Tensor value_in;
 
-  if (!is_fmha_supported_tensor(query, seq_last)) {
+  if (!is_fmha_supported_qkv(query, key, value, seq_last)) {
     query_in = query.contiguous();
-  } else
-    query_in = query;
-
-  if (!is_fmha_supported_tensor(key, seq_last)) {
     key_in = key.contiguous();
-  } else
-    key_in = key;
-
-  if (!is_fmha_supported_tensor(value, seq_last)) {
     value_in = value.contiguous();
-  } else
+  } else {
+    query_in = query;
+    key_in = key;
     value_in = value;
+  }
 
   // pad tensor to multiple of 64 on last dim
   auto [query_padded, query_orig_size, query_pad_right] =
