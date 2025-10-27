@@ -9,7 +9,7 @@
 #endif
 
 #include <utils/Helpers.h>
-#include <utils/LogImpl.h>
+//#include <utils/LogImpl.h>
 #include <utils/Macros.h>
 #include <utils/Settings.h>
 
@@ -77,56 +77,26 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     }                                                                      \
   }
 
-#define DPCPP_EXT_SUBMIT(q, str, ker_submit)                                \
-  {                                                                         \
-    DPCPP_EXCEP_TRY                                                         \
-    auto log_level = torch_ipex::xpu::dpcpp::Settings::I().get_log_level(); \
-    if (log_level >= LOG_LEVEL_DEBUG) {                                     \
-      EventLogger l;                                                        \
-      l.add_event("OPS", "", "", "begin", "event name:{}", __func__);       \
-      auto e = (ker_submit);                                                \
-      l.add_event("OPS", "", "", "submit", "submit event end");             \
-      e.wait_and_throw();                                                   \
-      l.add_event("OPS", "", "", "event wait", "event wait end");           \
-    } else {                                                                \
-      auto e = (ker_submit);                                                \
-    }                                                                       \
-    (q).throw_asynchronous();                                               \
-    DPCPP_EXCEP_CATCH                                                       \
+#define DPCPP_EXT_SUBMIT(q, str, ker_submit) \
+  {                                          \
+    DPCPP_EXCEP_TRY                          \
+    auto e = (ker_submit);                   \
+    (q).throw_asynchronous();                \
+    DPCPP_EXCEP_CATCH                        \
   }
 
-#define DPCPP_ONEDNN_EXT_SUBMIT(q, str, output_event, ker_submit)         \
-  DPCPP_EXCEP_TRY                                                         \
-  auto log_level = torch_ipex::xpu::dpcpp::Settings::I().get_log_level(); \
-  if (log_level >= LOG_LEVEL_DEBUG) {                                     \
-    EventLogger l;                                                        \
-    l.add_event("OPS", "", "", "begin", "event name:{}", __func__);       \
-    output_event = (ker_submit);                                          \
-    l.add_event("OPS", "", "", "submit", "submit event end");             \
-    output_event.wait_and_throw();                                        \
-    l.add_event("OPS", "", "", "event wait", "event wait end");           \
-  } else {                                                                \
-    output_event = (ker_submit);                                          \
-  }                                                                       \
-  (q).throw_asynchronous();                                               \
+#define DPCPP_ONEDNN_EXT_SUBMIT(q, str, output_event, ker_submit) \
+  DPCPP_EXCEP_TRY                                                 \
+  output_event = (ker_submit);                                    \
+  (q).throw_asynchronous();                                       \
   DPCPP_EXCEP_CATCH
 
-#define DPCPP_Q_SUBMIT(q, cgf, ...)                                         \
-  {                                                                         \
-    DPCPP_EXCEP_TRY                                                         \
-    auto log_level = torch_ipex::xpu::dpcpp::Settings::I().get_log_level(); \
-    if (log_level >= LOG_LEVEL_DEBUG) {                                     \
-      EventLogger l;                                                        \
-      l.add_event("OPS", "", "", "begin", "event name:{}", __func__);       \
-      auto e = (q).submit((cgf), ##__VA_ARGS__);                            \
-      l.add_event("OPS", "", "", "submit", "submit event end");             \
-      e.wait_and_throw();                                                   \
-      l.add_event("OPS", "", "", "event wait", "event wait end");           \
-    } else {                                                                \
-      auto e = (q).submit((cgf), ##__VA_ARGS__);                            \
-      (q).throw_asynchronous();                                             \
-    }                                                                       \
-    DPCPP_EXCEP_CATCH                                                       \
+#define DPCPP_Q_SUBMIT(q, cgf, ...)            \
+  {                                            \
+    DPCPP_EXCEP_TRY                            \
+    auto e = (q).submit((cgf), ##__VA_ARGS__); \
+    (q).throw_asynchronous();                  \
+    DPCPP_EXCEP_CATCH                          \
   }
 
 // utility to submit a list of CGFs

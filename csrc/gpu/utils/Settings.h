@@ -66,21 +66,6 @@ class IPEX_API Settings final {
 
   static Settings& I(); // Singleton
 
-  int get_log_level();
-  bool set_log_level(int level);
-
-  std::string get_log_output_file_path();
-  bool set_log_output_file_path(std::string path);
-
-  bool set_log_rotate_file_size(int size);
-  int get_log_rotate_file_size();
-
-  bool set_log_split_file_size(int size);
-  int get_log_split_file_size();
-
-  bool set_log_component(std::string component);
-  std::string get_log_component();
-
   XPU_BACKEND get_backend() const;
   bool set_backend(XPU_BACKEND backend);
 

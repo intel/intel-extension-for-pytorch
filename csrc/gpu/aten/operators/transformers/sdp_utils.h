@@ -13,7 +13,6 @@
 #include <ATen/core/grad_mode.h>
 #include <c10/core/SymFloat.h>
 #include <runtime/Device.h>
-#include "utils/LogUtils.h"
 
 #if defined(USE_XETLA)
 #include "../xetla/mha.h"
@@ -126,8 +125,7 @@ inline bool xetla_supported(sdp::sdp_params params) {
   }
 #endif
   if (!is_supported) {
-    IPEX_DEBUG_LOG(
-        "OPS", "", "Your IPEX version currently doesn't support xetla.");
+    TORCH_WARN_ONCE("Your IPEX version currently doesn't support xetla.");
   }
   return is_supported;
 }
@@ -155,9 +153,7 @@ inline bool has_for_nested_inputs(sdp_params params) {
 inline bool check_requires_grad_and_nested(sdp_params params) {
   // If we fail both checks then we return false
   if (has_for_nested_inputs(params) && input_requires_grad(params)) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Memory efficient attention currently doesn't support training with NT inputs.");
     return false;
   }
@@ -168,9 +164,7 @@ inline bool check_tensor_shapes(sdp_params params) {
   auto query_dim = params.query.dim();
   if (!(query_dim == params.key.dim() && query_dim == params.value.dim() &&
         (query_dim == 4))) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Both fused kernels requires query, key and value to be 4 dimensional.");
     return false;
   }
@@ -186,9 +180,7 @@ inline bool try_broadcast_param_size(
   if ((q_size != max_size && q_size != 1) ||
       (k_size != max_size && k_size != 1) ||
       (v_size != max_size && v_size != 1)) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Both fused kernels require query, key and value to have broadcastable {}.",
         param_name);
     return false;
@@ -200,9 +192,7 @@ inline bool check_safe_kv_broadcast(at::Tensor param) {
   const auto nt_tensor_impl = at::native::get_nested_tensor_impl(param);
   auto seq_len = nt_tensor_impl->opt_size(2);
   if (!seq_len.has_value()) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "For both fused kernels, if one of key/value batch_size requires "
         "broadcasting and the other does not, then the other must "
         "have a consistent seq_len dim.");
@@ -218,18 +208,14 @@ inline bool check_grouped_query_attention(sdp_params const& params) {
   const bool same_kv_heads = k_num_heads == v_num_heads;
 
   if (!(same_kv_heads)) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "grouped query attention require key and value to have the same num_heads and batch_size. ");
     return false;
   }
   // Check if grouped query attention is supported and validate the number of
   // heads
   if (q_num_heads % k_num_heads != 0) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "grouped query attention only support when the number of heads in key/value must divide number of heads in query.");
     return false;
   }
@@ -281,9 +267,7 @@ inline bool check_batch_size_and_num_heads(sdp_params params) {
       q_num_heads == k_num_heads && q_num_heads == v_num_heads;
 
   if (!same_batch_size) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "For dense input, both fused kernels require query, key and value to have the same batch_size. "
         "To broadcast dense inputs, try using unsqueeze and expand_to before passing them into the kernel.");
     return false;
@@ -294,9 +278,7 @@ inline bool check_batch_size_and_num_heads(sdp_params params) {
   }
 
   if (!same_num_heads) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "For dense input, both fused kernels require query, key and value to have the same num_heads. "
         "To broadcast dense inputs, try using unsqueeze and expand_to before passing them into the kernel.");
     return false;
@@ -312,9 +294,7 @@ inline bool check_for_seq_len_0_and_consistent_head_dim_nested_tensor_helper(
   auto num_head_dims = nt_tensor_impl->opt_size(1);
   if (!num_head_dims.has_value()) {
     // num_head_dims is ragged
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Fused kernels do not support ragged num_head_dims, {}"
         "has a ragged num_heads.",
         param_name);
@@ -328,9 +308,7 @@ inline bool check_for_seq_len_0_and_consistent_head_dim_nested_tensor_helper(
   // This is being called inside sdp with shape [batch, heads, {seq_len}, dim]
   for (const auto i : c10::irange(n_tensors)) {
     if (sizes_ptr[(i * size_tensor_stride) + 1] == 0) {
-      IPEX_DEBUG_LOG(
-          "OPS",
-          "",
+      TORCH_WARN_ONCE(
           "Fused kernels do not support seq_len == 0, {}"
           "has a seq len of 0.",
           param_name);
@@ -399,9 +377,7 @@ inline bool check_nonzero_sequence_lengths(sdp_params params) {
   bool zero_seq_len_q = params.query.sym_size(-2) == 0;
   bool zero_seq_len_k = params.key.sym_size(-2) == 0;
   if (zero_seq_len_q || zero_seq_len_k) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Both fused kernels do not support zero seq_len_q or seq_len_kv.");
     return false;
   }
@@ -422,9 +398,7 @@ inline bool check_last_dim_stride_equals_1(sdp_params params) {
       ? params.attn_mask.value().sym_stride(-1) == 1
       : true;
   if (!(qkv_strides_equal_1 && mask_stride_equal_1)) {
-    IPEX_DEBUG_LOG(
-        "OPS",
-        "",
+    TORCH_WARN_ONCE(
         "Both fused kernels require the last dimension of the input to have stride 1. ");
     return false;
   }

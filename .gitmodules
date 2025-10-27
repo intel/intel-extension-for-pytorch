@@ -13,9 +13,6 @@
 [submodule "third_party/oneDNN"]
 	path = third_party/oneDNN
 	url = https://github.com/oneapi-src/oneDNN.git
-[submodule "third_party/spdlog"]
-	path = third_party/spdlog
-	url = https://github.com/gabime/spdlog.git
 [submodule "third_party/sleef"]
 	path = third_party/sleef
 	url = https://github.com/shibatch/sleef.git

@@ -13,7 +13,6 @@
 
 #pragma once
 
-#include "LogUtils.h"
 #include "logging_utils.h"
 
 #include <iostream>
