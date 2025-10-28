@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-pip install torchmetrics pycocotools transformers==4.53.0 peft==0.17.1
+pip install torchmetrics pycocotools peft==0.17.1
 pip install torch-fidelity --no-deps
 pip install scipy
 

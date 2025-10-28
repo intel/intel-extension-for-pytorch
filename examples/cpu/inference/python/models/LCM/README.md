@@ -18,11 +18,15 @@
     ```
     pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
     ``` 
-3. Run setup.sh
+3. Install Transformers
+    ```
+    pip install transformers==4.57.1
+    ```
+4. Run setup.sh
     ```
     ./setup.sh
     ```
-4. Install Intel OpenMP and TCMalloc
+5. Install Intel OpenMP and TCMalloc
     ```
     pip install packaging intel-openmp accelerate
     conda install -y gperftools -c conda-forge

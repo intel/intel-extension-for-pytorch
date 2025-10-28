@@ -24,11 +24,15 @@
     cd ao
     python setup.py install
     ```
-4. Run setup.sh
+4. Install Transformers
+    ```
+    pip install transformers==4.57.1
+    ```
+5. Run setup.sh
     ```
     ./setup.sh
     ```
-5. Install Intel OpenMP and TCMalloc
+6. Install Intel OpenMP and TCMalloc
     ```
     pip install packaging intel-openmp accelerate
     conda install -y gperftools -c conda-forge
