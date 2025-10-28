@@ -24,7 +24,7 @@ Intel® Extension for PyTorch\* v2.8.10+xpu is the new release which supports In
     ```
     import torch
 
-    if torch.distributed.is_xccl_available:
+    if torch.distributed.is_xccl_available():
       torch.distributed.init_process_group(backend='xccl')
     else:
       import oneccl_bindings_for_pytorch
