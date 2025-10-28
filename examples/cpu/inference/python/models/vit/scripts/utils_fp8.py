@@ -41,6 +41,8 @@ class FP8QDQLinear(torch.nn.Module):
         self.bias = None
 
     def forward(self, input):
+        if isinstance(input, tuple):
+            input = input[0]
         dtype = input.dtype
         weight = dequantize_affine_float8_non_decomposed(
             self.weight.data,
@@ -77,9 +79,11 @@ class FP8QDQSDPA(torch.nn.Module):
         self.qk_out_scale = None
 
     def forward(self, hidden_states, head_mask=None, output_attentions=False):
-        key = self.transpose_for_scores(self.key(hidden_states))
-        value = self.transpose_for_scores(self.value(hidden_states))
-        query = self.transpose_for_scores(self.query(hidden_states))
+        batch_size = hidden_states.shape[0]
+        new_shape = batch_size, -1, self.num_attention_heads, self.attention_head_size
+        key = self.key(hidden_states).view(*new_shape).transpose(1, 2)
+        value = self.value(hidden_states).view(*new_shape).transpose(1, 2)
+        query = self.query(hidden_states).view(*new_shape).transpose(1, 2)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         query_qdq = qdq(query, self.q_out_scale)
@@ -114,20 +118,21 @@ class FP8QDQSDPA(torch.nn.Module):
 
         outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
 
-        return outputs
+        return outputs, None
 
 
 class MeasureSDPA(torch.nn.Module):
     def __init__(self, mod):
         super().__init__()
         self.__dict__.update(mod.__dict__)
-        self.transpose_for_scores = mod.transpose_for_scores
         self.name = None
 
     def forward(self, hidden_states, head_mask=None, output_attentions=False):
-        key = self.transpose_for_scores(self.key(hidden_states))
-        value = self.transpose_for_scores(self.value(hidden_states))
-        query = self.transpose_for_scores(self.query(hidden_states))
+        batch_size = hidden_states.shape[0]
+        new_shape = batch_size, -1, self.num_attention_heads, self.attention_head_size
+        key = self.key(hidden_states).view(*new_shape).transpose(1, 2)
+        value = self.value(hidden_states).view(*new_shape).transpose(1, 2)
+        query = self.query(hidden_states).view(*new_shape).transpose(1, 2)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         if self.name + ".qk_matmul" not in input_maxes:
@@ -193,7 +198,7 @@ class MeasureSDPA(torch.nn.Module):
 
         outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
 
-        return outputs
+        return outputs, None
 
 
 def generate_model_info(model):
@@ -238,7 +243,6 @@ def convert_fp8(model, config: str):
             else:
                 patched_mod = FP8QDQSDPA()
                 patched_mod.__dict__.update(mod.__dict__)
-                patched_mod.transpose_for_scores = mod.transpose_for_scores
 
                 patched_mod.q_out_scale = (
                     data[name + ".qk_matmul"][0] / torch.finfo(torch.float8_e4m3fn).max

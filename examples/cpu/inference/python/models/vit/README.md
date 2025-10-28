@@ -20,7 +20,7 @@ Vision Transformer inference best known configurations with PyTorch.
 
 * Install Transformers
   ```
-  pip install transformers==4.57.0
+  pip install transformers==4.57.1
   ```
 
 * Set CORE_PER_INSTANCE before running realtime mode
@@ -57,9 +57,8 @@ Vision Transformer inference best known configurations with PyTorch.
     ```
 2. Install TorchAO
     ```
-    git clone https://github.com/Valentine233/ao.git
+    git clone https://github.com/pytorch/ao.git
     cd ao
-    git checkout fp8
     git submodule sync
     git submodule update --init --recursive
     USE_CPU_KERNELS=1 python setup.py install
