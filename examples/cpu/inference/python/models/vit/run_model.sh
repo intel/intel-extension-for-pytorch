@@ -170,7 +170,7 @@ throughput="N/A"
 accuracy="N/A"
 
 if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
-    throughput=$(grep 'Throughput:' ${OUTPUT_DIR}/throughput_log* |sed -e 's/.*Throughput//;s/[^0-9.]//g' |awk '
+    throughput=$(grep -a 'Throughput:' ${OUTPUT_DIR}/throughput_log* |sed -e 's/.*Throughput//;s/[^0-9.]//g' |awk '
     BEGIN {
             sum = 0;
         i = 0;
@@ -186,11 +186,11 @@ if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
     echo "--------------------------------Performance Summary per NUMA Node--------------------------------"
     echo ""vit-base";"throughput";${precision};${BATCH_SIZE};${throughput}" | tee -a ${WORK_SPACE}/summary.log
 elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
-    accuracy=$(cat ${OUTPUT_DIR}/accuracy_log* | grep "eval_accuracy" |sed -e 's/.*= //;s/[^0-9.]//g')
-    f1=$(cat ${OUTPUT_DIR}/accuracy_log* | grep "eval_f1" |sed -e 's/.*= //;s/[^0-9.]//g')
+    accuracy=$(cat ${OUTPUT_DIR}/accuracy_log* | grep -a "eval_accuracy" |sed -e 's/.*= //;s/[^0-9.]//g')
+    f1=$(cat ${OUTPUT_DIR}/accuracy_log* | grep -a "eval_f1" |sed -e 's/.*= //;s/[^0-9.]//g')
     echo ""vit-base";"accuracy";${precision};${BATCH_SIZE};${accuracy}" | tee -a ${WORK_SPACE}/summary.log
 elif [[ "${TEST_MODE}" == "REALTIME" ]]; then
-    throughput=$(grep 'Throughput:' ${OUTPUT_DIR}/latency_log* |sed -e 's/.*Throughput://;s/[^0-9.]//g' |awk -v INSTANCES_PER_SOCKET=$INSTANCES_PER_SOCKET '
+    throughput=$(grep -a 'Throughput:' ${OUTPUT_DIR}/latency_log* |sed -e 's/.*Throughput://;s/[^0-9.]//g' |awk -v INSTANCES_PER_SOCKET=$INSTANCES_PER_SOCKET '
     BEGIN {
         sum = 0;
     i = 0;
@@ -203,7 +203,7 @@ elif [[ "${TEST_MODE}" == "REALTIME" ]]; then
     sum = sum / i * INSTANCES_PER_SOCKET;
         printf("%.2f", sum);
     }')
-    p99_latency=$(grep 'P99 Latency' ${OUTPUT_DIR}/latency_log* |sed -e 's/.*P99 Latency//;s/[^0-9.]//g' |awk -v INSTANCES_PER_SOCKET=$INSTANCES_PER_SOCKET '
+    p99_latency=$(grep -a 'P99 Latency' ${OUTPUT_DIR}/latency_log* |sed -e 's/.*P99 Latency//;s/[^0-9.]//g' |awk -v INSTANCES_PER_SOCKET=$INSTANCES_PER_SOCKET '
     BEGIN {
         sum = 0;
         i = 0;
