@@ -113,9 +113,9 @@ def varlen_fwd_reference(
     seqlen_q_ = seqlen_q.clone()
     seqlen_q_[:batch_size] = seqlen_q[1:]
     seqlen_q = (seqlen_q_ - seqlen_q)[:batch_size]
-    # seqlen_k_ = seqlen_k.clone()
-    # seqlen_k_[:batch_size] = seqlen_k[1:]
-    # seqlen_k = (seqlen_k_ - seqlen_k)[:batch_size]
+    seqlen_k_ = seqlen_k.clone()
+    seqlen_k_[:batch_size] = seqlen_k[1:]
+    seqlen_k = (seqlen_k_ - seqlen_k)[:batch_size]
 
     pad_q = torch.zeros(
         [batch_size, max_seqlen_q, num_head, head_size],
@@ -263,8 +263,6 @@ def test_varlen_fwd(
     cu_seqlen = (
         torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int32).to("xpu")
     )
-    seqlen_list = seqlen_list.to("xpu")
-    print(f"seqlen_list: {seqlen_list} cu_seqlen: {cu_seqlen}")
 
     query = torch.randn(
         [cu_seqlen[-1], num_heads_query, head_dim], dtype=dtype, device="xpu"
@@ -294,7 +292,7 @@ def test_varlen_fwd(
         value,
         out,
         cu_seqlen,
-        seqlen_list,
+        cu_seqlen,
         None,
         None,
         alibi_slopes,
@@ -316,7 +314,7 @@ def test_varlen_fwd(
         value,
         out_ref,
         cu_seqlen,
-        seqlen_list,
+        cu_seqlen,
         max_seqlen,
         max_seqlen,
         alibi_slopes,
@@ -336,7 +334,7 @@ def test_varlen_fwd(
         value,
         out,
         cu_seqlen,
-        seqlen_list,
+        cu_seqlen,
         alibi_slopes,
         max_seqlen,
         max_seqlen,
@@ -376,7 +374,6 @@ def test_varlen_attention_softcap(
     cu_seqlen = (
         torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int32).to("xpu")
     )
-    seqlen_list = seqlen_list.to("xpu")
 
     query = torch.randn(
         [cu_seqlen[-1], num_heads_query, head_dim], dtype=dtype, device="xpu"
@@ -395,7 +392,7 @@ def test_varlen_attention_softcap(
         value,
         out,
         cu_seqlen,
-        seqlen_list,
+        cu_seqlen,
         None,
         max_seqlen,
         max_seqlen,
