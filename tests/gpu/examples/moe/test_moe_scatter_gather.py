@@ -80,7 +80,6 @@ class TestTorchMethod:
         activation,
         topk_weights,
         mapped_slot,
-        token_for_experts,
         n_expert,
         n_topk,
         n_channels,
@@ -108,10 +107,12 @@ class TestTorchMethod:
         return gathered
 
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
-    @pytest.mark.parametrize("n_expert", [8, 16])
+    @pytest.mark.parametrize("n_expert", [8, 16, 512])
     @pytest.mark.parametrize("n_token", [16, 32, 4096])
-    @pytest.mark.parametrize("n_topk", [1, 2, 4, 6, 8])
+    @pytest.mark.parametrize("n_topk", [1, 2, 4, 6, 8, 10])
     def test_moe_scatter(self, dtype, n_expert, n_token, n_topk):
+        if n_topk > n_expert:
+            pytest.skip()
         n_channels = 1024
         experts_offset, n_expert_local = self.random_pair(n_expert)
 
@@ -146,10 +147,12 @@ class TestTorchMethod:
         assert torch.equal(ref_mapped_slot, mapped_slot)
 
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
-    @pytest.mark.parametrize("n_expert", [8, 16])
+    @pytest.mark.parametrize("n_expert", [8, 16, 512])
     @pytest.mark.parametrize("n_token", [16, 32, 4096])
-    @pytest.mark.parametrize("n_topk", [1, 2, 4, 6, 8])
+    @pytest.mark.parametrize("n_topk", [1, 2, 4, 6, 8, 10])
     def test_moe_gather(self, dtype, n_expert, n_token, n_topk):
+        if n_topk > n_expert:
+            pytest.skip()
         n_channels = 1024
         experts_offset, n_expert_local = self.random_pair(n_expert)
         activation = torch.rand(
@@ -171,7 +174,6 @@ class TestTorchMethod:
             activation,
             topk_weights,
             mapped_slot,
-            token_for_experts,
             n_expert,
             n_topk,
             n_channels,
@@ -181,7 +183,6 @@ class TestTorchMethod:
             activation,
             topk_weights,
             mapped_slot,
-            token_for_experts,
             n_expert,
             n_topk,
             normalize_scale,

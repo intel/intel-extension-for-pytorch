@@ -258,7 +258,6 @@ class MixtralSparseMoeBlock(nn.Module):
             reordered_moe_output,
             routing_weights,
             mapped_slot,
-            rows_for_experts,
             self.num_experts,
             self.top_k,
             normalize_scale,

@@ -1092,72 +1092,16 @@ void fused_grouped_topk(
 
 namespace MoEScatterImpl {
 
-/**
- * @brief Performs sub-group inclusive scan operation.
- * @tparam ScanT The data type of the value to scan.
- * @param item The SYCL nd_item object.
- * @param value The value to scan.
- * @return The scanned value.
- */
-template <typename ScanT, int SGSize>
-inline ScanT sub_group_inclusive_scan(sycl::nd_item<1> item, ScanT value) {
-  auto sg = item.get_sub_group();
-  auto sg_id = sg.get_group_linear_id();
-  auto lane_id = sg.get_local_linear_id();
-  for (int i = 1; i < SGSize; i *= 2) {
-    auto tmp = sycl::shift_group_right(sg, value, i);
-    if (lane_id >= i)
-      value += tmp;
-  }
-  return value;
-}
-
-/**
- * @brief Performs group inclusive scan operation.
- * @tparam ScanT The data type of the value to scan.
- * @param item The SYCL nd_item object.
- * @param value The value to scan.
- * @return The scanned value.
- */
-template <typename ScanT, int NumSg, int SgSize>
-inline ScanT group_inclusive_scan(sycl::nd_item<1> item, ScanT value) {
-  auto sg = item.get_sub_group();
-  auto sg_id = sg.get_group_linear_id();
-  auto lane_id = sg.get_local_linear_id();
-  sycl::multi_ptr<int[NumSg], sycl::access::address_space::local_space>
-      across_warp_cumsum = sycl::ext::oneapi::
-          group_local_memory_for_overwrite<int[NumSg], sycl::group<1>>(
-              item.get_group());
-  auto& across_warp_cumsum_ptr = *across_warp_cumsum;
-
-  // subgroup wide prefix sum
-  for (int i = 1; i < SgSize; i *= 2) {
-    auto tmp = sycl::shift_group_right(sg, value, i);
-    if (lane_id >= i)
-      value += tmp;
-  }
-  if (lane_id == SgSize - 1)
-    across_warp_cumsum_ptr[sg_id] = value;
-  item.barrier(sycl::access::fence_space::local_space);
-
-  int sg_prefix;
-  int prefix = 0;
-  for (int i = 0; i < NumSg; ++i) {
-    if (sg_id == i)
-      sg_prefix = prefix;
-    prefix += across_warp_cumsum_ptr[i];
-  }
-  return value + sg_prefix;
-}
-
 template <int TopK, typename T>
 struct MoEScatter {
   static constexpr int GroupWorkItem = 256;
   static constexpr int SgSize = 16;
   static constexpr int NumSg = GroupWorkItem / SgSize;
   static constexpr int ElemsPerItem = sizeof(float) * 4 / sizeof(T);
+  static constexpr int32_t EXCLUSIVE_SIZE = 1024;
 
   MoEScatter(
+      sycl::local_accessor<int32_t, 1>& slm,
       const T* activations,
       const int* rows_for_experts,
       const int* topk_indices,
@@ -1168,7 +1112,8 @@ struct MoEScatter {
       const int experts_offset,
       const int n_experts_local,
       const int n_channels)
-      : activations(activations),
+      : slm(slm),
+        activations(activations),
         rows_for_experts(rows_for_experts),
         topk_indices(topk_indices),
         offsets(offsets),
@@ -1199,27 +1144,23 @@ struct MoEScatter {
     // perform prefix sum on rows_for_experts to get expert offset
     auto token_id = item.get_group(0);
     auto local_id = item.get_local_linear_id();
+    auto local_range = item.get_local_range(0);
 
-    // allocate shared memory for expert index of current token
-    sycl::
-        multi_ptr<int[GroupWorkItem], sycl::access::address_space::local_space>
-            expert_cumsum = sycl::ext::oneapi::group_local_memory_for_overwrite<
-                int[GroupWorkItem],
-                sycl::group<1>>(item.get_group());
-    auto& expert_cumsum_ptr = *expert_cumsum;
+    int32_t* expert_cumsum_ptr = static_cast<int32_t*>(
+        slm.template get_multi_ptr<sycl::access::decorated::no>().get());
 
-    int expert_val = 0;
-    if (local_id < n_experts_local)
-      expert_val = rows_for_experts[local_id];
+    for (int i = local_id; i < n_experts_local; i += local_range) {
+      expert_cumsum_ptr[i] = rows_for_experts[i];
+    }
 
-    if (n_experts_local <= SgSize)
-      expert_val = sub_group_inclusive_scan<int, SgSize>(item, expert_val);
-    else
-      expert_val = group_inclusive_scan<int, NumSg, SgSize>(item, expert_val);
-
-    if (local_id < n_experts_local)
-      expert_cumsum_ptr[local_id] = expert_val;
     item.barrier(sycl::access::fence_space::local_space);
+
+    sycl::joint_inclusive_scan(
+        item.get_group(),
+        expert_cumsum_ptr,
+        expert_cumsum_ptr + EXCLUSIVE_SIZE,
+        expert_cumsum_ptr,
+        sycl::plus<int>{});
 
     int indices[TopK], expert_local_offset[TopK];
     for (int i = 0; i < TopK; ++i) {
@@ -1273,6 +1214,7 @@ struct MoEScatter {
       }
     }
   }
+  sycl::local_accessor<int32_t, 1> slm;
   const T* activations; // [n_tokens, n_channels]
   const int* rows_for_experts; // [n_experts]
   const int* topk_indices; // [n_tokens, num_top_k]
@@ -1292,8 +1234,10 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
   static constexpr int SgSize = 16;
   static constexpr int NumSg = GroupWorkItem / SgSize;
   static constexpr int ElemsPerItem = sizeof(float) * 4 / sizeof(T);
+  static constexpr int32_t EXCLUSIVE_SIZE = 1024;
 
   MoEScatter(
+      sycl::local_accessor<int32_t, 1>& slm,
       const T* activations,
       const int* rows_for_experts,
       const int* topk_indices,
@@ -1304,7 +1248,8 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
       const int experts_offset,
       const int n_experts_local,
       const int n_channels)
-      : activations(activations),
+      : slm(slm),
+        activations(activations),
         rows_for_experts(rows_for_experts),
         topk_indices(topk_indices),
         offsets(offsets),
@@ -1335,27 +1280,23 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
     // perform prefix sum on rows_for_experts to get expert offset
     auto token_id = item.get_group(0);
     auto local_id = item.get_local_linear_id();
+    auto local_range = item.get_local_range(0);
 
-    // allocate shared memory for expert index of current token
-    sycl::
-        multi_ptr<int[GroupWorkItem], sycl::access::address_space::local_space>
-            expert_cumsum = sycl::ext::oneapi::group_local_memory_for_overwrite<
-                int[GroupWorkItem],
-                sycl::group<1>>(item.get_group());
-    auto& expert_cumsum_ptr = *expert_cumsum;
+    int32_t* expert_cumsum_ptr = static_cast<int32_t*>(
+        slm.template get_multi_ptr<sycl::access::decorated::no>().get());
 
-    int expert_val = 0;
-    if (local_id < n_experts_local)
-      expert_val = rows_for_experts[local_id];
+    for (int i = local_id; i < n_experts_local; i += local_range) {
+      expert_cumsum_ptr[i] = rows_for_experts[i];
+    }
 
-    if (n_experts_local <= SgSize)
-      expert_val = sub_group_inclusive_scan<int, SgSize>(item, expert_val);
-    else
-      expert_val = group_inclusive_scan<int, NumSg, SgSize>(item, expert_val);
-
-    if (local_id < n_experts_local)
-      expert_cumsum_ptr[local_id] = expert_val;
     item.barrier(sycl::access::fence_space::local_space);
+
+    sycl::joint_inclusive_scan(
+        item.get_group(),
+        expert_cumsum_ptr,
+        expert_cumsum_ptr + EXCLUSIVE_SIZE,
+        expert_cumsum_ptr,
+        sycl::plus<int>{});
 
     int indices[TopK], expert_local_offset[TopK];
     for (int i = 0; i < TopK; ++i) {
@@ -1409,6 +1350,7 @@ struct MoEScatter<TopK, sycl::ext::oneapi::bfloat16> {
       }
     }
   }
+  sycl::local_accessor<int32_t, 1> slm;
   const T* activations; // [n_tokens, n_channels]
   const int* rows_for_experts; // [n_experts]
   const int* topk_indices; // [n_tokens, num_top_k]
@@ -1436,8 +1378,8 @@ void launch_moe_scatter(
   using Kernel = MoEScatter<TopK, T>;
   // TODO: maybe add template for GroupWorkItem in the future
   TORCH_CHECK(
-      Kernel::GroupWorkItem >= n_experts_local,
-      "MoEScatter::GroupWorkItem is expected to be larger than num_expert");
+      Kernel::EXCLUSIVE_SIZE >= n_experts_local,
+      "MoEScatter::EXCLUSIVE_SIZE is expected to be larger than num_expert");
   TORCH_CHECK(
       n_channels % Kernel::ElemsPerItem == 0,
       "n_channels is expected to be aligned to Kernel::ElemsPerItem");
@@ -1446,7 +1388,10 @@ void launch_moe_scatter(
   auto& queue = dpcppGetCurrentQueue();
 
   auto cgf = DPCPP_Q_CGF(cgh) {
+    sycl::local_accessor<int32_t, 1> slm(
+        sycl::range<1>(Kernel::EXCLUSIVE_SIZE), cgh);
     Kernel task(
+        slm,
         activations,
         rows_for_experts,
         topk_indices,
@@ -1495,6 +1440,7 @@ void moe_scatter(
     CASE_TOPK(4)
     CASE_TOPK(6)
     CASE_TOPK(8)
+    CASE_TOPK(10)
     default:
       TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
   }
@@ -1504,7 +1450,6 @@ void moe_scatter(
 
 namespace MoEGatherImpl {
 // Re-gather the outputs of MoE and scale them by the gating score.
-// Note: this kernel reset rows_for_experts to zero
 template <int TopK, typename T>
 struct MoEGather {
   static constexpr int GroupWorkItem = 256;
@@ -1512,7 +1457,6 @@ struct MoEGather {
   static constexpr int Stride = ElemsPerItem * GroupWorkItem;
   MoEGather(
       T* layer_output,
-      int32_t* rows_for_experts,
       const T* moe_output,
       const float* scores,
       const int32_t* mapped_slots,
@@ -1521,7 +1465,6 @@ struct MoEGather {
       const int32_t n_tokens,
       const bool normalize_scales)
       : layer_output(layer_output),
-        rows_for_experts(rows_for_experts),
         moe_output(moe_output),
         scores(scores),
         mapped_slots(mapped_slots),
@@ -1543,13 +1486,6 @@ struct MoEGather {
 
     for (int i = 0; i < TopK; i++) {
       token_mapped_slots[i] = mapped_slots[token_idx * TopK + i];
-    }
-
-    if (token_idx == 0) {
-      // Reset expert counts for its next use.
-      if (local_id < n_experts) {
-        rows_for_experts[local_id] = 0;
-      }
     }
 
     float token_scores[TopK];
@@ -1620,7 +1556,6 @@ struct MoEGather {
   }
 
   T* layer_output; // [n_tokens, hidden_size]
-  int32_t* rows_for_experts; // [n_experts]
   const T* moe_output; // [n_tokens * n_topk, hidden_size]
   const float* scores; // [n_tokens, n_topk]
   const int32_t* mapped_slots; // [n_tokens, n_topk]
@@ -1638,7 +1573,6 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
   static constexpr int Stride = ElemsPerItem * GroupWorkItem;
   MoEGather(
       T* layer_output,
-      int32_t* rows_for_experts,
       const T* moe_output,
       const float* scores,
       const int32_t* mapped_slots,
@@ -1647,7 +1581,6 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
       const int32_t n_tokens,
       const bool normalize_scales)
       : layer_output(layer_output),
-        rows_for_experts(rows_for_experts),
         moe_output(moe_output),
         scores(scores),
         mapped_slots(mapped_slots),
@@ -1669,13 +1602,6 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
 
     for (int i = 0; i < TopK; i++) {
       token_mapped_slots[i] = mapped_slots[token_idx * TopK + i];
-    }
-
-    if (token_idx == 0) {
-      // Reset expert counts for its next use.
-      if (local_id < n_experts) {
-        rows_for_experts[local_id] = 0;
-      }
     }
 
     float token_scores[TopK];
@@ -1746,7 +1672,6 @@ struct MoEGather<TopK, sycl::ext::oneapi::bfloat16> {
   }
 
   T* layer_output; // [n_tokens, hidden_size]
-  int32_t* rows_for_experts; // [n_experts]
   const T* moe_output; // [n_tokens * n_topk, hidden_size]
   const float* scores; // [n_tokens, n_topk]
   const int32_t* mapped_slots; // [n_tokens, n_topk]
@@ -1762,16 +1687,11 @@ void launch_moe_gather(
     const T* moe_output,
     const float* scores,
     const int32_t* mapped_slots,
-    int32_t* rows_for_experts,
     const int32_t n_channels,
     const int32_t n_experts,
     const int32_t n_tokens,
     const bool normalize_scales) {
   using Kernel = MoEGather<TopK, T>;
-  // TODO: maybe add template for GroupWorkItem in the future
-  TORCH_CHECK(
-      Kernel::GroupWorkItem >= n_experts,
-      "MoEScatter::GroupWorkItem is expected to be larger than num_expert");
   TORCH_CHECK(
       n_channels % Kernel::ElemsPerItem == 0,
       "n_channels is expected to be aligned to Kernel::ElemsPerItem");
@@ -1781,7 +1701,6 @@ void launch_moe_gather(
   auto cgf = DPCPP_Q_CGF(cgh) {
     Kernel task(
         layer_output,
-        rows_for_experts,
         moe_output,
         scores,
         mapped_slots,
@@ -1801,7 +1720,6 @@ void moe_gather(
     const T* moe_output,
     const float* scores,
     const int32_t* mapped_slots,
-    int32_t* rows_for_experts,
     const int32_t n_channels,
     const int32_t n_experts,
     const int32_t n_tokens,
@@ -1814,7 +1732,6 @@ void moe_gather(
         moe_output,          \
         scores,              \
         mapped_slots,        \
-        rows_for_experts,    \
         n_channels,          \
         n_experts,           \
         n_tokens,            \
@@ -1826,6 +1743,7 @@ void moe_gather(
     CASE_TOPK(4)
     CASE_TOPK(6)
     CASE_TOPK(8)
+    CASE_TOPK(10)
     default:
       TORCH_CHECK(false, "error: not support topk=%d,\n", topk);
   }
@@ -2178,7 +2096,6 @@ static at::Tensor moe_gather(
     const Tensor& moe_output, // [n_tokens * n_topk, n_channels]
     const Tensor& scores, // [n_tokens, n_topk]
     const Tensor& mapped_slot, //[n_tokens, n_topk]
-    Tensor& rows_for_experts, //[n_experts]
     const int64_t n_experts,
     const int64_t n_topk,
     const bool normalize_scales) {
@@ -2193,7 +2110,6 @@ static at::Tensor moe_gather(
         reinterpret_cast<sycl::half*>(moe_output.data_ptr()),
         reinterpret_cast<float*>(scores.data_ptr()),
         reinterpret_cast<int*>(mapped_slot.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
         n_channels,
         n_experts,
         n_tokens,
@@ -2206,7 +2122,6 @@ static at::Tensor moe_gather(
         reinterpret_cast<sycl::ext::oneapi::bfloat16*>(moe_output.data_ptr()),
         reinterpret_cast<float*>(scores.data_ptr()),
         reinterpret_cast<int*>(mapped_slot.data_ptr()),
-        reinterpret_cast<int*>(rows_for_experts.data_ptr()),
         n_channels,
         n_experts,
         n_tokens,
@@ -2219,7 +2134,6 @@ static at::Tensor moe_gather(
           reinterpret_cast<scalar_t*>(moe_output.data_ptr()),
           reinterpret_cast<float*>(scores.data_ptr()),
           reinterpret_cast<int*>(mapped_slot.data_ptr()),
-          reinterpret_cast<int*>(rows_for_experts.data_ptr()),
           n_channels,
           n_experts,
           n_tokens,

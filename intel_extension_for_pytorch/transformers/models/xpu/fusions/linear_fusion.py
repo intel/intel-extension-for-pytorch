@@ -358,7 +358,6 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             reordered_moe_output,
             routing_weights,
             mapped_slot,
-            rows_for_experts,
             self.num_experts,
             top_k,
             renormalize,
