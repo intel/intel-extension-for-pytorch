@@ -438,8 +438,7 @@ class fmha_forward_t {
             {end_y, end_x, b_stride * args.uB},
             {start_acc, start_x});
       } else if constexpr (kVarlen) {
-        // there is an assumption that kBc should equals to the block size, so
-        // the startT should always divisible by kBc
+        // there is an assumption that block size should divisible by kBc
         int32_t start_x;
         int32_t end_x;
         if (args.block_tables != nullptr) {
@@ -447,11 +446,11 @@ class fmha_forward_t {
           int32_t start_x_offset =
               args.block_tables
                   [batch_id * args.max_blocks_per_seq + block_slot_offset];
-          start_x = start_x_offset * args.block_size;
+          start_x = start_x_offset * args.block_size + startT % args.block_size;
           // end_x = start_x + args.block_size;
           int32_t seqlen = args.cu_seqlen_k[batch_id];
           int32_t remain_T = seqlen - startT;
-          remain_T = remain_T < args.block_size ? remain_T : args.block_size;
+          remain_T = remain_T < kBc ? remain_T : kBc;
           end_x = start_x + remain_T;
         } else {
           start_x = startT + args.cu_seqlen_k[batch_id];

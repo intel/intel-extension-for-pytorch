@@ -91,28 +91,7 @@ class fmha_forward_kernel_policy {
     bool gqa_enabled = (args.num_queries == NUM_QUERIES_GREEDY) &&
         _load_using_fmha_v3() &&
         (args.num_kv_heads * max_qhead_kv >= args.num_heads);
-    if (args.block_size == 64) {
-      // std::cout << "block size 64" << std::endl;
-      if (gqa_enabled) {
-        if (args.head_size <= HEAD_SIZE_LIMIT_0) {
-          return kernel_call<fmha_policy_1x64x64>(args);
-        } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
-          return kernel_call<fmha_policy_1x64x128>(args);
-        }
-      }
-      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
-        return kernel_call<fmha_policy_64x64x64>(args);
-      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
-        return kernel_call<fmha_policy_64x64x128>(args);
-      } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
-        return kernel_call<fmha_policy_64x64x256>(args);
-      } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
-        return kernel_call<fmha_policy_64x64x512>(args);
-      } else {
-        assert(false);
-        return {};
-      }
-    } else if (args.block_size == 128) {
+    if (args.block_size % 128 == 0) {
       if (gqa_enabled) {
         if (args.head_size <= HEAD_SIZE_LIMIT_0) {
           return kernel_call<fmha_policy_1x128x64>(args);
@@ -129,6 +108,27 @@ class fmha_forward_kernel_policy {
         return kernel_call<fmha_policy_64x128x256>(args);
       } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
         return kernel_call<fmha_policy_64x128x512>(args);
+      } else {
+        assert(false);
+        return {};
+      }
+    } else if (args.block_size % 64 == 0) {
+      // std::cout << "block size 64" << std::endl;
+      if (gqa_enabled) {
+        if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+          return kernel_call<fmha_policy_1x64x64>(args);
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+          return kernel_call<fmha_policy_1x64x128>(args);
+        }
+      }
+      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+        return kernel_call<fmha_policy_64x64x64>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+        return kernel_call<fmha_policy_64x64x128>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
+        return kernel_call<fmha_policy_64x64x256>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
+        return kernel_call<fmha_policy_64x64x512>(args);
       } else {
         assert(false);
         return {};
