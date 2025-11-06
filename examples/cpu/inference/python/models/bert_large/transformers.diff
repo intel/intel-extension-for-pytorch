@@ -268,7 +268,7 @@ index 999752485b..ec49f829af 100644
 +                    if args.profile:
 +                        prof.step()
 +                    time_end = time.time()
-+                    if epoch * steps_per_epoch + it > args.perf_begin_iter:
++                    if epoch * steps_per_epoch + it >= args.perf_begin_iter:
 +                        total_time +=(time_end - time_start)
 +                        timeBuff.append(time_end - time_start)
 +                    pbar.update(1)
@@ -1628,7 +1628,7 @@ index a2436dadc1..e951a9ad0b 100755
 +                            start = time.time()
 +                            outputs = model(**batch)
 +                            end = time.time()
-+                        if epoch * steps_per_epoch + it > self.args.perf_begin_iter:
++                        if epoch * steps_per_epoch + it >= self.args.perf_begin_iter:
 +                            timeBuff.append(end-start)
 +                        pbar.update(1)
 +

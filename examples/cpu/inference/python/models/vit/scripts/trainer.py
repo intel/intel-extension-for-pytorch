@@ -4115,7 +4115,7 @@ class Trainer:
                             start = time.time()
                             outputs = model(**batch)
                             end = time.time()
-                        if epoch * steps_per_epoch + it > self.args.perf_begin_iter:
+                        if epoch * steps_per_epoch + it >= self.args.perf_begin_iter:
                             timeBuff.append(end - start)
                         pbar.update(1)
 
