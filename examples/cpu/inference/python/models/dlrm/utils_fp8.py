@@ -1,5 +1,6 @@
 import torch
 import torchao  # noqa: F401
+import os
 
 quantize_affine_float8_non_decomposed = (
     torch.ops.torchao.quantize_affine_float8_non_decomposed.default
@@ -103,7 +104,6 @@ def inc_convert(model, dtype):
                 True,
             )
 
-    hook_handles = []
     import json
     from collections import namedtuple
 
@@ -121,7 +121,9 @@ def inc_convert(model, dtype):
 
     parent_child_mod_dict = generate_model_info(model)
 
-    with open("fp8_data.json", "r") as fp:
+    with open(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "fp8_data.json"), "r"
+    ) as fp:
         data = json.load(fp)
     with torch.no_grad():
         for name, mod in model.model.named_modules():

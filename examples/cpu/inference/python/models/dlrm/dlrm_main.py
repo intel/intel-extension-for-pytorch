@@ -530,6 +530,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         help="number of test batches",
     )
     parser.add_argument(
+        "--warmup_batches",
+        type=int,
+        default=100,
+        help="number of warmup batches, only works for weight-sharing=False "
+        "performance test",
+    )
+    parser.add_argument(
         "--dataset_name",
         type=str,
         default="criteo_1t",
@@ -841,6 +848,50 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def fetch_next(iterator, current_it, limit_batches, benchmark_batch, args):
+    if args.benchmark:
+        if current_it == limit_batches:
+            raise StopIteration
+        return benchmark_batch
+    else:
+        with record_function("generate batch"):
+            next_batch = next(iterator)
+        with record_function("unpack KeyJaggedTensor"):
+            next_batch.sparse_features = unpack(next_batch.sparse_features)
+        return next_batch
+
+
+def eval_step(
+    model,
+    iterator,
+    current_it,
+    limit_batches,
+    benchmark_batch,
+    args,
+    with_time=False,
+):
+    """
+    Performs a forward pass and returns logits and labels.
+    If with_time is True, also returns the forward time.
+    """
+    batch = fetch_next(
+        iterator,
+        current_it,
+        limit_batches,
+        benchmark_batch,
+        args,
+    )
+    with record_function("model forward"):
+        if with_time:
+            t1 = time.time()
+            logits = model(batch.dense_features, batch.sparse_features)
+            t2 = time.time()
+            return logits, batch.labels, t2 - t1
+        else:
+            logits = model(batch.dense_features, batch.sparse_features)
+            return logits, batch.labels
+
+
 def _evaluate(
     eval_model,
     eval_dataloader: DataLoader,
@@ -865,46 +916,10 @@ def _evaluate(
     limit_batches = args.limit_val_batches
     print_progress = args.print_progress
     autocast_enabled, autocast_dtype = parse_autocast(args.dtype)
-    log_freq = args.log_freq_eval
     enable_torch_profile = args.profile
 
-    benckmark_batch = fetch_batch(eval_dataloader)
-    benckmark_batch.sparse_features = unpack(benckmark_batch.sparse_features)
-
-    def fetch_next(iterator, current_it):
-        if args.benchmark:
-            if current_it == limit_batches:
-                raise StopIteration
-            return benckmark_batch
-        else:
-            with record_function("generate batch"):
-                next_batch = next(iterator)
-            with record_function("unpack KeyJaggedTensor"):
-                next_batch.sparse_features = unpack(next_batch.sparse_features)
-            return next_batch
-
-    def eval_step(model, iterator, current_it):
-        batch = fetch_next(iterator, current_it)
-        with record_function("model forward"):
-            logits = model(batch.dense_features, batch.sparse_features)
-        return logits, batch.labels
-
-    def gather_output(label, pred):
-        my_rank = dist.get_rank()
-        my_size = dist.get_world_size()
-        if my_rank == 0:
-            label_list = [torch.empty_like(label) for _ in range(my_size)]
-            pred_list = [torch.empty_like(pred) for _ in range(my_size)]
-        else:
-            label_list = None
-            pred_list = None
-        dist.barrier()
-        dist.gather(label, label_list, dst=0)
-        dist.gather(pred, pred_list, dst=0)
-        if my_rank == 0:
-            return torch.cat(label_list), torch.cat(pred_list)
-        else:
-            return None, None
+    benchmark_batch = fetch_batch(eval_dataloader)
+    benchmark_batch.sparse_features = unpack(benchmark_batch.sparse_features)
 
     pbar = tqdm(
         iter(int, 1),
@@ -948,12 +963,22 @@ def _evaluate(
             setattr(p, "_mode", "eval")  # noqa: B010
         while True:
             try:
-                logits, label = eval_step(eval_model, iterator, it)
+                logits, label = eval_step(
+                    eval_model,
+                    iterator,
+                    it,
+                    limit_batches,
+                    benchmark_batch,
+                    args,
+                    with_time=False,
+                )
                 pred = torch.sigmoid(logits)
                 preds.append(pred)
                 labels.append(label)
                 pbar.update(1)
                 it += 1
+                if enable_torch_profile:
+                    p.step()
             except StopIteration:
                 # Dataset traversal complete
                 break
@@ -999,7 +1024,7 @@ def _share_weight_benchmark(
     with ctx:
         stats = bench.benchmark(
             num_calling_threads=args.share_weight_instance,
-            num_warmup_iters=200,
+            num_warmup_iters=args.warmup_batches,
             num_iters=args.limit_val_batches * args.share_weight_instance,
         )
         print(stats)
@@ -1007,6 +1032,107 @@ def _share_weight_benchmark(
     batch_size = batch.dense_features.shape[0]
     throughput = (1 / latency) * 1000 * batch_size * args.share_weight_instance
     print("Throughput: {:.3f} fps".format(throughput))
+
+
+def _throughput_test_benchmark(
+    eval_model,
+    eval_dataloader: DataLoader,
+    stage: str,
+    epoch_num: float,
+    args,
+) -> float:
+    """
+    Evaluates model. Computes and prints AUROC. Helper function for train_val_test.
+
+    Args:
+        limit_batches (Optional[int]): Limits the dataloader to the first `limit_batches` batches.
+        eval_dataloader (DataLoader): Dataloader for either the validation set or test set.
+        stage (str): "val" or "test".
+        epoch_num (float): Iterations passed as epoch fraction (for logging purposes).
+        print_progress (bool): Whether to print tqdm progress bar.
+
+    Returns:
+    """
+    limit_batches = args.limit_val_batches
+    print_progress = args.print_progress
+    autocast_enabled, autocast_dtype = parse_autocast(args.dtype)
+    log_freq = args.log_freq_eval
+    enable_torch_profile = args.profile
+
+    benchmark_batch = fetch_batch(eval_dataloader)
+    benchmark_batch.sparse_features = unpack(benchmark_batch.sparse_features)
+
+    pbar = tqdm(
+        iter(int, 1),
+        desc=f"Evaluating {stage} set",
+        total=len(eval_dataloader),
+        disable=not print_progress,
+    )
+
+    print(f"EVAL_START, EPOCH_NUM: {epoch_num}")
+
+    if not (args.inductor and args.dtype == "int8"):
+        eval_model.eval()
+
+    iterator = itertools.islice(iter(eval_dataloader), limit_batches)
+    # Two filler batches are appended to the end of the iterator to keep the
+    # pipeline active while the last two remaining batches are still in
+    # progress awaiting results.
+    two_filler_batches = itertools.islice(
+        iter(eval_dataloader), TRAIN_PIPELINE_STAGES - 1
+    )
+    iterator = itertools.chain(iterator, two_filler_batches)
+
+    total_t = 0
+    it = 0
+    ctx1 = torch.no_grad()
+    ctx2 = torch.autocast("cpu", enabled=autocast_enabled, dtype=autocast_dtype)
+    ctx3 = torch.profiler.profile(
+        activities=[ProfilerActivity.CPU],
+        schedule=prof_schedule,
+        on_trace_ready=trace_handler,
+    )
+    with ctx1, ctx2:
+        if enable_torch_profile:
+            p = ctx3.__enter__()
+            setattr(p, "_dtype", autocast_dtype)  # noqa: B010
+            setattr(p, "_mode", "eval")  # noqa: B010
+        while True:
+            try:
+                logits, label, fw_t = eval_step(
+                    eval_model,
+                    iterator,
+                    it,
+                    limit_batches,
+                    benchmark_batch,
+                    args,
+                    with_time=True,
+                )
+                if it > args.warmup_batches:
+                    if enable_torch_profile:
+                        p.step()
+                    total_t += fw_t
+                    if (
+                        log_freq != 0
+                        and it % log_freq == 0
+                        and it > args.warmup_batches
+                    ):
+                        print(
+                            f"avg eval time per iter at ITER: {it}, "
+                            f"{total_t/(it - args.warmup_batches)} s, "
+                            f"num_samples: {limit_batches}"
+                        )
+                pbar.update(1)
+                it += 1
+            except StopIteration:
+                # Dataset traversal complete
+                break
+        if enable_torch_profile:
+            ctx3.__exit__(None, None, None)
+
+    print(f"Number of {stage} samples: {limit_batches}")
+    print(f"Throughput: {limit_batches/total_t} fps")
+    return
 
 
 @dataclass
@@ -1043,19 +1169,29 @@ def train_val_test(
     results = TrainValTestResults()
 
     with torch.no_grad():
-        if args.share_weight_instance > 0:
-            _share_weight_benchmark(model.model, val_dataloader, args)
+        if args.benchmark:
+            if args.share_weight_instance > 0:
+                _share_weight_benchmark(model.model, val_dataloader, args)
+            else:
+                _throughput_test_benchmark(
+                    model.model,
+                    val_dataloader,
+                    "val",
+                    0,
+                    args,
+                )
             exit()
-    # Mlperf is using val set to test auroc
-    # https://github.com/mlcommons/inference/blob/master/recommendation/dlrm_v2/pytorch/python/multihot_criteo.py#L99-L107
-    test_auroc = _evaluate(
-        model.model,
-        val_dataloader,
-        "test",
-        0,
-        args,
-    )
-    results.test_auroc = test_auroc
+        else:
+            # Mlperf is using val set to test auroc
+            # https://github.com/mlcommons/inference/blob/master/recommendation/dlrm_v2/pytorch/python/multihot_criteo.py#L99-L107
+            test_auroc = _evaluate(
+                model.model,
+                val_dataloader,
+                "test",
+                0,
+                args,
+            )
+            results.test_auroc = test_auroc
     return results
 
 
