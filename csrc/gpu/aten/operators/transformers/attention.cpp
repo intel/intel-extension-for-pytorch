@@ -1781,6 +1781,53 @@ Tensor paged_attention(
   }
 }
 
+bool check_kv_from_mamba_cache(
+    const at::Tensor& k_cache,
+    const at::Tensor& v_cache) {
+  if (k_cache.sizes() != v_cache.sizes() ||
+      k_cache.strides() != v_cache.strides() ||
+      k_cache.dtype() != v_cache.dtype() ||
+      k_cache.device() != v_cache.device()) {
+    return false;
+  }
+
+  auto sizes = k_cache.sizes();
+  int64_t num_blocks = sizes[0];
+  int64_t block_size = sizes[1];
+  int64_t num_kv_heads = sizes[2];
+  int64_t head_size = sizes[3];
+
+  int64_t expected_stride_0 = 2 * block_size * num_kv_heads * head_size;
+  int64_t expected_stride_1 = num_kv_heads * head_size;
+  int64_t expected_stride_2 = head_size;
+  int64_t expected_stride_3 = 1;
+
+  auto k_strides = k_cache.strides();
+  auto v_strides = v_cache.strides();
+
+  if (k_strides[0] != expected_stride_0 || k_strides[1] != expected_stride_1 ||
+      k_strides[2] != expected_stride_2 || k_strides[3] != expected_stride_3) {
+    return false;
+  }
+
+  auto k_data_ptr = k_cache.data_ptr();
+  auto v_data_ptr = v_cache.data_ptr();
+
+  int64_t element_size = k_cache.element_size();
+  int64_t offset_bytes = block_size * num_kv_heads * head_size * element_size;
+
+  if (static_cast<char*>(v_data_ptr) !=
+      static_cast<char*>(k_data_ptr) + offset_bytes) {
+    return false;
+  }
+
+  if (k_cache.storage().data_ptr() != v_cache.storage().data_ptr()) {
+    return false;
+  }
+
+  return true;
+}
+
 Tensor chunked_prefill(
     const at::Tensor& query, // [num_tokens_q, query_heads, head_dim]
     const at::Tensor& key, // [num_blocks, block_size, key_heads, head_dim]
@@ -1833,8 +1880,6 @@ Tensor chunked_prefill(
 
   // Check contiguous
   TORCH_CHECK(query.is_contiguous(), "query must be contiguous");
-  TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
-  TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
   TORCH_CHECK(cu_seqlens_q.is_contiguous(), "cu_seqlens_q must be contiguous");
   TORCH_CHECK(cu_seqlens_k.is_contiguous(), "cu_seqlens_k must be contiguous");
   TORCH_CHECK(block_table.is_contiguous(), "block_table must be contiguous");
@@ -1848,6 +1893,32 @@ Tensor chunked_prefill(
   int num_keys = max_seqlen_k;
   int block_size = key.size(1);
   int num_max_seq_block = block_table.size(1);
+
+  bool is_paged_attention_vllm = false;
+  uint32_t num_queries_per_token = num_heads_q / num_heads_k;
+  bool is_mamba_format = check_kv_from_mamba_cache(key, value);
+  if (max_seqlen_q == 1 && block_size == 64 &&
+      (head_dim == 128 || head_dim == 64) && num_queries_per_token <= 8 &&
+      !alibi_slopes_.has_value() && softcap <= 0.0 && window_size_left < 0 &&
+      window_size_right < 0 && !is_mamba_format) {
+    is_paged_attention_vllm = true;
+    TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
+    TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
+  } else if (block_size < 64) {
+    TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
+    TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
+  } else {
+    // key and value may be from mamba spec
+    // kv_cache = [num_blocks, 2, block_size, num_kv_heads, head_size]
+    // k, v = kv_cache.transpose(1, 0).unbind(0)
+    bool is_key_contiguous = key.is_contiguous();
+    bool is_value_contiguous = value.is_contiguous();
+    if ((!is_mamba_format) && (!(is_key_contiguous && is_value_contiguous))) {
+      TORCH_CHECK(
+          false,
+          "key and value should both be contiguous or unbind from kv_cache")
+    }
+  }
 
   TORCH_CHECK(
       block_table.size(0) == batch_size,
@@ -1924,11 +1995,7 @@ Tensor chunked_prefill(
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   // decode path, we may use 4k as threshold
-  uint32_t num_queries_per_token = num_heads_q / num_heads_k;
-  if (max_seqlen_q == 1 && block_size == 64 &&
-      (head_dim == 128 || head_dim == 64) && num_queries_per_token <= 8 &&
-      !alibi_slopes_.has_value() && softcap <= 0.0 && window_size_left < 0 &&
-      window_size_right < 0) {
+  if (is_paged_attention_vllm) {
     constexpr const uint32_t long_context_decode = 4096;
     const float softmax_scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
     int32_t wg_size = head_dim / 16;

@@ -295,6 +295,12 @@ class fmha_forward_v3_t {
     uint32_t local_left;
     uint32_t local_right;
 
+    // key and value may be from mamba spec
+    // kv_cache = [num_blocks, 2, block_size, num_kv_heads, head_size]
+    // k, v = kv_cache.transpose(1, 0).unbind(0)
+    // mamba_stride_ratio will be 2, else will be 1
+    int32_t mamba_stride_ratio;
+
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
@@ -320,6 +326,9 @@ class fmha_forward_v3_t {
           args.kv_strideT;
       kv_offset_x =
           args.kv_strideT > args.kv_strideN ? head_id_kv * args.kv_strideN : 0;
+
+      mamba_stride_ratio =
+          args.kv_strideB / (args.kv_strideN * args.block_size);
 
       softmax_l.fill(0.f);
       softmax_m.fill(kNegInfinity);
@@ -461,6 +470,7 @@ class fmha_forward_v3_t {
           int32_t start_x_offset =
               args.block_tables
                   [batch_id * args.max_blocks_per_seq + block_slot_offset];
+          start_x_offset *= mamba_stride_ratio;
           start_x = start_x_offset * args.block_size + startT % args.block_size;
           // end_x = start_x + args.block_size;
           int32_t seqlen = args.cu_seqlen_k[batch_id];

@@ -302,6 +302,7 @@ class TestChunkedPrefill(TestCase):
         window_size,
         dtype,
         softcap,
+        is_mamba_spec,
     ) -> None:
         seed = 0
 
@@ -381,6 +382,23 @@ class TestChunkedPrefill(TestCase):
             window_size,
             softcap,
         )
+
+        if is_mamba_spec:
+            num_blocks, block_size, num_kv_heads, head_size = key_cache_xpu.shape
+            kv_cache_xpu = torch.empty(
+                num_blocks,
+                2,
+                block_size,
+                num_kv_heads,
+                head_size,
+                dtype=dtype,
+                device="xpu",
+            )
+            kv_cache_xpu[:, 0, :, :, :] = key_cache_xpu
+            kv_cache_xpu[:, 1, :, :, :] = value_cache_xpu
+            kv_cache_xpu = kv_cache_xpu.contiguous()
+
+            key_cache_xpu, value_cache_xpu = kv_cache_xpu.transpose(1, 0).unbind(0)
 
         ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
             output_xpu,
@@ -524,6 +542,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("window_size", [(-1, -1), (8, 2)])
     @parametrize("dtype", [torch.float16])
     @parametrize("softcap", [-1.0, 50.0])
+    @parametrize("is_mamba_spec", [False, True])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
         reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
@@ -540,6 +559,7 @@ class TestChunkedPrefill(TestCase):
         window_size,
         dtype,
         softcap,
+        is_mamba_spec,
     ):
         self.chunk_prefill(
             num_gen_seqs,
@@ -553,6 +573,7 @@ class TestChunkedPrefill(TestCase):
             window_size,
             dtype,
             softcap,
+            is_mamba_spec,
         )
 
     @parametrize("num_gen_seqs", [1, 8])
@@ -569,6 +590,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("dtype", [torch.float16])
     @parametrize("window_size", [(-1, -1), (2, 2)])
     @parametrize("softcap", [-1.0, 50.0])
+    @parametrize("is_mamba_spec", [False, True])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
         reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
@@ -585,6 +607,7 @@ class TestChunkedPrefill(TestCase):
         dtype,
         softcap,
         window_size,
+        is_mamba_spec,
     ):
         self.chunk_prefill(
             num_gen_seqs,
@@ -598,6 +621,7 @@ class TestChunkedPrefill(TestCase):
             window_size,
             dtype,
             softcap,
+            is_mamba_spec,
         )
 
     @parametrize("num_gen_seqs", [1, 8])
