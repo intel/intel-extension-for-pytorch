@@ -417,6 +417,7 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
         if not args.test_auroc:
             config.error_on_recompile = True
 
+        config.install_free_tensors_for_export = False
         inductor_config.cpp_wrapper = True
         inductor_config.cpp.enable_kernel_profile = True
         if args.inference_only:
