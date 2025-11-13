@@ -52,7 +52,21 @@
                   <div class="menu-element" id="menu-installation">Installation</div>
                 </div>
                 <h1>Welcome to Intel® Extension for PyTorch* Documentation!<a class="headerlink" href="#welcome-to-intel-extension-for-pytorch-documentation" title="Permalink to this heading"></a></h1>
+                <section id="retirement-plan">
+                    <h2>Retirement Plan<a class="headerlink" href="#retirement-plan" title="Link to this heading"></a></h2>
+                    <p>You may already be aware that we plan to retire Intel® Extension for PyTorch* soon. This was announced in the Intel® Extension for PyTorch* 2.8 release notes and also highlighted in community ticket <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/867">#867</a>.</p>
+                    <p>We launched the Intel® Extension for PyTorch* in 2020 with the goal of extending the official PyTorch* to simplify achieving high performance on Intel® CPU and GPU platforms. Over the years, we have successfully upstreamed most of our features and optimizations for Intel® platforms into PyTorch* itself. As a result, we have discontinued active development of the Intel® Extension for PyTorch* and ceased official quarterly releases following the 2.8 release. We strongly recommend using PyTorch* directly going forward, as we remain committed to delivering robust support and performance with PyTorch* for Intel® CPU and GPU platforms.</p>
+                    <p>We will continue to provide critical bug fixes and security patches for two additional quarters to ensure a smooth transition for our partners and the broader community. After that, we plan to mark the project End-of-Life unless there is a solid need to continue maintenance. Concretely, this means:</p>
+                    <ul class="simple">
+                    <li><p>We will continue to provide critical bug fixes and security patches in the main branches of Intel® Extension for PyTorch*: <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main">CPU</a> and <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main">GPU</a>.</p></li>
+                    <li><p>We have stopped official quarterly releases. We will not create release branches or publish official binary wheels for Intel® Extension for PyTorch*.</p></li>
+                    <li><p>We will maintain Intel® Extension for PyTorch* as an open source project until the end of March 2026, to allow projects which depend on Intel® Extension for PyTorch* to completely remove the dependency.</p></li>
+                    </ul>
+                    <p>Thank you all for your continued support! Let’s keep the momentum going together!</p>
+                </section>
+
                 <div id="div-introduction">
+                    <h2>Introduction</h2>
 <p>Intel® Extension for PyTorch* extends PyTorch* with the latest performance optimizations for Intel hardware.
 Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup>Matrix Extensions (XMX) AI engines on Intel discrete GPUs.
 Moreover, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device.</p>

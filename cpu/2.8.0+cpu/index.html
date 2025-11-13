@@ -115,6 +115,20 @@
              
   <section id="intel-extension-for-pytorch">
 <h1>Intel® Extension for PyTorch*<a class="headerlink" href="#intel-extension-for-pytorch" title="Link to this heading"></a></h1>
+<section id="retirement-plan">
+<h2>Retirement Plan<a class="headerlink" href="#retirement-plan" title="Link to this heading"></a></h2>
+<p>You may already be aware that we plan to retire Intel® Extension for PyTorch* soon. This was announced in the Intel® Extension for PyTorch* 2.8 release notes and also highlighted in community ticket <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues/867">#867</a>.</p>
+<p>We launched the Intel® Extension for PyTorch* in 2020 with the goal of extending the official PyTorch* to simplify achieving high performance on Intel® CPU and GPU platforms. Over the years, we have successfully upstreamed most of our features and optimizations for Intel® platforms into PyTorch* itself. As a result, we have discontinued active development of the Intel® Extension for PyTorch* and ceased official quarterly releases following the 2.8 release. We strongly recommend using PyTorch* directly going forward, as we remain committed to delivering robust support and performance with PyTorch* for Intel® CPU and GPU platforms.</p>
+<p>We will continue to provide critical bug fixes and security patches for two additional quarters to ensure a smooth transition for our partners and the broader community. After that, we plan to mark the project End-of-Life unless there is a solid need to continue maintenance. Concretely, this means:</p>
+<ul class="simple">
+<li><p>We will continue to provide critical bug fixes and security patches in the main branches of Intel® Extension for PyTorch*: <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main">CPU</a> and <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main">GPU</a>.</p></li>
+<li><p>We have stopped official quarterly releases. We will not create release branches or publish official binary wheels for Intel® Extension for PyTorch*.</p></li>
+<li><p>We will maintain Intel® Extension for PyTorch* as an open source project until the end of March 2026, to allow projects which depend on Intel® Extension for PyTorch* to completely remove the dependency.</p></li>
+</ul>
+<p>Thank you all for your continued support! Let’s keep the momentum going together!</p>
+</section>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* extends PyTorch* with the latest performance optimizations for Intel hardware.
 Optimizations take advantage of Intel® Advanced Vector Extensions 512 (Intel® AVX-512) Vector Neural Network Instructions (VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel X<sup>e</sup>Matrix Extensions (XMX) AI engines on Intel discrete GPUs.
 Moreover, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs through the PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device.</p>
@@ -138,14 +152,15 @@ LLMs are introduced in the Intel® Extension for PyTorch*. For more information 
 <li><p><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features">Features</a></p></li>
 <li><p><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance">Performance</a></p></li>
 </ul>
+</section>
 <section id="architecture">
 <h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* is structured as shown in the following figure:</p>
-<figure class="align-center" id="id2">
+<figure class="align-center" id="id3">
 <a class="reference internal image-reference" href="_images/intel_extension_for_pytorch_structure.png"><img alt="Architecture of Intel® Extension for PyTorch*" src="_images/intel_extension_for_pytorch_structure.png" style="width: 800px;" />
 </a>
 <figcaption>
-<p><span class="caption-text">Architecture of Intel® Extension for PyTorch*</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+<p><span class="caption-text">Architecture of Intel® Extension for PyTorch*</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <ul class="simple">
@@ -187,7 +202,7 @@ LLMs are introduced in the Intel® Extension for PyTorch*. For more information 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7cbf90d372e0> 
+   <jinja2.runtime.BlockReference object at 0x759412d372e0> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a><a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a><a href='/#' data-wap_ref='dns' id='wap_dns'><small>| Your Privacy Choices</small><span style='height:10px;width:28px;display:inline-block;position:relative;'><svg style='position:absolute;width:28px;bottom:-2px;' version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 30 14' xml:space='preserve'><title>California Consumer Privacy Act (CCPA) Opt-Out Icon</title><style type='text/css'> .st0 { fill-rule: evenodd; clip-rule: evenodd; fill: #FFFFFF; } .st1 { fill-rule: evenodd; clip-rule: evenodd; fill: #0066FF; } .st2 { fill: #FFFFFF; } .st3 { fill: #0066FF; } </style><g><g id='final---dec.11-2020_1_'><g id='_x30_208-our-toggle_2_' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2_2_' transform='translate(1275.000000, 200.000000)'><path class='st0' d='M7.4,12.8h6.8l3.1-11.6H7.4C4.2,1.2,1.6,3.8,1.6,7S4.2,12.8,7.4,12.8z'></path></g></g></g><g id='final---dec.11-2020'><g id='_x30_208-our-toggle' transform='translate(-1275.000000, -200.000000)'><g id='Final-Copy-2' transform='translate(1275.000000, 200.000000)'><path class='st1' d='M22.6,0H7.4c-3.9,0-7,3.1-7,7s3.1,7,7,7h15.2c3.9,0,7-3.1,7-7S26.4,0,22.6,0z M1.6,7c0-3.2,2.6-5.8,5.8-5.8 h9.9l-3.1,11.6H7.4C4.2,12.8,1.6,10.2,1.6,7z'></path><path id='x' class='st2' d='M24.6,4c0.2,0.2,0.2,0.6,0,0.8l0,0L22.5,7l2.2,2.2c0.2,0.2,0.2,0.6,0,0.8c-0.2,0.2-0.6,0.2-0.8,0 l0,0l-2.2-2.2L19.5,10c-0.2,0.2-0.6,0.2-0.8,0c-0.2-0.2-0.2-0.6,0-0.8l0,0L20.8,7l-2.2-2.2c-0.2-0.2-0.2-0.6,0-0.8 c0.2-0.2,0.6-0.2,0.8,0l0,0l2.2,2.2L23.8,4C24,3.8,24.4,3.8,24.6,4z'></path><path id='y' class='st3' d='M12.7,4.1c0.2,0.2,0.3,0.6,0.1,0.8l0,0L8.6,9.8C8.5,9.9,8.4,10,8.3,10c-0.2,0.1-0.5,0.1-0.7-0.1l0,0 L5.4,7.7c-0.2-0.2-0.2-0.6,0-0.8c0.2-0.2,0.6-0.2,0.8,0l0,0L8,8.6l3.8-4.5C12,3.9,12.4,3.9,12.7,4.1z'></path></g></g></g></g></svg></span></a><a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref='nac' id='wap_nac'><small>| Notice at Collection</small></a></div><p></p><div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>.</div>
 
 
