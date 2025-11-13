@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ARGS=" --trust-remote-code --device cpu --disable-overlap-schedule --prompt-filename prompt.json  --max-total-tokens 65536 --mem-fraction-static 0.8 "
+ARGS=" --enable-torch-compile --trust-remote-code --device cpu --disable-overlap-schedule --prompt-filename prompt.json  --max-total-tokens 65536 --mem-fraction-static 0.8 "
 
 export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 export SGLANG_USE_CPU_ENGINE=1

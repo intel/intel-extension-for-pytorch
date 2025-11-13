@@ -34,6 +34,7 @@ pip install mkl-static mkl-include
 export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(which conda))/../'}:${CMAKE_PREFIX_PATH}"
 python setup.py install
 cd ..
+python -m pip install torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/ --no-deps
 
 # Build sgl-kernel
 conda install -y libnuma numactl
@@ -43,7 +44,7 @@ cp pyproject_cpu.toml pyproject.toml
 pip install uv
 pip install scikit-build-core
 SGLANG_CPU_FP8_BRGEMM=1 uv build --wheel -Cbuild-dir=build . --color=always --no-build-isolation
-pip install dist/sgl_kernel-0.2.5-cp310-cp310-linux_x86_64.whl --force-reinstall
+pip install "$(find dist -name 'sgl_kernel-*.whl' | sort | tail -n 1)" --force-reinstall
 cd ..
 
 conda install -y gperftools -c conda-forge
@@ -53,7 +54,7 @@ pip install intel-openmp==2024.2.0
 export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libiomp5.so:${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libtcmalloc.so
 
 # Download the prompt file
-wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-3.json
+wget -O prompt.json https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.com/miscellaneous/llm/prompt-1024-1.txt
 
 ```
 
@@ -83,16 +84,16 @@ bash run_model_with_sglang.sh
 export SGLANG_USE_CPU_ENGINE=1
 
 # BF16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype bfloat16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6 --enable-torch-compile
 
 # FP16
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --dtype float16  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6 --enable-torch-compile
 
 # INT8
-python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
+python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule --quantization w8a8_int8  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6 --enable-torch-compile
 
 # FP8
-SGLANG_LLAMA_BRGEMM_FP8A8=1 python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6
+SGLANG_LLAMA_BRGEMM_FP8A8=1 python -m sglang.launch_server --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --disable-overlap-schedule  --mem-fraction-static 0.8 --max-total-tokens 65536 --disable-radix-cache --tp 6 --enable-torch-compile
 
 ```
 

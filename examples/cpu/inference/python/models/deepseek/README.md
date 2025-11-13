@@ -80,7 +80,7 @@ wget --no-proxy -O prompt.json http://mlpc.intel.com/downloads/LLM/prompt-qwen3-
 ##### 2.1 Bench one batch
 ```sh
 # TP = 6, 43 OpenMP threads of rank0 are bound on 0-42 CPU cores, and the OpenMP threads of rank1 are bound on 43-85 CPU cores, etc.
-SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.bench_one_batch --batch-size ${BATCH_SIZE} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --tp 6 --prompt-file prompt.json --mem-fraction-static 0.8 --max-total-tokens 65536 
+SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.bench_one_batch --batch-size ${BATCH_SIZE} --input ${INPUT_TOKEN} --output ${OUTPUT_TOKEN} --model ${FINETUNED_MODEL} --trust-remote-code --device cpu --tp 6 --prompt-file prompt.json --mem-fraction-static 0.8 --max-total-tokens 65536 --enable-torch-compile
 ```
 
 
@@ -96,7 +96,7 @@ tar xf data.tar
 Server
 ```sh
 # R1 FP8
-SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.launch_server --model deepseek-ai/DeepSeek-R1 --trust-remote-code --device cpu --log-requests --log-requests-level 1 --disable-overlap-schedule --tp 6 --chunked-prefill-size 2048 --max-running-requests 8 --mem-fraction-static 0.8 --max-total-tokens 65536
+SGLANG_USE_CPU_ENGINE=1 SGLANG_DEEPSEEK_FP8A8=1 SGLANG_CPU_OMP_THREADS_BIND="0-42|43-85|86-127|128-170|171-213|214-255" python3 -m sglang.launch_server --model deepseek-ai/DeepSeek-R1 --trust-remote-code --device cpu --log-requests --log-requests-level 1 --disable-overlap-schedule --tp 6 --chunked-prefill-size 2048 --max-running-requests 8 --mem-fraction-static 0.8 --max-total-tokens 65536 --enable-torch-compile
 ```
 
 Client
