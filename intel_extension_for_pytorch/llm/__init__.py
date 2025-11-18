@@ -14,8 +14,6 @@ try:
         _get_relative_imports,
         _gradient_checkpointing_disable,
         _gradient_checkpointing_enable,
-        _get_class_from_dynamic_module,
-        _get_cached_module_file,
         _get_imports,
         _pad,
         load_low_precision_checkpoint,
@@ -25,10 +23,6 @@ try:
 
     transformers.dynamic_module_utils.get_relative_imports = _get_relative_imports
     transformers.dynamic_module_utils.get_imports = _get_imports
-    transformers.dynamic_module_utils.get_cached_module_file = _get_cached_module_file
-    transformers.dynamic_module_utils.get_class_from_dynamic_module = (
-        _get_class_from_dynamic_module
-    )
 
     from packaging import version
 
