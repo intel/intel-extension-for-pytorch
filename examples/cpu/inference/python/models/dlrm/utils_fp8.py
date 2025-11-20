@@ -102,6 +102,7 @@ def inc_convert(model, dtype):
                 1.0,
                 0,
                 True,
+                torch.float,
             )
 
     import json
