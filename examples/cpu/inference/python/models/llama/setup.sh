@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-pip install datasets sentencepiece psutil lm_eval
+pip install datasets sentencepiece psutil lm_eval===0.4.9 peft==0.17.1
 
 # Clone the Transformers repo in the LLAMA2 inference directory
 git clone https://github.com/jianan-gu/transformers -b flex_attention_enabling_2.7
