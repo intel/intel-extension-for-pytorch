@@ -46,6 +46,9 @@ Tensor fused_moe_gemm(
   auto matrix_b_shape = matrix_b.sizes().vec();
   int gemm_n = matrix_b_shape[2];
 
+  int n_experts_local = matrix_b_shape[0];
+  int n_experts_aligned = (n_experts_local + 7) / 8 * 8; // align to 8
+
   TORCH_CHECK(matrix_b_shape.size() == 3, "matrix_b must be 3D");
   TORCH_CHECK(
       matrix_b_shape[0] == n_experts,
@@ -54,11 +57,8 @@ Tensor fused_moe_gemm(
       matrix_b_shape[1] == gemm_k,
       "matrix_b must have the same size as matrix_a in the second dimension");
   TORCH_CHECK(
-      matrix_b_shape[0] == rows_for_experts.size(0),
-      "rows_for_experts must have the same size as the first dimension of matrix_b");
-  TORCH_CHECK(
-      n_experts % 8 == 0,
-      "n_experts must be a multiple of 8 for the current implementation");
+      n_experts_aligned == rows_for_experts.size(0),
+      "The size of experts must be aligned to an integer multiple of 8.");
 
   auto output = at::empty({total_m, gemm_n}, matrix_a.options());
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
@@ -198,6 +198,9 @@ Tensor fused_moe_gemm_persistent(
   auto matrix_b_shape = matrix_b.sizes().vec();
   int gemm_n = matrix_b_shape[2];
 
+  int n_experts_local = matrix_b_shape[0];
+  int n_experts_aligned = (n_experts_local + 7) / 8 * 8; // align to 8
+
   TORCH_CHECK(matrix_b_shape.size() == 3, "matrix_b must be 3D");
   TORCH_CHECK(
       matrix_b_shape[0] == n_experts,
@@ -206,11 +209,8 @@ Tensor fused_moe_gemm_persistent(
       matrix_b_shape[1] == gemm_k,
       "matrix_b must have the same size as matrix_a in the second dimension");
   TORCH_CHECK(
-      matrix_b_shape[0] == rows_for_experts.size(0),
-      "rows_for_experts must have the same size as the first dimension of matrix_b");
-  TORCH_CHECK(
-      n_experts % 8 == 0,
-      "n_experts must be a multiple of 8 for the current implementation");
+      n_experts_aligned == rows_for_experts.size(0),
+      "The size of experts must be aligned to an integer multiple of 8.");
 
   auto output = at::empty({total_m, gemm_n}, matrix_a.options());
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
