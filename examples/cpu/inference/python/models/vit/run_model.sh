@@ -44,6 +44,8 @@ fi
 
 export DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000"
+export ONEDNN_CACHE_PRIMITIVE_UNSAFE=1  # enable context cache for qlinear
+export TORCHINDUCTOR_MAX_AUTOTUNE_GEMM_BACKENDS="ATEN" # don't use gemm template. remove this when gemm template is better
 
 if [ -z "${OUTPUT_DIR}" ]; then
   echo "The required environment variable OUTPUT_DIR has not been set, please create the output path and set it to OUTPUT_DIR"
