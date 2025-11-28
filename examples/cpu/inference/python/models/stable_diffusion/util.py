@@ -43,31 +43,38 @@ class FP8QDQLinear(torch.nn.Module):
             scale=torch.tensor([self.scale]),
             output_dtype=torch.float,
         )
-        out = torch.nn.functional.linear(dq_input, weight, self.bias)
-        return out
+        return F.linear(dq_input, weight, self.bias)
 
 
 class FP8QDQConv2d(torch.nn.Module):
     def __init__(self, weight_shape, stride, padding, dilation, groups):
         super().__init__()
-        self.weight = torch.empty(weight_shape)
+        self.qtype = torch.float8_e4m3fn
+        self.weight = torch.randn(weight_shape).to(self.qtype)
         self.bias = None
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
         self.groups = groups
-        self.weight_scale = None
-        self.scale = None
+        self.weight_scale = 2.0
+        self.scale = 2.0
 
     def forward(self, input):
-        dtype = input.dtype
-        weight = self.weight.to(dtype) * self.weight_scale
-        q_input = torch.clamp(
-            (input / self.scale),
-            torch.finfo(torch.float8_e4m3fn).min,
-            torch.finfo(torch.float8_e4m3fn).max,
-        ).to(torch.float8_e4m3fn)
-        dq_input = q_input.to(dtype) * self.scale
+        weight = torch.ops.torchao.dequantize_affine_float8_non_decomposed.default(
+            tensor=self.weight.data,
+            scale=torch.tensor([self.weight_scale]),
+            output_dtype=torch.float,
+        )
+        q_input = torch.ops.torchao.quantize_affine_float8_non_decomposed.default(
+            tensor=input,
+            scale=torch.tensor([self.scale]),
+            float8_dtype=self.qtype,
+        )
+        dq_input = torch.ops.torchao.dequantize_affine_float8_non_decomposed.default(
+            tensor=q_input,
+            scale=torch.tensor([self.scale]),
+            output_dtype=torch.float,
+        )
 
         return F.conv2d(
             dq_input,
