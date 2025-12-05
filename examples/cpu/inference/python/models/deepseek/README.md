@@ -54,7 +54,7 @@ pip install intel-openmp==2024.2.0
 export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libiomp5.so:${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libtcmalloc.so
 
 # Download the prompt file
-wget --no-proxy -O prompt.json http://mlpc.intel.com/downloads/LLM/prompt-qwen3-1-16new.json
+wget -O prompt.json https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.com/miscellaneous/llm/prompt-1024-1.txt
 
 ```
 
