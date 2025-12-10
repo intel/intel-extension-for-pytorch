@@ -11,10 +11,16 @@ This document has instructions for running [ResNet50](https://github.com/Kaiming
 # Install PyTorch, Torchvision
 pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
 
+# Install necessary environment
+pip install numpy
+pip install pillow
+
 # Install Intel OpenMP and TCMalloc
 pip install packaging intel-openmp accelerate
 conda install -y gperftools -c conda-forge
 
+# Download pretrained model, you will find the model under ~/.cache/torch/hub/facebookresearch_WSL-Images_main
+python download_model.py
 ```
 
 ### Datasets

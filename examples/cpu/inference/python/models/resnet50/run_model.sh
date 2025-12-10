@@ -90,7 +90,7 @@ NUMAS=`lscpu | grep 'NUMA node(s)' | awk '{print $3}'`
 CORES_PER_NUMA=`expr $CORES \* $SOCKETS / $NUMAS`
 TOTAL_CORES=`expr $CORES \* $SOCKETS`
 
-ARGS_PYTORCH="$ARGS_PYTORCH --disable-numactl --enable-tcmalloc --log_path="${OUTPUT_DIR}" --log_file_prefix="./${LOG_PREFIX}_${PRECISION}""
+ARGS_PYTORCH="$ARGS_PYTORCH --disable-numactl --enable-tcmalloc --skip-cross-node-cores --log_path="${OUTPUT_DIR}" --log_file_prefix="./${LOG_PREFIX}_${PRECISION}""
 
 if [[ "$TEST_MODE" == "THROUGHPUT" ]]; then
     CORES_PER_INSTANCE=$CORES
