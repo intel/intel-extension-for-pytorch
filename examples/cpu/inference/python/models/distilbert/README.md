@@ -71,6 +71,8 @@ python convert.py $DATASET_DIR
 # Pre-Trained Model
 Follow the instructions below to download the pre-trained model.
 ```
+apt-get update && apt-get install -y git-lfs
+git lfs install
 git clone https://huggingface.co/distilbert-base-uncased-finetuned-sst-2-english
 export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
 ```
@@ -104,5 +106,5 @@ export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
 | **HF_DATASETS_OFFLINE**    |                               `export HF_DATASETS_OFFLINE=0`                               |
 | **BATCH_SIZE** (optional)  |                               `export BATCH_SIZE=<set a value for batch size, else it will run with default batch size>`                                |
  | **CORES_PER_INSTANCE** |            `export CORES_PER_INSTANCE=<set a value for cores per instance>`  |
- | **INSTANCES (Only for custom mode)** |           `export INSTANCES=<set a value for instances>`          
+ | **INSTANCES (Only for custom mode)** |           `export INSTANCES=<set a value for instances>`
 6. Run `run_model_inductor.sh`

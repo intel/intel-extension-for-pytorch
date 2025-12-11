@@ -79,7 +79,7 @@ if [[ "$TEST_MODE" == "THROUGHPUT" ]]; then
         echo "Running inference with torch.compile inductor backend."
         export TORCHINDUCTOR_FREEZING=1
         ARGS="$ARGS --inductor"
-        python -m torch.backends.xeon.run_cpu --disable-numactl --enable-jemalloc --throughput-mode  \
+        python -m torch.backends.xeon.run_cpu --disable-numactl --enable-jemalloc --throughput-mode --skip-cross-node-cores \
             ${EVAL_SCRIPT} $ARGS \
             --model_name_or_path   ${FINETUNED_MODEL} \
             --task_name sst2 \
