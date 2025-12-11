@@ -172,63 +172,6 @@ def parse_autocast(dtype: str):
     return autocast, _dtype
 
 
-def convert_int8(args, model, dataloader):
-    from torch.ao.quantization import (
-        HistogramObserver,
-        PerChannelMinMaxObserver,
-        QConfig,
-    )
-    from intel_extension_for_pytorch.quantization import prepare, convert
-
-    qconfig = QConfig(
-        activation=HistogramObserver.with_args(
-            qscheme=torch.per_tensor_symmetric,
-            dtype=torch.qint8,
-            bins=127,
-            quant_min=-127,
-            quant_max=126,
-        ),
-        weight=PerChannelMinMaxObserver.with_args(
-            dtype=torch.qint8, qscheme=torch.per_channel_symmetric
-        ),
-    )
-    batch = fetch_batch(dataloader)
-    batch.sparse_features = unpack(batch.sparse_features)
-    print_memory("int8 prepare")
-    model = prepare(
-        model,
-        qconfig,
-        example_inputs=(batch.dense_features, batch.sparse_features),
-        inplace=True,
-    )
-    if args.calibration:
-        # https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorch#calibration-set
-        assert args.synthetic_multi_hot_criteo_path, "need real dataset to calibrate"
-        batch_idx = list(range(128000))
-        batch = dataloader.dataset.load_batch(batch_idx)
-        batch.sparse_features = unpack(batch.sparse_features)
-        model(batch.dense_features, batch.sparse_features)
-        model.save_qconf_summary(qconf_summary=args.int8_configure_dir)
-        print(f"calibration done and save to {args.int8_configure_dir}")
-        exit()
-    else:
-        model.load_qconf_summary(qconf_summary=args.int8_configure_dir)
-        print_memory("int8 convert")
-        convert(model, inplace=True)
-        model.eval()
-        torch._C._jit_set_texpr_fuser_enabled(False)
-        print_memory("int8 trace")
-        model = torch.jit.trace(
-            model, (batch.dense_features, batch.sparse_features), check_trace=True
-        )
-        print_memory("int8 freeze")
-        model = torch.jit.freeze(model)
-        print_memory("int8 jit optimize")
-        model(batch.dense_features, batch.sparse_features)
-        model(batch.dense_features, batch.sparse_features)
-        return model
-
-
 def aoti_benchmark_compile(ninstances, nbatches, bs, tmp_dir, target_dir):
     import textwrap
 
@@ -428,27 +371,12 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
                 torch.backends.mkldnn.matmul.fp32_precision = "tf32"
         if dtype == torch.int8:
             assert args.inference_only
-            from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
-            import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-            from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
-                X86InductorQuantizer,
-            )
-            from torch.export import export_for_training
+            import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq  # noqa F401
+            from utils_int8 import calibrate
 
             print("[Info] Running torch.compile() INT8 quantization")
             with torch.no_grad():
-                example_inputs = (dense, sparse)
-                exported_model = export_for_training(
-                    model,
-                    example_inputs,
-                    strict=True,
-                ).module(check_guards=False)
-                quantizer = X86InductorQuantizer()
-                quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
-                prepared_model = prepare_pt2e(exported_model, quantizer)
-                prepared_model(dense, sparse)
-                converted_model = convert_pt2e(prepared_model)
-                torch.ao.quantization.move_exported_model_to_eval(converted_model)
+                converted_model = calibrate(model, dense, sparse)
                 print("[Info] Running torch.compile() with default backend")
                 if args.aot_inductor:
                     aot_inductor_benchmark(
@@ -461,7 +389,6 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
                         ),
                     )
                 else:
-                    model(dense, sparse)
                     model = torch.compile(converted_model)
                 model(dense, sparse)
                 model(dense, sparse)
@@ -1120,7 +1047,7 @@ def _throughput_test_benchmark(
                     ):
                         print(
                             f"avg eval time per iter at ITER: {it}, "
-                            f"{total_t/(it - args.warmup_batches)} s, "
+                            f"{total_t / (it - args.warmup_batches)} s, "
                             f"num_samples: {limit_batches}"
                         )
                 pbar.update(1)
@@ -1132,7 +1059,7 @@ def _throughput_test_benchmark(
             ctx3.__exit__(None, None, None)
 
     print(f"Number of {stage} samples: {limit_batches}")
-    print(f"Throughput: {limit_batches/total_t} fps")
+    print(f"Throughput: {limit_batches / total_t} fps")
     return
 
 
@@ -1196,6 +1123,14 @@ def train_val_test(
     return results
 
 
+def to_torchrec_dtype(args):
+    # TODO: Support more dtype
+    # Avoid OOM on int8 calibration
+    if args.benchmark and args.dtype == "int8":
+        return "BF16"
+    return "FP32"
+
+
 def construct_model(args):
     if (
         args.dtype == "int8"
@@ -1210,6 +1145,7 @@ def construct_model(args):
         return DLRMTrain(model), None, None
 
     device: torch.device = torch.device("cpu")
+
     eb_configs = [
         EmbeddingBagConfig(
             name=f"t_{feature_name}",
@@ -1220,6 +1156,7 @@ def construct_model(args):
                 else args.num_embeddings
             ),
             feature_names=[feature_name],
+            data_type=to_torchrec_dtype(args),
         )
         for feature_idx, feature_name in enumerate(DEFAULT_CAT_NAMES)
     ]

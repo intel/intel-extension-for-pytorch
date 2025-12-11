@@ -62,17 +62,13 @@ else:
         end = coreidx_per_numa[i + 1] - 1
         if enable_2nd_process:
             mid = (start + end) // 2
-            composed_cmd += (
-                f"taskset -c {start}-{mid} {cmd} --share-weight-instance={mid-start+1} "
-            )
+            composed_cmd += f"taskset -c {start}-{mid} {cmd} --share-weight-instance={mid - start + 1} "
             composed_cmd += " & "
             composed_cmd += (
-                f"taskset -c {mid + 1}-{end} {cmd} --share-weight-instance={end-mid} "
+                f"taskset -c {mid + 1}-{end} {cmd} --share-weight-instance={end - mid} "
             )
         else:
-            composed_cmd += (
-                f"taskset -c {start}-{end} {cmd} --share-weight-instance={end-start+1} "
-            )
+            composed_cmd += f"taskset -c {start}-{end} {cmd} --share-weight-instance={end - start + 1} "
         if i != (numas - 1):
             composed_cmd += " & "
     print(composed_cmd)

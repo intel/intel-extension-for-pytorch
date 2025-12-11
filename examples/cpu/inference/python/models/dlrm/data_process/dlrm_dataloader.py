@@ -107,9 +107,9 @@ def _get_in_memory_dataloader(
         ]
     elif stage in ["val", "test"]:
         stage_files: List[List[str]] = [
-            [os.path.join(dir_path, f"day_{DAYS-1}_dense.npy")],
-            [os.path.join(dir_path, f"day_{DAYS-1}_{sparse_part}")],
-            [os.path.join(dir_path, f"day_{DAYS-1}_labels.npy")],
+            [os.path.join(dir_path, f"day_{DAYS - 1}_dense.npy")],
+            [os.path.join(dir_path, f"day_{DAYS - 1}_{sparse_part}")],
+            [os.path.join(dir_path, f"day_{DAYS - 1}_labels.npy")],
         ]
     if stage in ["val", "test"] and args.test_batch_size is not None:
         batch_size = args.test_batch_size

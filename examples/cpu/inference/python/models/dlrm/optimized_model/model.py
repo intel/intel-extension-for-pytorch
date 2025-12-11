@@ -205,6 +205,27 @@ def replace_crossnet(dlrm):
 
 
 class SparseArchCatDense(SparseArch):
+    def _cat(self, embedded_dense, embedded_sparse):
+        dtype = embedded_sparse[0].dtype
+        if dtype == torch.int8:
+            # Next step: get scale through calibration rather than hardcoding
+            int8_embedded_dense = (
+                torch.ops.quantized_decomposed.quantize_per_tensor.default(
+                    embedded_dense, 0.04366782680153847, 0, -128, 127, torch.int8
+                )
+            )
+            int8_embedded_concat = [int8_embedded_dense] + list(embedded_sparse)
+            int8_embedded_concat = torch.cat(int8_embedded_concat, dim=1)
+            embedded_concat = (
+                torch.ops.quantized_decomposed.dequantize_per_tensor.default(
+                    int8_embedded_concat, 0.04366782680153847, 0, -128, 127, torch.int8
+                )
+            )
+        else:
+            embedded_concat = [embedded_dense] + list(embedded_sparse)
+            embedded_concat = torch.cat(embedded_concat, dim=1)
+        return embedded_concat
+
     def forward(
         self,
         embedded_dense_features,
@@ -220,8 +241,6 @@ class SparseArchCatDense(SparseArch):
         """
         (B, _) = embedded_dense_features.shape
         embedding_bag_collection = self.embedding_bag_collection
-        indices = tuple([sf["values"] for _, sf in sparse_features.items()])
-        offsets = tuple([sf["offsets"] for _, sf in sparse_features.items()])
         embedded_sparse_features: List[torch.Tensor] = []
         for i, embedding_bag in enumerate(
             embedding_bag_collection.embedding_bags.values()
@@ -234,8 +253,7 @@ class SparseArchCatDense(SparseArch):
                     per_sample_weights=None,
                 )
                 embedded_sparse_features.append(res)
-        to_cat = [embedded_dense_features] + list(embedded_sparse_features)
-        out = torch.cat(to_cat, dim=1)
+        out = self._cat(embedded_dense_features, embedded_sparse_features)
         return out
 
 
