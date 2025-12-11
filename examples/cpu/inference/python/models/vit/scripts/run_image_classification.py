@@ -406,7 +406,10 @@ def main():
         )
 
     _attn_implementation = "sdpa"
-    if training_args.int8 or training_args.fp8:
+    # As int8/fp8 sdpa is optimized for AMX machines, only enable it when AMX is supported.
+    if torch._C._cpu._is_amx_tile_supported() and (
+        training_args.int8 or training_args.fp8
+    ):
         # use the eager one to match int8/fp8 sdpa pattern during compiling
         _attn_implementation = "eager"
     config = AutoConfig.from_pretrained(
