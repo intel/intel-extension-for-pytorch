@@ -1124,10 +1124,13 @@ def train_val_test(
 
 
 def to_torchrec_dtype(args):
-    # TODO: Support more dtype
     # Avoid OOM on int8 calibration
-    if args.benchmark and args.dtype == "int8":
+    if args.dtype == "int8":
         return "BF16"
+    if args.dtype == "bf16":
+        return "BF16"
+    if args.dtype == "fp16":
+        return "FP16"
     return "FP32"
 
 
