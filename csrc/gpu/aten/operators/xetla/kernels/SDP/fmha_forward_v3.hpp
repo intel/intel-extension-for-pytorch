@@ -982,5 +982,6 @@ class fmha_forward_v3_t {
     store_for_backward(args);
   }
 }; // fmha_forward_t
+
 } // namespace fmha
 } // namespace gpu::xetla

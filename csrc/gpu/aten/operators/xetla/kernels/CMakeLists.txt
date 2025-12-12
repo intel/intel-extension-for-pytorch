@@ -61,7 +61,7 @@ if (USE_AOT_DEVLIST)
     endif()
     message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST_${ARCH}: ${XETLA_USE_AOT_DEVLIST_${ARCH}}")
   endforeach()
-  
+
   # General USE_AOT_DEVLIST for XeTLA libs
   # Use XETLA_USE_AOT_DEVLIST_${ARCH} if possible
   set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
@@ -98,14 +98,57 @@ include(compile_library.cmake)
 
 # ------------------------------------------------------------------------------------------------
 # compile GEMM libraries of FMHA and HGEMM
-FILE(GLOB_RECURSE kernels_src *.cpp)
+FILE(GLOB_RECURSE kernels_src
+  DEQUANTIZE/*.cpp
+  GEMM/*.cpp
+  GRU/*.cpp)
+message(STATUS "XeTLA: kernels_src: ${kernels_src}")
 include(SDP/fmha_forward_configure.cmake)
 fmha_forward_configure("${XETLA_USED_ARCHS}")
+
+FILE(GLOB_RECURSE sdpa_src
+  SDP/*.cpp)
+message(STATUS "XeTLA: sdpa_src: ${sdpa_src}")
+
+# split fmha src into different libs
+set(MAX_FILES_PER_LIB 16)
+message(STATUS "XeTLA: Splitting ${FMHA_FORWARD_KERNEL_SRCS_LENGTH} fmha kernels into multiple libraries, max ${MAX_FILES_PER_LIB} files per lib")
+math(EXPR num_gen_files "${FMHA_FORWARD_KERNEL_SRCS_LENGTH}")
+set(lib_index 0)
+set(chunk_files "")
+set(fmha_gen_libs "")
+
+foreach(src_file IN LISTS FMHA_FORWARD_KERNEL_SRCS)
+  list(APPEND chunk_files ${src_file})
+
+  list(LENGTH chunk_files chunk_len)
+  if(chunk_len GREATER_EQUAL MAX_FILES_PER_LIB)
+    math(EXPR lib_index "${lib_index} + 1")
+    set(lib_name "xetla_fmha_generated_${lib_index}")
+    add_library_with_options(${lib_name} TRUE "${XETLA_USE_AOT_DEVLIST}" FALSE ${chunk_files})
+    list(APPEND fmha_gen_libs ${lib_name})
+    set(chunk_files "")  # reset chunk
+  endif()
+endforeach()
+
+if(chunk_files)
+  math(EXPR lib_index "${lib_index} + 1")
+  set(lib_name "xetla_fmha_generated_${lib_index}")
+  add_library_with_options(${lib_name} TRUE "${XETLA_USE_AOT_DEVLIST}" FALSE ${chunk_files})
+  list(APPEND fmha_gen_libs ${lib_name})
+endif()
+
+message(STATUS "XeTLA: fmha_gen_libs: ${fmha_gen_libs}")
 
 # Xetla kernel apply different offline compiler options than framework.
 # If framework link XeTLA as static lib, link options would conflict now.
 # Temporarily adopting shared lib, will fix it soon.
-add_library_with_options(xetla_gemm TRUE "${XETLA_USE_AOT_DEVLIST}" ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS})
+add_library_with_options(xetla_gemm TRUE "${XETLA_USE_AOT_DEVLIST}" TRUE ${kernels_src})
+add_library_with_options(xetla_sdpa TRUE "${XETLA_USE_AOT_DEVLIST}" TRUE ${sdpa_src})
+
+foreach(fmha_lib ${fmha_gen_libs})
+  target_link_libraries(xetla_sdpa PUBLIC ${fmha_lib})
+endforeach()
 
 # ------------------------------------------------------------------------------------------------
 # compile libraries for INT4, one library for one configuration
@@ -116,6 +159,8 @@ GEMM_int4_configure("${XETLA_USED_ARCHS}")
 # link the libraries to the interface library\
 add_library(${TARGET} INTERFACE)
 list(APPEND XETLA_LIBS xetla_gemm)
+list(APPEND XETLA_LIBS xetla_sdpa)
+list(APPEND XETLA_LIBS ${fmha_gen_libs})
 list(APPEND XETLA_LIBS ${GEMM_INT4_LIBS})
 message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
 foreach(LIB ${XETLA_LIBS})

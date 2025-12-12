@@ -201,6 +201,29 @@ __XETLA_API typename std::
 }
 
 template <
+    int N,
+    fp8_format fmt,
+    typename f16_t,
+    typename = std::enable_if_t<
+        std::is_same_v<f16_t, sycl::half> ||
+        std::is_same_v<f16_t, sycl::ext::oneapi::bfloat16>>>
+__XETLA_API xetla_vector<f16_t, N> fp8_to_16bit_float(
+    xetla_vector<uint8_t, N> src) {
+  xetla_vector<uint16_t, N> bits_fp16;
+  if constexpr (std::is_same_v<f16_t, sycl::half> && fmt == fp8_format::E4M3) {
+    bits_fp16 = ((src << 8) >> 1 & 0xBF80) | ((src >> 7) << 15);
+    return bits_fp16.template bit_cast_view<f16_t>() * 256;
+  } else if constexpr (
+      std::is_same_v<f16_t, sycl::ext::oneapi::bfloat16> &&
+      fmt == fp8_format::E4M3) {
+    bits_fp16 = ((src << 8) >> 4 & 0x87F0) | ((src >> 7) << 15);
+    return bits_fp16.template bit_cast_view<f16_t>() * 1.329228e+36;
+  } else {
+    return bits_fp16.template bit_cast_view<f16_t>();
+  }
+}
+
+template <
     typename matB_acc_t,
     typename matB_t,
     fp8_format fp8_format,
@@ -220,7 +243,8 @@ struct dequant_fp8_weight_t {
     constexpr uint32_t block_size_x = matB_acc_t::block_size_x;
     constexpr uint32_t block_elems = block_size_y * block_size_x;
     constexpr int32_t num_block_x = tile_size_x / block_size_x;
-    assert(typeid(dtype_src) == typeid(uint8_t));
+    static_assert(
+        std::is_same_v<dtype_src, uint8_t>, "dtype_src must be uint8_t");
     constexpr uint32_t vnni_row_src = sizeof(uint32_t) / sizeof(uint8_t);
     constexpr uint32_t vnni_row_dst = sizeof(uint32_t) / sizeof(dtype_dst);
     constexpr int32_t vnni_row =
@@ -228,9 +252,16 @@ struct dequant_fp8_weight_t {
     static_assert(block_size_y % vnni_row == 0);
     static_assert(tile_size_y % vnni_row == 0);
     constexpr int32_t move_elems = vnni_row * block_size_x;
-    xetla_vector<dtype_dst, tile_elems> reg_src =
-        xetla_cvt<dtype_dst, sycl::half, tile_elems>(
-            fp8_to_fp16<tile_elems, fp8_format>(src.reg));
+    xetla_vector<dtype_dst, tile_elems> reg_src;
+    if constexpr (
+        (std::is_same_v<dtype_dst, sycl::half> ||
+         std::is_same_v<dtype_dst, sycl::ext::oneapi::bfloat16>)&&fp8_format ==
+        fp8_format::E4M3) {
+      reg_src = fp8_to_16bit_float<tile_elems, fp8_format, dtype_dst>(src.reg);
+    } else {
+      reg_src = xetla_cvt<dtype_dst, sycl::half, tile_elems>(
+          fp8_to_fp16<tile_elems, fp8_format>(src.reg));
+    }
     if constexpr (sizeof(uint8_t) == sizeof(dtype_dst)) {
       dst.reg = reg_src;
       return;
@@ -252,6 +283,7 @@ struct dequant_fp8_weight_t {
             (i * num_block_x + j) * block_elems);
         auto reg_dst_blk = reg_dst.xetla_select<block_elems, 1>(
             (i * num_block_x + j) * block_elems);
+#pragma unroll
         for (uint32_t row_i = 0; row_i < block_size_y; row_i += vnni_row) {
           auto reg_src_move =
               reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
@@ -261,16 +293,15 @@ struct dequant_fp8_weight_t {
                   .xetla_format<native_type_t<move_dtype>>();
 #pragma unroll
           for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
-            if constexpr (sizeof(dtype_dst) > sizeof(uint8_t)) {
-              reg_dst_move.xetla_select<block_size_x, 1>(
-                  move_i * block_size_x) =
-                  reg_src_move.xetla_select<block_size_x, select_stride>(
-                      move_i);
-            } else {
-              reg_dst_move.xetla_select<block_size_x, select_stride>(move_i) =
-                  reg_src_move.xetla_select<block_size_x, 1>(
-                      move_i * block_size_x);
-            }
+            reg_dst_move.xetla_select<block_size_x, 1>(move_i * block_size_x) =
+                reg_src_move.xetla_select<block_size_x, select_stride>(move_i);
+            // #pragma unroll
+            //             for (uint32_t idx = 0; idx < block_size_x; idx++) {
+            //               reg_dst_move.xetla_select<1, 1>(move_i *
+            //               block_size_x + idx) =
+            //                   reg_src_move.xetla_select<1, 1>(idx *
+            //                   select_stride + move_i);
+            //             }
           }
         }
       }
@@ -289,6 +320,7 @@ struct dequant_fp8_weight_t {
             remain_elems_start + j * remain_block_elems);
         // for mma, here we can guarantee that the remaining is a multiple of
         // vnni_row
+#pragma unroll
         for (uint32_t row_i = 0; row_i < remain_size_y; row_i += vnni_row) {
           auto reg_src_move =
               reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
@@ -298,16 +330,8 @@ struct dequant_fp8_weight_t {
                   .xetla_format<native_type_t<move_dtype>>();
 #pragma unroll
           for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
-            if constexpr (sizeof(dtype_dst) > sizeof(uint8_t)) {
-              reg_dst_move.xetla_select<block_size_x, 1>(
-                  move_i * block_size_x) =
-                  reg_src_move.xetla_select<block_size_x, select_stride>(
-                      move_i);
-            } else {
-              reg_dst_move.xetla_select<block_size_x, select_stride>(move_i) =
-                  reg_src_move.xetla_select<block_size_x, 1>(
-                      move_i * block_size_x);
-            }
+            reg_dst_move.xetla_select<block_size_x, 1>(move_i * block_size_x) =
+                reg_src_move.xetla_select<block_size_x, select_stride>(move_i);
           }
         }
       }

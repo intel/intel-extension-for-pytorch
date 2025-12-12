@@ -25,17 +25,21 @@
 #include "paged_attention_policy_vllm.hpp"
 #include "xetla.hpp"
 
+using namespace gpu::xetla;
+
 namespace gpu::xetla {
 
 namespace attention {
 
 template <
     typename T,
+    typename KV_T,
     typename U,
     uint32_t HEAD_SIZE,
     uint32_t BLOCK_SIZE,
     uint32_t QUERY_GROUP_SIZE,
-    gpu_arch arch_tag>
+    gpu_arch arch_tag,
+    fp8_format fp8_t>
 cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
   using policy =
       paged_attention_policy_vllm<HEAD_SIZE, BLOCK_SIZE, QUERY_GROUP_SIZE>;
@@ -51,7 +55,8 @@ cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
   std::vector<std::function<void(sycl::handler&)>> cghs;
   std::function<void(sycl::handler&)> cgh0 = [=](sycl::handler& cgh) {
     // first kernel
-    using kernel = paged_attention_kernel_vllm<policy, T, U, arch_tag>;
+    using kernel =
+        paged_attention_kernel_vllm<policy, T, KV_T, U, arch_tag, fp8_t>;
 
     sycl::nd_range<3> nd_range = kernel::get_nd_range(
         fwd_args.num_seqs, fwd_args.num_kv_heads, max_num_partitions);
@@ -63,8 +68,8 @@ cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
           fwd_args.exp_sums,
           reinterpret_cast<T*>(fwd_args.tmp_out),
           reinterpret_cast<T*>(fwd_args.query),
-          reinterpret_cast<T*>(fwd_args.key_cache),
-          reinterpret_cast<T*>(fwd_args.value_cache),
+          reinterpret_cast<KV_T*>(fwd_args.key_cache),
+          reinterpret_cast<KV_T*>(fwd_args.value_cache),
           reinterpret_cast<T*>(fwd_args.sinks),
           reinterpret_cast<float*>(fwd_args.alibi_slopes),
           reinterpret_cast<U*>(fwd_args.block_tables),
@@ -75,7 +80,8 @@ cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
           fwd_args.num_kv_heads,
           fwd_args.head_size,
           fwd_args.max_blocks_per_seq,
-          fwd_args.softcap);
+          fwd_args.softcap,
+          fwd_args.fp8_scale);
 
       kernel_fn(item, args);
     });
@@ -83,7 +89,8 @@ cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
   cghs.push_back(cgh0);
   std::function<void(sycl::handler&)> cgh1 = [=](sycl::handler& cgh) {
     // second reduce kernel
-    using reduce_kernel = paged_attention_reduce_vllm<policy, T, U, arch_tag>;
+    using reduce_kernel =
+        paged_attention_reduce_vllm<policy, T, KV_T, U, arch_tag, fp8_t>;
     sycl::nd_range<3> nd_range =
         reduce_kernel::get_nd_range(fwd_args.num_seqs, fwd_args.num_heads);
 
@@ -110,11 +117,13 @@ cgfs_t launch_split_kv_kernels(paged_attention_fwd_kernel_args_t fwd_args) {
 
 template <
     typename T,
+    typename KV_T,
     typename U,
     uint32_t HEAD_SIZE,
     uint32_t BLOCK_SIZE,
     uint32_t QUERY_GROUP_SIZE,
-    gpu_arch arch_tag>
+    gpu_arch arch_tag,
+    fp8_format fp8_t>
 cgfs_t launch_split_kv_kernels(
     paged_attention_loop_fwd_kernel_args_t fwd_args) {
   using policy =
@@ -122,7 +131,8 @@ cgfs_t launch_split_kv_kernels(
 
   std::vector<std::function<void(sycl::handler&)>> cghs;
   std::function<void(sycl::handler&)> cgh0 = [=](sycl::handler& cgh) {
-    using kernel = paged_attention_loop_kernel<policy, T, U, arch_tag>;
+    using kernel =
+        paged_attention_loop_kernel<policy, T, KV_T, U, arch_tag, fp8_t>;
 
     sycl::nd_range<3> nd_range =
         kernel::get_nd_range(fwd_args.num_seqs, fwd_args.num_kv_heads);
@@ -132,8 +142,8 @@ cgfs_t launch_split_kv_kernels(
       typename kernel::arguments_t args(
           reinterpret_cast<T*>(fwd_args.out),
           reinterpret_cast<T*>(fwd_args.query),
-          reinterpret_cast<T*>(fwd_args.key_cache),
-          reinterpret_cast<T*>(fwd_args.value_cache),
+          reinterpret_cast<KV_T*>(fwd_args.key_cache),
+          reinterpret_cast<KV_T*>(fwd_args.value_cache),
           reinterpret_cast<T*>(fwd_args.sinks),
           reinterpret_cast<float*>(fwd_args.alibi_slopes),
           reinterpret_cast<U*>(fwd_args.block_tables),
@@ -144,7 +154,8 @@ cgfs_t launch_split_kv_kernels(
           fwd_args.num_kv_heads,
           fwd_args.head_size,
           fwd_args.max_blocks_per_seq,
-          fwd_args.softcap);
+          fwd_args.softcap,
+          fwd_args.fp8_scale);
 
       kernel_fn(item, args);
     });
@@ -155,69 +166,108 @@ cgfs_t launch_split_kv_kernels(
 
 } // namespace attention
 
-#define CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, QUERY_GROUP_SIZE) \
-  attention::launch_split_kv_kernels<                                     \
-      T,                                                                  \
-      U,                                                                  \
-      HEAD_SIZE,                                                          \
-      BLOCK_SIZE,                                                         \
-      QUERY_GROUP_SIZE,                                                   \
-      arch_tag>(args)
+#define CALL_VLLM_LAUNCHER(                                     \
+    T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, QUERY_GROUP_SIZE, FP8_T) \
+  attention::launch_split_kv_kernels<                           \
+      T,                                                        \
+      KV_T,                                                     \
+      U,                                                        \
+      HEAD_SIZE,                                                \
+      BLOCK_SIZE,                                               \
+      QUERY_GROUP_SIZE,                                         \
+      arch_tag,                                                 \
+      FP8_T>(args)
 
-#define CALL_VLLM_LAUNCHER_QUERY_GROUP_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE) \
-  switch (args.num_queries_per_tokens) {                                 \
-    case 1: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 1);         \
-    }                                                                    \
-    case 2: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 2);         \
-    }                                                                    \
-    case 3: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 3);         \
-    }                                                                    \
-    case 4: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 4);         \
-    }                                                                    \
-    case 5: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 5);         \
-    }                                                                    \
-    case 6: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 6);         \
-    }                                                                    \
-    case 7: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 7);         \
-    }                                                                    \
-    case 8: {                                                            \
-      return CALL_VLLM_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, 8);         \
-    }                                                                    \
-    default: {                                                           \
-      TORCH_CHECK(0, "Unsupported block size: ");                        \
-      return {};                                                         \
-    }                                                                    \
+#define CALL_VLLM_LAUNCHER_QUERY_GROUP_SIZE(                                  \
+    T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, fp8_t)                                 \
+  switch (args.num_queries_per_tokens) {                                      \
+    case 1: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 1, fp8_t); \
+    }                                                                         \
+    case 2: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 2, fp8_t); \
+    }                                                                         \
+    case 3: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 3, fp8_t); \
+    }                                                                         \
+    case 4: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 4, fp8_t); \
+    }                                                                         \
+    case 5: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 5, fp8_t); \
+    }                                                                         \
+    case 6: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 6, fp8_t); \
+    }                                                                         \
+    case 7: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 7, fp8_t); \
+    }                                                                         \
+    case 8: {                                                                 \
+      return CALL_VLLM_LAUNCHER(T, KV_T, U, HEAD_SIZE, BLOCK_SIZE, 8, fp8_t); \
+    }                                                                         \
+    default: {                                                                \
+      TORCH_CHECK(0, "Unsupported block size: ");                             \
+      return {};                                                              \
+    }                                                                         \
   }
 
 // Note: only support block_size = 64, to reduce compiliation time
-#define CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE)          \
-  switch (args.block_size) {                                    \
-    case 64: {                                                  \
-      CALL_VLLM_LAUNCHER_QUERY_GROUP_SIZE(T, U, HEAD_SIZE, 64); \
-    }                                                           \
-    default: {                                                  \
-      TORCH_CHECK(0, "Unsupported block size: ");               \
-      return {};                                                \
-    }                                                           \
+#define CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, KV_T, U, HEAD_SIZE, fp8_t)          \
+  switch (args.block_size) {                                                 \
+    case 64: {                                                               \
+      CALL_VLLM_LAUNCHER_QUERY_GROUP_SIZE(T, KV_T, U, HEAD_SIZE, 64, fp8_t); \
+    }                                                                        \
+    default: {                                                               \
+      TORCH_CHECK(0, "Unsupported block size: ");                            \
+      return {};                                                             \
+    }                                                                        \
   }
 
-template <gpu::xetla::gpu_arch arch_tag, typename T, typename arg_type>
-cgfs_t split_kv_dispatch(arg_type args) {
+template <
+    gpu::xetla::gpu_arch arch_tag,
+    typename T,
+    typename KV_T,
+    typename arg_type,
+    fp8_format fp8_t = fp8_format::E4M3>
+cgfs_t dispatch_kv_dtype(arg_type args) {
   using U = int32_t;
   if (args.head_size == 128) {
-    CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, U, 128);
+    CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, KV_T, U, 128, fp8_t);
   } else if (args.head_size == 64) {
-    CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, U, 64);
+    CALL_VLLM_LAUNCHER_BLOCK_SIZE(T, KV_T, U, 64, fp8_t);
   } else {
     TORCH_CHECK(0, "Unsupported head size");
     return {};
+  }
+}
+
+template <gpu::xetla::gpu_arch arch_tag, typename T, typename arg_type>
+cgfs_t split_kv_dispatch(arg_type args) {
+  if (args.is_fp8_kv) {
+    switch (args.fp8_fmt_kv) {
+      case fp8_format::E4M3: {
+        return dispatch_kv_dtype<
+            arch_tag,
+            T,
+            uint8_t,
+            arg_type,
+            fp8_format::E4M3>(args);
+      }
+      case fp8_format::E5M2: {
+        return dispatch_kv_dtype<
+            arch_tag,
+            T,
+            uint8_t,
+            arg_type,
+            fp8_format::E5M2>(args);
+      }
+      default: {
+        TORCH_CHECK(0, "Unsupported FP8 format for KV");
+        return {};
+      }
+    }
+  } else {
+    return dispatch_kv_dtype<arch_tag, T, T, arg_type>(args);
   }
 }
 
@@ -296,5 +346,6 @@ XETLA_KERNEL_API cgfs_t paged_attention_loop_vllm(
 
 #undef CALL_VLLM_LAUNCHER_BLOCK_SIZE
 #undef CALL_VLLM_LAUNCHER
+#undef CALL_VLLM_LAUNCHER_QUERY_GROUP_SIZE
 
 } // namespace gpu::xetla

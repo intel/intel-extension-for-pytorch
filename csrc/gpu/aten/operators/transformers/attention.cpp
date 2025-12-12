@@ -1850,17 +1850,11 @@ Tensor chunked_prefill(
     bool is_causal,
     const bool return_softmax,
     c10::optional<at::Generator> gen_,
-    const double softcap = -1.0) {
+    const double softcap = -1.0,
+    const double fp8_scale = 1.0f) {
   // Check datatype
   TORCH_CHECK(
       !seqused_k.has_value(), "We do not support seqused_k feature currently!");
-  auto q_scalar_type = query.scalar_type();
-  TORCH_CHECK(
-      q_scalar_type == key.scalar_type(),
-      "The datatype of key should be the same as query");
-  TORCH_CHECK(
-      q_scalar_type == value.scalar_type(),
-      "The datatype of value should be the same as query");
   TORCH_CHECK(
       cu_seqlens_q.scalar_type() == at::kInt,
       "The datatype of cu_seqlens_q should be int32");
@@ -1869,6 +1863,10 @@ Tensor chunked_prefill(
       "The datatype of cu_seqlens_k should be int32");
   TORCH_CHECK(
       block_table.scalar_type() == at::kInt, "The block_table should be int32");
+
+  TORCH_CHECK(
+      query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16,
+      "The datatype of q should be float16 or bfloat16");
 
   // Check device
   TORCH_CHECK(query.is_xpu(), "query must on XPU");
@@ -1989,6 +1987,24 @@ Tensor chunked_prefill(
   constexpr const int partition_size = 512;
 
 #if defined(USE_XETLA)
+  auto key_dtype = key.scalar_type();
+  auto q_scalar_type = query.scalar_type();
+  TORCH_CHECK(
+      key_dtype == value.scalar_type(),
+      "The datatype of value should be the same as key");
+
+  gpu::xetla::fp8_format fp8_type;
+  bool is_fp8_kv = true;
+  if (key_dtype == at::ScalarType::Float8_e4m3fn) {
+    fp8_type = gpu::xetla::fp8_format::E4M3;
+  } else if (key_dtype == at::ScalarType::Float8_e5m2) {
+    fp8_type = gpu::xetla::fp8_format::E5M2;
+  } else {
+    TORCH_CHECK(
+        q_scalar_type == key.scalar_type(),
+        "The datatype of key should be the same as query");
+    is_fp8_kv = false;
+  }
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),
       "SDP kernel requires XMX, but the current platform has no XMX ...");
@@ -2041,7 +2057,10 @@ Tensor chunked_prefill(
            block_size,
            num_max_seq_block,
            max_seqlen_k,
-           -1});
+           -1,
+           fp8_scale,
+           fp8_type,
+           is_fp8_kv});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     } else {
       auto cgfs = gpu::xetla::paged_attention_loop_vllm(
@@ -2064,16 +2083,19 @@ Tensor chunked_prefill(
            block_size,
            num_max_seq_block,
            max_seqlen_k,
-           -1});
+           -1,
+           fp8_scale,
+           fp8_type,
+           is_fp8_kv});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     }
   } else if (block_size >= 64) {
     auto cgfs = gpu::xetla::fmha_forward_kernel(
         arch_tag,
         xeType,
-        {query.data_ptr(),
-         key.data_ptr(),
-         value.data_ptr(),
+        {reinterpret_cast<void*>(query.data_ptr()),
+         reinterpret_cast<void*>(key.data_ptr()),
+         reinterpret_cast<void*>(value.data_ptr()),
          alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
                                    : (void*)nullptr,
          sink_.has_value() ? sink_.value().data_ptr() : (void*)nullptr,
@@ -2117,89 +2139,13 @@ Tensor chunked_prefill(
          block_table.data_ptr<int32_t>(), // block_tables
          num_max_seq_block, // max_blocks_per_seq
          block_size, // block_size
-         num_tokens}); // num_tokens
+         num_tokens, // num_tokens
+         is_fp8_kv, // is fp8 kv cache
+         fp8_type,
+         fp8_scale});
     DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
   } else {
-    // constexpr const int partition_size = 512;
-    int32_t num_partitions =
-        (max_seqlen_k + partition_size - 1) / partition_size;
-    if (max_seqlen_k > partition_size) {
-      // split kv
-      Tensor tmp_out = at::empty(
-          {num_tokens, num_heads_q, num_partitions, head_dim},
-          query.options().dtype(query.scalar_type()).device(query.device()));
-      Tensor max_logits = at::empty(
-          {num_tokens, num_heads_q, num_partitions},
-          query.options().dtype(at::kFloat).device(query.device()));
-      Tensor exp_sums = at::empty(
-          {num_tokens, num_heads_q, num_partitions},
-          query.options().dtype(at::kFloat).device(query.device()));
-
-      auto cgfs = gpu::xetla::chunked_prefill_split_kv(
-          arch_tag,
-          xeType,
-          {max_logits.data_ptr<float>(),
-           exp_sums.data_ptr<float>(),
-           tmp_out.data_ptr(),
-           out_.data_ptr(),
-           query.data_ptr(),
-           key.data_ptr(),
-           value.data_ptr(),
-           alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
-                                     : nullptr,
-           block_table.data_ptr<int32_t>(),
-           cu_seqlens_q.data_ptr<int32_t>(),
-           cu_seqlens_k.data_ptr<int32_t>(),
-           max_seqlen_k,
-           max_seqlen_q,
-           max_seqlen_k,
-           softmax_scale,
-           batch_size,
-           num_heads_q,
-           num_heads_k,
-           head_dim,
-           num_max_seq_block,
-           block_size,
-           window_size_left,
-           window_size_right,
-           is_causal,
-           is_local,
-           softcap});
-      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
-    } else {
-      // slice kv
-      auto cgfs = gpu::xetla::chunked_prefill_slice_kv(
-          arch_tag,
-          xeType,
-          {nullptr,
-           nullptr,
-           nullptr,
-           out_.data_ptr(),
-           query.data_ptr(),
-           key.data_ptr(),
-           value.data_ptr(),
-           alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
-                                     : nullptr,
-           block_table.data_ptr<int32_t>(),
-           cu_seqlens_q.data_ptr<int32_t>(),
-           cu_seqlens_k.data_ptr<int32_t>(),
-           max_seqlen_k,
-           max_seqlen_q,
-           max_seqlen_k,
-           softmax_scale,
-           batch_size,
-           num_heads_q,
-           num_heads_k,
-           head_dim,
-           num_max_seq_block,
-           block_size,
-           window_size_left,
-           window_size_right,
-           is_causal,
-           is_local,
-           softcap});
-      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
-    }
+    AT_ERROR("XeTLA ChunkPrefill FP8KV: only support block_size >= 64");
   }
 #else
   AT_ERROR("XETLA ChunkPrefill: xetla library not found in compilation");

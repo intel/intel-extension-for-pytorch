@@ -13,11 +13,12 @@ This is an implementation of the Flash Attention algorithm
 namespace gpu::xetla {
 
 namespace fmha {
-template <typename T>
+template <typename T, typename KV_T = T>
 struct dispatch_fmha_forward_args_t {
   T* query;
-  T* key;
-  T* value;
+  /* use uint8_t type here when k,v dtype is fp8 */
+  KV_T* key;
+  KV_T* value;
   T* alibi;
   T* sink;
   T* attn_mask;
@@ -53,10 +54,12 @@ struct dispatch_fmha_forward_args_t {
   uint32_t max_blocks_per_seq;
   uint32_t block_size;
   uint32_t num_tokens;
+  fp8_format fp8_fmt_kv;
+  float fp8_scale;
   dispatch_fmha_forward_args_t(const fmha_forward_kernel_args_t& args)
       : query(reinterpret_cast<T*>(args.query)),
-        key(reinterpret_cast<T*>(args.key)),
-        value(reinterpret_cast<T*>(args.value)),
+        key(reinterpret_cast<KV_T*>(args.key)),
+        value(reinterpret_cast<KV_T*>(args.value)),
         alibi(reinterpret_cast<T*>(args.alibi)),
         sink(reinterpret_cast<T*>(args.sink)),
         attn_mask(reinterpret_cast<T*>(args.attn_mask)),
@@ -91,12 +94,15 @@ struct dispatch_fmha_forward_args_t {
         block_tables(args.block_tables),
         max_blocks_per_seq(args.max_blocks_per_seq),
         block_size(args.block_size),
-        num_tokens(args.num_tokens){};
+        num_tokens(args.num_tokens),
+        fp8_fmt_kv(args.fp8_fmt_kv),
+        fp8_scale(args.fp8_scale){};
 };
 
 template <
     typename fmha_forward_op_t,
     typename T,
+    typename KV_T,
     bool USE_V2 = false,
     bool USE_V4 = false>
 struct FmhaForwardKernelFunctor {
@@ -171,6 +177,48 @@ struct FmhaForwardKernelFunctor {
           .block_size = args.block_size,
       };
       fmha_fwd_op(item, op_args);
+    } else if constexpr (std::is_same_v<KV_T, uint8_t>) {
+      typename fmha_forward_op_t::arguments_t op_args(
+          args.query,
+          args.key,
+          args.value,
+          args.alibi,
+          args.sink,
+          args.attn_mask,
+          args.dropout_mask,
+          args.out,
+          (accum_t*)args.log_sumexp,
+          args.num_batches,
+          args.num_heads,
+          args.num_kv_heads,
+          args.head_size,
+          args.num_queries,
+          args.num_keys,
+          args.q_strideB,
+          args.q_strideN,
+          args.q_strideF,
+          args.kv_strideB,
+          args.kv_strideN,
+          args.kv_strideT,
+          args.bias_strideB,
+          args.bias_strideN,
+          args.bias_strideF,
+          args.cu_seqlen_q,
+          args.cu_seqlen_k,
+          (accum_t)args.softmax_scale,
+          (accum_t)args.dropout_prob,
+          args.alibi_padded_block_size,
+          args.attn_mask_padded_block_size,
+          args.window_size_left,
+          args.window_size_right,
+          args.seed_t,
+          args.offset_t,
+          -1,
+          args.block_tables,
+          args.max_blocks_per_seq,
+          args.block_size,
+          (accum_t)args.fp8_scale);
+      fmha_fwd_op(item, op_args);
     } else {
       typename fmha_forward_op_t::arguments_t op_args(
           args.query,
@@ -214,17 +262,18 @@ struct FmhaForwardKernelFunctor {
       fmha_fwd_op(item, op_args);
     }
   }
-  FmhaForwardKernelFunctor(const dispatch_fmha_forward_args_t<T>& args)
+  FmhaForwardKernelFunctor(const dispatch_fmha_forward_args_t<T, KV_T>& args)
       : args(args) {}
 
  private:
-  dispatch_fmha_forward_args_t<T> args;
+  dispatch_fmha_forward_args_t<T, KV_T> args;
 };
 
 // The launcher of fmha forward kernel
 template <
     typename fmha_policy,
     typename T,
+    typename KV_T,
     gpu_arch arch_tag,
     bool kUseAlibi,
     bool kUseBias,
@@ -234,7 +283,8 @@ template <
     bool kIsDropout,
     bool kIsVarlen,
     bool kIsLocal>
-cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args);
+cgfs_t xetla_fmha_forward_kernel(
+    const dispatch_fmha_forward_args_t<T, KV_T>& args);
 
 } // namespace fmha
 } // namespace gpu::xetla

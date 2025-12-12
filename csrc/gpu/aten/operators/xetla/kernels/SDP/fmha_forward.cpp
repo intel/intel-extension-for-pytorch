@@ -38,6 +38,7 @@ static inline bool _load_using_fmha_v3() {
 /// @brief Main execution function for flash mha forward.
 template <
     typename T,
+    typename KV_T,
     gpu_arch arch_tag,
     bool kUseAlibi = false,
     bool kUseBias = false,
@@ -65,6 +66,7 @@ class fmha_forward_kernel_policy {
     return fmha::xetla_fmha_forward_kernel<
         fmha_policy,
         T,
+        KV_T,
         arch_tag,
         kUseAlibi,
         kUseBias,
@@ -78,13 +80,13 @@ class fmha_forward_kernel_policy {
 
  public:
   static bool is_chunked_prefill(
-      const fmha::dispatch_fmha_forward_args_t<T>& args) {
+      const fmha::dispatch_fmha_forward_args_t<T, KV_T>& args) {
     return args.block_tables != nullptr;
   }
 
   template <typename fmha_policy>
   static cgfs_t chunked_prefill_wrapper(
-      const fmha::dispatch_fmha_forward_args_t<T>& args) {
+      const fmha::dispatch_fmha_forward_args_t<T, KV_T>& args) {
     // TODO: there should be more tuning here
     static constexpr uint32_t max_qhead_kv = 8;
     static constexpr uint32_t kv_heads_limit = 1;
@@ -140,7 +142,7 @@ class fmha_forward_kernel_policy {
     }
   }
 
-  static cgfs_t run(const fmha::dispatch_fmha_forward_args_t<T>& args) {
+  static cgfs_t run(const fmha::dispatch_fmha_forward_args_t<T, KV_T>& args) {
 #ifdef SDP_DBG
     printf("\n%s\n", __PRETTY_FUNCTION__);
 #endif
@@ -167,7 +169,8 @@ class fmha_forward_kernel_policy {
       constexpr bool igpu_wo_dropout =
           arch_tag == gpu_arch::XeLpg && !kIsDropout;
       constexpr bool v2_available = igpu_wo_dropout && !kUseAlibi &&
-          !kIsCausal && !kIsTraining && !kIsDropout && !kIsVarlen && !kIsLocal;
+          !kIsCausal && !kIsTraining && !kIsDropout && !kIsVarlen &&
+          !kIsLocal && std::is_same_v<KV_T, uint8_t>;
       // roughly policy should match (num_queries)x(num_keys)x(head_size)
       if (args.head_size <= HEAD_SIZE_LIMIT_0) {
         if (v2_available && args.num_queries == NUM_QUERIES_GREEDY &&
@@ -241,22 +244,28 @@ class fmha_forward_kernel_policy {
   };
 };
 
-template <typename T, gpu_arch arch_tag, bool... Bs>
+// dispatch for fp8 kv
+template <typename T, typename KV_T, gpu_arch arch_tag, bool... Bs>
 cgfs_t dispatch_fmha_forward(
-    const fmha::dispatch_fmha_forward_args_t<T>& args) {
-  return fmha_forward_kernel_policy<T, arch_tag, Bs...>::run(args);
+    const fmha::dispatch_fmha_forward_args_t<T, KV_T>& args) {
+  return fmha_forward_kernel_policy<T, KV_T, arch_tag, Bs...>::run(args);
 }
 
 // dispatch different conditions
-template <typename T, gpu_arch arch_tag, bool... Bs, typename... Ts>
+template <
+    typename T,
+    typename KV_T,
+    gpu_arch arch_tag,
+    bool... Bs,
+    typename... Ts>
 cgfs_t dispatch_fmha_forward(
-    const fmha::dispatch_fmha_forward_args_t<T>& args,
+    const fmha::dispatch_fmha_forward_args_t<T, KV_T>& args,
     bool b,
     Ts... ts) {
   if (b) {
-    return dispatch_fmha_forward<T, arch_tag, Bs..., true>(args, ts...);
+    return dispatch_fmha_forward<T, KV_T, arch_tag, Bs..., true>(args, ts...);
   } else {
-    return dispatch_fmha_forward<T, arch_tag, Bs..., false>(args, ts...);
+    return dispatch_fmha_forward<T, KV_T, arch_tag, Bs..., false>(args, ts...);
   }
 }
 
@@ -265,32 +274,57 @@ template <gpu_arch arch_tag>
 cgfs_t _fmha_forward_kernel(
     XetlaType xeType,
     const fmha_forward_kernel_args_t& args) {
-  if (xeType == XetlaType::fp16) {
-    return dispatch_fmha_forward<fp16, arch_tag>(
-        fmha::dispatch_fmha_forward_args_t<fp16>(args),
-        args.alibi != nullptr, // is alibi
-        args.attn_mask != nullptr, // is is_attn_mask
-        args.is_causal,
-        args.seq_last,
-        args.is_training,
-        args.is_dropout,
-        args.is_varlen,
-        args.is_local);
-  } else if constexpr (arch_tag != gpu_arch::XeLpg) {
-    return dispatch_fmha_forward<bf16, arch_tag>(
-        fmha::dispatch_fmha_forward_args_t<bf16>(args),
-        args.alibi != nullptr, // is alibi
-        args.attn_mask != nullptr, // is is_attn_mask
-        args.is_causal,
-        args.seq_last,
-        args.is_training,
-        args.is_dropout,
-        args.is_varlen,
-        args.is_local);
-    return {};
+  if (args.is_fp8_kv && arch_tag != gpu_arch::XeLpg) {
+    if (xeType == XetlaType::fp16) {
+      return dispatch_fmha_forward<fp16, uint8_t, arch_tag>(
+          fmha::dispatch_fmha_forward_args_t<fp16, uint8_t>(args),
+          args.alibi != nullptr, // is alibi
+          args.attn_mask != nullptr, // is is_attn_mask
+          args.is_causal,
+          args.seq_last,
+          args.is_training,
+          args.is_dropout,
+          args.is_varlen,
+          args.is_local);
+    } else {
+      return dispatch_fmha_forward<bf16, uint8_t, arch_tag>(
+          fmha::dispatch_fmha_forward_args_t<bf16, uint8_t>(args),
+          args.alibi != nullptr, // is alibi
+          args.attn_mask != nullptr, // is is_attn_mask
+          args.is_causal,
+          args.seq_last,
+          args.is_training,
+          args.is_dropout,
+          args.is_varlen,
+          args.is_local);
+    }
   } else {
-    printf("bfloat16 is not supported on the XeLpg platform\n");
-    return {};
+    if (xeType == XetlaType::fp16) {
+      return dispatch_fmha_forward<fp16, fp16, arch_tag>(
+          fmha::dispatch_fmha_forward_args_t<fp16>(args),
+          args.alibi != nullptr, // is alibi
+          args.attn_mask != nullptr, // is is_attn_mask
+          args.is_causal,
+          args.seq_last,
+          args.is_training,
+          args.is_dropout,
+          args.is_varlen,
+          args.is_local);
+    } else if constexpr (arch_tag != gpu_arch::XeLpg) {
+      return dispatch_fmha_forward<bf16, bf16, arch_tag>(
+          fmha::dispatch_fmha_forward_args_t<bf16>(args),
+          args.alibi != nullptr, // is alibi
+          args.attn_mask != nullptr, // is is_attn_mask
+          args.is_causal,
+          args.seq_last,
+          args.is_training,
+          args.is_dropout,
+          args.is_varlen,
+          args.is_local);
+    } else {
+      printf("bfloat16 is not supported on the XeLpg platform\n");
+      assert(false);
+    }
   }
 }
 

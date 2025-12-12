@@ -22,7 +22,7 @@ function(configure_ SCALAR_TS ARCH AOT_DEVLIST QUANT_MODE WG_M WG_N SG_M SG_N SG
     foreach(SCALAR_T ${SCALAR_TS})
         set(SUFFIX "${ARCH}_${QUANT_MODE_FLAG_${QUANT_MODE}}_${SCALAR_T}_${SUFFIX0}")
         configure_file(GEMM/GEMM_int4.cpp.in "GEMM_int4_${SUFFIX}.cpp")
-        add_library_with_options("xetla_${SUFFIX}" ${USE_DOUBLE_GRF} "${AOT_DEVLIST}" "${CMAKE_CURRENT_BINARY_DIR}/GEMM_int4_${SUFFIX}.cpp")
+        add_library_with_options("xetla_${SUFFIX}" ${USE_DOUBLE_GRF} "${AOT_DEVLIST}" TRUE "${CMAKE_CURRENT_BINARY_DIR}/GEMM_int4_${SUFFIX}.cpp")
         list(APPEND GEMM_INT4_LIBS "xetla_${SUFFIX}")
         set(GEMM_INT4_LIBS ${GEMM_INT4_LIBS} PARENT_SCOPE)
     endforeach()

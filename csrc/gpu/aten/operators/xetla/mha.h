@@ -59,6 +59,9 @@ struct fmha_forward_kernel_args_t {
   uint32_t max_blocks_per_seq = 0;
   uint32_t block_size = 0;
   uint32_t num_tokens = 0;
+  bool is_fp8_kv = false;
+  fp8_format fp8_fmt_kv = fp8_format::E4M3;
+  float fp8_scale = 1.0f;
 };
 
 struct paged_attention_fwd_kernel_args_t {
@@ -83,6 +86,9 @@ struct paged_attention_fwd_kernel_args_t {
   uint32_t max_blocks_per_seq;
   uint32_t max_context_len;
   float softcap = -1.;
+  float fp8_scale = 1.0f;
+  fp8_format fp8_fmt_kv = fp8_format::E4M3;
+  bool is_fp8_kv = false;
 };
 
 struct paged_attention_loop_fwd_kernel_args_t {
@@ -104,6 +110,9 @@ struct paged_attention_loop_fwd_kernel_args_t {
   uint32_t max_blocks_per_seq;
   uint32_t max_context_len;
   float softcap = -1.;
+  float fp8_scale = 1.0f;
+  fp8_format fp8_fmt_kv = fp8_format::E4M3;
+  bool is_fp8_kv = false;
 };
 
 struct chunked_prefill_fwd_kernel_args_t {

@@ -41,11 +41,15 @@ namespace attention {
 template <
     typename policy,
     typename scalar_t,
+    typename kv_t,
     typename index_t,
-    gpu_arch arch_tag>
+    gpu_arch arch_tag,
+    fp8_format fp8_format_ = fp8_format::E4M3>
 class paged_attention_kernel_vllm {
  public:
   using accum_t = float;
+
+  struct unused_t {};
 
   struct arguments_t {
     // Input and output tensors
@@ -53,8 +57,8 @@ class paged_attention_kernel_vllm {
     accum_t* exp_sums; // [num_seqs, num_heads, max_num_partitions]
     scalar_t* out; // [num_seqs, num_heads, max_num_partitions, head_size]
     scalar_t* query; // [num_seqs, num_heads, head_size]
-    scalar_t* key_cache; // [num_blocks, block_size, num_kv_heads, head_size]
-    scalar_t* value_cache; // [num_blocks, block_size, num_kv_heads, head_size]
+    kv_t* key_cache; // [num_blocks, block_size, num_kv_heads, head_size]
+    kv_t* value_cache; // [num_blocks, block_size, num_kv_heads, head_size]
     scalar_t* sinks; // [num_heads]
     float* alibi_slopes; // [num_heads] - alibi_slopes
 
@@ -72,14 +76,15 @@ class paged_attention_kernel_vllm {
     uint32_t head_size;
     uint32_t max_blocks_per_seq;
     accum_t softcap;
+    float fp8_scale;
 
     inline arguments_t(
         accum_t* max_logits,
         accum_t* exp_sums,
         scalar_t* out,
         scalar_t* query,
-        scalar_t* key_cache,
-        scalar_t* value_cache,
+        kv_t* key_cache,
+        kv_t* value_cache,
         scalar_t* sinks,
         float* alibi_slopes,
         index_t* block_tables,
@@ -90,7 +95,8 @@ class paged_attention_kernel_vllm {
         uint32_t num_kv_heads,
         uint32_t head_size,
         uint32_t max_blocks_per_seq,
-        accum_t softcap)
+        accum_t softcap,
+        float fp8_scale = 1.0f)
         : max_logits(max_logits),
           exp_sums(exp_sums),
           out(out),
@@ -107,7 +113,8 @@ class paged_attention_kernel_vllm {
           num_kv_heads(num_kv_heads),
           head_size(head_size),
           max_blocks_per_seq(max_blocks_per_seq),
-          softcap(softcap) {}
+          softcap(softcap),
+          fp8_scale(fp8_scale) {}
   };
 
   using tanh_t = typename subgroup::tanh_op_t;
@@ -273,9 +280,10 @@ class paged_attention_kernel_vllm {
     constexpr mem_layout k_mem_layout = mem_layout::col_major;
     constexpr tdesc_update_dir key_update_dir = tdesc_update_dir::x_dir;
 
-    using key_tile_t = subgroup::tile_t<scalar_t, key_tile_desc_t>;
+    using key_mma_tile_t = subgroup::tile_t<scalar_t, key_tile_desc_t>;
+    using key_tile_t = subgroup::tile_t<kv_t, key_tile_desc_t>;
     using key_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
+        mem_desc_t<kv_t, k_mem_layout, mem_space::global>,
         key_tile_desc_t,
         msg_type::block_2d,
         arch_tag>;
@@ -290,14 +298,25 @@ class paged_attention_kernel_vllm {
     using tile_mma = subgroup::tile_mma_t<
         score_acc_tile_t,
         score_acc_tile_t,
-        key_tile_t,
+        key_mma_tile_t,
         query_tile_t,
         mma_engine::xmx,
         arch_tag>;
 
+    using dequantize_key_t = std::conditional_t<
+        std::is_same_v<kv_t, uint8_t>,
+        subgroup::dequant_fp8_weight_t<
+            key_mma_tile_t,
+            key_tile_t,
+            fp8_format_,
+            false>,
+        unused_t>;
+
     query_tile_t mat_query;
     key_tile_t mat_key;
+    key_mma_tile_t mat_key_mma;
     score_acc_tile_t score_sub(neg_infinity);
+    dequantize_key_t dequant_key;
 
     constexpr uint32_t boundary_score_y = query_group_size;
     uint32_t start_score_x = ctx.sg_id * block_size;
@@ -349,11 +368,21 @@ class paged_attention_kernel_vllm {
         query_payload.template update_tdesc<query_update_dir>(head_size_stride);
         key_payload.template update_tdesc<key_update_dir>(head_size_stride);
 
+        if constexpr (std::is_same_v<kv_t, uint8_t>) {
+          dequant_key(mat_key_mma, mat_key, args.fp8_scale);
+        } else {
+          mat_key_mma = mat_key;
+        }
+
         SW_BARRIER();
-        tile_mma::mma(score_sub, score_sub, mat_key, mat_query);
+        tile_mma::mma(score_sub, score_sub, mat_key_mma, mat_query);
         SW_BARRIER();
       }
       score_sub.reg *= args.sm_scale;
+
+      if constexpr (std::is_same_v<kv_t, uint8_t>) {
+        score_sub.reg *= args.fp8_scale;
+      }
 
       uint32_t remained_len = ctx.context_len - bid * block_size;
       using remain_tile_mask = fmha::tile_mask_t<score_acc_tile_t>;
@@ -512,9 +541,10 @@ class paged_attention_kernel_vllm {
         sg_tile_size_x,
         sg_tile_size_y,
         reg_layout::vnni_tiled>;
-    using value_tile_t = subgroup::tile_t<scalar_t, value_tile_desc_t>;
+    using value_tile_t = subgroup::tile_t<kv_t, value_tile_desc_t>;
+    using value_mma_tile_t = subgroup::tile_t<scalar_t, value_tile_desc_t>;
     using value_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+        mem_desc_t<kv_t, mem_layout::row_major, mem_space::global>,
         value_tile_desc_t,
         msg_type::block_2d,
         arch_tag>;
@@ -549,14 +579,25 @@ class paged_attention_kernel_vllm {
     using tile_mma = subgroup::tile_mma_t<
         out_acc_tile_t,
         out_acc_tile_t,
-        value_tile_t,
+        value_mma_tile_t,
         exp_score_tile_t,
         mma_engine::xmx,
         arch_tag>;
 
+    using dequant_value_t = std::conditional_t<
+        std::is_same_v<kv_t, uint8_t>,
+        subgroup::dequant_fp8_weight_t<
+            value_mma_tile_t,
+            value_tile_t,
+            fp8_format_,
+            false>,
+        unused_t>;
+
     exp_score_tile_t mat_exp_score;
     value_tile_t mat_value;
+    value_mma_tile_t mat_value_mma;
     out_acc_tile_t mat_acc_out(0.0f);
+    dequant_value_t dequant_value;
 
 #pragma unroll
     for (uint32_t i = 0; i < value_blocks_per_sg; ++i) {
@@ -580,9 +621,19 @@ class paged_attention_kernel_vllm {
 
       exp_score_payload.template update_tdesc<exp_score_update_dir>(block_size);
 
+      if constexpr (std::is_same_v<kv_t, uint8_t>) {
+        dequant_value(mat_value_mma, mat_value, args.fp8_scale);
+      } else {
+        mat_value_mma = mat_value;
+      }
+
       SW_BARRIER();
-      tile_mma::mma(mat_acc_out, mat_acc_out, mat_value, mat_exp_score);
+      tile_mma::mma(mat_acc_out, mat_acc_out, mat_value_mma, mat_exp_score);
       SW_BARRIER();
+    }
+
+    if constexpr (std::is_same_v<kv_t, uint8_t>) {
+      mat_acc_out.reg *= args.fp8_scale;
     }
 
     out_tile_t mat_out;
@@ -661,8 +712,10 @@ class paged_attention_kernel_vllm {
 template <
     typename policy,
     typename scalar_t,
+    typename kv_t,
     typename index_t,
-    gpu_arch arch_tag>
+    gpu_arch arch_tag,
+    fp8_format fp8_format_>
 class paged_attention_reduce_vllm {
  public:
   using accum_t = float;
@@ -1119,18 +1172,22 @@ class paged_attention_reduce_vllm {
 template <
     typename policy,
     typename scalar_t,
+    typename kv_t,
     typename index_t,
-    gpu_arch arch_tag>
+    gpu_arch arch_tag,
+    fp8_format fp8_format_ = fp8_format::E4M3>
 class paged_attention_loop_kernel {
  public:
   using accum_t = float;
+
+  struct unused_t {};
 
   struct arguments_t {
     // Input and output tensors
     scalar_t* out; // [num_seqs, num_heads, head_size]
     scalar_t* query; // [num_seqs, num_heads, head_size]
-    scalar_t* key_cache; // [num_blocks, block_size, num_kv_heads, head_size]
-    scalar_t* value_cache; // [num_blocks, block_size, num_kv_heads, head_size]
+    kv_t* key_cache; // [num_blocks, block_size, num_kv_heads, head_size]
+    kv_t* value_cache; // [num_blocks, block_size, num_kv_heads, head_size]
     scalar_t* sinks; // [num_heads]
     float* alibi_slopes; // [num_heads] - alibi_slopes
 
@@ -1148,12 +1205,13 @@ class paged_attention_loop_kernel {
     uint32_t head_size;
     uint32_t max_blocks_per_seq;
     accum_t softcap;
+    float fp8_scale;
 
     inline arguments_t(
         scalar_t* out,
         scalar_t* query,
-        scalar_t* key_cache,
-        scalar_t* value_cache,
+        kv_t* key_cache,
+        kv_t* value_cache,
         scalar_t* sinks,
         float* alibi_slopes,
         index_t* block_tables,
@@ -1164,7 +1222,8 @@ class paged_attention_loop_kernel {
         uint32_t num_kv_heads,
         uint32_t head_size,
         uint32_t max_blocks_per_seq,
-        accum_t softcap)
+        accum_t softcap,
+        float fp8_scale = 1.0f)
         : out(out),
           query(query),
           key_cache(key_cache),
@@ -1179,7 +1238,8 @@ class paged_attention_loop_kernel {
           num_kv_heads(num_kv_heads),
           head_size(head_size),
           max_blocks_per_seq(max_blocks_per_seq),
-          softcap(softcap) {}
+          softcap(softcap),
+          fp8_scale(fp8_scale) {}
   };
 
   using tanh_t = typename subgroup::tanh_op_t;
@@ -1358,9 +1418,10 @@ class paged_attention_loop_kernel {
     constexpr mem_layout k_mem_layout = mem_layout::col_major;
     constexpr tdesc_update_dir key_update_dir = tdesc_update_dir::x_dir;
 
-    using key_tile_t = subgroup::tile_t<scalar_t, key_tile_desc_t>;
+    using key_tile_t = subgroup::tile_t<kv_t, key_tile_desc_t>;
+    using key_mma_tile_t = subgroup::tile_t<scalar_t, key_tile_desc_t>;
     using key_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
+        mem_desc_t<kv_t, k_mem_layout, mem_space::global>,
         key_tile_desc_t,
         msg_type::block_2d,
         arch_tag>;
@@ -1375,14 +1436,25 @@ class paged_attention_loop_kernel {
     using tile_mma = subgroup::tile_mma_t<
         score_acc_tile_t,
         score_acc_tile_t,
-        key_tile_t,
+        key_mma_tile_t,
         query_tile_t,
         mma_engine::xmx,
         arch_tag>;
 
+    using dequantize_key_t = std::conditional_t<
+        std::is_same_v<kv_t, uint8_t>,
+        subgroup::dequant_fp8_weight_t<
+            key_mma_tile_t,
+            key_tile_t,
+            fp8_format_,
+            false>,
+        unused_t>;
+
     query_tile_t mat_query;
     key_tile_t mat_key;
+    key_mma_tile_t mat_key_mma;
     score_acc_tile_t score_sub(neg_infinity);
+    dequantize_key_t dequant_key;
 
     constexpr uint32_t boundary_score_y = query_group_size;
     uint32_t start_score_x = ctx.sg_id * block_size;
@@ -1436,11 +1508,21 @@ class paged_attention_loop_kernel {
         query_payload.template update_tdesc<query_update_dir>(head_size_stride);
         key_payload.template update_tdesc<key_update_dir>(head_size_stride);
 
+        if constexpr (std::is_same_v<kv_t, uint8_t>) {
+          dequant_key(mat_key_mma, mat_key, args.fp8_scale);
+        } else {
+          mat_key_mma = mat_key;
+        }
+
         SW_BARRIER();
-        tile_mma::mma(score_sub, score_sub, mat_key, mat_query);
+        tile_mma::mma(score_sub, score_sub, mat_key_mma, mat_query);
         SW_BARRIER();
       }
       score_sub.reg *= args.sm_scale;
+
+      if constexpr (std::is_same_v<kv_t, uint8_t>) {
+        score_sub.reg *= args.fp8_scale;
+      }
 
       uint32_t remained_len = ctx.context_len - bid * block_size;
       using remain_tile_mask = fmha::tile_mask_t<score_acc_tile_t>;
@@ -1604,9 +1686,10 @@ class paged_attention_loop_kernel {
         sg_tile_size_x,
         sg_tile_size_y,
         reg_layout::vnni_tiled>;
-    using value_tile_t = subgroup::tile_t<scalar_t, value_tile_desc_t>;
+    using value_tile_t = subgroup::tile_t<kv_t, value_tile_desc_t>;
+    using value_mma_tile_t = subgroup::tile_t<scalar_t, value_tile_desc_t>;
     using value_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+        mem_desc_t<kv_t, mem_layout::row_major, mem_space::global>,
         value_tile_desc_t,
         msg_type::block_2d,
         arch_tag>;
@@ -1633,14 +1716,25 @@ class paged_attention_loop_kernel {
     using tile_mma = subgroup::tile_mma_t<
         out_acc_tile_t,
         out_acc_tile_t,
-        value_tile_t,
+        value_mma_tile_t,
         exp_score_tile_t,
         mma_engine::xmx,
         arch_tag>;
 
+    using dequant_value_t = std::conditional_t<
+        std::is_same_v<kv_t, uint8_t>,
+        subgroup::dequant_fp8_weight_t<
+            value_mma_tile_t,
+            value_tile_t,
+            fp8_format_,
+            false>,
+        unused_t>;
+
     exp_score_tile_t mat_exp_score;
     value_tile_t mat_value;
+    value_mma_tile_t mat_value_mma;
     out_acc_tile_t cur_mat_acc_out(0);
+    dequant_value_t dequant_value;
 
     const int start_block_idx = partition_idx * ctx.num_blocks_per_wg;
     const int end_block_idx =
@@ -1669,9 +1763,20 @@ class paged_attention_loop_kernel {
 
       exp_score_payload.template update_tdesc<exp_score_update_dir>(block_size);
 
+      if constexpr (std::is_same_v<kv_t, uint8_t>) {
+        dequant_value(mat_value_mma, mat_value, args.fp8_scale);
+      } else {
+        mat_value_mma = mat_value;
+      }
+
       SW_BARRIER();
-      tile_mma::mma(cur_mat_acc_out, cur_mat_acc_out, mat_value, mat_exp_score);
+      tile_mma::mma(
+          cur_mat_acc_out, cur_mat_acc_out, mat_value_mma, mat_exp_score);
       SW_BARRIER();
+    }
+
+    if constexpr (std::is_same_v<kv_t, uint8_t>) {
+      cur_mat_acc_out.reg *= args.fp8_scale;
     }
 
     // load rescale_factor from slm

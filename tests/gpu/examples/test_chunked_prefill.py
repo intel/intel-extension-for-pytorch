@@ -430,8 +430,10 @@ class TestChunkedPrefill(TestCase):
         use_alibi,
         is_causal,
         version,
+        window_size,
         dtype,
         qtype,
+        softcap,
     ) -> None:
         seed = 0
 
@@ -513,6 +515,8 @@ class TestChunkedPrefill(TestCase):
             scale,
             alibi_slopes,
             is_causal,
+            window_size,
+            softcap,
         )
 
         ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
@@ -528,9 +532,12 @@ class TestChunkedPrefill(TestCase):
             is_causal,
             block_tables_xpu,
             alibi_slopes_xpu,
+            window_size_left=window_size[0],
+            window_size_right=window_size[1],
+            softcap=softcap,
         )
 
-        torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
+        torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=1e-3, rtol=1e-3)
 
     @parametrize("num_gen_seqs", [1, 8])
     @parametrize("max_seqlen_k", [1024])
@@ -576,7 +583,51 @@ class TestChunkedPrefill(TestCase):
             is_mamba_spec,
         )
 
-    @parametrize("num_gen_seqs", [1, 8])
+    @parametrize("num_gen_seqs", [1, 8, 16, 32])
+    @parametrize("max_seqlen_k", [1024])
+    @parametrize("num_heads", [(16, 16), (10, 2)])
+    @parametrize("head_size", [64, 128])
+    @parametrize("block_size", [64])  # , 128])
+    @parametrize("use_alibi", [False])
+    @parametrize("is_causal", [False, True])
+    @parametrize("window_size", [(-1, -1)])
+    @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("qtype", [torch.float8_e4m3fn])
+    @parametrize("softcap", [-1.0, 50.0])
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(),
+        reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
+    )
+    def test_chunked_prefill_fp8(
+        self,
+        num_gen_seqs,
+        max_seqlen_k,
+        num_heads,
+        head_size,
+        block_size,
+        use_alibi,
+        is_causal,
+        window_size,
+        dtype,
+        qtype,
+        softcap,
+    ):
+        self.chunk_prefill_fp8(
+            num_gen_seqs,
+            max_seqlen_k,
+            num_heads,
+            head_size,
+            block_size,
+            use_alibi,
+            is_causal,
+            "chunked_prefill",
+            window_size,
+            dtype,
+            qtype,
+            softcap,
+        )
+
+    @parametrize("num_gen_seqs", [1, 8, 16, 32])
     # @parametrize("num_gen_seqs", [13])
     @parametrize("max_seqlen_k", [1024])
     # @parametrize("max_seqlen_k", [76])
@@ -624,9 +675,9 @@ class TestChunkedPrefill(TestCase):
             is_mamba_spec,
         )
 
-    @parametrize("num_gen_seqs", [1, 8])
+    @parametrize("num_gen_seqs", [1, 8, 32])
     # @parametrize("num_gen_seqs", [13])
-    @parametrize("max_seqlen_k", [512])
+    @parametrize("max_seqlen_k", [512, 1024, 2048, 4096, 8192])
     # @parametrize("max_seqlen_k", [76])
     @parametrize("num_heads", [(16, 16)])
     @parametrize("head_size", [64, 128])
@@ -634,8 +685,10 @@ class TestChunkedPrefill(TestCase):
     @parametrize("block_size", [64, 128, 192])
     @parametrize("use_alibi", [False])
     @parametrize("is_causal", [False])
-    @parametrize("dtype", [torch.float16])
-    @parametrize("qtype", [torch.float8_e5m2, torch.float8_e4m3fn])
+    @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("qtype", [torch.float8_e4m3fn])
+    @parametrize("window_size", [(-1, -1)])
+    @parametrize("softcap", [-1.0])
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(),
         reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
@@ -649,8 +702,10 @@ class TestChunkedPrefill(TestCase):
         block_size,
         use_alibi,
         is_causal,
+        window_size,
         dtype,
         qtype,
+        softcap,
     ):
         self.chunk_prefill_fp8(
             num_gen_seqs,
@@ -661,8 +716,10 @@ class TestChunkedPrefill(TestCase):
             use_alibi,
             is_causal,
             "flash_decoding",
+            window_size,
             dtype,
             qtype,
+            softcap,
         )
 
 

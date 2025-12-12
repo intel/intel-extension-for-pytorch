@@ -1,5 +1,6 @@
 
-function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
+function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST HIDDEN)
+
   # link openblas
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
     -fsycl
@@ -53,9 +54,13 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
   target_include_directories(${TARGET} PUBLIC ${TORCH_INCLUDE_DIRS})
   target_include_directories(${TARGET} PUBLIC ${SYCL_INCLUDE_DIR})
   target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})
+  
+  if(HIDDEN)
+    set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
+  else()
+    set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET default CXX_VISIBILITY_INLINES_HIDDEN OFF)
+  endif()
 
-  # Set visibility to hidden to close the differences of Windows & Linux
-  set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
   if(${USE_DOUBLE_GRF})
     target_compile_definitions(${TARGET} PRIVATE USE_DOUBLE_GRF)
   endif()

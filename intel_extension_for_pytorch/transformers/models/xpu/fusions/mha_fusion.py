@@ -566,9 +566,9 @@ class _IPEXPagedAttentionXPU:
         v_scale: float = 1.0,
         softcap: float = -1.0,
     ):
-        k_cache, v_cache = convert_from_fp8(
-            query.dtype, k_cache, v_cache, k_scale, v_scale, kv_cache_dtype
-        )
+        # k_cache, v_cache = convert_from_fp8(
+        #     query.dtype, k_cache, v_cache, k_scale, v_scale, kv_cache_dtype
+        # )
         head_dim = query.size(-1)
         pad_query = query
         pad_k_cache = k_cache
@@ -618,6 +618,7 @@ class _IPEXPagedAttentionXPU:
             False,
             None,
             softcap,
+            k_scale,
         )
         if head_dim % 64 != 0:
             output.copy_(pad_output[:, :, :head_dim])
