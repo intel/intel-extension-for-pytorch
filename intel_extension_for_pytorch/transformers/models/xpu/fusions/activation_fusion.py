@@ -84,7 +84,7 @@ def rotary_embedding_batched_xpu(
     offsets: Optional[torch.Tensor] = None,
 ):
     if offsets is None:
-        torch.ops.torch_ipex.rotary_embedding(
+        torch.ops.torch_ipex.rotary_embedding_legacy(
             positions, query, key, head_size, cos_sin_cache, is_nexo_style, rotary_dim
         )
     else:

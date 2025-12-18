@@ -1,3 +1,4 @@
+import copy
 import intel_extension_for_pytorch as ipex  # noqa F401
 import torch
 import torch.nn as nn
@@ -107,7 +108,7 @@ def _apply_rotary_emb(
     return x_out
 
 
-class RotaryEmbedding(nn.Module):
+class RotaryEmbeddingLegacy(nn.Module):
     """Original rotary positional embedding."""
 
     def __init__(
@@ -269,7 +270,7 @@ class RotaryEmbedding(nn.Module):
                 offsets,
             )
         else:
-            torch.ops.torch_ipex.rotary_embedding(
+            torch.ops.torch_ipex.rotary_embedding_legacy(
                 positions,
                 query,
                 key,
@@ -377,7 +378,7 @@ def _rotate_gptj(x: torch.Tensor) -> torch.Tensor:
 @pytest.mark.parametrize("seed", SEEDS)
 @pytest.mark.parametrize("device", DEVICES)
 @torch.inference_mode()
-def test_rotary_embedding(
+def test_rotary_embedding_legacy(
     is_neox_style: bool,
     batch_size: int,
     seq_len: int,
@@ -398,7 +399,7 @@ def test_rotary_embedding(
     torch.set_default_device(device)
     if rotary_dim is None:
         rotary_dim = head_size
-    rope = RotaryEmbedding(
+    rope = RotaryEmbeddingLegacy(
         head_size, rotary_dim, max_position, base, is_neox_style, dtype
     )
     rope = rope.to(dtype=dtype)
@@ -443,7 +444,7 @@ def test_batched_rotary_embedding(
     torch.set_default_device(device)
     if rotary_dim is None:
         rotary_dim = head_size
-    rope = RotaryEmbedding(
+    rope = RotaryEmbeddingLegacy(
         head_size, rotary_dim, max_position, base, is_neox_style, dtype
     )
     rope = rope.to(dtype=dtype)
@@ -462,3 +463,193 @@ def test_batched_rotary_embedding(
     # Compare the results.
     assert torch.allclose(out_query, ref_query, atol=1e-3, rtol=1e-3)
     assert torch.allclose(out_key, ref_key, atol=1e-3, rtol=1e-3)
+
+
+def apply_rotary_emb_torch(
+    x: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor,
+    is_neox_style: bool,
+) -> torch.Tensor:
+    cos = cos.unsqueeze(-2).to(x.dtype)
+    sin = sin.unsqueeze(-2).to(x.dtype)
+    if is_neox_style:
+        x1, x2 = torch.chunk(x, 2, dim=-1)
+    else:
+        x1 = x[..., ::2]
+        x2 = x[..., 1::2]
+    o1 = x1 * cos - x2 * sin
+    o2 = x2 * cos + x1 * sin
+    if is_neox_style:
+        return torch.cat((o1, o2), dim=-1)
+    else:
+        return torch.stack((o1, o2), dim=-1).flatten(-2)
+
+
+class RotaryEmbedding(nn.Module):
+    """Original rotary positional embedding."""
+
+    def __init__(
+        self,
+        head_size: int,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: float,
+        is_neox_style: bool,
+        dtype: torch.dtype,
+    ) -> None:
+        super().__init__()
+        self.head_size = head_size
+        self.rotary_dim = rotary_dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+        self.is_neox_style = is_neox_style
+        self.dtype = dtype
+
+        cache = self._compute_cos_sin_cache()
+        cache = cache.to(dtype)
+        self.cos_sin_cache: torch.Tensor
+        self.register_buffer("cos_sin_cache", cache, persistent=False)
+
+    def _compute_inv_freq(self, base: float) -> torch.Tensor:
+        """Compute the inverse frequency."""
+        # NOTE(woosuk): To exactly match the HF implementation, we need to
+        # use CPU to compute the cache and then move it to GPU. However, we
+        # create the cache on GPU for faster initialization. This may cause
+        # a slight numerical difference between the HF implementation and ours.
+        inv_freq = 1.0 / (
+            base
+            ** (
+                torch.arange(0, self.rotary_dim, 2, dtype=torch.float) / self.rotary_dim
+            )
+        )
+        return inv_freq
+
+    def _compute_cos_sin_cache(self) -> torch.Tensor:
+        """Compute the cos and sin cache."""
+        inv_freq = self._compute_inv_freq(self.base)
+        t = torch.arange(self.max_position_embeddings, dtype=torch.float)
+
+        freqs = torch.einsum("i,j -> ij", t, inv_freq)
+        cos = freqs.cos()
+        sin = freqs.sin()
+        cache = torch.cat((cos, sin), dim=-1)
+        return cache
+
+    def forward_native(
+        self,
+        positions: torch.Tensor,
+        query: torch.Tensor,
+        key: Optional[torch.Tensor] = None,
+        offsets: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """A PyTorch-native implementation of forward()."""
+        if offsets is not None:
+            positions = positions + offsets
+        positions = positions.flatten()
+        num_tokens = positions.shape[0]
+        cos_sin = self.cos_sin_cache.index_select(0, positions)
+        cos, sin = cos_sin.chunk(2, dim=-1)
+
+        query_shape = query.shape
+        query = query.view(num_tokens, -1, self.head_size)
+        query_rot = query[..., : self.rotary_dim]
+        query_pass = query[..., self.rotary_dim :]
+        query_rot = apply_rotary_emb_torch(query_rot, cos, sin, self.is_neox_style)
+        query = torch.cat((query_rot, query_pass), dim=-1).reshape(query_shape)
+
+        # key may be None in some cases, e.g. cross-layer KV sharing
+        if key is not None:
+            key_shape = key.shape
+            key = key.view(num_tokens, -1, self.head_size)
+            key_rot = key[..., : self.rotary_dim]
+            key_pass = key[..., self.rotary_dim :]
+            key_rot = apply_rotary_emb_torch(key_rot, cos, sin, self.is_neox_style)
+            key = torch.cat((key_rot, key_pass), dim=-1).reshape(key_shape)
+        return query, key
+
+    def forward_xpu(
+        self,
+        positions: torch.Tensor,
+        query: torch.Tensor,
+        key: Optional[torch.Tensor] = None,
+        offsets: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+
+        # __setattr__ in nn.Module (called by `self.cos_sin_cache = ...`)
+        # is expensive, so avoid calling it if possible
+        if (
+            self.cos_sin_cache.device != query.device
+            or self.cos_sin_cache.dtype != query.dtype
+        ):
+            self.cos_sin_cache = self.cos_sin_cache.to(query.device, dtype=query.dtype)
+
+        # ops.rotary_embedding()/batched_rotary_embedding()
+        # are in-place operations that update the query and key tensors.
+        if offsets is not None:
+            raise NotImplementedError(
+                "batched_rotary_embedding is not implemented yet."
+            )
+        else:
+            torch.ops.torch_ipex.rotary_embedding(
+                positions,
+                query,
+                key,
+                self.head_size,
+                self.cos_sin_cache,
+                self.is_neox_style,
+            )
+        return query, key
+
+    def extra_repr(self) -> str:
+        s = f"head_size={self.head_size}, rotary_dim={self.rotary_dim}"
+        s += f", max_position_embeddings={self.max_position_embeddings}"
+        s += f", base={self.base}, is_neox_style={self.is_neox_style}"
+        return s
+
+
+@pytest.mark.parametrize("device", ["xpu"])
+@pytest.mark.parametrize("max_position", [11, 4096, 32768])
+@pytest.mark.parametrize("is_neox_style", [True, False])
+@pytest.mark.parametrize("rotary_dim", [32])
+@pytest.mark.parametrize("head_size", [32, 108])
+@pytest.mark.parametrize("seq_len", [11, 1024])
+@pytest.mark.parametrize("use_key", [True, False])
+@pytest.mark.parametrize("head_stride_is_contiguous", [True, False])
+def test_rotary_embedding(
+    device,
+    max_position,
+    is_neox_style,
+    rotary_dim,
+    head_size,
+    seq_len,
+    use_key,
+    head_stride_is_contiguous,
+):
+    batch_size = 1
+    base = 10000
+    num_heads = 7
+    rot = RotaryEmbedding(
+        head_size, rotary_dim, max_position, base, is_neox_style, torch.float32
+    )
+
+    positions = torch.randint(0, max_position, (batch_size, seq_len), device=device)
+    head_stride = head_size + (64 if head_stride_is_contiguous else 0)
+
+    query = torch.randn(
+        batch_size, seq_len, num_heads, head_stride, dtype=torch.float32, device=device
+    )
+    key = torch.randn_like(query) if use_key else None
+    query = query[..., :head_size]
+    key = key[..., :head_size] if use_key else None
+
+    rot_ref = copy.deepcopy(rot).to(device)
+    key_ref = key.clone() if use_key else None
+    query_ref = query.clone()
+    positions_ref = positions.clone()
+
+    out_query, out_key = rot.forward_xpu(positions, query, key)
+    ref_query, ref_key = rot_ref.forward_native(positions_ref, query_ref, key_ref)
+
+    torch.testing.assert_close(out_query, ref_query, rtol=1e-2, atol=1e-2)
+    torch.testing.assert_close(out_key, ref_key, rtol=1e-2, atol=1e-2)
