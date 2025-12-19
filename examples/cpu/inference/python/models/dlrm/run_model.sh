@@ -79,7 +79,7 @@ if [[ "1" == ${TORCH_INDUCTOR} ]];then
     MANUALLY_LAUNCH=1
 fi
 
-EVAL_BATCH=${EVAL_BATCH:-300}
+EVAL_BATCH=${EVAL_BATCH:-20000}
 echo "EVAL_BATCH: $EVAL_BATCH"
 
 if [[ $PRECISION == "bf16" ]]; then

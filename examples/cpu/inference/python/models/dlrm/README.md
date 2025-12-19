@@ -87,7 +87,7 @@ https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorc
 |:---------------------------:|:------------------------------------------------------------------------------------:|
 | **TEST_MODE** (THROUGHPUT, ACCURACY)              | `export TEST_MODE=THROUGHPUT`                  |
 | **DATASET_DIR**             |                               `export DATASET_DIR=<multi-hot dataset dir>`                                  |
-| **EVAL_BATCH**             |                               `export EVAL_BATCH=300`                                  |
+| **EVAL_BATCH**             |                               `export EVAL_BATCH=20000`                                  |
 | **WEIGHT_DIR** (ONLY FOR ACCURACY)     |                 `export WEIGHT_DIR=<offical released checkpoint>`        |
 | **PRECISION**    |                               `export PRECISION=int8 <specify the precision to run: int8, fp32, bf32, bf16 or tf32>`                             |
 | **OUTPUT_DIR**    |                               `export OUTPUT_DIR=$PWD`                               |
