@@ -884,23 +884,27 @@ class TestLLMModules(TestCase):
             (1, 32, 128),
             (32, 32, 128),
         ]
-        for size in test_tensor_size:
+        for size, use_key in itertools.product(test_tensor_size, [True, False]):
             q = torch.randn(size).float()
-            k = torch.randn(size).float()
+            k = torch.randn(size).float() if use_key else None
             rotary_dim = size[-1]
             seqlen = size[0]
             position_ids = torch.arange(size[0])
             sin, cos = get_sin_cos(position_ids, rotary_dim, 10000, seqlen, q.dtype)
 
             ref_q = apply(q, cos, sin)
-            ref_k = apply(k, cos, sin)
+            ref_k = apply(k, cos, sin) if use_key else None
 
             ipex_q, ipex_k = ipex.llm.functional.rotary_embedding(
                 q, k, sin, cos, rotary_dim, True
             )
 
             self.assertEqual(ipex_q, ref_q)
-            self.assertEqual(ref_k, ipex_k)
+            if use_key:
+                self.assertEqual(ref_k, ipex_k)
+            else:
+                self.assertIsNone(ipex_k)
+                self.assertIsNone(ref_k)
 
     def test_add_layernorm(self):
         for add_back in [True, False]:
