@@ -1158,8 +1158,8 @@ def main():
                 print(
                     f"Step {training_steps:5d}: loss: {gloss:6.3f} lm_acc: {lm_acc:.3f} \
                     seq_acc: {seq_acc:.3f} lbs: {args.train_batch_size} gbs: {total_batch_size} \
-                    DT: {(t1-t0)*1000.0:.1f} XT: {(t2-t1)*1000.0:.1f} FT: {(t3-t2)*1000.0:.1f} \
-                    BT: {(t4-t3)*1000.0:.1f} OT: {(t5-t4)*1000.0:.1f} TT: {(t5-t0)*1000.0:.1f}"
+                    DT: {(t1 - t0) * 1000.0:.1f} XT: {(t2 - t1) * 1000.0:.1f} FT: {(t3 - t2) * 1000.0:.1f} \
+                    BT: {(t4 - t3) * 1000.0:.1f} OT: {(t5 - t4) * 1000.0:.1f} TT: {(t5 - t0) * 1000.0:.1f}"
                 )
 
                 update_step = training_steps % args.gradient_accumulation_steps == 0
