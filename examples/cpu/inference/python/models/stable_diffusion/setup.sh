@@ -21,7 +21,7 @@ pip install scipy
 
 git clone https://github.com/huggingface/diffusers.git
 cd diffusers
-git checkout v0.35.1
+git checkout 1cdb872
 git apply ../diffusers.patch
 pip install -e .
 cd ..
