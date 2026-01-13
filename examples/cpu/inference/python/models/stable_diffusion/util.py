@@ -101,7 +101,9 @@ def generate_model_info(model):
 
 
 def convert(model):
-    with open("data.json", "r") as fp:
+    with open(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json"), "r"
+    ) as fp:
         data = json.load(fp)
     parent_child_mod_dict = generate_model_info(model)
     with torch.no_grad():
