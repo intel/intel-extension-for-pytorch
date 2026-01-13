@@ -17,6 +17,7 @@
 #
 
 pip install datasets sentencepiece psutil lm_eval===0.4.9 peft==0.17.1
+conda install https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.51.1-h0c1763c_0.conda
 
 # Clone the Transformers repo in the LLAMA2 inference directory
 git clone https://github.com/jianan-gu/transformers -b flex_attention_enabling_2.7
