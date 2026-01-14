@@ -16,13 +16,13 @@ class TestLinearReorder(VerboseTestCase):
                     "reorder_for_pack": 2,
                     "reorder_for_dtype": 0,
                     "reorder_for_format": 0,
-                    "redundent_reorder": 0,
+                    "redundant_reorder": 0,
                 },
                 "bf16": {
                     "reorder_for_pack": 3,
                     "reorder_for_dtype": 0,
                     "reorder_for_format": 0,
-                    "redundent_reorder": 0,
+                    "redundant_reorder": 0,
                 },
             }  # there should be only reorders on prepack, if any other reorder appears, will cause fail
             seg = None
@@ -54,10 +54,10 @@ class TestLinearReorder(VerboseTestCase):
                     )
 
                 if self.is_dnnl_verbose(line) and self.RedundantReorder(line):
-                    segmentation[seg]["redundent_reorder"] -= 1
+                    segmentation[seg]["redundant_reorder"] -= 1
                     self.assertTrue(
-                        segmentation[seg]["redundent_reorder"] >= 0,
-                        "show unexpected redundent reorder",
+                        segmentation[seg]["redundant_reorder"] >= 0,
+                        "show unexpected redundant reorder",
                     )
 
 
