@@ -591,17 +591,17 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
         return new_m, optimizer, params_attr
 
     if device_type == "cpu":
-        opt_model, opt_optmizer, params_attr = convert_rec(
+        opt_model, opt_optimizer, params_attr = convert_rec(
             model, optimizer, params_attr
         )
 
         patch_state_dict(opt_model, params_attr, "prepack")
         setattr(opt_model, "params_attr", params_attr)  # noqa: B010
-        if opt_optmizer is not None:
-            setattr(opt_optmizer, "params_attr", params_attr)  # noqa: B010
-            optim._optimizer_utils.patch_load_state_dict(opt_optmizer)
-            optim._optimizer_utils.patch_state_dict(opt_optmizer)
-        return opt_model, opt_optmizer, params_attr
+        if opt_optimizer is not None:
+            setattr(opt_optimizer, "params_attr", params_attr)  # noqa: B010
+            optim._optimizer_utils.patch_load_state_dict(opt_optimizer)
+            optim._optimizer_utils.patch_state_dict(opt_optimizer)
+        return opt_model, opt_optimizer, params_attr
 
 
 def record_input_shape_for_prepack(module, sample_input):

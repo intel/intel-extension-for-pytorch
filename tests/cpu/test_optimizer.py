@@ -40,7 +40,7 @@ class TestOptimizers(TestCase):
         )
         for i in range(2):
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                # torch optmizer
+                # torch optimizer
                 y = module(*module.input).sum()
                 optimizer.zero_grad(set_to_none=set_to_none)
                 y.backward()
