@@ -573,6 +573,7 @@ def main_worker(gpu, ngpus_per_node, args):
             shuffle=False,
             num_workers=args.workers,
             pin_memory=True,
+            drop_last=True,
         )
     else:
         train_loader = None
@@ -651,20 +652,20 @@ def main_worker(gpu, ngpus_per_node, args):
                 memory_format=torch.channels_last
             )
             if args.int8:
-                from torch.ao.quantization.quantize_pt2e import (
+                from torchao.quantization.pt2e.quantize_pt2e import (
                     prepare_pt2e,
                     convert_pt2e,
                 )
-                import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-                from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
+                import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+                from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
                     X86InductorQuantizer,
                 )
-                from torch.export import export_for_training
+                from torch.export import export
 
                 print("[Info] Running torch.compile() INT8 quantization")
                 with torch.no_grad():
                     example_inputs = (x,)
-                    exported_model = export_for_training(model, example_inputs).module()
+                    exported_model = export(model, example_inputs, strict=True).module()
                     quantizer = X86InductorQuantizer()
                     quantizer.set_global(
                         xiq.get_default_x86_inductor_quantization_config()

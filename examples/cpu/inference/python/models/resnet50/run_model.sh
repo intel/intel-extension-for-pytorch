@@ -69,12 +69,15 @@ fi
 
 rm -rf "${OUTPUT_DIR}/${LOG_PREFIX}_*"
 
-if [[ $PRECISION == "bf16" ]]; then
+if [[ $PRECISION == "int8" ]]; then
+    echo "running int8 path"
+    ARGS="$ARGS --int8"
+elif [[ $PRECISION == "bf16" ]]; then
     ARGS="$ARGS --bf16 --jit"
     echo "running bf16 path"
 else
     echo "The specified precision '${PRECISION}' is unsupported."
-    echo "Supported precisions are: bf16"
+    echo "Supported precisions are: int8 bf16"
     exit 1
 fi
 

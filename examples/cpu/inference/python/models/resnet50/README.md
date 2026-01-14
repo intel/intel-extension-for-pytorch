@@ -11,6 +11,11 @@ This document has instructions for running [ResNet50](https://github.com/Kaiming
 # Install PyTorch, Torchvision
 pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
 
+# Install TorchAO if test int8
+git clone https://github.com/pytorch/ao.git
+cd ao
+python setup.py install
+
 # Install necessary environment
 pip install numpy
 pip install pillow
@@ -54,7 +59,7 @@ The folder that contains the `val` directory should be set as the `DATASET_DIR` 
 | **INSTANCES** (required if no test mode)         |     `export INSTANCES=<the number of total instances>`            |
 | **DATASET_DIR** (required for ACCURACY)          |     `export DATASET_DIR=<path to ImageNet>`                       |
 | **OUTPUT_DIR**                                   |     `export OUTPUT_DIR=$PWD`                                      |
-| **PRECISION**                                    |     `export PRECISION=bf16` (bf16)                                |
+| **PRECISION**                                    |     `export PRECISION=bf16` (bf16, int8)                          |
 | **BATCH_SIZE** (optional)                        |     `export BATCH_SIZE=64`                                        |
 
 2. Command lines
