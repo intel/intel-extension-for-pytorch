@@ -101,7 +101,7 @@ functions:
 ***************************************************************************
 IPEX_OP_REGISTER | IPEX_OP_REGISTER_TO_PLAIN
 This macro is used to register ops into torch_ipex library. Through this macro,
-function schema and signature will automatically be infered from function
+function schema and signature will automatically be inferred from function
 prototype. However, it is worth to note that this macro will not works on
 overload functions(see IPEX_OP_REGISTER_OVERLOAD). Here is some examples for
 register ipex operators:

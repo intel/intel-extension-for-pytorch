@@ -14,14 +14,14 @@ at::Tensor dil_add_swish(const at::Tensor& mm_output, const at::Tensor& bias) {
   scalar_t* mm_output_data_base = mm_output.data_ptr<scalar_t>();
   scalar_t* bias_data_base = bias.data_ptr<scalar_t>();
 
-  auto infered_size = mm_output.sizes().vec();
-  int64_t dim_size = infered_size[infered_size.size() - 1];
+  auto inferred_size = mm_output.sizes().vec();
+  int64_t dim_size = inferred_size[inferred_size.size() - 1];
   int64_t outer_size = 1;
   // The last dim is the loop unit. We need to minus 2 to exclude the last dim.
-  // infered_size.size() - 2 is the -2th dimension.
-  for (int64_t i = infered_size.size() - 2; i >= 0; i--) {
+  // inferred_size.size() - 2 is the -2th dimension.
+  for (int64_t i = inferred_size.size() - 2; i >= 0; i--) {
     // Calculate outer loop number;
-    outer_size *= infered_size[i];
+    outer_size *= inferred_size[i];
   }
 
   int64_t grain_size = at::internal::GRAIN_SIZE / (16 * dim_size);
