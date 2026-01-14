@@ -81,7 +81,7 @@ https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorc
     ./setup.sh
     ```
 
-5. Setup required environment paramaters
+5. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

@@ -50,7 +50,7 @@ bash download_dataset.sh
 ```
 
 ### Inference
-1. Setup required environment paramaters
+1. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

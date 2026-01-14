@@ -59,7 +59,7 @@ wget -O prompt.json https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.c
 ```
 
 ### Performance
-#### 1. Setup required environment paramaters
+#### 1. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

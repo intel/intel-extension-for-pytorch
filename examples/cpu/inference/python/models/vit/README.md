@@ -80,7 +80,7 @@ Vision Transformer inference best known configurations with PyTorch.
    #Run "download_data.sh"
    ./download_data.sh
   ```
-7. Setup required environment paramaters
+7. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

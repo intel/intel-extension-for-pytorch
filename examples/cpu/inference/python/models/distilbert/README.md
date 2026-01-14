@@ -90,7 +90,7 @@ export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
   ./setup.sh
   ```
 
-5. Setup required environment paramaters
+5. Setup required environment parameters
 
 # Custom mode
  Run in custom mode by export TEST_MODE="" and export BATCH_SIZE to set the batch_size, export CORES_PER_INSTANCE to set the number of cores per instance and export INSTANCES to set the number of instances.

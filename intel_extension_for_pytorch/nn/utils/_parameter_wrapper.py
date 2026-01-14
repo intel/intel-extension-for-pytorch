@@ -261,7 +261,7 @@ def found_wrapper(parameter, params_attr):
 
 
 def patch_state_dict(model, params_attr, mode):
-    def get_parammeter_from_model(model, name_list):
+    def get_parameter_from_model(model, name_list):
         if name_list[0] == "module" and not hasattr(model, "module"):
             # for DDP model, there is an extra module
             name_list = name_list[1:]
@@ -282,7 +282,7 @@ def patch_state_dict(model, params_attr, mode):
             # k = "submodule_name.submodule_name.attr_name"
             # for example, "attn.linear.weight"
             name_list = k.split(".")
-            param = get_parammeter_from_model(model, name_list)
+            param = get_parameter_from_model(model, name_list)
             param_wrapper = found_wrapper(param, params_attr)
             if param_wrapper:
                 if mode == "inference" and param_wrapper.original_dtype is not None:
@@ -323,7 +323,7 @@ class ParameterWrapper(object):
         self.parameter: torch.nn.Parameter = None
         # Parameter trail for split optimization
         self.parameter_trail: torch.Tensor = None
-        # The original dtype for Paramter
+        # The original dtype for Parameter
         self.original_dtype: torch.dtype = None
         # The caseted dtype by ipex.optimize
         self.casted_dtype: torch.dtype = None

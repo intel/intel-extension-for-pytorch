@@ -27,7 +27,7 @@ export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libtcmall
 ```
 
 ### Inference
-1. Setup required environment paramaters
+1. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

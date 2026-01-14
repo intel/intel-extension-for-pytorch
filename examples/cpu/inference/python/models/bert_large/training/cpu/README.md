@@ -145,7 +145,7 @@ you can use "SHARD_NUM" to control the shard files number. the default "SHARD_NU
   ```
   ./setup.sh
   ```
-4. Setup required environment paramaters
+4. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
