@@ -21,7 +21,7 @@ from ._utils import (
     quantized_modules_has_weights,
     load_qconf_summary_to_model,
     get_fqn_valid_for_module_dict_key,
-    check_model_obsever_has_run,
+    check_model_observer_has_run,
 )
 from ._quantization_state import (
     AutoQuantizationState,
@@ -459,7 +459,7 @@ def auto_prepare(
                 sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
                 get_default_recipe(nodes)
             else:
-                if check_model_obsever_has_run(model):
+                if check_model_observer_has_run(model):
                     # re-compute the scales and zp if user load a json file and re-do the calibration step.
                     attach_scale_zp_values_to_model(model)
                 else:
@@ -769,7 +769,7 @@ def auto_convert(
         sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
         get_default_recipe(nodes)
     else:
-        if check_model_obsever_has_run(module):
+        if check_model_observer_has_run(module):
             # re-compute the scales and zp if user load a json file and re-do the calibration step.
             attach_scale_zp_values_to_model(module)
         else:

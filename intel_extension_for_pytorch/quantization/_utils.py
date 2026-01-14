@@ -241,7 +241,7 @@ def _check_observer_has_run(observer):
     return True
 
 
-def check_model_obsever_has_run(
+def check_model_observer_has_run(
     module: torch.nn.Module,
 ) -> None:
     """
@@ -272,7 +272,7 @@ def check_model_obsever_has_run(
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
 
     for _, child in module.named_children():
-        if check_model_obsever_has_run(child):
+        if check_model_observer_has_run(child):
             return True
 
     return False
