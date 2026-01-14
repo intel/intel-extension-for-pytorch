@@ -454,7 +454,9 @@ class MultiStreamModule(nn.Module):
         else:
             AssertionError(
                 False
-            ), "Concat output failed, unsupported output hint type of:{}".format(type_arg)
+            ), "Concat output failed, unsupported output hint type of:{}".format(
+                type_arg
+            )
         return None
 
     def _concat_output_for_each_stream(self):
