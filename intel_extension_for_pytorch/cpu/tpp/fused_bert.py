@@ -1295,7 +1295,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
             "Set seed failed for libxsmm which may impact the training loss, you can call "
             + "torch.manual_seed(N) before invoking fast_bert."
         )
-    # replace the original transfomers module object with tpp module which has the same functionality but with more
+    # replace the original transformers module object with tpp module which has the same functionality but with more
     # operator fusion optimization
     new_model = copy.deepcopy(model)
     global layer_use_bf16

@@ -194,11 +194,11 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
 
     if "transformers" in sys.modules:
 
-        def is_transfomer_model(model):
+        def is_transformer_model(model):
             name = model.__class__.__module__
             return name.startswith("transformers.models.")
 
-        if is_transfomer_model(model):
+        if is_transformer_model(model):
             try:
                 from transformers.utils.fx import symbolic_trace as hf_symbolic_trace
             except ImportError:
