@@ -91,7 +91,7 @@ class LlgaKernel {
   // create qtensor for output of public format
   ArgSpec getQuantizedSpec(ArgSpec spec, size_t offset) const;
 
-  std::map<size_t, int64_t> initializeTensorIdToOccurence() const;
+  std::map<size_t, int64_t> initializeTensorIdToOccurrence() const;
 
   // PyTorch copy constants inside the subgraph instead of referencing them.
   // Constants inputs to the partition are no longer in the graph->inputs().
