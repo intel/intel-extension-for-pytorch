@@ -151,21 +151,21 @@ def run_bench(bench_name, module, input_data, optimizer=None, training=False):
 
 def inference_bench(dataset, emb_list, merged_emb):
     emblist_input, merged_emb_input = dataset
-    run_bench("EmbedddingBag List Inference", emb_list, emblist_input)
-    run_bench("Merged EmbedddingBag Inference", merged_emb, merged_emb_input)
+    run_bench("EmbeddingBag List Inference", emb_list, emblist_input)
+    run_bench("Merged EmbeddingBag Inference", merged_emb, merged_emb_input)
 
 
 def training_bench(dataset, emb_list, merged_emb, optimizer):
     emblist_input, merged_emb_input = dataset
     run_bench(
-        "EmbedddingBag List Training",
+        "EmbeddingBag List Training",
         emb_list,
         emblist_input,
         optimizer=optimizer,
         training=True,
     )
     run_bench(
-        "Merged EmbedddingBag Training", merged_emb, merged_emb_input, training=True
+        "Merged EmbeddingBag Training", merged_emb, merged_emb_input, training=True
     )
 
 
