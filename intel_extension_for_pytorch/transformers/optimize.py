@@ -2053,10 +2053,10 @@ def model_convert_lowering(
 
 
 # TODO: refine this check in other specific path
-def validate_device_avaliable(device: str):
+def validate_device_available(device: str):
     def error_message(device):
         raise RuntimeError(
-            f"Device [{device}] is not avaliable in your IPEX package, need to re-install IPEX with [{device}] support, exiting..."
+            f"Device [{device}] is not available in your IPEX package, need to re-install IPEX with [{device}] support, exiting..."
         )
 
     if device == "xpu":
@@ -2150,7 +2150,7 @@ def optimize(
         )
         return model, optimizer
 
-    validate_device_avaliable(device)
+    validate_device_available(device)
 
     try:
         well_supported_model = False

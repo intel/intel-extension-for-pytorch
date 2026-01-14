@@ -21,7 +21,7 @@ void get_mkl_version() {
 void get_libxsmm_version() {
 #if 1
   printf(
-      "Not avaliable yet, due to libxsmm CMake build not generate version info.\n");
+      "Not available yet, due to libxsmm CMake build not generate version info.\n");
 #else
   printf("libxsmm config version:  %s\n", LIBXSMM_CONFIG_VERSION);
   printf("Config branch:           %s\n", LIBXSMM_CONFIG_BRANCH);
