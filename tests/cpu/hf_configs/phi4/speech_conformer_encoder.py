@@ -2118,9 +2118,9 @@ class ConformerEncoderLayer(nn.Module):
             if set to True, use GLULinear module,
              otherwise, used GLUPointWiseConv module.
               default to False.
-        attention_innner_dim: int, otional
+        attention_inner_dim: int, otional
             if equal to -1, attention dim for linears k/q/v is
-            equal to d_model. otherwise attention_innner_dim is used.
+            equal to d_model. otherwise attention_inner_dim is used.
             default -1.
         attention_glu_type: str, optional
             activation function for glu used in the multihead attention,
@@ -2173,7 +2173,7 @@ class ConformerEncoderLayer(nn.Module):
         conv_glu_type="sigmoid",
         bias_in_glu=True,
         linear_glu_in_convm=False,
-        attention_innner_dim=-1,
+        attention_inner_dim=-1,
         attention_glu_type="swish",
         activation_checkpointing="",
         export=False,
@@ -2198,7 +2198,7 @@ class ConformerEncoderLayer(nn.Module):
                 n_head,
                 d_model,
                 dropout_rate,
-                attention_innner_dim,
+                attention_inner_dim,
                 attention_glu_type,
                 bias_in_glu,
                 use_pt_scaled_dot_product_attention=use_pt_scaled_dot_product_attention,
