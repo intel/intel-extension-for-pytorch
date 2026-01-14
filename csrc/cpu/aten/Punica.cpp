@@ -17,9 +17,9 @@ at::Tensor punica_bgmv_shrink_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     const double scale) {
-  punica_bgmv_shrink_kernel_stub(kCPU, out, input, weights, indicies, scale);
+  punica_bgmv_shrink_kernel_stub(kCPU, out, input, weights, indices, scale);
   return out;
 }
 
@@ -27,11 +27,11 @@ at::Tensor punica_sgmv_shrink_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     const double scale) {
   punica_sgmv_shrink_kernel_stub(
-      kCPU, out, input, weights, indicies, seq_lens, scale);
+      kCPU, out, input, weights, indices, seq_lens, scale);
   return out;
 }
 
@@ -39,10 +39,10 @@ at::Tensor punica_bgmv_expand_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     bool add_inputs) {
   punica_bgmv_expand_kernel_stub(
-      kCPU, out, input, weights, indicies, add_inputs);
+      kCPU, out, input, weights, indices, add_inputs);
   return out;
 }
 
@@ -50,11 +50,11 @@ at::Tensor punica_sgmv_expand_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     bool add_inputs) {
   punica_sgmv_expand_kernel_stub(
-      kCPU, out, input, weights, indicies, seq_lens, add_inputs);
+      kCPU, out, input, weights, indices, seq_lens, add_inputs);
   return out;
 }
 
@@ -62,7 +62,7 @@ at::Tensor punica_bgmv_expand_slice_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     int64_t slice_offset,
     int64_t slice_size,
     bool add_inputs) {
@@ -71,7 +71,7 @@ at::Tensor punica_bgmv_expand_slice_forward_cpu(
       out,
       input,
       weights,
-      indicies,
+      indices,
       slice_offset,
       slice_size,
       add_inputs);
@@ -82,7 +82,7 @@ at::Tensor punica_sgmv_expand_slice_forward_cpu(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     int64_t slice_offset,
     int64_t slice_size,
@@ -92,7 +92,7 @@ at::Tensor punica_sgmv_expand_slice_forward_cpu(
       out,
       input,
       weights,
-      indicies,
+      indices,
       seq_lens,
       slice_offset,
       slice_size,

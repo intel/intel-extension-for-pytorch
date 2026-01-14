@@ -12,14 +12,14 @@ void punica_bgmv_shrink(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     const double scale);
 
 void punica_sgmv_shrink(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     const double scale);
 
@@ -27,14 +27,14 @@ void punica_bgmv_expand(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     bool add_inputs);
 
 void punica_sgmv_expand(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     bool add_inputs);
 
@@ -42,7 +42,7 @@ void punica_bgmv_expand_slice(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     int64_t slice_offset,
     int64_t slice_size,
     bool add_inputs);
@@ -51,7 +51,7 @@ void punica_sgmv_expand_slice(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     int64_t slice_offset,
     int64_t slice_size,
@@ -62,14 +62,14 @@ using punica_bgmv_shrink_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     const double scale);
 
 using punica_sgmv_shrink_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     const double scale);
 
@@ -77,14 +77,14 @@ using punica_bgmv_expand_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     bool add_inputs);
 
 using punica_sgmv_expand_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     bool add_inputs);
 
@@ -92,7 +92,7 @@ using punica_bgmv_expand_slice_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     int64_t slice_offset,
     int64_t slice_size,
     bool add_inputs);
@@ -101,7 +101,7 @@ using punica_sgmv_expand_slice_fn = void (*)(
     at::Tensor& out,
     at::Tensor& input,
     at::Tensor& weights,
-    at::Tensor& indicies,
+    at::Tensor& indices,
     at::Tensor& seq_lens,
     int64_t slice_offset,
     int64_t slice_size,

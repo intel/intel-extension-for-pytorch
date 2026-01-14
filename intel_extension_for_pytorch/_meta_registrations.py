@@ -767,7 +767,7 @@ def meta_bgmv_shrink(
     out,
     input,
     weights,
-    indicies,
+    indices,
     scale,
 ):
     return out.new_empty(out.shape)
@@ -778,7 +778,7 @@ def meta_bgmv_expand(
     out,
     input,
     weights,
-    indicies,
+    indices,
     add_inputs,
 ):
     return out.new_empty(out.shape)
@@ -789,7 +789,7 @@ def meta_bgmv_expand_slice(
     out,
     input,
     weights,
-    indicies,
+    indices,
     slice_offset,
     slice_size,
     add_inputs,
@@ -802,7 +802,7 @@ def meta_sgmv_shrink(
     out,
     inputs,
     weights,
-    indicies,
+    indices,
     seq_lens,
     scale,
 ):
@@ -814,7 +814,7 @@ def meta_sgmv_expand(
     out,
     input,
     weights,
-    indicies,
+    indices,
     seq_lens,
     add_inputs,
 ):
@@ -826,7 +826,7 @@ def meta_sgmv_expand_slice(
     out,
     input,
     weights,
-    indicies,
+    indices,
     slice_offset,
     slice_size,
     add_inputs,

@@ -353,13 +353,13 @@ class PagedAttentionTest(TestCase):
         )
 
         # Run the reference implementation.
-        block_indicies = torch.div(slot_mapping, block_size, rounding_mode="floor")
-        block_indicies = block_indicies.cpu().tolist()
+        block_indices = torch.div(slot_mapping, block_size, rounding_mode="floor")
+        block_indices = block_indices.cpu().tolist()
         block_offsets = slot_mapping % block_size
         block_offsets = block_offsets.cpu().tolist()
         for i in range(num_token):
             for j in range(num_head):
-                block_idx = block_indicies[i]
+                block_idx = block_indices[i]
                 block_offset = block_offsets[i]
                 cloned_key_cache[block_idx, j, block_offset, :] = key[i][j]
                 cloned_value_cache[block_idx, j, block_offset, :] = value[i][j]
