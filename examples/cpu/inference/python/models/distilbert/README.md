@@ -9,6 +9,12 @@
   ```
   pip install torch --index-url https://download.pytorch.org/whl/nightly/cpu/
   ```
+* Installation of TorchAO
+  ```
+  git clone https://github.com/pytorch/ao.git
+  cd ao
+  python setup.py install
+  ```
 * Set tcmalloc Preload for better performance
   ```
   conda install -y gperftools -c conda-forge
@@ -99,7 +105,7 @@ export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
 |:---------------------------:|:------------------------------------------------------------------------------------:|
 | **TEST_MODE**              |                     `export TEST_MODE=THROUGHPUT <select from: THROUGHPUT< REALTIME, ACCURACY,"">`                                  |
 | **DATASET_DIR**              |                               `export DATASET_DIR=<path-to-sst-2>`                                  |
-| **PRECISION**    |                               `export PRECISION=bf16`                             |
+| **PRECISION**    |                               `export PRECISION=bf16(bf16, int8-fp32, int8-bf16)`                             |
 | **OUTPUT_DIR**    |                               `export OUTPUT_DIR=$PWD`                               |
 | **FINETUNED_MODEL**    |                               `export FINETUNED_MODEL=<path to pre-trained model>`                               |
 | **SEQUENCE_LENGTH**    |                               `export SEQUENCE_LENGTH=128`                        |

@@ -1683,18 +1683,19 @@ class Trainer:
                     )
             example_batch = self._prepare_inputs(example_batch)
             if self.args.int8:
-                from torch.ao.quantization.quantize_pt2e import (
+                from torchao.quantization.pt2e.quantize_pt2e import (
                     prepare_pt2e,
                     convert_pt2e,
                 )
-                import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-                from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
+                import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+                from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
                     X86InductorQuantizer,
                 )
-                from torch.export import export_for_training
+                from torch.export import export
+                from torchao.quantization.pt2e import move_exported_model_to_eval
                 from torch._export.utils import _disable_aten_to_metadata_assertions
-                from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import (
-                    _int8_sdpa_init,
+                from torchao.prototype.inductor.fx_passes.qsdpa_fusion import (
+                    _qsdpa_init,
                     custom_pass,
                 )
 
@@ -1705,13 +1706,13 @@ class Trainer:
                     _disable_aten_to_metadata_assertions(),
                     inductor_config.patch(post_grad_custom_pre_pass=custom_pass),
                 ):
-                    exported_model = export_for_training(
+                    exported_model = export(
                         model,
                         (),
                         kwargs=example_batch,
                         strict=True,
                     ).module()
-                    _int8_sdpa_init()
+                    _qsdpa_init()
                     quantizer = X86InductorQuantizer()
                     quantizer.set_global(
                         xiq.get_default_x86_inductor_quantization_config()
@@ -1722,7 +1723,7 @@ class Trainer:
                     prepared_model = prepare_pt2e(exported_model, quantizer)
                     prepared_model(**example_batch)
                     converted_model = convert_pt2e(prepared_model)
-                    torch.ao.quantization.move_exported_model_to_eval(converted_model)
+                    move_exported_model_to_eval(converted_model)
                     with torch.autocast(
                         "cpu", enabled=(self.args.bf16 or self.args.int8_bf16)
                     ):
