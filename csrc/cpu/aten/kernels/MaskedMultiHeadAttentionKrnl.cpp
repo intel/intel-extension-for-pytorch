@@ -1279,7 +1279,7 @@ scale_dot_product_for_indirect_access_kv_cache(
             auto attn_w_stride =
                 (bsi * head_num + head_group_start) * attn_w_strideH;
             for (auto ti = k_start; ti < k_start + block_size; ti++) {
-              // caculate the innerproduct for the current token and store the
+              // calculate the innerproduct for the current token and store the
               // key
               if (offset > 0 && ti == query_ti + offset) {
                 for (auto bbi = 0; bbi < beam_size; bbi++) {
@@ -1301,7 +1301,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                       true,
                       kc_head_start);
                 }
-              } else { // caculate the innerproduct for the past token
+              } else { // calculate the innerproduct for the past token
                 auto bi = bsi * beam_size;
                 auto q_ptr_start =
                     q_ptr + bi * qStrideB + head_group_start * qStrideH;
@@ -1351,7 +1351,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 auto beam = need_update_beam_idx && ti >= prompt_len
                     ? new_beam_idx[bi][ti]
                     : bsi * beam_size;
-                // caculate the innerproduct for the current token and store the
+                // calculate the innerproduct for the current token and store the
                 // key
                 if (offset > 0 && ti == query_ti + offset) {
                   auto kc_head_start = k_cache_ptr + ti * kcStrideS +
@@ -1366,7 +1366,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                       head_size,
                       true,
                       kc_head_start);
-                } else { // caculate the innerproduct for the past token
+                } else { // calculate the innerproduct for the past token
                   auto kc_head_start = k_cache_ptr + ti * kcStrideS +
                       beam * kcStrideB + kv_hi * kcStrideH;
                   reduce_head<QT, KCT, KCT>(
@@ -1588,7 +1588,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                       flag_access_start);
                 }
               } else {
-                // caculate the innerproduct for the past token
+                // calculate the innerproduct for the past token
                 if (need_update_beam_idx && vi >= prompt_len) {
                   for (auto bbi = 0; bbi < beam_size; bbi++) {
                     auto bi = bsi * beam_size + bbi;
@@ -1666,7 +1666,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                 auto beam = need_update_beam_idx && vi >= prompt_len
                     ? new_beam_idx[bi][vi]
                     : bsi * beam_size;
-                // caculate the innerproduct for the current token and store the
+                // calculate the innerproduct for the current token and store the
                 // key
                 if (offset > 0 && vi == offset) {
                   auto v_cache_head_start = v_cache_ptr + vi * vcStrideS +
@@ -1684,7 +1684,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                       v_cache_head_start,
                       flag_access_start);
                 } else {
-                  // caculate the innerproduct for the past token
+                  // calculate the innerproduct for the past token
                   auto v_cache_head_start = v_cache_ptr + vi * vcStrideS +
                       beam * vcStrideB + kv_hi * vcStrideH;
                   mul_attenion_weights_and_value_of_head<VCT, float, VCT>(
@@ -1886,7 +1886,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
             auto attn_w_stride =
                 (bsi * head_num + head_group_start) * attn_w_strideH;
             for (auto ti = k_start; ti < k_start + block_size; ti++) {
-              // caculate the innerproduct for the current token and store the
+              // calculate the innerproduct for the current token and store the
               // key
               if (offset > 0 && ti == query_ti + offset) {
                 for (auto bbi = 0; bbi < beam_size; bbi++) {
@@ -1908,7 +1908,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                       true,
                       kc_head_start);
                 }
-              } else { // caculate the innerproduct for the past token
+              } else { // calculate the innerproduct for the past token
                 auto bi = bsi * beam_size;
                 auto q_ptr_start =
                     q_ptr + bi * qStrideB + head_group_start * qStrideH;
@@ -1958,7 +1958,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                 auto beam = need_update_beam_idx && ti >= prompt_len
                     ? new_beam_idx[bi][ti]
                     : bsi * beam_size;
-                // caculate the innerproduct for the current token and store the
+                // calculate the innerproduct for the current token and store the
                 // key
                 if (offset > 0 && ti == query_ti + offset) {
                   auto kc_head_start = k_cache_ptr + ti * kcStrideS +
@@ -1973,7 +1973,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                       head_size,
                       true,
                       kc_head_start);
-                } else { // caculate the innerproduct for the past token
+                } else { // calculate the innerproduct for the past token
                   auto kc_head_start = k_cache_ptr + ti * kcStrideS +
                       beam * kcStrideB + kv_hi * kcStrideH;
                   reduce_head_half(
@@ -2086,7 +2086,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
           if (chg_attn_w_layout) {
             auto attn_w_stride = (bsi * head_num + hi) * attn_w_strideH;
             for (auto vi = v_start; vi < v_start + block_size; vi++) {
-              // caculate the attention values for the current token
+              // calculate the attention values for the current token
               if (offset > 0 && vi == offset) {
                 for (auto bbi = 0; bbi < beam_size; bbi++) {
                   auto bi = bsi * beam_size + bbi;
@@ -2115,7 +2115,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                       flag_access_start);
                 }
               } else {
-                // caculate the innerproduct for the past token
+                // calculate the innerproduct for the past token
                 if (need_update_beam_idx && vi >= prompt_len) {
                   for (auto bbi = 0; bbi < beam_size; bbi++) {
                     auto bi = bsi * beam_size + bbi;
@@ -2193,7 +2193,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                 auto beam = need_update_beam_idx && vi >= prompt_len
                     ? new_beam_idx[bi][vi]
                     : bsi * beam_size;
-                // caculate the attention values for the current token
+                // calculate the attention values for the current token
                 if (offset > 0 && vi == offset) {
                   auto v_cache_head_start = v_cache_ptr + vi * vcStrideS +
                       bi * vcStrideB + kv_hi * vcStrideH;
@@ -2210,7 +2210,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                       v_cache_head_start,
                       flag_access_start);
                 } else {
-                  // caculate the innerproduct for the past token
+                  // calculate the innerproduct for the past token
                   auto v_cache_head_start = v_cache_ptr + vi * vcStrideS +
                       beam * vcStrideB + kv_hi * vcStrideH;
                   mul_attenion_weights_and_value_of_head_half(

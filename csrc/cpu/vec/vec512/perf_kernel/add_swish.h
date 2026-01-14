@@ -38,7 +38,7 @@ inline void _dil_add_swish_fusion_kernel(
     vec_add_tmp =
         vec_a; // keep the intermediate result for later use in the mul
 
-    // caculate sigmoid e^x / (1 + e^x)
+    // calculate sigmoid e^x / (1 + e^x)
     vec_a = _dil_exp_kernel(vec_a);
     vec_addone_tmp = _mm512_add_ps(vec_a, vec_ps_1);
     vec_a = _mm512_div_ps(vec_a, vec_addone_tmp);
@@ -59,7 +59,7 @@ inline void _dil_add_swish_fusion_kernel(
     vec_add_tmp =
         vec_a; // keep the intermediate result for later use in the second mul
 
-    // caculate sigmoid e^x / (1 + e^x)
+    // calculate sigmoid e^x / (1 + e^x)
     vec_a = _dil_exp_kernel(vec_a);
     vec_addone_tmp = _mm512_add_ps(vec_a, vec_ps_1);
     vec_a = _mm512_div_ps(vec_a, vec_addone_tmp);

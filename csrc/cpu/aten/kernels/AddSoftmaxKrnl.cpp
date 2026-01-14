@@ -138,7 +138,7 @@ at::Tensor dil_div_add_softmax(
       //    val = sum(output_data)
       _dil_exp_reduce_sum_fusion_kernel(
           tmp_out_ptr, dim_size, tmp_out_ptr, val);
-      // Calculat the normalization [e^x / sum(e^x)]:
+      // Calculate the normalization [e^x / sum(e^x)]:
       //    output_data = output_data / sum(output_data)
       _dil_normalization_kernel<scalar_t>(
           tmp_out_ptr, val, dim_size, output_data_base + i * dim_size);
@@ -227,7 +227,7 @@ at::Tensor& dil_add_softmax_(at::Tensor& a, const at::Tensor& b) {
           dim_size,
           a_data_base + i * dim_size,
           val);
-      // Calculat the normalization [e^x / sum(e^x)]:
+      // Calculate the normalization [e^x / sum(e^x)]:
       //  output_data = output_data / sum(output_data)
 
       _dil_normalization_kernel<float>(

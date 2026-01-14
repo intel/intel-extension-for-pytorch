@@ -181,7 +181,7 @@ at::Tensor dil_div_maskfill_softmax(
 
       _dil_exp_reduce_sum_fusion_kernel(
           tmp_out_ptr, dim_size, tmp_out_ptr, val);
-      // Calculat the normalization [e^x / sum(e^x)]:
+      // Calculate the normalization [e^x / sum(e^x)]:
       //    output_data = output_data / sum(output_data)
 
       _dil_normalization_kernel<scalar_t>(

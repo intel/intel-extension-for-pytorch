@@ -11,7 +11,7 @@ IPEX_DEFINE_DISPATCH(reshape_and_cache_kernel_stub);
 IPEX_DEFINE_DISPATCH(flash_attn_var_len_kernel_stub);
 
 /*
- *Caculate the masked multihead attention for decoder layer in decoder only
+ *Calculate the masked multihead attention for decoder layer in decoder only
  */
 at::Tensor single_query_cached_kv_attention_forward_cpu(
     at::Tensor& out, // [num_seqs, num_heads, head_size]

@@ -390,7 +390,7 @@ inline void reshape_attn_mask_to_4d(
 }
 
 /*
- *Caculate the flash attention SDPA.
+ *Calculate the flash attention SDPA.
  *@template scalar_t: q/k/v data type
  *@template q_split_size: q block size
  *@template kv_split_size: kv block size
