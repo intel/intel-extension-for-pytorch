@@ -23,7 +23,7 @@
         "conv_activation": "swish",
         "conv_glu_type": "swish",
         "depthwise_multiplier": 1,
-        "depthwise_seperable_out_channel": 1024,
+        "depthwise_separable_out_channel": 1024,
         "dropout_rate": 0.0,
         "encoder_embedding_config": {
           "input_size": 80
