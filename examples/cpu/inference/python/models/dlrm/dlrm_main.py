@@ -34,7 +34,6 @@ from typing import List, Optional
 import time
 
 import torch
-import torch.distributed as dist
 
 print(f"torch version {torch.__version__}")
 import torchmetrics as metrics
@@ -72,6 +71,8 @@ ADAGRAD_LR_DECAY = 0
 ADAGRAD_INIT_ACC = 0
 ADAGRAD_EPS = 1e-8
 WEIGHT_DECAY = 0
+
+DEBUG_RANGE = 400  # only used for debug mode
 
 
 def unpack(input) -> dict:
@@ -141,17 +142,6 @@ def fetch_batch(dataloader):
         batch = dataloader.func(
             dataloader.source.dataset.batch_generator._generate_batch()
         )
-    return batch
-
-
-def split_dense_input_and_label_for_ranks(batch):
-    my_rank = dist.get_rank()
-    my_size = dist.get_world_size()
-    local_bs = int(batch.dense_features.shape[0] / my_size)
-    start = local_bs * my_rank
-    end = start + local_bs
-    batch.dense_features = batch.dense_features[start:end]
-    batch.labels = batch.labels[start:end]
     return batch
 
 
@@ -345,10 +335,24 @@ def aot_inductor_benchmark(args, model, dtype, example_inputs):
     aoti_benchmark_compile(args, tmp_dir)
 
 
+def map_sparses(debug, sparses):
+    """
+    For debug. Mapped to a smaller range.
+    """
+    if not debug:
+        return
+
+    for i in range(26):
+        sparses[f"cat_{i}"]["values"] = torch.min(
+            sparses[f"cat_{i}"]["values"], torch.tensor(DEBUG_RANGE - 1)
+        )
+
+
 def stock_pt_optimize(args, model, optimizer, dataloader):
     example_batch = fetch_batch(dataloader)
     example_batch.sparse_features = unpack(example_batch.sparse_features)
     dense, sparse = example_batch.dense_features, example_batch.sparse_features
+    map_sparses(args.debug, sparse)
     autocast, dtype = parse_autocast(args.dtype)
     if args.inductor:
         from torch._inductor import config as inductor_config
@@ -389,6 +393,7 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
                         ),
                     )
                 else:
+                    converted_model(dense, sparse)
                     model = torch.compile(converted_model)
                 model(dense, sparse)
                 model(dense, sparse)
@@ -410,6 +415,8 @@ def stock_pt_optimize(args, model, optimizer, dataloader):
                     model = torch.compile(model)
                     model(dense, sparse)
                     model(dense, sparse)
+    if args.debug:
+        exit()
     return model, optimizer
 
 
@@ -771,7 +778,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         "--fp8",
         dest="fp8",
         action="store_true",
-        help="Flag to determine if adagrad optimizer should be used.",
+        help="Flag to determine if fp8 should be used.",
+    )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Flag to determine if debug.",
     )
     return parser.parse_args(argv)
 
@@ -1135,20 +1148,11 @@ def to_torchrec_dtype(args):
 
 
 def construct_model(args):
-    if (
-        args.dtype == "int8"
-        and not args.int8_prepare
-        and not args.calibration
-        and args.jit
-    ):
-        assert args.inference_only
-        print(f"loading int8 model from {args.int8_model_dir}")
-        model = torch.jit.load(args.int8_model_dir)
-        print_memory("int8 loading finished")
-        return DLRMTrain(model), None, None
-
     device: torch.device = torch.device("cpu")
-
+    if args.debug:
+        args.num_embeddings_per_feature = [
+            min(x, DEBUG_RANGE) for x in args.num_embeddings_per_feature
+        ]
     eb_configs = [
         EmbeddingBagConfig(
             name=f"t_{feature_name}",
@@ -1194,66 +1198,10 @@ def construct_model(args):
     # re-write crossnet with using nn.linear instead of only using torch.linear
     replace_crossnet(train_model.model)
     print_memory("start replace emeddingbag ")
-    # embedding_optimizer = torch.optim.Adagrad if args.adagrad else torch.optim.SGD
-    # This will apply the Adagrad optimizer in the backward pass for the embeddings (sparse_arch). This means that
-    # the optimizer update will be applied in the backward pass, in this case through a fused op.
-    # TorchRec will use the FBGEMM implementation of EXACT_ADAGRAD.
-    # For GPU devices, a fused CUDA kernel is invoked. For CPU, FBGEMM_GPU invokes CPU kernels
-    # https://github.com/pytorch/FBGEMM/blob/2cb8b0dff3e67f9a009c4299defbd6b99cc12b8f
-    #     /fbgemm_gpu/fbgemm_gpu/split_table_batched_embeddings_ops.py#L676-L678
 
-    # Note that lr_decay, weight_decay and initial_accumulator_value for Adagrad optimizer in FBGEMM v0.3.2
-    # cannot be specified below. This equivalently means that all these parameters are hardcoded to zero.
-    optimizer_kwargs = {"lr": args.learning_rate}
-    if args.adagrad:
-        optimizer_kwargs["eps"] = ADAGRAD_EPS
-    # apply_optimizer_in_backward(
-    #     embedding_optimizer,
-    #     train_model.model.sparse_arch.parameters(),
-    #     optimizer_kwargs,
-    # )
     model = train_model
-    # model.model.sparse_arch = SparseArchTraceAbleWrapper(model.model.sparse_arch)
 
-    # def optimizer_with_params():
-    #     if args.adagrad:
-    #         return lambda params: torch.optim.Adagrad(
-    #             params,
-    #             lr=args.learning_rate,
-    #             lr_decay=ADAGRAD_LR_DECAY,
-    #             weight_decay=WEIGHT_DECAY,
-    #             initial_accumulator_value=ADAGRAD_INIT_ACC,
-    #             eps=ADAGRAD_EPS,
-    #         )
-    #     else:
-    #         return lambda params: torch.optim.SGD(
-    #             params,
-    #             lr=args.learning_rate,
-    #             weight_decay=WEIGHT_DECAY,
-    #         )
-
-    # dense_optimizer = KeyedOptimizerWrapper(
-    #     dict(in_backward_optimizer_filter(model.named_parameters())),
-    #     optimizer_with_params(),
-    # )
-    # optimizer = CombinedOptimizer([model.fused_optimizer, dense_optimizer])
     optimizer, lr_scheduler = None, None
-    if not args.inference_only:
-        print_memory("start create optimizer ")
-        assert args.adagrad
-        param = (
-            list(model.model.dense_arch.parameters())
-            + list(model.model.inter_arch.parameters())
-            + list(model.model.over_arch.parameters())
-        )
-        optimizer = torch.optim.Adagrad(
-            param,
-            lr=args.learning_rate,
-            lr_decay=ADAGRAD_LR_DECAY,
-            weight_decay=WEIGHT_DECAY,
-            initial_accumulator_value=ADAGRAD_INIT_ACC,
-            eps=ADAGRAD_EPS,
-        )
     return model, optimizer, lr_scheduler
 
 
@@ -1377,11 +1325,10 @@ def main(argv: List[str]) -> None:
         print_memory("start StockPT ")
         if args.dtype == "bf16":
             model.model.sparse_arch = model.model.sparse_arch.bfloat16()
-            # model.model.inter_arch.crossnet.bias = model.model.inter_arch.crossnet.bias.bfloat16()
         if args.dtype == "fp16":
             model.model.sparse_arch = model.model.sparse_arch.half()
-            # model.model.inter_arch.crossnet.bias = model.model.inter_arch.crossnet.bias.half()
         if args.fp8:
+            # register pattern match
             import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer  # noqa: F401
             from utils_fp8 import inc_convert
 

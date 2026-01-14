@@ -193,7 +193,7 @@ class MultiHotCriteoIterDataPipe(IterableDataset):
         # read .npy header
         zf.open(npy_name, "r")
         version = np.lib.format.read_magic(zf.fp)
-        shape, fortran_order, dtype = np.lib.format._read_array_header(zf.fp, version)
+        shape, fortran_order, dtype = np.lib.format.read_array_header_1_0(zf.fp)
         assert (
             dtype == "int32"
         ), f"sparse multi-hot dtype is {dtype} but should be int32"

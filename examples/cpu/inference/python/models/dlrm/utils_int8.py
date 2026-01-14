@@ -1,13 +1,15 @@
+import math
 import torch
+from torch.nn import functional as F
 import torchao  # noqa: F401
-from torch.ao.quantization.observer import (
+from torchao.quantization.pt2e.observer import (
     HistogramObserver,
     PerChannelMinMaxObserver,
 )
-from torch.ao.quantization.quantizer.quantizer import (
+from torchao.quantization.pt2e.quantizer.quantizer import (
     QuantizationSpec,
 )
-from torch.ao.quantization.quantizer.xnnpack_quantizer_utils import (
+from torchao.quantization.pt2e.quantizer.utils import (
     QuantizationConfig,
 )
 
@@ -34,10 +36,9 @@ def _is_valid_dqq_pattern(dtype=torch.float32):
         )
         for i in range(2, len(q_pattern_node.args)):
             assert q_pattern_node.args[i] == dq_pattern_node.args[i]
-        # TODO: reenable checking after enable cat calibration
-        # assert math.isclose(
-        #     q_pattern_node.args[1], dq_pattern_node.args[1], rel_tol=1e-5, abs_tol=1e-5
-        # )
+        assert math.isclose(
+            q_pattern_node.args[1], dq_pattern_node.args[1], rel_tol=1e-5, abs_tol=1e-5
+        )
         cat_node = dq_pattern_node.args[0]
         return cat_node.target is torch.ops.aten.cat.default
 
@@ -90,7 +91,7 @@ def _register_dqq_pattern():
     _register_dequant_quant_pass(quantized_op_output_pattern_pt2e)
 
 
-def get_default_quantization_config(
+def get_dlrm_quantization_config(
     is_qat: bool = False,
     is_dynamic: bool = False,
     reduce_range: bool = False,
@@ -147,25 +148,32 @@ def print_memory(stage):
     )
 
 
+def _get_first_scale(model):
+    for node in model.graph.nodes:
+        if "quantize_per_tensor_default" == str(node):
+            return node.args[1]
+    assert 0
+
+
 def _calibrate(model, example_inputs):
-    from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
+    from torchao.quantization.pt2e.quantize_pt2e import prepare_pt2e, convert_pt2e
     import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq  # noqa F401
     from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
         X86InductorQuantizer,
     )
-    from torch.export import export_for_training
+    from torch.export import export
 
-    exported_model = export_for_training(
+    exported_model = export(
         model,
         example_inputs,
         strict=True,
     ).module(check_guards=False)
     quantizer = X86InductorQuantizer()
-    quantizer.set_global(get_default_quantization_config())
+    quantizer.set_global(get_dlrm_quantization_config())
     prepared_model = prepare_pt2e(exported_model, quantizer)
     prepared_model(*example_inputs)
     converted_model = convert_pt2e(prepared_model)
-    torch.ao.quantization.move_exported_model_to_eval(converted_model)
+    torchao.quantization.pt2e.move_exported_model_to_eval(converted_model)
     return converted_model
 
 
@@ -238,6 +246,8 @@ def calibrate(model, dense, sparse):
     print_memory("start calibrate mlp")
     converted_dense = _calibrate(model.dense_arch, (dense,))
     converted_mlps = _calibrate(model.mlps, (embedded_concat,))
+    mlps_scale = _get_first_scale(converted_mlps)
+    model.sparse_arch.scale = mlps_scale
 
     model.mlps = converted_mlps
     model.dense_arch = converted_dense
@@ -248,12 +258,24 @@ def calibrate(model, dense, sparse):
     class QEmbeddingBag(torch.nn.Module):
         def __init__(
             self,
-            weight_shape,
-            qtype,
+            max_norm,
+            norm_type,
+            scale_grad_by_freq,
+            mode,
+            sparse,
+            include_last_offset,
+            padding_idx,
         ):
             super().__init__()
             self.weight = None
             self.weight_scale = None
+            self.max_norm = max_norm
+            self.norm_type = norm_type
+            self.scale_grad_by_freq = scale_grad_by_freq
+            self.mode = mode
+            self.sparse = sparse
+            self.include_last_offset = include_last_offset
+            self.padding_idx = padding_idx
 
         def forward(
             self,
@@ -261,17 +283,29 @@ def calibrate(model, dense, sparse):
             offsets=None,
             per_sample_weights=None,
         ):
-            # Next step: get scale through calibration rather than hardcoding
-            return torch.ops.torchao._scaled_embedding_bag(
-                self.weight,
-                input,
-                offsets,
-                torch.tensor([self.weight_scale]),
-                0.04366782680153847,
+            weight = torch.ops.quantized_decomposed.dequantize_per_tensor.default(
+                self.weight.data,
+                self.weight_scale,
                 0,
-                True,
+                -128,
+                127,
                 torch.int8,
             )
+
+            res = F.embedding_bag(
+                input,
+                weight,
+                offsets,
+                self.max_norm,
+                self.norm_type,
+                self.scale_grad_by_freq,
+                self.mode,
+                self.sparse,
+                per_sample_weights,
+                self.include_last_offset,
+                self.padding_idx,
+            )
+            return res
 
     if qtype == torch.int8:
         qmin = torch.iinfo(qtype).min
@@ -302,7 +336,6 @@ def calibrate(model, dense, sparse):
             param = mod.weight
             xmax = torch.max(torch.abs(param))
             weight_scale = xmax / qmax
-            mod.weight_scale = weight_scale
             q_param = torch.clamp(
                 (param / weight_scale),
                 qmin,
@@ -310,8 +343,13 @@ def calibrate(model, dense, sparse):
             ).to(qtype)
 
             patched_mod = QEmbeddingBag(
-                weight_shape=list(mod.weight.shape),
-                qtype=qtype,
+                max_norm=mod.max_norm,
+                norm_type=mod.norm_type,
+                scale_grad_by_freq=mod.scale_grad_by_freq,
+                mode=mod.mode,
+                sparse=mod.sparse,
+                include_last_offset=mod.include_last_offset,
+                padding_idx=mod.padding_idx,
             )
             patched_mod.weight_scale = weight_scale.item()
             patched_mod.weight = q_param

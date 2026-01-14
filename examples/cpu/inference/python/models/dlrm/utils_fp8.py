@@ -1,4 +1,5 @@
 import torch
+from torch.nn import functional as F
 import torchao  # noqa: F401
 import os
 
@@ -77,7 +78,6 @@ def inc_convert(model, dtype):
             padding_idx,
         ):
             super().__init__()
-            # self.mod = mod
             self.max_norm = max_norm
             self.norm_type = norm_type
             self.scale_grad_by_freq = scale_grad_by_freq
@@ -94,15 +94,24 @@ def inc_convert(model, dtype):
             offsets=None,
             per_sample_weights=None,
         ):
-            return torch.ops.torchao._scaled_embedding_bag(
-                self.weight.data,
+            weight = dequantize_per_tensor(
+                tensor=self.weight.data,
+                scale=self.weight_scale,
+                output_dtype=dtype,
+            )
+
+            return F.embedding_bag(
                 input,
+                weight,
                 offsets,
-                torch.tensor([self.weight_scale]),
-                1.0,
-                0,
-                True,
-                torch.float,
+                self.max_norm,
+                self.norm_type,
+                self.scale_grad_by_freq,
+                self.mode,
+                self.sparse,
+                per_sample_weights,
+                self.include_last_offset,
+                self.padding_idx,
             )
 
     import json

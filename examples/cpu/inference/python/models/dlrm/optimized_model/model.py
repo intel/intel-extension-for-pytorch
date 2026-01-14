@@ -205,20 +205,23 @@ def replace_crossnet(dlrm):
 
 
 class SparseArchCatDense(SparseArch):
+    def __init__(self, embedding_bag_collection):
+        super().__init__(embedding_bag_collection)
+        self.scale = None
+
     def _cat(self, embedded_dense, embedded_sparse):
-        dtype = embedded_sparse[0].dtype
-        if dtype == torch.int8:
-            # Next step: get scale through calibration rather than hardcoding
-            int8_embedded_dense = (
-                torch.ops.quantized_decomposed.quantize_per_tensor.default(
-                    embedded_dense, 0.04366782680153847, 0, -128, 127, torch.int8
+        if self.scale is not None:
+            embedded_concat = [embedded_dense] + list(embedded_sparse)
+            for i in range(len(embedded_concat)):
+                embedded_concat[i] = (
+                    torch.ops.quantized_decomposed.quantize_per_tensor.default(
+                        embedded_concat[i], self.scale, 0, -128, 127, torch.int8
+                    )
                 )
-            )
-            int8_embedded_concat = [int8_embedded_dense] + list(embedded_sparse)
-            int8_embedded_concat = torch.cat(int8_embedded_concat, dim=1)
+            embedded_concat = torch.cat(embedded_concat, dim=1)
             embedded_concat = (
                 torch.ops.quantized_decomposed.dequantize_per_tensor.default(
-                    int8_embedded_concat, 0.04366782680153847, 0, -128, 127, torch.int8
+                    embedded_concat, self.scale, 0, -128, 127, torch.int8
                 )
             )
         else:
