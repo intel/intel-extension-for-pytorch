@@ -36,7 +36,7 @@ std::vector<int64_t> conv_input_size(
 static inline std::vector<int64_t> padding_r(
     at::IntArrayRef padding,
     at::IntArrayRef output_padding) {
-  // ConvTranpose padding adjustment
+  // ConvTranspose padding adjustment
   //
   // PyTorch uses padding/output_padding:
   //   osize = (isize - 1) * stride - 2 * padding + dilation * (kernel_size - 1)

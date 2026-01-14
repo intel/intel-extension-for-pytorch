@@ -1118,7 +1118,7 @@ inline void copy_key_value(
 }
 
 /*
- *The scale-dot product for indirect access kv chache and fuse
+ *The scale-dot product for indirect access kv cache and fuse
  *matmul+div+add+softmax to improve data reuse
  *@param  query Query embeeding with the of [beam_size*batch, cur_len, head_num,
  *head_size]
@@ -1128,7 +1128,7 @@ inline void copy_key_value(
  *head_size]
  *@param  key_cache Cache past key embeeding with the of [max_len,
  *beam_size*batch, head_num, head_size]
- *@param  value_chache Cache past value embeeding with the of [max_len,
+ *@param  value_cache Cache past value embeeding with the of [max_len,
  *beam_size*batch, head_num, head_size]
  *@param  beam_idx Beam info for every token [max_len, beam_size*batch]
  *@param  offset  The length of decoded(past) token.
@@ -1273,7 +1273,7 @@ scale_dot_product_for_indirect_access_kv_cache(
           auto k_start = block_id * kv_block_size;
           auto block_size = std::min(kv_block_size, seq_len - k_start);
           auto query_ti = 0;
-          // maping the query head to key/value head to support MGA/MQA
+          // mapping the query head to key/value head to support MGA/MQA
           auto kv_hi = head_group_start / group_size;
           if (chg_attn_w_layout) {
             auto attn_w_stride =
@@ -1555,7 +1555,7 @@ scale_dot_product_for_indirect_access_kv_cache(
           auto v_start = block_id * kv_block_size;
           auto block_size = std::min(kv_block_size, seq_len - v_start);
           auto query_ti = 0;
-          // maping the query head to key/value head to support MGA/MQA
+          // mapping the query head to key/value head to support MGA/MQA
           auto kv_hi = hi / group_size;
           if (chg_attn_w_layout) {
             auto attn_w_stride = (bsi * head_num + hi) * attn_w_strideH;
@@ -1880,7 +1880,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
           auto k_start = block_id * kv_block_size;
           auto block_size = std::min(kv_block_size, seq_len - k_start);
           auto query_ti = 0;
-          // maping the query head to key/value head to support MGA/MQA
+          // mapping the query head to key/value head to support MGA/MQA
           auto kv_hi = head_group_start / group_size;
           if (chg_attn_w_layout) {
             auto attn_w_stride =
@@ -2081,7 +2081,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
           auto v_start = block_id * kv_block_size;
           auto block_size = std::min(kv_block_size, seq_len - v_start);
           auto query_ti = 0;
-          // maping the query head to key/value head to support MGA/MQA
+          // mapping the query head to key/value head to support MGA/MQA
           auto kv_hi = hi / group_size;
           if (chg_attn_w_layout) {
             auto attn_w_stride = (bsi * head_num + hi) * attn_w_strideH;
@@ -2684,7 +2684,7 @@ masked_multihead_self_attention_kernel_impl(
     }
     beam_idx_access[max_positions][0] = cur_len; // record the prompt token len
     beam_idx_access[max_positions + 1][0] =
-        query.size(0); // record the promt bs info
+        query.size(0); // record the prompt bs info
 
   } else if (offset > 0 && offset + cur_len > cache_size) {
     auto new_cache_size = cache_size * 2;
@@ -2726,7 +2726,7 @@ masked_multihead_self_attention_kernel_impl(
           offset,
           scale_attn,
           attention_mask_v);
-    // just a  funcationality path,need to optimize
+    // just a functionality path, need to optimize
     auto tokens_outs = std::vector<at::Tensor>(cur_len);
     for (auto i = 0; i < cur_len; i++) {
       auto query_i = query.select(1, i).unsqueeze(1);
@@ -2934,7 +2934,7 @@ deepseekv2_mla_kernel_impl(
     }
     beam_idx_access[max_positions][0] = cur_len; // record the prompt token len
     beam_idx_access[max_positions + 1][0] =
-        query.size(0); // record the promt bs info
+        query.size(0); // record the prompt bs info
 
   } else if (offset > 0 && offset + cur_len > cache_size) {
     auto new_cache_size = cache_size * 2;

@@ -608,7 +608,7 @@ class MergedEmbeddingBagWithAdaGrad(MergedEmbeddingBag):
 class MergedEmbeddingBagWithCat(MergedEmbeddingBag):
     r"""
     To support `MergedEmbeddingBag` with cat all outputs with an given input.
-    It is a common structure in recomendation system to cat dense output with
+    It is a common structure in recommendation system to cat dense output with
     sparse (embeddingbag) output together. MergedEmbeddingBagWithCat aims to
     fuse the cat together to have good memory behaviour.
     Native usage for multiple EmbeddingBag cat with dense is:
@@ -765,7 +765,7 @@ class DistMergeEmbeddingBagWithAdaGrad(MergedEmbeddingBagWithAdaGrad):
     r"""
     The distributed version or MergedEmbeddingBagWithAdaGrad
     After creating Pytorch Distributed process group, we can create DistMergeEmbeddingBagWithAdaGrad
-    and the emb tables will be automatically seperated to different ranks.
+    and the emb tables will be automatically separated to different ranks.
     Each rank will keep particia table and will only run forward/backward/update on the rows it keeped in local.
     We will also merge the result from different ranks through all to all during forward/backward.
     The returned results for forward is shape of [local BS * num tables * emb_dim]

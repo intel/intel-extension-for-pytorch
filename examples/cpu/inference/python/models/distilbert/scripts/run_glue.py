@@ -680,7 +680,7 @@ def main():
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
 
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
+        # Loop to handle MNLI double evaluation (matched, miss-matched)
         tasks = [data_args.task_name]
         eval_datasets = [eval_dataset]
         if data_args.task_name == "mnli":
@@ -718,7 +718,7 @@ def main():
     if training_args.do_predict:
         logger.info("*** Predict ***")
 
-        # Loop to handle MNLI double evaluation (matched, mis-matched)
+        # Loop to handle MNLI double evaluation (matched, miss-matched)
         tasks = [data_args.task_name]
         predict_datasets = [predict_dataset]
         if data_args.task_name == "mnli":

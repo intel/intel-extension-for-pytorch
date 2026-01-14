@@ -253,7 +253,7 @@ Intel® Extension for PyTorch\* is using OneDNN backend for those most computing
 
 To achieve better performance, OneDNN backend is using its [primitive cache](https://oneapi-src.github.io/oneDNN/dev_guide_primitive_cache.html) to store those created primitives for different input shapes during warm-up stage (default primitive cache size is 1024, i.e., 1024 cached primitives). Therefore, when the total size of the primitives created by all the input shapes is within the default threshold, Intel® Extension for PyTorch\* could get fully computation performance from OneDNN kernels.
 
-Different input shapes usualy come from dynamic shapes of datasets. Dynamic shapes commonly exist in [MaskRCNN model](https://github.com/matterport/Mask_RCNN) (object detection), [Transformers](https://github.com/huggingface/transformers/) Wav2vec2 model (speech-recognition) and other speech/text-generation related Transformers models.
+Different input shapes usually come from dynamic shapes of datasets. Dynamic shapes commonly exist in [MaskRCNN model](https://github.com/matterport/Mask_RCNN) (object detection), [Transformers](https://github.com/huggingface/transformers/) Wav2vec2 model (speech-recognition) and other speech/text-generation related Transformers models.
 
 However, we might meet the fact that model would need to cache a large amount of various input shapes, which would even exceed the default primitive cache size. In such case, we recommend tuning the OneDNN primitive cache by setting `ONEDNN_PRIMITIVE_CACHE_CAPACITY` environment variable to get better performance (Note that it is at the cost of increased memory usage):
 

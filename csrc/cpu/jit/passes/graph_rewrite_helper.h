@@ -10,7 +10,7 @@ namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite_helper {
 
-// those code just copy from PyTorch offical and extend
+// those code just copy from PyTorch official and extend
 // replaceConvolutionWithAtenConv to handle conv_transpose3d.
 
 torch::jit::Value* getValue(

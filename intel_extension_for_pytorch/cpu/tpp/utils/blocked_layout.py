@@ -188,7 +188,7 @@ class BlockedTensor(object):
         return self.unblocked_tensor().__getitem__(key)
 
     def __getattr__(self, attr):
-        # print("requiested attr: %s" % attr)
+        # print("requested attr: %s" % attr)
         if attr == "shape":
             return torch.Size(self.get_plain_shape())
         if attr == "dtype":

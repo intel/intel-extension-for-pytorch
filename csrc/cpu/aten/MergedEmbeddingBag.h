@@ -50,7 +50,7 @@ class EMBROWFixLen {
  * EmbeddingRowCache with smaller memory usage.
  *
  * EmbeddingRowCache contains var length EmbRow hash map and Fixed length EmbRow
- * with len=64, 128, 256 And handle different lenght inside EmbeddingRowCache
+ * with len=64, 128, 256 And handle different length inside EmbeddingRowCache
  * without expose len info to users.
  *
  * The robin_hood::unordered_map<int64_t, T*> _cached_ptr is used because user
@@ -61,7 +61,7 @@ class EMBROWFixLen {
  *     We will allocate memory to hold emb row very frequently during Embedding
  * FW/BW, we wish to allocate the memory on stack by using temporal varalble
  * instead of allocating them in heap for performance consideration. So we use C
- * array to hold fixed length and use std::vector to hold var lenght
+ * array to hold fixed length and use std::vector to hold var length
  * (std::vector will use memory on heap).
  *
  * How to use:

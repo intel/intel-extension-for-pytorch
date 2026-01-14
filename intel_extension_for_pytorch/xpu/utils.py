@@ -222,7 +222,7 @@ def optimize(
     adding this alias is to unify the coding style in user scripts base on torch.xpu
     modular.
 
-    TODO: When finish merge frontend code, add other aurgments describtion here.
+    TODO: When finish merge frontend code, add other aurgments description here.
     Args (Specific default values for XPU device):
         inplace (bool): Default set false to save valuable XPU device memory.
         weights_prepack (bool): Disabled for XPU device.

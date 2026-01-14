@@ -235,7 +235,7 @@ class MaskedMHATest(TestCase):
                 elif beam_size == 1:
                     beam_idx_t = torch.arange(batch_size)
                 beam_idx[offset] = beam_idx_t
-                # reorder cache for naive impelementation
+                # reorder cache for naive implementation
                 key_cache = torch.index_select(key_cache, 0, beam_idx_t)
                 value_cache = torch.index_select(value_cache, 0, beam_idx_t)
 
@@ -396,7 +396,7 @@ class MaskedMHATest(TestCase):
                     beam_idx_t = torch.arange(batch_size)
                 beam_idx[offset] = beam_idx_t
                 offset = offset + 1
-                # reorder cache for naive impelementation
+                # reorder cache for naive implementation
                 key_cache = torch.index_select(key_cache, 0, beam_idx_t)
                 value_cache = torch.index_select(value_cache, 0, beam_idx_t)
                 key_cache_bf16 = torch.index_select(key_cache_bf16, 0, beam_idx_t)

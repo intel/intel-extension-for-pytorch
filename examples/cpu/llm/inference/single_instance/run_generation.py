@@ -45,7 +45,7 @@ parser.add_argument(
     "--model-id",
     type=str,
     default="EleutherAI/gpt-j-6B",
-    help="the huggingface mdoel id",
+    help="the huggingface model id",
 )
 parser.add_argument(
     "--dtype",
@@ -474,7 +474,7 @@ if args.benchmark:
                     prompt = prompt_pool[model_type][args.input_tokens]
             else:
                 raise SystemExit(
-                    "[ERROR] Plese use --prompt if want to use custom input."
+                    "[ERROR] Please use --prompt if want to use custom input."
                 )
             if model_type == "mllama":
                 raw_image = load_image(args.image_url)

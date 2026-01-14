@@ -138,7 +138,7 @@ class Launcher:
             self.verbose(
                 "warning",
                 f"{env_name} in environment variable is {os.environ[env_name]} while the value you would like to set"
-                + f" is {env_value}. Use the exsiting value. Please unset the {env_name} if you wish ipex launcher set it ",
+                + f" is {env_value}. Use the existing value. Please unset the {env_name} if you wish ipex launcher set it ",
                 warning_type=WarningType.AmbiguousArgument,
             )
             return os.environ[env_name]
@@ -269,7 +269,7 @@ class Launcher:
         """
         Enable TCMalloc/JeMalloc with LD_PRELOAD and set configuration for JeMalloc.
         By default, PTMalloc will be used for PyTorch, but TCMalloc and JeMalloc can get better
-        memory resue and reduce page fault to improve performance.
+        memory reuse and reduce page fault to improve performance.
         """
         if skip_list is None:
             skip_list = []
@@ -334,7 +334,7 @@ class Launcher:
                     begin, end = core_range
                     assert (
                         begin <= end
-                    ), "Begining index of a range must be <= ending index."
+                    ), "Beginning index of a range must be <= ending index."
                     ret.extend(list(range(begin, end + 1)))
         ret = list(set(ret))
         return ret

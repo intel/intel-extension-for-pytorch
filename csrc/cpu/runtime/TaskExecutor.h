@@ -43,13 +43,13 @@ class IPEX_API TaskExecutor {
 
   // Put the deleted function in the private.
   TaskExecutor(const TaskExecutor& task_executor) =
-      delete; // Not support copy or move construtor.
+      delete; // Not support copy or move constructor.
   TaskExecutor(TaskExecutor&& task_executor) =
-      delete; // Not support copy or move construtor.
+      delete; // Not support copy or move constructor.
   TaskExecutor& operator=(const TaskExecutor& task_executor) =
-      delete; // Not support copy or move construtor.
+      delete; // Not support copy or move constructor.
   TaskExecutor& operator=(TaskExecutor&& task_executor) =
-      delete; // Not support copy or move construtor.
+      delete; // Not support copy or move constructor.
 };
 
 } // namespace runtime

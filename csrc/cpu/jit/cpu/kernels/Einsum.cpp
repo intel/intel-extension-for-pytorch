@@ -178,7 +178,7 @@ static Tensor sumproduct_pair(
   // we now work with the following permutations / shapes.
   // the pipeline is permute inputs -> reshape inputs -> batch matrix mul ->
   // reshape(view) output -> permute output output: "lro, lo, 1-for-summed-dims,
-  // ro" with orgiginal shape dimensions left:   "lro, lo, summed" permuted with
+  // ro" with original shape dimensions left:   "lro, lo, summed" permuted with
   // lpermutation and the three flattened right:  "lro, summed, ro" permuted
   // with rpermutation and the three flattened then the permuted output is a
   // view of bmm(left, right) finally, opermutation reverts the permutation to
@@ -192,7 +192,7 @@ static Tensor sumproduct_pair(
   for (auto& d : sum_dims_) {
     out_size.push_back(1);
     (void)(d);
-  }; // avoid warining about not using d
+  }; // avoid warning about not using d
   for (auto& d : ro)
     out_size.push_back(right.size(d));
   std::vector<int64_t> lpermutation(lro);
@@ -395,7 +395,7 @@ unsigned char einsum_index_to_label(uint8_t index) {
  *2) unsqueeze and permute the inputs/output to have same dims. The dim order
  * of all inputs and output is same.
  *\param equation:  The subscripts for the Einstein summation.
- *more detials about equation can found:
+ *more details about equation can found:
  *https://pytorch.org/docs/stable/generated/torch.einsum.html
  *\param operands: The tensors to compute the Einstein summation of.
  *\return tuple<has_zero_size_dim, out_size, dim_last_op, sum_dims,
@@ -731,7 +731,7 @@ einsum_prepare(
 /*!
  * This function use oneDNN binary post-ops to do the einsum+binary fusion.
  *\param equation:  The subscripts for the Einstein summation.
- *more detials about equation can found:
+ *more details about equation can found:
  *https://pytorch.org/docs/stable/generated/torch.einsum.html
  *\param operands: The tensors to compute the Einstein summation of.
  *\param add_arg: the other input of binary ops.

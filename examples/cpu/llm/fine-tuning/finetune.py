@@ -1,5 +1,5 @@
 """
-This script is adapted from the following official alpaca-loca fine-tuning code with minimal code changes:
+This script is adapted from the following official alpaca-local fine-tuning code with minimal code changes:
 https://github.com/tloen/alpaca-lora/blob/main/finetune.py
 """
 

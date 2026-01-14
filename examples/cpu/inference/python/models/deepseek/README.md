@@ -74,7 +74,7 @@ wget -O prompt.json https://intel-extension-for-pytorch.s3.us-east-1.amazonaws.c
 
 **Please avoid cross NUMA node memory access when setting SGLANG_CPU_OMP_THREADS_BIND.**
 
-`SGLANG_CPU_OMP_THREADS_BIND` specifies the CPU cores dedicated to the OpenMP threads. `--tp` sets the TP size. Below are the example of running without TP and with TP = 6. By changing `--tp` and `SGLANG_CPU_OMP_THREADS_BIND` accordingly, you could set TP size to other values and specifiy the core binding for each rank.
+`SGLANG_CPU_OMP_THREADS_BIND` specifies the CPU cores dedicated to the OpenMP threads. `--tp` sets the TP size. Below are the example of running without TP and with TP = 6. By changing `--tp` and `SGLANG_CPU_OMP_THREADS_BIND` accordingly, you could set TP size to other values and specify the core binding for each rank.
 
 
 ##### 2.1 Bench one batch

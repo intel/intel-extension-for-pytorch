@@ -95,7 +95,7 @@ def patch_step_for_master_weight_training(optimizer):
                 k.grad = _param.grad.detach().float()
 
         loss = self._original_step(closure)
-        # sync mater weight to model's paramerter
+        # sync mater weight to model's parameter
         for k, v in self.params_attr.items():
             _param = v.parameter
             if _param is None or _param is k:
@@ -132,7 +132,7 @@ def patch_step_for_master_weight_training(optimizer):
 
     def step_sync_weight(self, closure=None):
         loss = self._original_step(closure)
-        # sync mater weight to model's paramerter
+        # sync mater weight to model's parameter
         for k, v in self.params_attr.items():
             _param = v.parameter
             if _param is None or _param is k:
@@ -357,7 +357,7 @@ def patch_state_dict(optimizer):
         )
 
 
-def optimizer_fusion(optimizer, device_type, user_explict_fuse):
+def optimizer_fusion(optimizer, device_type, user_explicit_fuse):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
@@ -375,7 +375,7 @@ def optimizer_fusion(optimizer, device_type, user_explict_fuse):
                 + str(device_type)
                 + ". For now, only support CPU, XPU."
             )
-            warn_if_user_explicitly_set(user_explict_fuse, msg)
+            warn_if_user_explicitly_set(user_explicit_fuse, msg)
             return optimizer
         if not hasattr(optimizer, "_original_step"):
             setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
@@ -383,9 +383,9 @@ def optimizer_fusion(optimizer, device_type, user_explict_fuse):
         setattr(optimizer, "fused", True)  # noqa: B010
     except KeyError:
         msg = (
-            "Does not suport fused step for "
+            "Does not support fused step for "
             + str(type(optimizer))
             + ", will use non-fused step"
         )
-        warn_if_user_explicitly_set(user_explict_fuse, msg)
+        warn_if_user_explicitly_set(user_explicit_fuse, msg)
     return optimizer

@@ -38,7 +38,7 @@ class proxy_compute_eng(object):
     XETLA = -5
 
 
-# --- [ CPU proxys:
+# --- [ CPU proxies:
 _register_proxy_ops("interaction_forward")
 
 
@@ -46,7 +46,7 @@ if not hasattr(intel_extension_for_pytorch._C, "FP32MathMode"):
     intel_extension_for_pytorch._C.__dict__["FP32MathMode"] = proxy_math_mode
 
 
-# --- [ XPU proxys:
+# --- [ XPU proxies:
 _register_proxy("ShortStorageBase")
 _register_proxy("CharStorageBase")
 _register_proxy("IntStorageBase")

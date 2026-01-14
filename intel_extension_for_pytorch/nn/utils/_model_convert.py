@@ -26,7 +26,7 @@ def replace_customized_linear_with_linear(model):
 
 def replace_dropout_with_identity(model):
     # replace dropout with identity during inference, so that aten::dropout won't be on the JIT graph.
-    # This optimization may provide more fusion opportunites on the graph.
+    # This optimization may provide more fusion opportunities on the graph.
     if isinstance(model, torch.jit.ScriptModule):
         return
     if not model.training:
@@ -189,7 +189,7 @@ def _convert_gptq_scales_qzeros(scales, qzeros, inplace=True):
     GPTQ format:
         scales: (n_groups, N)
         qzeros: (n_groups, N // 8)
-        qzeros are substracted by 1 before packing
+        qzeros are subtracted by 1 before packing
 
     Desired format:
         scales: (N, n_groups)
@@ -231,7 +231,7 @@ def _convert_optimum_format_to_desired(qweight, scales, qzeros, inplace=True):
         qweight: (math.ceil(IC / comp_ratio), OC)
         scales: (n_groups, OC)
         qzeros: (n_groups, math.ceil(OC / comp_ratio))
-        qzeros are substracted by 1 before packing
+        qzeros are subtracted by 1 before packing
 
     Desired format:
         compression_dim = 1

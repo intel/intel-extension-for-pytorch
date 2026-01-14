@@ -1583,7 +1583,7 @@ class XformExtTPP {
     if (ignore_vnni_for_fp32 == false) {
       PCL_ASSERT(
           (xtype == XformTPP::XFORM_XPOSE_TPP || dtype != LIBXSMM_DATATYPE_F32),
-          "Only Transpose Xofrm supportd for FP32 datatype, specified %d\n",
+          "Only Transpose Xofrm supported for FP32 datatype, specified %d\n",
           (int)xtype);
     }
     const int BS = xsmm_get_vnni_block_size(dtype);

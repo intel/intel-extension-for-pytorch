@@ -465,7 +465,7 @@ class ParameterWrapper(object):
     def pack_weight(self, use_dnnl=True):
         if not use_dnnl:
             # TODO: Haozhe, LinWei
-            # weired case that cannot override ".data" for mkl here
+            # weird case that cannot override ".data" for mkl here
             # The op_ctx seems not hold the original plain format weight
             self.parameter = self.op_ctx.get_weight()
         else:

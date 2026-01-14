@@ -82,7 +82,7 @@ inline constexpr uint32_t pack_u16(uint16_t a, uint16_t b) {
 #define CHECK_LAST_DIM_CONTIGUOUS(x)            \
   TORCH_CHECK(                                  \
       x.strides()[x.strides().size() - 1] == 1, \
-      #x "must be contiguous at last dimention")
+      #x "must be contiguous at last dimension")
 
 #define CHECK_INPUT(x) \
   CHECK_CPU(x);        \

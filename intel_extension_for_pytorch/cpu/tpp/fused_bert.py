@@ -1247,7 +1247,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         >>> # running training step.
 
     """
-    # tpp bert optimization depends on the transformers repo to implementate the related module
+    # tpp bert optimization depends on the transformers repo to implement the related module
     installed_pkg = {dist.metadata["Name"].lower() for dist in distributions()}
     min_version = "4.6.0"
     max_version = "4.51.3"
@@ -1285,7 +1285,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     ):
         raise ValueError("TPP only supports torch.float and torch.bfloat16.")
 
-    # setup the seed for libxsmm (can be only positive int value) which will imapct some ops using seed. e.g., dropout
+    # setup the seed for libxsmm (can be only positive int value) which will impact some ops using seed. e.g., dropout
     try:
         torch_ipex_cpp.xsmm_manual_seed(
             torch.tensor(torch.initial_seed()).to(torch.int32).abs().item()

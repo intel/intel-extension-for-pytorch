@@ -615,7 +615,7 @@ class TestIpexOps(JitLlgaTestCase):
 
 
 class TestIpexQuantizationConvertAPI(JitLlgaTestCase):
-    def test_inplace_preapre(self):
+    def test_inplace_prepare(self):
         class M(nn.Module):
             def __init__(self):
                 super(M, self).__init__()

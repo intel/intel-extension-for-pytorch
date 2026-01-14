@@ -1532,7 +1532,7 @@ void reshape_and_cache_kernel(
  * seqlen_q = 5 and seqlen_k = 2, the causal mask is: 0 0 0 0 0 0 1 0 1 1 If the
  * row of the mask is all zero, the output will be zero.
  *
- * For the chuned prefill case, the data layout is as follow:
+ * For the chunked prefill case, the data layout is as follow:
  *
  * Definition of context_len, query_len, and seq_len.
  *   |---------- N-1 iteration --------|
@@ -1556,9 +1556,9 @@ void flash_attn_varlen_kernel(
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks, num_heads, block_size,  head_size]
     at::Tensor& value_cache, //[num_blocks, num_heads, block_size, head_size]
-    at::Tensor& cu_seqlens_q, // [batch_size+1] // the accumulted sequence
+    at::Tensor& cu_seqlens_q, // [batch_size+1] // the accumulated sequence
                               // length of query
-    at::Tensor& cu_seqlens_k, // [batch_size+1] // the accumulted sequence
+    at::Tensor& cu_seqlens_k, // [batch_size+1] // the accumulated sequence
                               // length of key(cached)
     int64_t max_seqlen_q, // max sequence length of query
     int64_t max_seqlens_k, // max sequence length of key and value(cached,
@@ -2037,7 +2037,7 @@ void reshape_and_cache_cpu_kernel_impl(
   TORCH_CHECK(
       kv_cache_dtype == "fp8" || kv_cache_dtype == "fp8_e5m2" ||
           kv_cache_dtype == "auto",
-      "not supported kv_cahce_dtype");
+      "not supported kv_cache_dtype");
   RECORD_FUNCTION(
       "ipex::reshape_and_cache_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
@@ -2095,7 +2095,7 @@ void flash_attn_varlen_cpu_kernel_impl(
   TORCH_CHECK(
       kv_cache_dtype == "fp8" || kv_cache_dtype == "fp8_e5m2" ||
           kv_cache_dtype == "auto",
-      "not supported kv_cahce_dtype");
+      "not supported kv_cache_dtype");
   RECORD_FUNCTION(
       "ipex::flash_attn_varlen_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));

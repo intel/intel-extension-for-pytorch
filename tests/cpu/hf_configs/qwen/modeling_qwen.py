@@ -1435,7 +1435,7 @@ def _rotate_half(x):
 
 
 def apply_rotary_pos_emb(t, freqs):
-    """Apply rotary embedding to the first rotary_dim of the iput
+    """Apply rotary embedding to the first rotary_dim of the input
 
     Arguments:
       t (tensor(batch_size, seq_len, n_head, head_dim)):

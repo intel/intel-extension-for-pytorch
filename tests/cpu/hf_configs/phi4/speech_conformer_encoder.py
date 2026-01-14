@@ -996,7 +996,7 @@ def np_loadtxt_with_retry(filepath):
 class MeanVarianceNormLayer(nn.Module):
     """Mean/variance normalization layer.
 
-    Will substract mean and multiply input by inverted standard deviation.
+    Will subtract mean and multiply input by inverted standard deviation.
     Typically used as a very first layer in a model.
 
     Args:
@@ -2973,7 +2973,7 @@ class ConformerEncoder(TransformerEncoderBase):
 
         unfolded = False
         ori_bz, seq_len, D = input_tensor.shape
-        max_seq_len = 500  # maxium position for absolute positional encoding
+        max_seq_len = 500  # maximum position for absolute positional encoding
         if seq_len > max_seq_len:
             # audio sequence is longer than max_seq_len, unfold it into chunks of max_seq_len
             unfolded = True

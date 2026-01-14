@@ -69,7 +69,7 @@ hyperparams:
   launcher:
     hp: ['malloc']
 ```
-`malloc` will be tuned using its default search space, `['tc', 'je', 'pt']`. All other launcher hyperparamters (`ncores_per_instance`, `ninstances`, `use_all_nodes`, `use_logical_cores`, `disable_numactl`, `disable_iomp`) will not be tuned and instead will use their default values.
+`malloc` will be tuned using its default search space, `['tc', 'je', 'pt']`. All other launcher hyperparameters (`ncores_per_instance`, `ninstances`, `use_all_nodes`, `use_logical_cores`, `disable_numactl`, `disable_iomp`) will not be tuned and instead will use their default values.
 
 #### User defined search space
 

@@ -116,7 +116,7 @@ at::Tensor& run(
     at::Tensor& accumu,
     const ideep::attr_t& attr);
 
-// Runing backward for ConvTranspose by given grad_output, input and grad_masks.
+// Running backward for ConvTranspose by given grad_output, input and grad_masks.
 // Will using the mkldnn_weight stored in the context
 std::tuple<at::Tensor, at::Tensor, at::Tensor> run_backward(
     ContextConvTranspose& context,

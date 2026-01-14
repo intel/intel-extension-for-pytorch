@@ -33,7 +33,7 @@ if [[ "${TEST_MODE}" == "THROUGHPUT" ]]; then
 elif [[ "${TEST_MODE}" == "ACCURACY" ]]; then
     echo "TEST_MODE set to ACCURACY"
     BATCH_SIZE=${BATCH_SIZE:-65536}
-    LOG_PREFIX=dlrm_inference_accuarcy_log
+    LOG_PREFIX=dlrm_inference_accuracy_log
     if [ -z "${DATASET_DIR}" ]; then
         echo "The required environment variable DATASET_DIR has not been set"
         exit 1
@@ -71,7 +71,7 @@ mkdir -p ${OUTPUT_DIR}
 TORCH_INDUCTOR=${TORCH_INDUCTOR:-"0"}
 AOT_INDUCTOR=${AOT_INDUCTOR:-"0"}
 # if the number of cores are not equal on different numa node
-# or for TORCHINDUCTOR=1 we will lanuch 2 process per numa
+# or for TORCHINDUCTOR=1 we will launch 2 process per numa
 ENABLE_2ND_PROCESS=${ENABLE_2ND_PROCESS:-"0"}
 MANUALLY_LAUNCH=${MANUALLY_LAUNCH:-"0"}
 if [[ "1" == ${TORCH_INDUCTOR} ]];then

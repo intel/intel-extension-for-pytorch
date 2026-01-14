@@ -291,7 +291,7 @@ void LlgaKernel::prepareAndCacheRunArgs(
         // Currently, only weight will use quantize_per_channel, data will
         // always use quantize_per_tensor. We will only allocate buffer for data
         // (output of a LlgaPartition). If in the future, we need allocate
-        // buffer for qensor that is quantized per channel, need implemeted
+        // buffer for qensor that is quantized per channel, need implemented
         // as_strided_qtensorimpl for PER_CHANNEL QScheme.
         qtensor.as_strided_(spec.sizes(), spec.strides());
         outputs.push_back(qtensor);

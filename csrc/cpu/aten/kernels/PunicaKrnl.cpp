@@ -32,7 +32,7 @@ namespace {
 
 template <typename T1, typename T2>
 void _dot(
-    const T1* intput,
+    const T1* input,
     const T2* weight,
     T1* out,
     int64_t len,
@@ -45,7 +45,7 @@ void _dot(
   int64_t vec_size = 16; // 512/32
   auto qk_sum_vec = _mm512_setzero_ps();
   for (hsi = 0; hsi <= len - vec_size; hsi += vec_size) {
-    auto q_vec = _loadu(intput + hsi);
+    auto q_vec = _loadu(input + hsi);
     auto k_vec = _loadu(weight + hsi);
     qk_sum_vec = _mm512_fmadd_ps(q_vec, k_vec, qk_sum_vec);
   }

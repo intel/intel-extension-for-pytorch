@@ -1411,7 +1411,7 @@ inline bool use_vnni(
   int64_t thresh_size = (dtype == at::kBFloat16) ? 64 : 16;
   bool need_pack = kvSize >= thresh_size && qSize >= thresh_size;
   // When the number of gemm is greater than the number of pack,
-  // the pack overhead can be overlaped.
+  // the pack overhead can be overlapped.
   if (need_pack) {
     double pack_size = batchSize * num_head * kvSize * headSize;
     double qs_per_thread =

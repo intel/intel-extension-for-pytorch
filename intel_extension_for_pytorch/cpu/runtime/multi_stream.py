@@ -12,7 +12,7 @@ class MultiStreamModuleHint(object):
     r"""
     MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
     or concat the output. Each argument should be None, with type of int or a container
-    which containes int or None such as: (0, None, ...) or [0, None, ...]. If the argument
+    which contains int or None such as: (0, None, ...) or [0, None, ...]. If the argument
     is None, it means this argument will not be split or concat. If the argument is with
     type int, its value means along which dim this argument will be split or concat.
 
@@ -301,7 +301,7 @@ class MultiStreamModule(nn.Module):
         else:
             AssertionError(
                 False
-            ), "Generate stream input failed, unsupport input hint type of:{}".format(
+            ), "Generate stream input failed, unsupported input hint type of:{}".format(
                 type_arg
             )
         return None
@@ -400,7 +400,7 @@ class MultiStreamModule(nn.Module):
         else:
             AssertionError(
                 False
-            ), "Generate outputs failed, unsupport output hint type of:{}".format(
+            ), "Generate outputs failed, unsupported output hint type of:{}".format(
                 type_arg
             )
         return None
@@ -454,7 +454,7 @@ class MultiStreamModule(nn.Module):
         else:
             AssertionError(
                 False
-            ), "Concat output failed, unsupport output hint type of:{}".format(type_arg)
+            ), "Concat output failed, unsupported output hint type of:{}".format(type_arg)
         return None
 
     def _concat_output_for_each_stream(self):
@@ -529,9 +529,9 @@ class MultiStreamModule(nn.Module):
 
 class _MultiStreamBenchmarkModule(nn.Module):
     # Here is an internal Module for weight sharing benchmark
-    # The diffence with MultiStreamModule:
+    # The difference with MultiStreamModule:
     #    * The input will not be split. So each stream will run with the same input.
-    #    * The output will not be concat. But synchronization point for each stream still exsits at the end \
+    #    * The output will not be concat. But synchronization point for each stream still exists at the end \
     #      of the forward method.
     def __init__(
         self,

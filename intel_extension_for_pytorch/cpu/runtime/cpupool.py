@@ -24,7 +24,7 @@ class CPUPool(object):
         if core_ids is not None:
             if node_id is not None:
                 logger.warning(
-                    "Both of core_ids and node_id are inputed. core_ids will be used with priority."
+                    "Both of core_ids and node_id are inputted. core_ids will be used with priority."
                     + "You can eliminate this warning by only using one of them",
                     _type=WarningType.AmbiguousArgument,
                 )

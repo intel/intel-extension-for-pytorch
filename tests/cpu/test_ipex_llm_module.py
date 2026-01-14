@@ -857,7 +857,7 @@ class TestLLMModules(TestCase):
             self.assertEqual(out_2, ref_out)
 
     def test_modules_naming(self):
-        # below ipex.llm modeules has thier own UTs, here only test their access of naming from ipex.llm.modules
+        # below ipex.llm modeules has their own UTs, here only test their access of naming from ipex.llm.modules
         assert ipex.llm.modules.RotaryEmbedding is not None
         assert ipex.llm.modules.RotaryEmbedding.apply_function is not None
         assert ipex.llm.modules.PagedAttention is not None

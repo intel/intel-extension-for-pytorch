@@ -74,7 +74,7 @@ For memory management, it configures NUMA binding and preload optimized memory a
 spawns up multiple distributed training processes on each of the training nodes. For intel_extension_for_pytorch, oneCCL
 is used as the communication backend and MPI used to launch multi-proc. To get the better
 performance, you should specify the different cores for oneCCL communication and computation
-process seperately. This tool can automatically set these ENVs(such as I_MPI_PIN_DOMIN) and launch
+process separately. This tool can automatically set these ENVs(such as I_MPI_PIN_DOMIN) and launch
 multi-proc for you.
 
 The utility can be used for single-node distributed training, in which one or

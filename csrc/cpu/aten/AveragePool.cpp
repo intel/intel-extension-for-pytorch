@@ -308,7 +308,7 @@ at::Tensor avg_pool3d_out_cpu(
   } else {
     TORCH_CHECK(
         false,
-        "Unsupport memory format. Supports only ChannelsLast3d, Contiguous");
+        "Unsupported memory format. Supports only ChannelsLast3d, Contiguous");
   }
 
   TORCH_CHECK(
@@ -459,7 +459,7 @@ at::Tensor avg_pool3d_backward_out_cpu(
   } else {
     TORCH_CHECK(
         false,
-        "Unsupport memory format. Supports only ChannelsLast3d, Contiguous");
+        "Unsupported memory format. Supports only ChannelsLast3d, Contiguous");
   }
 
   TORCH_CHECK(

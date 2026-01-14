@@ -562,7 +562,7 @@ def auto_convert(
         """
         An override of `torch.Tensor` to enable dynamic dispatch for
         quantization inference.
-        For each function with a `__torch_fuction__` override, this proxy does
+        For each function with a `__torch_function__` override, this proxy does
         the following for functions which need quantization:
         1. calls `_auto_quant_state.validate_cur_op` to validate that
            the currently seen op is the same as what was recorded during tracing

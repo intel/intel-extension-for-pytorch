@@ -246,7 +246,7 @@ class DpcppBuildExtension(build_ext, object):
             original_spawn = self.compiler.spawn
         else:
             original_compile = self.compiler._compile
-            # save origin function for passthough
+            # save origin function for passthrough
             original_link_shared_object = self.compiler.link_shared_object
             original_spawn = self.compiler.spawn
 
@@ -908,7 +908,7 @@ def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> 
         # subprocess.run assumes that sys.__stdout__ has not been modified and
         # attempts to write to it by default.  However, when we call _run_ninja_build
         # from ahead-of-time cpp extensions, the following happens:
-        # 1) If the stdout encoding is not utf-8, setuptools detachs __stdout__.
+        # 1) If the stdout encoding is not utf-8, setuptools detaches __stdout__.
         #    https://github.com/pypa/setuptools/blob/7e97def47723303fafabe48b22168bbc11bb4821/setuptools/dist.py#L1110
         #    (it probably shouldn't do this)
         # 2) subprocess.run (on POSIX, with no stdout override) relies on
@@ -1013,7 +1013,7 @@ def _write_ninja_file_to_build_library(
     #
     # Pybind11 before 2.4 used to build an ABI strings using the following pattern:
     # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_BUILD_TYPE}__"
-    # Since 2.4 compier type, stdlib and build abi parameters are also encoded like this:
+    # Since 2.4 compiler type, stdlib and build abi parameters are also encoded like this:
     # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_COMPILER_TYPE}
     # {PYBIND11_STDLIB}{PYBIND11_BUILD_ABI}{PYBIND11_BUILD_TYPE}__"
     #

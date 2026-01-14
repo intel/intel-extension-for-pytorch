@@ -70,7 +70,7 @@ Vision Transformer inference best known configurations with PyTorch.
     ./setup.sh
     ```
 5. Prepare for downloading access
-    On https://huggingface.co/datasets/ILSVRC/imagenet-1k, login your account, and click the aggreement and then generating {your huggingface token}
+    On https://huggingface.co/datasets/ILSVRC/imagenet-1k, login your account, and click the agreement and then generating {your huggingface token}
 
     huggingface-cli login
     {your huggingface token}

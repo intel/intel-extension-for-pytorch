@@ -373,7 +373,7 @@ bool CPUFeature::_do_check_and_init_amx() {
 }
 
 bool CPUFeature::isa_level_amx() {
-  // check and init in a funtion, avoid to double init.
+  // check and init in a function, avoid to double init.
   static bool b_is_support = _do_check_and_init_amx();
 
   return b_is_support;

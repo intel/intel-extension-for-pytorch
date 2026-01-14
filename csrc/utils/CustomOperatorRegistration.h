@@ -25,7 +25,7 @@ struct TypeSelector {
     extract_type(args...);
   }
 
-  at::ArrayRef<T> retrive_types() {
+  at::ArrayRef<T> retrieve_types() {
     return at::ArrayRef<T>(container_.begin(), container_.end());
   }
 
@@ -117,7 +117,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mul_add", mul_add);
 }
 And if this op does not support oneDNN's block format memory layout for tensor.
-It would be necessary for developer to register it specificly by adopting the
+It would be necessary for developer to register it specifically by adopting the
 macro IPEX_OP_REGISTER_NEED_PLAIN. In this way, all the tensor passed to this
 operator will automatically convert to normal tensor layout when execution.
 

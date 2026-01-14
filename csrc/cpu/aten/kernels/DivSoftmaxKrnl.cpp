@@ -10,7 +10,7 @@ namespace {
 #if defined(CPU_CAPABILITY_AVX512)
 using namespace torch_ipex::cpu::kernel;
 /**
- * @brief This function is caculating the loop unit offset for current loop idx
+ * @brief This function is calculating the loop unit offset for current loop idx
  * element, and the loop is for reading a tensor with its last dim as the loop
  * unit
  * @param[in] outer_loop_idx the loop idx
@@ -93,7 +93,7 @@ inline std::vector<int64_t> _adjust_strides(
  * - The number of the input tensor dimension should be >=2
  * - The mask b has the same dimension as a, or it can be expand_as a with (bs
  * :: seq_length), i.e., 2D tensor expands from mid dims
- * - The datatype for inpust a and output are same.
+ * - The datatype for input a and output are same.
  *
  * @param[in] a a contiguous tensor to do div and softmax
  * @param[in] b a mask tensor to be masked_fill into tensor a after div and

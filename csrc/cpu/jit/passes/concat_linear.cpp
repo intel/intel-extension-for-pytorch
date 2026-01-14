@@ -113,7 +113,7 @@ class ConcatLinearLayers {
         TORCH_CHECK(
             (aten_linear.find(base_node) != aten_linear.end()) ==
                 (aten_linear.find(compatible_layers[i]) != aten_linear.end()),
-            "one of the layer is replaced by ipex linear while one of the other layer is original aten linear, it is ambiguity to know whether we shoudl create ipex linear or aten linear for concated linear")
+            "one of the layer is replaced by ipex linear while one of the other layer is original aten linear, it is ambiguity to know whether we should create ipex linear or aten linear for concated linear")
       }
       // Create concated aten linear
       if (aten_linear.find(base_node) != aten_linear.end()) {

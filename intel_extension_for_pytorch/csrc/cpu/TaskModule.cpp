@@ -88,7 +88,7 @@ std::unique_ptr<FutureTensor> TaskModule::run_async(
           // set the thread local status, such as the grad mode before
           // execuating the status
           at::GradMode::set_enabled(grad_mode);
-          // execuate the task
+          // execute the task
           (*task)();
         });
       }
@@ -122,7 +122,7 @@ std::unique_ptr<FutureTensor> TaskModule::run_async(
         // set the thread local status, such as the grad mode before execuating
         // the status
         at::GradMode::set_enabled(grad_mode);
-        // execuate the task
+        // execute the task
         (*task)();
       });
     }

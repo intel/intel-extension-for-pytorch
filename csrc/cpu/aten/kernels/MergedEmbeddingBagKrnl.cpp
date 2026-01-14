@@ -603,10 +603,10 @@ std::vector<Tensor> merged_embeddingbag_forward_cpu_kernel_impl(
 /**
  * Read from embedding table, and write to world_size * num_chk * num_emb's
  *EmbeddingRowCache world_size dimension decide which ranks should this
- *particial look up result sent to num_emb dimmension devide which emb table
+ *particial look up result sent to num_emb dimension divide which emb table
  *should this particial look up result belong to num_chk dimension is hard code
  *to 16 here for better parallel scope, list 3 parallel choices:
- *(1) Only parallel on num_emb, this limite the thread nums == num_emb
+ *(1) Only parallel on num_emb, this limit the thread nums == num_emb
  *(2) Parallel on num_emb and gbatch. Total tasks = num_emb * gbatch
  *(3) Parallel on num_emb and num_chk. Total tasks = num_emb * num_chk
  *
@@ -782,7 +782,7 @@ mergedemb_distribute_forward_local_kernel_impl(
                 indices_ptr[i] = indices[i].data_ptr<index_t>();
                 offsets_ptr[i] = offsets[i].data_ptr<index_t>();
               }
-              // read from weight and accumuate in emb cache
+              // read from weight and accumulate in emb cache
               int64_t num_chk = 16;
               std::vector<EmbeddingRowCache<acc_t>> cache_with_num_chk(
                   world_size * num_chk * num_emb);
@@ -807,7 +807,7 @@ mergedemb_distribute_forward_local_kernel_impl(
                   emb_dim,
                   world_size);
               // read from emb cache and write to the buffer while will be
-              // comunicated with other ranks
+              // communicated with other ranks
               prepare_ccl_buffer<acc_t, scalar_t, index_t>(
                   idx,
                   val,
@@ -884,7 +884,7 @@ void mergedemb_distribute_forward_merge_kernel_impl(
                 val_ptr[i] = val[i].data_ptr<scalar_t>();
                 ofs_ptr[i] = ofs[i].data_ptr<int64_t>();
               }
-              // read from weight and accumuate in emb cache
+              // read from weight and accumulate in emb cache
               mergedemb_distribute_forward_merge<acc_t, scalar_t, index_t>(
                   world_size,
                   num_emb,

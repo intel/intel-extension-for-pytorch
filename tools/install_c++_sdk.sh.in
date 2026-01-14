@@ -59,7 +59,7 @@ if [[ ${MODE} == "install" ]]; then
     cp intel_ext_pt_cpuConfig.cmake ${LIBTORCH_PATH}/share/cmake/intel_ext_pt_cpu
 
     echo $IPEX_VERSION > ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
-    echo "Installation successed!"
+    echo "Installation succeeded!"
 elif [[ ${MODE} == "uninstall" ]]; then
     while IFS= read -r lib
     do
@@ -73,5 +73,5 @@ elif [[ ${MODE} == "uninstall" ]]; then
     if [ -f ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu ]; then
         rm ${LIBTORCH_PATH}/build-version-libintel-ext-pt-cpu
     fi
-    echo "Uninstallation successed!"
+    echo "Uninstallation succeeded!"
 fi

@@ -19,7 +19,7 @@ namespace cpu {
 
 /**
  * We tried to fuse Div+Matmul+Add+Softmax as a signel operator. But
- * the oneDNN matmul performance with binary postop is poor, then we splited
+ * the oneDNN matmul performance with binary postop is poor, then we split
  * the fusion into two parts - Div+Matmul and Add+Softmax. When the oneDNN
  * fixes the performance issue, we can directly leverage oneDNN's
  * implementation.
@@ -247,7 +247,7 @@ at::Tensor dil_sd_flash_mha(
 
 /**
  *  This kernel implements Flast attention on stable-diffusion models (from
- * Diffusers 0.12.1 and 0.13) for BF16 dtype, where qkv is splited; Note that
+ * Diffusers 0.12.1 and 0.13) for BF16 dtype, where qkv is split; Note that
  * in 0.13, aten::scaled_dot_product_attention uses the scale of sqrt(headSize)
  * if no scale is provided for query, where we are following
  */

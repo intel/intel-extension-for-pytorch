@@ -72,7 +72,7 @@ void init_libxsmm() {
   auto max_threads = omp_get_max_threads();
   PCL_ASSERT(
       max_threads <= MAX_THREADS,
-      "Maximun %d threads supported, %d threads being used, please compile with increased  MAX_THREADS value\n",
+      "Maximum %d threads supported, %d threads being used, please compile with increased  MAX_THREADS value\n",
       MAX_THREADS,
       max_threads);
   libxsmm_init();

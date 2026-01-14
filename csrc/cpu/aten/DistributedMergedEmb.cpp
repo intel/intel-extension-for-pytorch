@@ -68,7 +68,7 @@ IPEX_DEFINE_DISPATCH(mergedemb_distribute_backward_merge_adagrad_update_stub);
  * distributed-merged-embedding-foward-lookup
  * 1. mergedemb_distribute_backward_local_cpu will finish the backward with
  * local grad (shape of [local BS * num_table * emb_dim]), the output grad will
- * be organzied by 3 TensorList: val Tensors, idx Tensors, ofs Tensors. The
+ * be organized by 3 TensorList: val Tensors, idx Tensors, ofs Tensors. The
  * number of the Tensors in 1 TensorList equal to world size. val[i], idx[i],
  * ofs[i] is the tensors will be transfer to rank i by sparse all to all. It
  * contains the grads for those indices on rank i.

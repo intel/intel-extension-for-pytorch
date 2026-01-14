@@ -195,7 +195,7 @@ class JitLlgaTestCase(JitTestCase):
 
             # test Fallback when input shape changes:
             if x_var:
-                assert x_kwarg is None, "x_kwarg input doesn't suppport use with x_var"
+                assert x_kwarg is None, "x_kwarg input doesn't support use with x_var"
                 y_var = fp32_model(*x_var)
                 y_var = y_var.to(torch.bfloat16) if int8_bf16 else y_var
                 y_var_llga = traced_model(*x_var)

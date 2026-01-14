@@ -586,7 +586,7 @@ class TestGraphCapture(TestCase):
             origin_optimizer.zero_grad()
             loss.backward()
             origin_optimizer.step()
-            # traing second step for ipex model.
+            # training second step for ipex model.
             y3 = ipex_model(ipex_x)
             loss3 = y3.sum()
             ipex_optimizer.zero_grad()

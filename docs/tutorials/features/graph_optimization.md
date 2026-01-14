@@ -127,9 +127,9 @@ Here listed all the currently supported int8 patterns in Intel® Extension for P
 
 
 ### Folding
-Stock PyTorch provids constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking `torch.jit.freeze`. Take the Resnet50 as an example:
+Stock PyTorch provides constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking `torch.jit.freeze`. Take the Resnet50 as an example:
 
 [//]: # (marker_feature_graph_optimization_folding)
 [//]: # (marker_feature_graph_optimization_folding)
 
-If the model owner does not invoke the `torch.jit.freeze`, the `BatchNormalization` still exists on the graph. Otheriwse, the `BatchNormalization` will be folded on the graph to save the compuation and then improve the performance. Refer to the [Constant Folding Wikipedia page](https://en.wikipedia.org/wiki/Constant_folding) for more details.
+If the model owner does not invoke the `torch.jit.freeze`, the `BatchNormalization` still exists on the graph. Otherwise, the `BatchNormalization` will be folded on the graph to save the computation and then improve the performance. Refer to the [Constant Folding Wikipedia page](https://en.wikipedia.org/wiki/Constant_folding) for more details.

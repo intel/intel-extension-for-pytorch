@@ -29,7 +29,7 @@ class TestCumSum(TestCase):
         self.assertEqual(aRes, bRes)
         self.assertEqual(aRes, torch.tensor([[1, 1, 2], [0, 0, 0], [1, 2, 3]]))
 
-        # Check that cummulative sum over a zero length dimension doesn't crash on backprop.
+        # Check that cumulative sum over a zero length dimension doesn't crash on backprop.
         # Also check that cumsum over other dimensions in a tensor with a zero-length
         # dimensiuon also works
         # Also include a basic suite of similar tests for other bases cases.

@@ -138,7 +138,7 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
                 in2 = BasicTransformerBlock.attn2.to_v.in_features
                 # The first dimension of hd/ehd (2) is related to user given batch size
                 # The second dimension of hd (4096, 1024, 256) is related to user ginve h, w
-                # The second dimension of ehd (77) is max-seq-lenght from text-encoder
+                # The second dimension of ehd (77) is max-seq-length from text-encoder
                 # All dimensions above cannot be got from unet model
                 # We can hardcode this because the guards of dynamo export do not require
                 # Concrete shapes on these dimensions with hd and ehd
@@ -204,7 +204,7 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
             except ImportError:
                 # fx are not exposed in transformers.utils
                 logger.warning(
-                    "failed to import transformers symbolic_trace, cannnot apply concat linear",
+                    "failed to import transformers symbolic_trace, cannot apply concat linear",
                     _type=WarningType.NotSupported,
                 )
             try:
@@ -214,7 +214,7 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
                 return concat_linear(model, inplace)
             except BaseException:
                 logger.warning(
-                    "failed to symbolic trace model with transformers symbolic_trace, cannnot apply concat linear",
+                    "failed to symbolic trace model with transformers symbolic_trace, cannot apply concat linear",
                     _type=WarningType.NotSupported,
                 )
     else:
@@ -223,7 +223,7 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
             return concat_linear(model, inplace)
         except BaseException:
             logger.warning(
-                "pytorch native symbolic trace failed, may cannnot apply concat linear",
+                "pytorch native symbolic trace failed, may cannot apply concat linear",
                 _type=WarningType.NotSupported,
             )
     return model

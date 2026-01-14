@@ -1649,7 +1649,7 @@ def ipex_quantization_flow(
 
 
 def attach_extra_weight_for_large_batch_inference(model):
-    # Traverse the entire model and attch extra bf16 weight to linear
+    # Traverse the entire model and attach extra bf16 weight to linear
     assert _using_tpp()
     from intel_extension_for_pytorch.nn.utils._weight_prepack import (
         _IPEXLinear,
@@ -2093,7 +2093,7 @@ def optimize(
     T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Qwen3, Whisper. Maira2, Jamba, DeepSeekV2.
 
     For the model that is not in the scope of supported model family above, will try to
-    apply default ipex.optimize transparently to get benifits (not include quantizations,
+    apply default ipex.optimize transparently to get benefits (not include quantizations,
     only works for dtypes of torch.bfloat16 and torch.half and torch.float).
 
     Args:
@@ -2116,7 +2116,7 @@ def optimize(
             where `checkpoint` is the state_dict and `quant_method` is dict specifying the quantization
             method including GPTQ or AWQ, e,g, quant_method = {`quant_method`: `gptq`}.
         sample_inputs (Tuple tensors): sample inputs used for model quantization or torchscript.
-            Default value is ``None``, and for well supported model, we provide this sample inputs automaticlly.
+            Default value is ``None``, and for well supported model, we provide this sample inputs automatically.
         deployment_mode (bool): Whether to apply the optimized model for deployment of model generation.
             It means there is no need to further apply optimization like torchscirpt. Default value is ``True``.
         cache_weight_for_large_batch (bool): Whether to cache the dedicated weight for large batch to speed up

@@ -1,5 +1,5 @@
 
-// The orginal python code can be found in
+// The original python code can be found in
 // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gptj/modeling_gptj.py
 // apply_rotary_pos_emb
 #include "RotaryPositionEmbedding.h"

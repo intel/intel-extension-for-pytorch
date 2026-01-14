@@ -129,7 +129,7 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
 
   // TODO: Record original aten nodes, while convert aten linear-> ipex linear,
   // will ignore these aten linear (if they are fp32 dtype). For BF16 dtype,
-  // always use ipex linear. This is a temporay solution, for next PR to clean
+  // always use ipex linear. This is a temporary solution, for next PR to clean
   // up fusion pass, will further abstract this as a class method.
   auto aten_linear_recorder = ATenLinearRecorder(graph);
   // linear folding
@@ -244,7 +244,7 @@ FusionBehavior getCurrentBehavior(size_t remaining_depth) {
     }
   }
   // should never get here
-  TORCH_WARN("Stratgy changed mid-invocation, NYI");
+  TORCH_WARN("Strategy changed mid-invocation, NYI");
   return FusionBehavior::STATIC;
 }
 

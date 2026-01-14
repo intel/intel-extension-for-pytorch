@@ -15,7 +15,7 @@ void FuseShuffle(std::shared_ptr<torch::jit::Graph>& graph);
 void PostScalarDivOrMul(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseMHAScoreCalc(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseLinearSwishCustomized(std::shared_ptr<torch::jit::Graph>& graph);
-// This path will be removed after pytorch offical path is optimized well.
+// This path will be removed after pytorch official path is optimized well.
 void replaceAtenMaxPool2dWithIpexMaxPool2d(
     std::shared_ptr<torch::jit::Graph>& graph);
 void fuseBmmAdd(std::shared_ptr<torch::jit::Graph>& graph);

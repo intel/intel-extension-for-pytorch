@@ -69,7 +69,7 @@ void cat_contig_firstdim_impl(
       // short input tensor list: parallel on dim_size (dim_size == ninputs *
       // input_dim_size).
       //
-      // note that prallel on ninputs may not have enough parallelism (e.g.
+      // note that parallel on ninputs may not have enough parallelism (e.g.
       // inputs == 2), also parallel on input_dim_size would trigger multiple
       // omp sessions, which has additional overhead.
       //
@@ -340,14 +340,14 @@ void cpu_cat_contig_dispatch(
   int64_t dim_size = result.sizes()[dim];
   int64_t outer_size = result.numel() / (dim_size * inner_size);
 
-  // Note on cat implementation choosen:
+  // Note on cat implementation chosen:
   //
   // In order to minimize overhead of meta info creation, pass down
   // `all_same_sizes_and_stride` to the kernel. `True` indicates all the input
   // tensors all have the same shape and stride.
   //
   // All kernels have a single omp loop (the non-contiguous path may have
-  // mutiple omp loops). All kernels trim grain_size in the parallel loop w.r.t.
+  // multiple omp loops). All kernels trim grain_size in the parallel loop w.r.t.
   // `at::internal::GRAIN_SIZE`.
   //
   // 1. `cat_contig_firstdim_impl`: used when outer_size == 1 (dim is the first

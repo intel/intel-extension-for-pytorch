@@ -54,7 +54,7 @@ inline std::vector<int64_t> _adjust_strides(
 
 /**
  * @brief Fuse the div (div scalar or mul 1/scalar) add operator and softmax
- * operator. softmax(alpah * a + b)
+ * operator. softmax(alpha * a + b)
  *
  * @attention
  * There are some assumptions for this operator.
@@ -64,7 +64,7 @@ inline std::vector<int64_t> _adjust_strides(
  * - The input tensors are contiguous
  * - The number of the input tensor dimension should be >=2
  * - Only the second input tensor is brodcastable
- * - The datatype for inpusts(a,b) and output are same.
+ * - The datatype for inputs(a,b) and output are same.
  *
  * @param[in] a a contiguous tensor to be added
  * @param[in] b a tensor to be added while it should be broadcastable

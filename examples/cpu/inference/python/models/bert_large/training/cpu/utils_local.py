@@ -71,7 +71,7 @@ def setup_seeds(master_seed, epochs, device):
     Generates seeds from one master_seed.
     Function returns (worker_seeds, shuffling_seeds), worker_seeds are later
     used to initialize per-worker random number generators (mostly for
-    dropouts), shuffling_seeds are for RNGs resposible for reshuffling the
+    dropouts), shuffling_seeds are for RNGs responsible for reshuffling the
     dataset before each epoch.
     Seeds are generated on worker with rank 0 and broadcasted to all other
     workers.

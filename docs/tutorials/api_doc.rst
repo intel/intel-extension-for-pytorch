@@ -103,7 +103,7 @@ Quantization
 .. autofunction:: prepare
 .. autofunction:: convert
 
-Prototype API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
+Prototype API, introduction is available at `feature page <./features/int8_recipe_tuning_api.md>`_.
 
 .. autofunction:: autotune
 

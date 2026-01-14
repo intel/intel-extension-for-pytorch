@@ -325,7 +325,7 @@ void GroupNormKernelImplChannelsLastInternal(
   const bool gamma_null = (gamma_data == nullptr);
   const bool beta_null = beta_data == nullptr;
 
-  // NB: About algorithm choosen:
+  // NB: About algorithm chosen:
   //
   // On channels last, GroupNorm has a input shape of {N, H, W, GD},
   // Mean and rstd are collected per each n and g, which involves reduction
@@ -462,7 +462,7 @@ void GroupNormKernelImplChannelsLastInternal(
     //
     // We could fuse step 3 and 4 into a single session but this way is better:
     //   a. D might be too small for vectorization;
-    //   b. Avoid duplicate caculation of scale/bias, each HxW plain share the
+    //   b. Avoid duplicate calculation of scale/bias, each HxW plain share the
     //   same scale/bias
     //
     for (const auto n : c10::irange(N)) {

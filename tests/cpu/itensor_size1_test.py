@@ -10,7 +10,7 @@ import intel_extension_for_pytorch as ipex
 # (3) We consider such case to remain strictly channelslast stride (calling into oneDNN), since
 # channelslast is with priority.
 # (4) So we do not expect any reorder of "plainformat <-> channelslast" on conv op src/dst (fwd and bwd).
-# The reoders should only have 3 on this script, which are all for weight format.
+# The reorders should only have 3 on this script, which are all for weight format.
 m = torch.nn.Conv2d(2, 1, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 m = m.to(memory_format=torch.channels_last)
 m.train()

@@ -27,7 +27,7 @@ inline void _dil_add_swish_fusion_kernel(
   int i = 0;
 
   // load tensor<float> a & b
-  // assum the same size , no need to broadcast
+  // assume the same size, no need to broadcast
   for (; i <= size - 16; i += 16) {
     // a is first operand of add, b is bias
     vec_a = _loadu(a + i);

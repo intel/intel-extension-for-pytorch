@@ -1619,7 +1619,7 @@ if args.benchmark:
                     prompt = prompt_pool[model.name][args.input_tokens]
             else:
                 raise SystemExit(
-                    "[ERROR] Plese use --prompt if want to use custom input."
+                    "[ERROR] Please use --prompt if want to use custom input."
                 )
 
             if model.name == "mllama":

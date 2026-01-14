@@ -568,7 +568,7 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             # _ipex_module_empty_weight_tensor and _ipex_module_empty_bias_tensor
             # have to be a Parameter so that dynamo could convert it into FakeTensor
             # These empty tensors will only be used during inference but we'll set
-            # it in both training and eval mode to supprt the use case of the below
+            # it in both training and eval mode to support the use case of the below
             # workflow:
             # model.train() -> ipex.optimize(model) -> model.eval()
             new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
