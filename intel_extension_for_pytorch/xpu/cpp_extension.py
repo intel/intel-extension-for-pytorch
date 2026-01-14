@@ -991,7 +991,7 @@ def _write_ninja_file_to_build_library(
     # include_paths() gives us the location of torch/extension.h
     system_includes = include_paths()
     # sysconfig.get_path('include') gives us the location of Python.h
-    # Explicitly specify 'posix_prefix' scheme on non-Windows platforms to workaround error on some MacOS
+    # Explicitly specify 'posix_prefix' scheme on non-Windows platforms to workaround error on some macOS
     # installations where default `get_path` points to non-existing `/Library/Python/M.m/include` folder
     python_include_path = sysconfig.get_path(
         "include", scheme="nt" if IS_WINDOWS else "posix_prefix"

@@ -2289,7 +2289,7 @@ class TrainingArguments:
                 )
                 if device.type != "mps":
                     raise ValueError(
-                        "Either you do not have an MPS-enabled device on this machine or MacOS version is not 12.3+ "
+                        "Either you do not have an MPS-enabled device on this machine or macOS version is not 12.3+ "
                         "or current PyTorch install was not built with MPS enabled."
                     )
             if device.type == "mps":

@@ -75,7 +75,7 @@ In case you want to reinstall, make sure that you uninstall Intel® Extension fo
 
 ### Tips and Debugging
 
-* A prerequisite to installing Intel® Extension for PyTorch\* is CMake. We recommend installing it with [Homebrew](https://brew.sh/) with `brew install cmake` if you are developing on MacOS or Linux system.
+* A prerequisite to installing Intel® Extension for PyTorch\* is CMake. We recommend installing it with [Homebrew](https://brew.sh/) with `brew install cmake` if you are developing on macOS or Linux system.
 * Our `setup.py` requires Python >= 3.6
 * If you run into errors when running `python setup.py develop`, here are some debugging steps:
   1. Run `printf '#include <stdio.h>\nint main() { printf("Hello World");}'|clang -x c -; ./a.out` to make sure your CMake works and can compile this simple Hello World program without errors.
