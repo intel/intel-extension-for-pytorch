@@ -94,7 +94,7 @@ def _get_exec_path(module_name, path):
     return os.path.join(path, f"{module_name}{EXEC_EXT}")
 
 
-def get_dpcpp_complier():
+def get_dpcpp_compiler():
     # build cxx via dpcpp
     dpcpp_cmp = shutil.which("icpx")
     if dpcpp_cmp is None:
@@ -105,7 +105,7 @@ def get_dpcpp_complier():
     return dpcpp_cmp
 
 
-def get_icx_complier():
+def get_icx_compiler():
     # build cc via icx
     icx_cmp = shutil.which("icx")
     if icx_cmp is None:
@@ -278,14 +278,14 @@ class DpcppBuildExtension(build_ext, object):
             try:
                 original_compiler = self.compiler.compiler_so
                 if _is_cpp_file(src):
-                    _cxxbin = get_dpcpp_complier()
+                    _cxxbin = get_dpcpp_compiler()
                     self.compiler.set_executable("compiler_so", _cxxbin)
                     if isinstance(cflags, dict):
                         cflags = cflags["cxx"]
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif _is_c_file(src):
-                    _ccbin = get_icx_complier()
+                    _ccbin = get_icx_compiler()
                     self.compiler.set_executable("compiler_so", _ccbin)
                     if isinstance(cflags, dict):
                         cflags = cflags["cxx"]
@@ -365,7 +365,7 @@ class DpcppBuildExtension(build_ext, object):
             # create output directories avoid linker error.
             create_parent_dirs_by_path(output_libname)
 
-            _cxxbin = get_dpcpp_complier()
+            _cxxbin = get_dpcpp_compiler()
             cmd = _gen_link_lib_cmd_line(
                 _cxxbin,
                 objects,
@@ -705,7 +705,7 @@ def _write_ninja_file_and_compile_objects(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
     get_compiler_abi_compatibility_and_version(compiler)
 
     build_file_path = os.path.join(build_directory, "build.ninja")
@@ -745,7 +745,7 @@ def _write_ninja_file_and_build_library(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
     check_compiler_abi_compatibility(compiler)
 
     extra_ldflags = _prepare_ldflags(extra_ldflags or [], verbose, is_standalone)
@@ -1259,7 +1259,7 @@ def _write_ninja_file(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
 
     # Version 1.3 is required for the `deps` directive.
     config = ["ninja_required_version = 1.3"]
