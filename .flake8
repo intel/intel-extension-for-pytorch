@@ -35,4 +35,5 @@ exclude =
     ./scripts,
     ./third_party,
     ./examples,
-    *.pyi
+    *.pyi,
+    ./examples/cpu/inference/python/models/dlrm/torchrec/**

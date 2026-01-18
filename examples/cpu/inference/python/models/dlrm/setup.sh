@@ -14,9 +14,7 @@
 # limitations under the License.
 #
 
-pip install torchrec --index-url https://download.pytorch.org/whl/nightly/cpu --no-deps
 pip install torchmetrics==1.0.3
-pip install fbgemm-gpu --index-url https://download.pytorch.org/whl/nightly/cpu
 pip install torchsnapshot
 pip install pyre_extensions
 pip install iopath
