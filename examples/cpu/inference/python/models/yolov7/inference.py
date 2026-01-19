@@ -296,12 +296,16 @@ def test(
             dynamo_config.use_recursive_dict_tags_for_guards = False
 
         if int8:
-            from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
-            import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-            from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
+            import torchao
+            from torchao.quantization.pt2e.quantize_pt2e import (
+                prepare_pt2e,
+                convert_pt2e,
+            )
+            import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+            from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
                 X86InductorQuantizer,
             )
-            from torch.export import export_for_training
+            from torch.export import export
 
             use_dynamic_batch = (
                 not performance and (len(dataloader.dataset) % batch_size) != 0
@@ -314,7 +318,7 @@ def test(
             print("[Info] Running torch.compile() INT8 quantization")
             with torch.no_grad():
                 example_inputs = (x, augment)
-                exported_model = export_for_training(
+                exported_model = export(
                     model,
                     example_inputs,
                     strict=True,
@@ -338,7 +342,7 @@ def test(
                         x = x.contiguous(memory_format=torch.channels_last)
                         prepared_model(x, augment)
                 converted_model = convert_pt2e(prepared_model)
-                torch.ao.quantization.move_exported_model_to_eval(converted_model)
+                torchao.quantization.pt2e.move_exported_model_to_eval(converted_model)
                 print("[Info] Running torch.compile() with default backend")
                 model = torch.compile(converted_model, dynamic=rect)
         elif bf16:

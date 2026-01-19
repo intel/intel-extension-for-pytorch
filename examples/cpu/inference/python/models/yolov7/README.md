@@ -19,6 +19,13 @@
   pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
   ```
 
+* Install TorchAO
+  ```
+  git clone https://github.com/pytorch/ao.git
+  cd ao
+  python setup.py install
+  ```
+
 * Set IOMP and Tcmalloc Preload for better performance
 
   ```

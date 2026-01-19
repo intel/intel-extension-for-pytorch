@@ -287,18 +287,21 @@ def main():
                 pipe.text_encoder = torch.compile(pipe.text_encoder)
                 pipe.vae.decode = torch.compile(pipe.vae.decode)
         elif args.precision == "int8-fp32" or args.precision == "int8-bf16":
-            from torch.ao.quantization.quantize_pt2e import prepare_pt2e, convert_pt2e
-            import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
-            from torch.ao.quantization.quantizer.x86_inductor_quantizer import (
+            from torchao.quantization.pt2e.quantize_pt2e import (
+                prepare_pt2e,
+                convert_pt2e,
+            )
+            import torchao.quantization.pt2e.quantizer.x86_inductor_quantizer as xiq
+            from torchao.quantization.pt2e.quantizer.x86_inductor_quantizer import (
                 X86InductorQuantizer,
             )
-            from torch.export import export_for_training
+            from torch.export import export
 
             if args.calibration:
                 if args.precision == "int8-fp32":
                     with torch.no_grad():
                         config = pipe.unet.config
-                        pipe.unet = export_for_training(
+                        pipe.unet = export(
                             pipe.unet, inputs, kwargs=extra_kargs, strict=True
                         ).module()
                         quantizer = X86InductorQuantizer()
@@ -477,7 +480,7 @@ def main():
                 elif args.precision == "int8-bf16":
                     with torch.autocast("cpu"), torch.no_grad():
                         config = pipe.unet.config
-                        pipe.unet = export_for_training(
+                        pipe.unet = export(
                             pipe.unet, inputs, kwargs=extra_kargs, strict=True
                         ).module()
                         quantizer = X86InductorQuantizer()
@@ -654,10 +657,12 @@ def main():
                         print(".........calibration step done..........")
                         return
             else:
+                import torchao
+
                 quantized_unet = torch.export.load(args.quantized_model_path)
                 config = pipe.unet.config
                 pipe.unet = quantized_unet.module()
-                torch.ao.quantization.move_exported_model_to_eval(pipe.unet)
+                torchao.quantization.pt2e.move_exported_model_to_eval(pipe.unet)
                 pipe.unet.config = config
                 if args.precision == "int8-fp32":
                     with torch.no_grad():
