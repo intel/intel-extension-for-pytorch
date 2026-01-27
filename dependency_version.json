@@ -5,13 +5,13 @@
   },
   "pytorch": {
     "index-url": "https://download.pytorch.org/whl/nightly/cpu",
-    "version": "2.10.0.dev20251103+cpu"
+    "version": "2.10.0.dev20251213+cpu"
   },
   "torchaudio": {
-    "version": "2.10.0.dev20251103+cpu"
+    "version": "2.10.0.dev20251213+cpu"
   },
   "torchvision": {
-    "version": "0.25.0.dev20251103+cpu"
+    "version": "0.25.0.dev20251213+cpu"
   },
   "deepspeed": {
     "version": "0.18.2",

@@ -4,7 +4,6 @@ import unittest
 from intel_extension_for_pytorch.quantization.fp8 import (
     fp8_autocast,
     DelayedScaling,
-    Format,
     prepare_fp8,
 )
 import intel_extension_for_pytorch._C as core
@@ -50,7 +49,7 @@ class TestFP8Cases(TestCase):
 
         with fp8_autocast(
             enabled=True,
-            fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),
+            fp8_recipe=DelayedScaling(),
             device="cpu",
         ):
             for i in range(10):
@@ -185,7 +184,7 @@ class TestFP8Cases(TestCase):
             with fp8_autocast(
                 enabled=False,
                 calibrating=True,
-                fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),
+                fp8_recipe=DelayedScaling(),
                 device="cpu",
             ):
                 _ = fp8_linear_inference(inp2[i])
@@ -205,7 +204,7 @@ class TestFP8Cases(TestCase):
         with fp8_autocast(
             enabled=True,
             calibrating=False,
-            fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),
+            fp8_recipe=DelayedScaling(),
             device="cpu",
         ):
             out_fp8_iter5 = fp8_linear_with_calibration(inp2[4])
@@ -222,7 +221,7 @@ class TestFP8Cases(TestCase):
         fp8_linear = prepare_fp8(nn_linear, device="cpu")
         with fp8_autocast(
             enabled=True,
-            fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),
+            fp8_recipe=DelayedScaling(),
             device="cpu",
         ):
             fp8_out = fp8_linear(inp)

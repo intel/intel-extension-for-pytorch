@@ -172,3 +172,6 @@ h5py
 six
 tensorflow
 pandas
+grpc
+numba
+nvtabular

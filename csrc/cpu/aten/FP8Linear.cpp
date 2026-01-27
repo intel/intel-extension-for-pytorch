@@ -81,7 +81,7 @@ at::Tensor fp8_linear_impl(
   if (input_scale != 1.0f) {
     op_attr.set_scales_mask(DNNL_ARG_SRC, 0);
   }
-  if (input_scale != 1.0f) {
+  if (weight_scale != 1.0f) {
     op_attr.set_scales_mask(DNNL_ARG_WEIGHTS, 0);
   }
 
@@ -102,13 +102,15 @@ at::Tensor fp8_linear_impl(
     // on any other error just re-throw
     throw;
   }
+  auto expected_weight =
+      weight_t.reorder_if_differ_in(primitive_desc.weights_desc());
   auto primitive = dnnl::matmul(primitive_desc);
 
   // Prepare args and execute primitive
   ideep::tensor scratchpad(primitive_desc.scratchpad_desc());
   ideep::exec_args args;
   args.insert({DNNL_ARG_SRC, src});
-  args.insert({DNNL_ARG_WEIGHTS, weight_t});
+  args.insert({DNNL_ARG_WEIGHTS, expected_weight});
   args.insert({DNNL_ARG_DST, dst});
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad});
   if (with_bias) {
