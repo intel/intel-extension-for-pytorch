@@ -24,12 +24,11 @@ using namespace at::AtenIpexTypeXPU;
 namespace torch_ipex::xpu {
 namespace oneDNN {
 
-static inline void set_quant_primitive_attr(
-    const Tensor& input,
+
+static inline void set_w8a8_quant_primitive_attr(
     primitive_attr& pattr,
     const Tensor& scale,
-    const Tensor& zp,
-    const int64_t group_size,
+    const c10::optional<Tensor>& zp,
     const int64_t act_quant_mode,
     const int64_t k) {
   // set scale and zero point for matmul args
@@ -50,6 +49,125 @@ static inline void set_quant_primitive_attr(
         /* mask */ (1 << 0) + (1 << 1),
         {1, k},
         memory::data_type::s32);
+  } else if (
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR_SYM)) {
+    pattr.set_scales(
+        DNNL_ARG_SRC,
+        /* mask */ 0,
+        {},
+        get_onednn_dtype(scale));
+    pattr.set_zero_points(
+        DNNL_ARG_SRC,
+        /* mask */ 0,
+        {},
+        memory::data_type::s32);
+  }
+
+    pattr.set_scales(
+        DNNL_ARG_SRC,
+        /* mask */ (1 << 0) + (1 << 1),
+        {1, k},
+        get_onednn_dtype(scale));
+    // pattr.set_scales(
+    //     DNNL_ARG_WEIGHTS,
+    //     /* mask */ 0,
+    //     {},
+    //     get_onednn_dtype(scale));
+    pattr.set_scales(
+      DNNL_ARG_WEIGHTS,
+      /* mask */ (1 << 0) + (1 << 1),
+      {k, 1},
+      get_onednn_dtype(scale));
+    pattr.set_zero_points(
+        DNNL_ARG_WEIGHTS,
+        /* mask */ 0,
+        {},
+        memory::data_type::s8);
+}
+
+static int set_post_res_attr(
+    primitive_ext& matmul_ext,
+    engine& eng,
+    const Tensor& res_flat,
+    const Tensor& res1_flat,
+    int arg_off) {
+  if (res_flat.defined()) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1,
+        res_flat.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(
+              get_onednn_md(res_flat), eng, res_flat.data_ptr());
+        });
+  }
+  if (res1_flat.defined()) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_MULTIPLE_POST_OP(1) | DNNL_ARG_SRC_1,
+        res1_flat.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(
+              get_onednn_md(res1_flat), eng, res1_flat.data_ptr());
+        });
+  }
+  return arg_off;
+}
+
+static void set_general_args(
+    primitive_ext& matmul_ext,
+    std::vector<std::pair<int, void*>>& arg_handles,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    Tensor& result,
+    const c10::optional<Tensor>& bias) {
+  arg_handles.reserve(8);
+
+  arg_handles.emplace_back(DNNL_ARG_SRC, mat1.data_ptr());
+  arg_handles.emplace_back(DNNL_ARG_WEIGHTS, mat2.data_ptr());
+  arg_handles.emplace_back(DNNL_ARG_DST, result.data_ptr());
+  if (bias.has_value()) {
+    arg_handles.emplace_back(DNNL_ARG_BIAS, bias.value().data_ptr());
+  }
+
+#ifdef USE_SCRATCHPAD_MODE
+  int scratchpad_size = matmul_ext.get_scratchpad_size();
+  Tensor scratchpad_tensor = at::AtenIpexTypeXPU::empty(
+      {scratchpad_size}, mat1.options().dtype(at::kByte), c10::nullopt);
+  arg_handles.emplace_back(DNNL_ARG_SCRATCHPAD, scratchpad_tensor.data_ptr());
+#endif
+}
+
+static inline void set_quant_primitive_attr(
+    // const Tensor& input,
+    primitive_attr& pattr,
+    const Tensor& scale,
+    const Tensor& zp,
+    const int64_t group_size,
+    const int64_t act_quant_mode,
+    const int64_t k) {
+  // set scale and zero point for matmul args
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+  // set scale and zp for quantized activation
+  if (act_quant_mode == static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M) ||
+      act_quant_mode ==
+          static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_M_SYM)) {
+    pattr.set_scales(
+        DNNL_ARG_SRC,
+        /* mask */ (1 << 0) + (1 << 1),
+        {1, k},
+        get_onednn_dtype(scale));
+    // YC WA
+    // pattr.set_zero_points(
+    //     DNNL_ARG_SRC,
+    //     /* mask */ (1 << 0) + (1 << 1),
+    //     {1, k},
+    //     memory::data_type::s32);
   } else if (
       act_quant_mode ==
           static_cast<int64_t>(ActQuantScheme::QUANT_A_PER_TENSOR) ||
@@ -90,15 +208,41 @@ static inline void set_quant_primitive_attr(
   if (act_quant_mode == static_cast<int64_t>(ActQuantScheme::UNQUANT_A))
     pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
 
-  if (input.scalar_type() == at::ScalarType::BFloat16) {
-    pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
-  } else if (input.scalar_type() == at::ScalarType::Half) {
-    pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
-  } else {
-    TORCH_INTERNAL_ASSERT(
-        false, "Unsupported data type for int4 matmul: ", input.scalar_type());
-  }
+  // if (input.scalar_type() == at::ScalarType::BFloat16) {
+  //   pattr.set_fpmath_mode(dnnl::fpmath_mode::bf16, true);
+  // } else if (input.scalar_type() == at::ScalarType::Half) {
+  //   pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+  // } else {
+  //   TORCH_INTERNAL_ASSERT(
+  //       false, "Unsupported data type for int4 matmul: ", input.scalar_type());
+  // }
 }
+
+static int set_w8a8_wei_scale_zp_attr(
+    primitive_ext& matmul_ext,
+    engine& eng,
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Tensor& scale,
+    const Tensor& zp,
+    int arg_off = 0) {
+  matmul_ext.set_attribute(
+      arg_off++,
+      DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS,
+      scale.data_ptr(),
+      [&]() {
+        return dpcpp_onednn_memory(get_onednn_md(scale), eng, scale.data_ptr());
+      });
+  matmul_ext.set_attribute(
+      arg_off++,
+      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+      zp.data_ptr(),
+      [&]() {
+        return dpcpp_onednn_memory(get_onednn_md(zp), eng, zp.data_ptr());
+      });
+  return arg_off;
+}
+
 
 template <typename F>
 static at::Tensor dnnl_matmul_w4a16_common(
@@ -383,7 +527,8 @@ static at::Tensor dnnl_matmul_w4a16(
 
   auto quant = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
   };
 
   result = dnnl_matmul_w4a16_common(
@@ -420,7 +565,8 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
 
   auto silu = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     pattr.set_post_ops(po);
@@ -462,7 +608,8 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
   auto res_flat = res.flatten(0, -2);
   auto resmul = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -504,7 +651,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
 
   auto bias_gelu = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     if (approximate == "none") {
       po.append_eltwise(algorithm::eltwise_gelu_erf, 1.f, 0.f);
@@ -555,7 +703,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
   auto res1_flat = res1.flatten(0, -2);
   auto bias_resadd_resadd = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     po.append_binary(algorithm::binary_add, get_onednn_md(res1_flat));
@@ -598,7 +747,8 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
   auto res_flat = res.flatten(0, -2);
   auto silu_mul = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -642,7 +792,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
   auto res_flat = res.flatten(0, -2);
   auto silu_mul_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_eltwise(algorithm::eltwise_swish, 1.f, 0.f);
     po.append_binary(algorithm::binary_mul, get_onednn_md(res_flat));
@@ -685,7 +836,8 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -727,7 +879,8 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
   auto res_flat = res.flatten(0, -2);
   auto bias_add_int4 = [&](primitive_attr& pattr) {
     set_quant_primitive_attr(
-        mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        // mat1, pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
+        pattr, scale, zp, group_size, act_quant_mode, mat1.size(-1));
     post_ops po;
     po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     pattr.set_post_ops(po);
@@ -907,6 +1060,227 @@ static inline void dnnl_matmul_w8a16_fp8(
   DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
       matmul_ext, strm, engine, arg_handles, arg_off);
 }
+
+static void determine_bias_type(bias_type_t& b_type, const c10::optional<Tensor>& bias, int m, int n) {
+  bias_shape_t bias_shape;
+  bias_data_type_t bias_dtype;
+  if (bias.has_value() && bias.value().defined()) {
+    auto& b = bias.value();
+    const auto nuelm = b.numel();
+    if (nuelm == 1) {
+      bias_shape = bias_shape_t::scalar;
+    } else if (nuelm == m * n) {
+      bias_shape = bias_shape_t::mn;
+    } else if (b.size(b.dim() - 1) == n && nuelm == n) {
+      bias_shape = bias_shape_t::n;
+    } else if (b.size(b.dim() - 1) == 1 && nuelm == m) {
+      bias_shape = bias_shape_t::m;
+    } else if (nuelm == 0) {
+      bias_shape = bias_shape_t::none;
+    } else {
+      TORCH_CHECK(0, "unsupported bias dim in matmul ...", b.sizes());
+    }
+
+    switch (b.scalar_type()) {
+      case at::ScalarType::Float:
+        bias_dtype = bias_data_type_t::f32;
+        break;
+      case at::ScalarType::BFloat16:
+        bias_dtype = bias_data_type_t::bf16;
+        break;
+      case at::ScalarType::Half:
+        bias_dtype = bias_data_type_t::f16;
+        break;
+      default:
+        TORCH_CHECK(
+            false,
+            "Unsupported data type for bias in int4 matmul: ",
+            b.scalar_type());
+    }
+  } else {
+    bias_shape = bias_shape_t::none;
+    bias_dtype = bias_data_type_t::none;
+  }
+  b_type = make_bias_type(bias_shape, bias_dtype);
+}
+
+template <typename F>
+static at::Tensor dnnl_matmul_w8a8_common(
+    Tensor& result, // dst, [b, m, n]
+    const Tensor& mat1, // src, [b, m, k]
+    const Tensor& act_scale,
+    const c10::optional<Tensor>& act_zp,
+    const Tensor& mat2, // quantized weight, [K/8, N] transpose
+    const c10::optional<Tensor>& bias,
+    const Tensor& weight_scale, // [k/group_size, n]
+    const Tensor& weight_zp, // [k/group_size, n/8]
+    bool m2_trans,
+    F pattr,
+    Tensor res_flat,
+    Tensor res1_flat) {
+  TORCH_CHECK(mat1.is_contiguous(), "Expect mat1 to be contiguous");
+  // YC WA
+  // TORCH_CHECK(mat2.is_contiguous(), "Expect mat2 to be contiguous");
+  TORCH_CHECK(mat1.scalar_type() == at::ScalarType::Char ||
+              mat1.scalar_type() == at::ScalarType::Byte,
+      "Expect mat1 to be Char or Byte, but got ",
+      mat1.scalar_type());
+  TORCH_CHECK(mat2.scalar_type() == at::ScalarType::Char ||
+              mat2.scalar_type() == at::ScalarType::Byte,
+      "Expect mat2 to be Char or Byte, but got ",
+      mat2.scalar_type());
+
+  auto src_sz = mat1.sizes();
+  auto o_sz = mat1.sizes().vec();
+  auto b_sz = mat2.sizes();
+  *(o_sz.end() - 1) = *(b_sz.end() - 1);
+  // force out dtype to fp16
+  // result = at::empty(o_sz, mat1.options().dtype(at::kFloat));
+
+  const int m = std::reduce(
+      src_sz.begin(), src_sz.end() - 1, 1, std::multiplies<int64_t>());
+  const int n = b_sz[1]; // presume channel last format
+  const int k = *(src_sz.end() - 1);
+
+  // get device, engine, stream
+  const int device_id = at::xpu::current_device();
+  at::Device curDevice = at::Device(at::kXPU, device_id);
+  auto engine = GpuEngineManager::Instance().get_engine(curDevice);
+
+  dnnl::joint_dtypes_t jd;
+  if (mat1.scalar_type() == at::ScalarType::Char) {
+    if (mat2.scalar_type() == at::ScalarType::Char)
+      jd = dnnl::joint_dtypes_t::_s8_s8;
+    else if (mat2.scalar_type() == at::ScalarType::Byte)
+      jd = dnnl::joint_dtypes_t::_s8_u8;
+  } else if (mat1.scalar_type() == at::ScalarType::Byte) {
+    if (mat2.scalar_type() == at::ScalarType::Char)
+      jd = dnnl::joint_dtypes_t::_u8_s8;
+    else if (mat2.scalar_type() == at::ScalarType::Byte)
+      jd = dnnl::joint_dtypes_t::_u8_u8;
+  }
+
+  bias_type_t b_type;
+  determine_bias_type(b_type, bias, m, n);
+
+  const int64_t ldb = mat2.strides()[mat2.dim() - 1];
+  const int64_t lda = mat1.strides()[mat1.dim() - 2];
+  const int64_t ldc = result.strides()[result.dim() - 2];
+
+  // only support nt for int4 matmul
+  trans_type_t tt = trans_type_t::nt;
+  int64_t group_size = -1;
+  int64_t zp_group_size = -1;
+  auto& matmul_ext = matmul_primitive_create_and_cache(
+      jd,
+      tt,
+      b_type,
+      m,
+      n,
+      k,
+      lda,
+      ldb,
+      ldc,
+      device_id,
+      pattr,
+      group_size,
+      zp_group_size);
+
+  int arg_off = 0;
+
+  matmul_ext.set_attribute(
+    arg_off++,
+    DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC,
+    act_scale.data_ptr(),
+    [&]() { return dpcpp_onednn_memory(get_onednn_md(act_scale), engine, act_scale.data_ptr()); });
+
+  arg_off = set_w8a8_wei_scale_zp_attr(
+      matmul_ext, engine, mat1, mat2, weight_scale, weight_zp, arg_off);
+  arg_off = set_post_res_attr(matmul_ext, engine, res_flat, res1_flat, arg_off);
+
+  std::vector<std::pair<int, void*>> arg_handles;
+  set_general_args(matmul_ext, arg_handles, mat1, mat2, result, bias);  
+
+  auto strm = GpuStreamManager::Instance().get_stream();
+  DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
+      matmul_ext, strm, engine, arg_handles, arg_off);
+
+  return result;
+}
+
+static at::Tensor dnnl_matmul_w8a8(
+    Tensor& result, // dst, [b, m, n]
+    const Tensor& mat1, // src, [b, m, k]
+    const Tensor& act_scale,
+    const c10::optional<Tensor>& act_zp,
+    const Tensor& mat2, // quantized weight, [k, n] transpose
+    const c10::optional<Tensor>& bias,
+    const Tensor& weight_scale, // [k/group_size, n]
+    const Tensor& weight_zp, // [k/group_size, n/8]
+    bool m2_trans) {
+  RECORD_FUNCTION("dnnl_matmul_w8a8", std::vector<c10::IValue>({mat1, mat2}));
+
+  auto quant = [&](primitive_attr& pattr) {
+    set_w8a8_quant_primitive_attr(
+        pattr, weight_scale, weight_zp, -1, mat1.size(-1));
+  };
+
+  result = dnnl_matmul_w8a8_common(
+      result,
+      mat1,
+      act_scale,
+      act_zp,
+      mat2,
+      bias,
+      weight_scale,
+      weight_zp,
+      m2_trans,
+      quant,
+      at::Tensor(),
+      at::Tensor());
+
+  return result;
+}
+
+// static at::Tensor dnnl_matmul_w4a8(
+//     Tensor& result, // dst, [b, m, n]
+//     const Tensor& mat1, // src, [b, m, k]
+//     const Tensor& act_scale,
+//     const Tensor& act_zp,
+//     const Tensor& mat2, // quantized weight, [k, n] transpose
+//     const c10::optional<Tensor>& bias,
+//     const Tensor& weight_scale, // [k/group_size, n]
+//     const Tensor& weight_zp, // [k/group_size, n/8]
+//     int64_t group_size,
+//     bool m2_trans,
+//     const c10::optional<Tensor>& g_idx,
+//     int64_t act_quant_mode) {
+//   RECORD_FUNCTION("dnnl_matmul_w4a8", std::vector<c10::IValue>({mat1, mat2}));
+
+//   auto quant = [&](primitive_attr& pattr) {
+//     set_quant_primitive_attr(
+//         pattr, weight_scale, weight_zp, group_size, act_quant_mode, mat1.size(-1));
+//   };
+
+//   result = dnnl_matmul_w4a8_common(
+//       result,
+//       mat1,
+//       act_scale,
+//       act_zp,
+//       mat2,
+//       bias,
+//       weight_scale,
+//       weight_zp,
+//       act_quant_mode,
+//       group_size,
+//       m2_trans,
+//       g_idx,
+//       quant,
+//       at::Tensor(),
+//       at::Tensor());
+
+//   return result;
+// }
 
 } // namespace oneDNN
 } // namespace torch_ipex::xpu

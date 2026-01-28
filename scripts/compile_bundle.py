@@ -17,16 +17,13 @@ import urllib.parse
 UTILSFILENAME = 'compilation_utils.py'
 SYSTEM = platform.system()
 SCRIPTDIR = os.path.dirname(os.path.abspath(__file__))
-BASEDIR = SCRIPTDIR
-SRCDIR = ''
-if Path(BASEDIR).parts[-1] == 'scripts' and \
-        os.path.isdir(os.path.join(BASEDIR, '..', 'intel_extension_for_pytorch')) and \
-        os.path.exists(os.path.join(BASEDIR, '..', 'setup.py')):
-    dir_parts = Path(BASEDIR).parts
-    SRCDIR = dir_parts[-2]
-    BASEDIR = os.path.join(*dir_parts[:-2])
-if SRCDIR == '':
-    SRCDIR = 'intel-extension-for-pytorch'
+# 核心修改：强制 BASEDIR 为 scripts 目录的上一级（即 intel_extension_for_pytorch 根目录）
+BASEDIR = os.path.abspath(os.path.join(SCRIPTDIR, '..'))
+# 强制 SRCDIR 为当前仓库目录名（无需检测）
+# SRCDIR = os.path.basename(BASEDIR)
+SRCDIR=""
+# 校验：确保当前目录是 IPEX 根目录（有 setup.py）
+assert os.path.exists(os.path.join(BASEDIR, 'setup.py')), f"当前目录 {BASEDIR} 不是 IPEX 根目录（无 setup.py）"
 
 def _get_whl_from_dist(directory):
     whl_files = []
@@ -159,7 +156,8 @@ def process(*args):
     global source_env
     global get_duration
     global download
-    utils_filepath = os.path.join(BASEDIR, SRCDIR, 'scripts', 'tools', 'compilation_helper', UTILSFILENAME) if BASEDIR != SCRIPTDIR else os.path.join(BASEDIR, UTILSFILENAME)
+    utils_filepath = os.path.join(BASEDIR, 'scripts', 'tools', 'compilation_helper', UTILSFILENAME) if BASEDIR != SCRIPTDIR else os.path.join(BASEDIR, UTILSFILENAME)
+    print("why : ", utils_filepath)
     import importlib.util
     spec = importlib.util.spec_from_file_location('script_module', utils_filepath)
     utils_module = importlib.util.module_from_spec(spec)
@@ -200,12 +198,8 @@ def process(*args):
 
     # Update IPEX source code
     t0 = int(time.time() * 1000)
-    update_source_code(SRCDIR,
-                       'https://github.com/intel/intel-extension-for-pytorch.git',
-                       args_ver_ipex,
-                       basedir = BASEDIR,
-                       show_command = args_verbose)
-    durations['Retrieve IPEX source code'] = get_duration(t0)
+    print(f"使用本地 IPEX 仓库: {os.path.join(BASEDIR, SRCDIR)}")
+    durations['Retrieve IPEX source code'] = 0.0  # 跳过拉取，耗时为0
 
     # Retrieve dependency information
     sys.path.append(os.path.join(BASEDIR, SRCDIR, 'scripts', 'tools',  'compilation_helper'))
@@ -765,33 +759,16 @@ if __name__ == '__main__':
 
     assert not (args.rel_with_deb_info and args.debug), 'Arguments --rel-with-deb-info and --debug cannot be set at the same time.'
 
-    utils_filepath = os.path.join(BASEDIR, UTILSFILENAME)
-    if BASEDIR != SCRIPTDIR:
-        assert args.ver_ipex == '', 'Argument --ver-ipex cannot be set if you run the script from a exisiting source code directory.'
-    else:
-        assert args.ver_ipex != '', 'Argument --ver-ipex must be set to a branch/tag/commit of Intel® Extension for PyTorch* source code.'
-        if os.path.isfile(utils_filepath):
-            os.remove(utils_filepath)
-        url = f'https://github.com/intel/intel-extension-for-pytorch/blob/{urllib.parse.quote(args.ver_ipex)}/scripts/tools/compilation_helper/{UTILSFILENAME}'
-        import subprocess
-        p = subprocess.Popen('python -m pip install requests',
-                     stdout = subprocess.PIPE,
-                     stderr = subprocess.STDOUT,
-                     shell = True,
-                     text = True)
-        del sys.modules['subprocess']
-        for line in iter(p.stdout.readline, ''):
-            pass
-        import requests
-        response = requests.get(url)
-        assert response.status_code >= 200 and response.status_code < 300, f'Failed to access {url}, status code: {response.status_code}.'
-        urls = re.findall('"rawBlobUrl":"(.*?)"', response.text)
-        assert len(urls) == 1, f'Unexpected number of raw URLs retrieved.\n{matches}'
-        response = requests.get(urls[0], stream=True)
-        with open(utils_filepath, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
-        del sys.modules['requests']
+    # 修改后（完全删除下载逻辑，直接用本地路径）
+    # 核心：指定本地 compilation_utils.py 的路径（IPEX 仓库内的默认路径）
+    utils_filepath = os.path.join(BASEDIR, 'scripts', 'tools', 'compilation_helper', UTILSFILENAME)
+
+    # 校验：确保本地文件存在（避免找不到脚本）
+    assert os.path.exists(utils_filepath), f"""
+    本地 compilation_utils.py 不存在！
+    预期路径：{utils_filepath}
+    请检查 IPEX 仓库是否完整，或手动确认该文件路径。
+    """
 
     process(
             args.install_pytorch,

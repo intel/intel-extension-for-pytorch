@@ -110,6 +110,38 @@ Tensor fp8_gemm_v2(
   return result;
 }
 
+
+Tensor mm_w8a8(
+    const Tensor& input,
+    const Tensor& input_scl,
+    const c10::optional<Tensor>& input_zp,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    Tensor& result) {
+  // TORCH_CHECK(!input_scl.has_value(), "scale for activation is not supported.");
+  TORCH_CHECK(!input_zp.has_value(), "zp for activation is not supported.");
+  // TORCH_CHECK(!weight_zp.has_value(), "zp for weight is not supported.");
+  // TORCH_CHECK(weight_scl.dim() == 1, "Only per-tensor scale for weight is supported.");
+  Tensor out;
+#ifndef USE_PRIMITIVE_CACHE
+  TORCH_CHECK(false, "mm_w8a8 is only availble when USE_PRIMITIVE_CACHE=ON");
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w8a8(
+        result,
+        input,
+        input_scl,
+        input_zp,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        false);
+#endif // USE_PRIMITIVE_CACHE
+  return out;
+}
+
+
 Tensor fp8_gemm_w8a16(
     const Tensor& A,
     const Tensor& B,
@@ -225,6 +257,10 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm_w8a16.xpu",
       at::AtenIpexTypeXPU::fp8_gemm_w8a16,
+      c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "mm_w8a8.xpu",
+      at::AtenIpexTypeXPU::mm_w8a8,
       c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH(
       "fp8_gemm_backward.xpu",

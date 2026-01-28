@@ -91,6 +91,10 @@ enum class joint_dtypes_t {
   bf16_f8_e5m2,
   f16_f8_e4m3,
   bf16_f8_e4m3,
+  _s8_s8,
+  _s8_u8,
+  _u8_s8,
+  _u8_u8,
 };
 
 enum class trans_type_t { nn = 0, nt, tn, tt };
@@ -810,6 +814,62 @@ static inline primitive_ext& matmul_primitive_create_and_cache(
           zp_group_size);
     case joint_dtypes_t::bf16_f8_e4m3:
       return matmul_primitive_create_and_cache<joint_dtypes_t::bf16_f8_e4m3, F>(
+          Tt,
+          b_type,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::_s8_s8:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::_s8_s8, F>(
+          Tt,
+          b_type,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::_s8_u8:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::_s8_u8, F>(
+          Tt,
+          b_type,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::_u8_s8:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::_u8_s8, F>(
+          Tt,
+          b_type,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldc,
+          device_id,
+          attr,
+          scale_group_size,
+          zp_group_size);
+    case joint_dtypes_t::_u8_u8:
+      return matmul_primitive_create_and_cache<joint_dtypes_t::_u8_u8, F>(
           Tt,
           b_type,
           m,
