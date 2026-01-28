@@ -12,7 +12,7 @@ DLRM v2 Inference best known configurations with PyTorch.
 ## Bare Metal
 ### General setup
 
-Install Pytorch, TorchVison and jeMalloc.
+Install Pytorch and jeMalloc.
 ```
 git clone https://github.com/yanbing-j/pytorch.git
 cd pytorch
@@ -22,6 +22,7 @@ git submodule update --init --recursive
 conda install cmake ninja
 pip install -r requirements.txt
 pip install mkl-static mkl-include
+export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
 python setup.py install
 cd ..
 

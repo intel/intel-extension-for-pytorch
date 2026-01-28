@@ -1,4 +1,3 @@
-import math
 import torch
 from torch.nn import functional as F
 import torchao  # noqa: F401
@@ -13,82 +12,8 @@ from torchao.quantization.pt2e.quantizer.utils import (
     QuantizationConfig,
 )
 
-from torch._dynamo.utils import counters
-from torch._inductor.fx_passes.freezing_patterns import register_freezing_graph_pattern
-from torch._inductor.pattern_matcher import (
-    Arg,
-    CallFunction,
-    KeywordArg,
-    Match,
-)
 
 quantized_decomposed = torch.ops.quantized_decomposed
-
-
-def _is_valid_dqq_pattern(dtype=torch.float32):
-    def _inner(match):
-        assert dtype in [torch.float32, torch.bfloat16]
-        q_pattern_node = match.output_node()
-        dq_pattern_node = q_pattern_node.args[0]
-        assert q_pattern_node.target is quantized_decomposed.quantize_per_tensor.default
-        assert (
-            dq_pattern_node.target is quantized_decomposed.dequantize_per_tensor.default
-        )
-        for i in range(2, len(q_pattern_node.args)):
-            assert q_pattern_node.args[i] == dq_pattern_node.args[i]
-        assert math.isclose(
-            q_pattern_node.args[1], dq_pattern_node.args[1], rel_tol=1e-5, abs_tol=1e-5
-        )
-        cat_node = dq_pattern_node.args[0]
-        return cat_node.target is torch.ops.aten.cat.default
-
-    return _inner
-
-
-def _register_dequant_quant_pass(pattern, pass_number=3, dtype=torch.float32):
-    @register_freezing_graph_pattern(
-        pattern,
-        extra_check=_is_valid_dqq_pattern(dtype),
-        pass_number=pass_number,
-    )
-    def dqq_fusion(match: Match, *args, **kwargs):
-        assert dtype in [torch.float32, torch.bfloat16]
-
-        q_pattern_node = match.output_node()
-        dq_pattern_node = q_pattern_node.args[0]
-        cat_node = dq_pattern_node.args[0]
-
-        q_pattern_node.replace_all_uses_with(cat_node)
-        cat_node.meta.update(q_pattern_node.meta)
-
-        match.graph.erase_node(q_pattern_node)
-        match.graph.erase_node(dq_pattern_node)
-
-        counters["inductor"]["concat_dqq_matcher_nodes"] += 1
-        counters["inductor"]["concat_dqq_matcher_nodes"] += len(match.nodes)
-
-
-def _register_dqq_pattern():
-    dequantize_per_tensor_activation_pattern = CallFunction(
-        quantized_decomposed.dequantize_per_tensor.default,
-        Arg(),
-        Arg(),
-        Arg(),
-        Arg(),
-        Arg(),
-        Arg(),
-    )
-    quantized_op_output_pattern_pt2e = CallFunction(
-        quantized_decomposed.quantize_per_tensor.default,
-        dequantize_per_tensor_activation_pattern,
-        KeywordArg("o_inv_scale"),
-        KeywordArg("o_zp"),
-        KeywordArg("o_qmin"),
-        KeywordArg("o_qmax"),
-        KeywordArg("o_dtype"),
-    )
-    print(quantized_op_output_pattern_pt2e)
-    _register_dequant_quant_pass(quantized_op_output_pattern_pt2e)
 
 
 def get_dlrm_quantization_config(
@@ -231,8 +156,6 @@ def fetch_batch(dataloader):
 
 
 def calibrate(model, dense, sparse):
-
-    _register_dqq_pattern()
 
     def get_embedded_concat(model, dense, sparse):
         embedded_dense = model.dense_arch(dense)
