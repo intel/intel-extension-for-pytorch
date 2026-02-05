@@ -180,17 +180,14 @@ elif args.dtype in ["int8", "int8-bf16"]:
                 )
         elif args.weight_dtype == "INT4":
             if args.dtype == "int8-bf16":
-                from torchao.dtypes import Int4CPULayout
-
                 print("---- apply torchao a16w4 api ----", flush=True)
+                from torchao.prototype.int4_opaque_tensor import (
+                    Int4WeightOnlyOpaqueTensorConfig,
+                )
+
                 quant_api.quantize_(
                     model,
-                    quant_api.Int4WeightOnlyConfig(
-                        group_size=args.group_size,
-                        layout=Int4CPULayout(),
-                        set_inductor_config=False,
-                        version=1,
-                    ),
+                    Int4WeightOnlyOpaqueTensorConfig(group_size=args.group_size),
                 )
                 unwrap_tensor_subclass(model)
             elif args.dtype == "int8":
