@@ -208,22 +208,49 @@ class SparseArchCatDense(SparseArch):
     def __init__(self, embedding_bag_collection):
         super().__init__(embedding_bag_collection)
         self.scale = None
+        self.qtype = None
+
+    def quant(self, tensor: torch.Tensor) -> torch.Tensor:
+        if self.qtype == torch.int8:
+            return torch.ops.quantized_decomposed.quantize_per_tensor.default(
+                tensor, self.scale, 0, -128, 127, torch.int8
+            )
+        elif self.qtype == torch.float8_e4m3fn:
+            return torch.ops.torchao.quantize_affine_float8_non_decomposed.default(
+                tensor=tensor,
+                scale=torch.tensor([self.scale]),
+                float8_dtype=torch.float8_e4m3fn,
+            )
+        else:
+            raise AssertionError(f"Unknown qtype in cat: {self.qtype}")
+
+    def dequant(self, tensor: torch.Tensor) -> torch.Tensor:
+        if self.qtype == torch.int8:
+            return torch.ops.quantized_decomposed.dequantize_per_tensor.default(
+                tensor, self.scale, 0, -128, 127, torch.int8
+            )
+        elif self.qtype == torch.float8_e4m3fn:
+            return torch.ops.torchao.dequantize_affine_float8_non_decomposed.default(
+                tensor=tensor,
+                scale=torch.tensor([self.scale]),
+                output_dtype=torch.float,
+            )
+        else:
+            raise AssertionError(f"Unknown qtype in cat: {self.qtype}")
 
     def _cat(self, embedded_dense, embedded_sparse):
         if self.scale is not None:
-            embedded_concat = [embedded_dense] + list(embedded_sparse)
-            for i in range(len(embedded_concat)):
-                embedded_concat[i] = (
-                    torch.ops.quantized_decomposed.quantize_per_tensor.default(
-                        embedded_concat[i], self.scale, 0, -128, 127, torch.int8
+            if self.qtype not in [torch.int8, torch.float8_e4m3fn]:
+                raise ValueError(
+                    "qtype {} not supported in _cat, please use torch.int8 or torch.float8_e4m3fn".format(
+                        self.qtype
                     )
                 )
+            embedded_concat = [embedded_dense] + list(embedded_sparse)
+            for i in range(len(embedded_concat)):
+                embedded_concat[i] = self.quant(embedded_concat[i])
             embedded_concat = torch.cat(embedded_concat, dim=1)
-            embedded_concat = (
-                torch.ops.quantized_decomposed.dequantize_per_tensor.default(
-                    embedded_concat, self.scale, 0, -128, 127, torch.int8
-                )
-            )
+            embedded_concat = self.dequant(embedded_concat)
         else:
             embedded_concat = [embedded_dense] + list(embedded_sparse)
             embedded_concat = torch.cat(embedded_concat, dim=1)
@@ -242,7 +269,7 @@ class SparseArchCatDense(SparseArch):
         Returns:
             torch.Tensor: tensor of shape B X (F + 1) X D.
         """
-        (B, _) = embedded_dense_features.shape
+        B, _ = embedded_dense_features.shape
         embedding_bag_collection = self.embedding_bag_collection
         embedded_sparse_features: List[torch.Tensor] = []
         for i, embedding_bag in enumerate(

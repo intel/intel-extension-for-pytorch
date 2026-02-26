@@ -12,7 +12,6 @@ from torchao.quantization.pt2e.quantizer.utils import (
     QuantizationConfig,
 )
 
-
 quantized_decomposed = torch.ops.quantized_decomposed
 
 
@@ -171,6 +170,7 @@ def calibrate(model, dense, sparse):
     converted_mlps = _calibrate(model.mlps, (embedded_concat,))
     mlps_scale = _get_first_scale(converted_mlps)
     model.sparse_arch.scale = mlps_scale
+    model.sparse_arch.qtype = torch.int8
 
     model.mlps = converted_mlps
     model.dense_arch = converted_dense

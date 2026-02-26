@@ -131,6 +131,9 @@ def inc_convert(model, dtype):
 
     parent_child_mod_dict = generate_model_info(model)
 
+    model.model.sparse_arch.qtype = torch.float8_e4m3fn
+    model.model.sparse_arch.scale = 0.026069696992635727
+
     with open(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "fp8_data.json"), "r"
     ) as fp:
