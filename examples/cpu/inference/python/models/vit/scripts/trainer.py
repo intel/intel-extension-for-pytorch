@@ -1633,6 +1633,7 @@ class Trainer:
             from torch._inductor import config as inductor_config
 
             inductor_config.cpp_wrapper = True
+            inductor_config.cpp.enable_concat_linear = True
             example_batch = next(iter(dataloader))
             if "pixel_values" in example_batch and self.args.benchmark:
                 if self.args.fp16_cpu:
