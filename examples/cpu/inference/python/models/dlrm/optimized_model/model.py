@@ -249,7 +249,8 @@ class SparseArchCatDense(SparseArch):
             embedded_concat = [embedded_dense] + list(embedded_sparse)
             for i in range(len(embedded_concat)):
                 embedded_concat[i] = self.quant(embedded_concat[i])
-            embedded_concat = torch.cat(embedded_concat, dim=1)
+            with torch.autocast(device_type="cpu", enabled=False):
+                embedded_concat = torch.cat(embedded_concat, dim=1)
             embedded_concat = self.dequant(embedded_concat)
         else:
             embedded_concat = [embedded_dense] + list(embedded_sparse)
