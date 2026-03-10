@@ -408,9 +408,9 @@ def main():
     _attn_implementation = "sdpa"
     # As int8/fp8 sdpa is optimized for AMX machines, only enable it when AMX is supported.
     if hasattr(torch.cpu, "_is_amx_tile_supported"):
-        is_amx_tile_supported = torch.cpu._is_amx_tile_supported
+        is_amx_tile_supported = torch.cpu._is_amx_tile_supported()
     elif hasattr(torch._C._cpu, "_is_amx_tile_supported"):
-        is_amx_tile_supported = torch._C._cpu._is_amx_tile_supported
+        is_amx_tile_supported = torch._C._cpu._is_amx_tile_supported()
     else:
         is_amx_tile_supported = False
     if is_amx_tile_supported and (training_args.int8 or training_args.fp8):
