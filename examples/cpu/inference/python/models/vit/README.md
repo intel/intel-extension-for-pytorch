@@ -46,7 +46,7 @@ Vision Transformer inference best known configurations with PyTorch.
     # install torch from source
     git clone https://github.com/yanbing-j/pytorch.git
     cd pytorch
-    git checkout yanbing/tf32_dev_branch_for_test
+    git checkout yanbing/tf32_dev_branch_for_test_base_1113_alpha_cand
     git submodule sync
     git submodule update --init --recursive
     conda install cmake ninja
@@ -57,6 +57,9 @@ Vision Transformer inference best known configurations with PyTorch.
     ```
 2. Install TorchAO
     ```
+    # For FP8, please use GCC 15 to build torchao.
+    conda install -c conda-forge gcc=15 gxx=15
+
     git clone https://github.com/pytorch/ao.git
     cd ao
     git submodule sync
