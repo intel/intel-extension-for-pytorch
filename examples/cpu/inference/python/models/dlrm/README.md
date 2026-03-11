@@ -16,7 +16,7 @@ Install Pytorch and jeMalloc.
 ```
 git clone https://github.com/yanbing-j/pytorch.git
 cd pytorch
-git checkout yanbing/tf32_dev_branch_for_test
+git checkout yanbing/tf32_dev_branch_for_test_base_1113_alpha_cand
 git submodule sync
 git submodule update --init --recursive
 conda install cmake ninja
@@ -26,6 +26,8 @@ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
 python setup.py install
 cd ..
 
+# For FP8 data type, GCC 15 is necessary for AO build.
+conda install -c conda-forge gcc=15 gxx=15
 git clone https://github.com/pytorch/ao.git
 cd ao
 git submodule sync
@@ -49,6 +51,13 @@ conda install jemalloc
   ```
   pip install packaging intel-openmp
   export LD_PRELOAD=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}/lib/libiomp5.so:$LD_PRELOAD
+  ```
+* For FP8 data type, GCC15 is necessary for AO build and model runtime
+
+  GCC 15 contains AVX10.2 intrinsic header support. AO build need GCC 15.
+  PyTorch build can use GCC 11, __AVX10_2__ can be automatically defined by GCC when GCC 15 at runtime.
+  ```
+  conda install -c conda-forge gcc=15 gxx=15
   ```
 
 ## Datasets
@@ -81,8 +90,11 @@ https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorc
     ```
     ./setup.sh
     ```
-
-5. Setup required environment paramaters
+5. Install GCC 15
+    ```
+    conda install -c conda-forge gcc=15 gxx=15
+    ```
+6. Setup required environment paramaters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
