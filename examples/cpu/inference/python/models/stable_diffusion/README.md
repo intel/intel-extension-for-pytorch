@@ -14,25 +14,46 @@
     python3 -m venv venv
     . ./venv/bin/activate
     ```
-2. Install PyTorch, Torchvision
+2. Install PyTorch
     ```
-    pip install torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu/
+    git clone https://github.com/yanbing-j/pytorch.git
+    cd pytorch
+    git checkout yanbing/tf32_dev_branch_for_test_base_1113_alpha_cand
+    git submodule sync
+    git submodule update --init --recursive
+    conda install cmake ninja
+    pip install -r requirements.txt
+    pip install mkl-static mkl-include
+    export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+    python setup.py install
+    cd ..
     ```
-3. Install TorchAO
+3. Install Torchvision
     ```
+    git clone https://github.com/pytorch/vision.git
+    cd vision
+    pip install -e .
+    ```
+4. Install TorchAO
+    ```
+    # For FP8, please use GCC 15 to build torchao.
+    conda install -c conda-forge gcc=15 gxx=15
     git clone https://github.com/pytorch/ao.git
     cd ao
-    python setup.py install
+    git submodule sync
+    git submodule update --init --recursive
+    USE_CPU_KERNELS=1 python setup.py install
+    cd ..
     ```
-4. Install Transformers
+5. Install Transformers
     ```
     pip install transformers==4.57.1
     ```
-5. Run setup.sh
+6. Run setup.sh
     ```
     ./setup.sh
     ```
-6. Install Intel OpenMP and TCMalloc
+7. Install Intel OpenMP and TCMalloc
     ```
     pip install packaging intel-openmp accelerate
     conda install -y gperftools -c conda-forge
