@@ -38,7 +38,7 @@ void PrepareDequantForLLGA(std::shared_ptr<torch::jit::Graph>& graph);
 
 // PyTorch dequant node receives qtensor as input, thus no quantization-related
 // info (scales, zp, etc.) on the IR, while LLGA needs those info on the
-// dequantize node. We add a pass to retreive the quantization info from the
+// dequantize node. We add a pass to retrieve the quantization info from the
 // quantize node just before the dequantize node and save them on the dequantize
 // node.
 void SaveDequantInformation(std::shared_ptr<torch::jit::Graph>& graph);

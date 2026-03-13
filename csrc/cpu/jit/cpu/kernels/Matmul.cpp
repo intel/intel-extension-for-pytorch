@@ -104,7 +104,7 @@ void mkl_fp32_bmm_impl(
  *
  * @param tensor1
  * @param tensor2
- * @param out Optinal output provided by user for matmul
+ * @param out Optional output provided by user for matmul
  * @attr Attribute for matmul oneDNN primitive
  * @return output Tensor.
  * Since oneDNN 2.6.0, AMX and AVX512 brgemm are enabled for the DNNL MATMUL
@@ -233,7 +233,7 @@ at::Tensor dil_matmul(const at::Tensor& tensor1, const at::Tensor& tensor2) {
  *
  * @param tensor1
  * @param tensor2
- * @param out Optinal output provided by user for matmul
+ * @param out Optional output provided by user for matmul
  * @param div_input Input Tensor for div
  * @return Value for the fusion pattern output.
  */
@@ -262,7 +262,7 @@ at::Tensor dil_matmul_div(
  *
  *@param tensor1
  *@param tensor2
- *@param out Optinal output provided by user for matmul
+ *@param out Optional output provided by user for matmul
  *@param div_input Input scalar for div
  *@return Value for the fusion pattern output.
  */

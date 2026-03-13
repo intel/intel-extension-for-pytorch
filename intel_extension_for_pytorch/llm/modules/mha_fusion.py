@@ -471,7 +471,7 @@ class PagedAttention:
             v_scale
         )
 
-    This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+    This operator is used to store the key/value token states into the pre-allocated kv_cache buffers of paged attention.
 
     Args:
         key (torch.Tensor): The keytensor. The shape should be [num_seqs, num_heads, head_size].
@@ -489,7 +489,7 @@ class PagedAttention:
 
     [class method]: reshape_and_cache_flash
     ipex.llm.modules.PagedAttention.reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale)
-    This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
+    This operator is used to store the key/value token states into the pre-allocated kv_cache buffers of paged attention.
     This method implementation is the same as reshape_and_cache but we need this to align with XPU.
 
     Args:
@@ -550,7 +550,7 @@ class PagedAttention:
         window_size (int): left size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
-        alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        alibi_slopes (torch.Tensor, optional): which is the alibi slope with the shape of (num_heads).
         softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
     [class method]: flash_atten_varlen
@@ -593,7 +593,7 @@ class PagedAttention:
         is_cusal (bool): Whether to apply causal attention masking. Default is True. False is not supported yet.
         block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
             to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
-        alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
+        alibi_slopes (torch.Tensor, optional): which is the alibi slope with the shape of (num_heads).
         window_size_left (int): left size of sliding window, default is -1.
         window_size_right (int): right size of sliding window, default is -1.
         k_scale (float): The scale used by the fp8 key cache.

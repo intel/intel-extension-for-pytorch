@@ -241,7 +241,7 @@ def _check_observer_has_run(observer):
     return True
 
 
-def check_model_obsever_has_run(
+def check_model_observer_has_run(
     module: torch.nn.Module,
 ) -> None:
     """
@@ -272,7 +272,7 @@ def check_model_obsever_has_run(
                 ), "The observer's dtype only can be torch.quint8 or torch.qint8"
 
     for _, child in module.named_children():
-        if check_model_obsever_has_run(child):
+        if check_model_observer_has_run(child):
             return True
 
     return False
@@ -383,7 +383,7 @@ def convert_quant_state_map_to_nodes(quant_state_map):
         for nonq_op_infos in v.seen_nonq_op_infos:
             new_node = Node(nonq_op_infos)
             nodes.append(new_node)
-    # create connection between nodess
+    # create connection between nodes
     for cur in nodes:
         if isinstance(cur, ParentNode):
             continue
@@ -667,7 +667,7 @@ def _create_observer(setting):
 
 
 def save_quant_state(quant_state_map, configure_file):
-    # save qparam's as json file for tunning
+    # save qparam's as json file for tuning
     quant_state_dict = OrderedDict()
     for k, v in quant_state_map.items():
         layer_infos = OrderedDict()
@@ -1062,7 +1062,7 @@ def load_qconf_summary_to_model(model, qconf_summary):
                     activation=activation_obs,
                     weight=_create_observer(weight_observer),
                 )
-            # overide the cur model's info
+            # override the cur model's info
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_infos = input_tensor_infos
             v.idx_to_seen_q_op_infos[int(i)].input_tensor_force_inf_dtype = (
                 input_force_dtype_infos
@@ -1244,7 +1244,7 @@ def _lstm_forward(module, input, hx, weights):
 
 def module_call_to_function_call(module, args, weights):
     r"""
-    This function is a help function which replace nn.module call to funtion call, which implement
+    This function is a help function which replace nn.module call to function call, which implement
     the nn.module's forward function.
     """
     if isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Conv3d):

@@ -198,14 +198,14 @@ def optimize(
     perspective it has drawbacks. Running with the ``blocked layout``, oneDNN
     splits one or several dimensions of data into blocks with fixed size each
     time the operator is executed. More details information about oneDNN data
-    mermory format is available at `oneDNN manual
+    memory format is available at `oneDNN manual
     <https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html>`_.
     To reduce this overhead, data will be converted to predefined block shapes
     prior to the execution of oneDNN operator execution. In runtime, if the data
     shape matches oneDNN operator execution requirements, oneDNN won't perform
     memory layout conversion but directly go to calculation. Through this
     methodology, called ``weight prepacking``, it is possible to avoid runtime
-    weight data format convertion and thus increase performance.
+    weight data format conversion and thus increase performance.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations on.
@@ -239,7 +239,7 @@ def optimize(
             set by ``level`` knob. For now, XPU doesn't support weights prepack.
         replace_dropout_with_identity (bool): Whether to replace ``nn.Dropout``
             with ``nn.Identity``. If replaced, the ``aten::dropout`` won't be
-            included in the JIT graph. This may provide more fusion opportunites
+            included in the JIT graph. This may provide more fusion opportunities
             on the graph. This only works for inference model. The default value
             is ``None``. Explicitly setting this knob overwrites the configuration
             set by ``level`` knob.

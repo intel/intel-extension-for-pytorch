@@ -75,18 +75,18 @@ ArgSpec LlgaKernel::getQuantizedSpec(ArgSpec spec, size_t offset) const {
   return spec;
 }
 
-std::map<size_t, int64_t> LlgaKernel::initializeTensorIdToOccurence() const {
-  std::map<size_t, int64_t> tensorIdToOccurence;
+std::map<size_t, int64_t> LlgaKernel::initializeTensorIdToOccurrence() const {
+  std::map<size_t, int64_t> tensorIdToOccurrence;
   for (auto& lt : partition_.get_input_ports()) {
     auto inputId = lt.get_id();
-    std::map<size_t, int64_t>::iterator it(tensorIdToOccurence.find(inputId));
-    if (it != tensorIdToOccurence.end()) {
+    std::map<size_t, int64_t>::iterator it(tensorIdToOccurrence.find(inputId));
+    if (it != tensorIdToOccurrence.end()) {
       it->second++;
     } else {
-      tensorIdToOccurence[inputId] = 1;
+      tensorIdToOccurrence[inputId] = 1;
     }
   }
-  return tensorIdToOccurence;
+  return tensorIdToOccurrence;
 }
 
 ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
@@ -100,22 +100,22 @@ ArgSpecs LlgaKernel::initializeInputSpecs(const TensorArgs& inputs) {
     }
   });
   GRAPH_DEBUG("Initializing graph input logical tensors");
-  // initializeTensorIdToOccurence can also be called just once for the first
+  // initializeTensorIdToOccurrence can also be called just once for the first
   // input shape
-  std::map<size_t, int64_t> tensorIdToOccurence =
-      initializeTensorIdToOccurence();
+  std::map<size_t, int64_t> tensorIdToOccurrence =
+      initializeTensorIdToOccurrence();
   for (size_t i = 0; i < nGraphInputs_; i++) {
     auto spec = ArgSpec(graph_->inputs()[i]).supplementTensorInfo(inputs[i]);
-    int64_t occurence = tensorIdToOccurence[spec.tid()];
-    inputSpecs.insert(inputSpecs.end(), occurence, spec);
+    int64_t occurrence = tensorIdToOccurrence[spec.tid()];
+    inputSpecs.insert(inputSpecs.end(), occurrence, spec);
   }
 
   std::call_once(constantSpecInitializedFlag_, [&]() {
     for (size_t i = 0; i < nGraphInputs_; i++) {
       auto spec = ArgSpec(graph_->inputs()[i]).supplementTensorInfo(inputs[i]);
-      int64_t occurence = tensorIdToOccurence[spec.tid()];
+      int64_t occurrence = tensorIdToOccurrence[spec.tid()];
       initializedInputIds_.insert(spec.tid());
-      runArgsIdx_.insert(runArgsIdx_.end(), occurence, i);
+      runArgsIdx_.insert(runArgsIdx_.end(), occurrence, i);
     }
     for (auto& lt : partition_.get_input_ports()) {
       auto inputId = lt.get_id();
@@ -291,7 +291,7 @@ void LlgaKernel::prepareAndCacheRunArgs(
         // Currently, only weight will use quantize_per_channel, data will
         // always use quantize_per_tensor. We will only allocate buffer for data
         // (output of a LlgaPartition). If in the future, we need allocate
-        // buffer for qensor that is quantized per channel, need implemeted
+        // buffer for qensor that is quantized per channel, need implemented
         // as_strided_qtensorimpl for PER_CHANNEL QScheme.
         qtensor.as_strided_(spec.sizes(), spec.strides());
         outputs.push_back(qtensor);

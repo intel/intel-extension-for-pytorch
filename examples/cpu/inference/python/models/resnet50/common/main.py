@@ -512,10 +512,10 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.dummy:
         assert args.evaluate, "please using real dataset if you want run training path"
     if not args.ipex and not args.inductor:
-        # for offical pytorch, int8 and jit path is not enabled.
+        # for official pytorch, int8 and jit path is not enabled.
         # for torch.compile(backend=inductor) INT8 quantization is been supported.
-        assert not args.int8, "int8 path is not enabled for offical pytorch"
-        assert not args.jit, "jit path is not enabled for offical pytorch"
+        assert not args.int8, "int8 path is not enabled for official pytorch"
+        assert not args.jit, "jit path is not enabled for official pytorch"
 
     if not args.dummy:
         # Data loading code
@@ -583,7 +583,7 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.ipex:
             print("using ipex model to do inference\n")
         else:
-            print("using offical pytorch model to do inference\n")
+            print("using official pytorch model to do inference\n")
 
         # IPEX Path
         if args.ipex:
@@ -616,17 +616,17 @@ def main_worker(gpu, ngpus_per_node, args):
                     model = torch.jit.freeze(model.eval())
                     y = model(x)
                     y = model(x)
-                    print("running int8 evalation step\n")
+                    print("running int8 evaluation step\n")
             else:
                 if args.bf16:
                     model = ipex.optimize(model, dtype=torch.bfloat16, inplace=True)
-                    print("running bfloat16 evalation step\n")
+                    print("running bfloat16 evaluation step\n")
                 elif args.fp16:
                     model = ipex.optimize(model, dtype=torch.half, inplace=True)
-                    print("running float16 evalation step\n")
+                    print("running float16 evaluation step\n")
                 else:
                     model = ipex.optimize(model, dtype=torch.float32, inplace=True)
-                    print("running fp32 evalation step\n")
+                    print("running fp32 evaluation step\n")
                 if args.jit:
                     x = torch.randn(args.batch_size, 3, 224, 224).contiguous(
                         memory_format=torch.channels_last
@@ -1020,7 +1020,7 @@ def validate(val_loader, model, criterion, args):
         model.eval()
 
     if args.ipex and args.int8 and args.calibration:
-        print("runing int8 calibration step\n")
+        print("running int8 calibration step\n")
         import intel_extension_for_pytorch as ipex
         from torch.ao.quantization import (
             MinMaxObserver,
@@ -1049,7 +1049,7 @@ def validate(val_loader, model, criterion, args):
             print(".........calibration step done..........")
     else:
         if args.dummy:
-            # always running channle last for fp32, bf16, int8
+            # always running channel last for fp32, bf16, int8
             with torch.no_grad():
                 if args.weight_sharing:
                     threads = []

@@ -14,7 +14,7 @@ using namespace torch::jit;
 
 // FuseShuffle is matching the channelshuffle pattern, where:
 // (1) the first view is [n, c, h, w] => [n, groups, c // groups, h, w]
-// (2) the tranpose is for groups => [n, c // groups, grpups, h, w]
+// (2) the transpose is for groups => [n, c // groups, grpups, h, w]
 // (3) the output view shape should be the same as the input tensor shape
 void FuseShuffle(std::shared_ptr<Graph>& graph) {
   // below is channelshuffle for staic view shape pattern
@@ -98,7 +98,7 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
             trans_dim0_val < trans_dim1_val ? trans_dim0_val : trans_dim1_val;
         auto dim1_val =
             trans_dim0_val > trans_dim1_val ? trans_dim0_val : trans_dim1_val;
-        // If the tranpose if not for groups. ex. [n, c1, c2, h, w] => [n, c2,
+        // If the transpose if not for groups. ex. [n, c1, c2, h, w] => [n, c2,
         // c1, h, w]
         if ((dim1_val - dim0_val) != 1) {
           return false;
@@ -140,7 +140,7 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
 
         for (int i = 0; i < flattern_shape_list.size(); i++) {
           if (flattern_shape_list[i] != inputTensor.sizes()[i].value()) {
-            // [n, c, h, w] => view [n, groups, c // groups, h, w] => tranpose
+            // [n, c, h, w] => view [n, groups, c // groups, h, w] => transpose
             // [n, c // groups, groups, h, w]
             // => view [n, -1, h, w]
             //    or
@@ -991,7 +991,7 @@ void replaceAddWithQAdd(std::shared_ptr<Graph>& graph) {
         %qout = aten::quantize_per_tensor(%r, %o_scale, %o_zp, %o_dtype)
         return (%qout) )";
 
-  // fliter the unsupported case
+  // filter the unsupported case
   auto fusion_filter = [](const Match& match,
                           const std::unordered_map<std::string, Value*>& vmap) {
     auto alpha = match.values_map.at(vmap.at("alpha"));
@@ -1023,7 +1023,7 @@ void fuseBmmAdd(std::shared_ptr<Graph>& graph) {
     graph(%input, %batch1, %batch2, %alpha):
         %res = ipex::bmm_add(%input, %batch1, %batch2, %alpha)
         return (%res))";
-  // fliter the unsupported case
+  // filter the unsupported case
   auto fusion_filter = [](const Match& match,
                           const std::unordered_map<std::string, Value*>& vmap) {
     const auto& match_vmap = match.values_map;
@@ -1108,7 +1108,7 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     };
     // Check if the dimension of the first tensor is either 4 or 5.
     // Check if the data type, the size of Channels, and the memory format are
-    // float, mutiples of 16, and ChannelsLast(3d), respectively.
+    // float, multiples of 16, and ChannelsLast(3d), respectively.
     if (!(tensor1->dim().value() == 4 || tensor1->dim().value() == 5) ||
         !check_type_channelsize(*tensor1)) {
       return false;
@@ -1298,7 +1298,7 @@ void FusePythonGELUWithAten(std::shared_ptr<Graph>& graph) {
   SingleGeluTanh_v2.runOnGraph(graph, filter_v2);
 }
 
-// This path will be removed after pytorch offical path is optimized well.
+// This path will be removed after pytorch official path is optimized well.
 void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
   std::string max_pool2d = R"(
       graph(%a, %kernel_size:int[], %stride:int[], %padding:int[], %dilation:int[], %ceil_mode:bool):

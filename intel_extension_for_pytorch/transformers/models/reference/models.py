@@ -6743,7 +6743,7 @@ def ConformerEncoder_forward(self, xs_pad, masks):
 
     unfolded = False
     ori_bz, seq_len, D = input_tensor.shape
-    max_seq_len = 500  # maxium position for absolute positional encoding
+    max_seq_len = 500  # maximum position for absolute positional encoding
     if seq_len > max_seq_len:
         # audio sequence is longer than max_seq_len, unfold it into chunks of max_seq_len
         unfolded = True
@@ -7559,7 +7559,7 @@ def detect_language(
         )
     elif input_features is not None and encoder_outputs is not None:
         raise ValueError(
-            "Make sure to specificy only one of `input_features` or `encoder_outputs` - not both!"
+            "Make sure to specify only one of `input_features` or `encoder_outputs` - not both!"
         )
     elif input_features is not None:
         inputs = {"input_features": input_features[:, :, :num_segment_frames]}

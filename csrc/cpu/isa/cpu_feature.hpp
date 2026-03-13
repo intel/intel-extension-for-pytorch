@@ -140,7 +140,7 @@ class CPUFeature {
 
  public:
   /*
-  isa level referance to oneDNN.
+  isa level reference to oneDNN.
   ------------------------------------------------------------------------------------
   The ISAs are partially ordered:
   SSE41 < AVX < AVX2,

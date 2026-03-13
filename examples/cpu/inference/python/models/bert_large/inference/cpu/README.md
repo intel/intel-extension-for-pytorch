@@ -74,7 +74,7 @@ export FINETUNED_MODEL=$(pwd)/bert_squad_model
     ```
     ./setup.sh
     ```
-4. Setup required environment paramaters
+4. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

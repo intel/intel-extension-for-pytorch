@@ -260,7 +260,7 @@ class ThreadedLoop {
   error: array initializer must be an initializer list
   So, now this->bounds is initialized by copy elements one by one
   This change leads to another problem: bounds is an array of LoopSpecs,
-  but LoopSpecs does not have a default consturctor. So, we added a
+  but LoopSpecs does not have a default constructor. So, we added a
   default constructor for LoopSpecs.
   */
   ThreadedLoop(const LoopSpecs (&bounds)[N], std::string scheme = "")

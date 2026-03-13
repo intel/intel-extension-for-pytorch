@@ -183,7 +183,7 @@ void InitIpexModuleBindings(py::module m) {
       .def("get", &torch_ipex::runtime::FutureTensor::get);
 
   // The holder type is std::shared_ptr<torch_ipex::runtime::CPUPool>.
-  // Please use std::shared_ptr<torch_ipex::runtime::CPUPool> as funtion
+  // Please use std::shared_ptr<torch_ipex::runtime::CPUPool> as function
   // parameter. If you pass it as parameter from python into C++.
   py::class_<
       torch_ipex::runtime::CPUPool,

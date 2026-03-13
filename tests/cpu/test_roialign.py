@@ -121,7 +121,7 @@ def expected_fn(
 class RoIAlignTester(TestCase):
     def test_roialign(self):
         pool_size = 5
-        # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
+        # n_channels % (pool_size ** 2) == 0 required for PS operations.
         n_channels = 2 * (pool_size**2)
         for datatype in [torch.double, torch.float32, torch.float16]:
             x = torch.rand(2, n_channels, 10, 10, dtype=datatype)
@@ -214,7 +214,7 @@ class RoIAlignTester(TestCase):
     @skipIfNoTorchVision
     def test_torchvision_roialign(self):
         pool_size = 5
-        # n_channels % (pool_size ** 2) == 0 required for PS opeartions.
+        # n_channels % (pool_size ** 2) == 0 required for PS operations.
         n_channels = 2 * (pool_size**2)
         for datatype in [torch.double, torch.float32, torch.float16]:
             x = torch.rand(2, n_channels, 10, 10, dtype=datatype)

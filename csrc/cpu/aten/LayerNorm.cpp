@@ -25,7 +25,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> layer_norm_impl(
     double eps) {
   TORCH_CHECK(
       gamma.scalar_type() == at::kFloat && beta.scalar_type() == at::kFloat,
-      "gamma adn beta's data type should be float");
+      "gamma and beta's data type should be float");
   ideep::tensor x = itensor_view_from_dense(X);
   const ideep::tensor scale = itensor_view_from_dense(gamma);
   const ideep::tensor shift = itensor_view_from_dense(beta);
@@ -148,7 +148,7 @@ at::Tensor layer_norm_forward(
  * Now, we only use oneDNN kernel when both weight and bias are provided.
  * ToDo: more scenarios to use oneDNN or remvoe this pass
  * when at::layer_norm performance is back compared to w/o
- * mergeing https://github.com/pytorch/pytorch/pull/59987
+ * merging https://github.com/pytorch/pytorch/pull/59987
  *
  * @param input: the source tensor to layernorm
  * @param normalized_shape: input shape from an expected input of size

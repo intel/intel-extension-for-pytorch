@@ -281,7 +281,7 @@ def test(
     model = model.to(memory_format=torch.channels_last)
 
     if evaluate:
-        print("using offical pytorch model to do inference\n")
+        print("using official pytorch model to do inference\n")
         x = torch.rand(batch_size, 3, imgsz, imgsz).contiguous(
             memory_format=torch.channels_last
         )

@@ -43,9 +43,9 @@ class IPEX_API CPUPool {
   // Put deleted function into private.
   CPUPool() = delete;
   CPUPool(const CPUPool& source_cpu_pool) =
-      delete; // avoid potential risk of double destory masks.
+      delete; // avoid potential risk of double destroy masks.
   CPUPool& operator=(const CPUPool& source_cpu_pool) =
-      delete; // avoid potential risk of double destory masks.
+      delete; // avoid potential risk of double destroy masks.
   CPUPool& operator=(CPUPool&& source_cpu_pool) = delete;
 };
 

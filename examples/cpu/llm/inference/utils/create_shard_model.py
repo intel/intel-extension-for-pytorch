@@ -17,7 +17,7 @@ parser.add_argument(
     "--model-id",
     type=str,
     default="EleutherAI/gpt-j-6B",
-    help="the huggingface mdoel id",
+    help="the huggingface model id",
 )
 parser.add_argument(
     "--save-path",

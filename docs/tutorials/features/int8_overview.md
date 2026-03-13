@@ -31,12 +31,12 @@ qconfig = QConfig(activation=MinMaxObserver.with_args(qscheme=torch.per_tensor_a
                   weight=PerChannelMinMaxObserver.with_args(dtype=torch.qint8, qscheme=torch.per_channel_symmetric))
 ```
 
-Note: we fully use PyTorch [observer methonds](https://pytorch.org/docs/stable/quantization-support.html#torch-quantization-observer), so you can use a different PyTorch obsever methond to define the [QConfig](https://pytorch.org/docs/1.11/generated/torch.quantization.qconfig.QConfig.html). For weight observer, we only support **torch.qint8** dtype now.
+Note: we fully use PyTorch [observer methonds](https://pytorch.org/docs/stable/quantization-support.html#torch-quantization-observer), so you can use a different PyTorch observer method to define the [QConfig](https://pytorch.org/docs/1.11/generated/torch.quantization.qconfig.QConfig.html). For weight observer, we only support **torch.qint8** dtype now.
 
 **Suggestion**:
 
 1. For activation observer, if using **qscheme** as **torch.per_tensor_affine**, **torch.quint8** is preferred. If using **qscheme** as **torch.per_tensor_symmetric**, **torch.qint8** is preferred. For weight observer, setting **qscheme** to **torch.per_channel_symmetric** can get a better accuracy.
-2. If your CPU device doesn't support VNNI, seting the observer's **reduce_range** to **True** can get a better accuracy, such as skylake.
+2. If your CPU device doesn't support VNNI, setting the observer's **reduce_range** to **True** can get a better accuracy, such as skylake.
 
 ### Prepare Model and Do Calibration
 

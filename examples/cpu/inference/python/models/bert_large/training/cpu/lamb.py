@@ -85,7 +85,7 @@ class Lamb(Optimizer):
                 data = p.data
                 if grad.is_sparse:
                     raise RuntimeError(
-                        "Lamb does not support sparse gradients, consider SparseAdam instad."
+                        "Lamb does not support sparse gradients, consider SparseAdam instead."
                     )
 
                 state = self.state[p]

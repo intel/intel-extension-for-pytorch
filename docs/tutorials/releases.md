@@ -655,7 +655,7 @@ Highlights include:
   The support for dynamic shapes in Intel® Extension for PyTorch\* INT8 integration is still work in progress. When the input shapes are dynamic, for example inputs of variable image sizes in an object detection task or of variable sequence lengths in NLP tasks, the Intel® Extension for PyTorch\* INT8 path may slow down the model inference. In this case, use stock PyTorch INT8 functionality.
   **Note**: Using Runtime Extension feature if batch size cannot be divided by number of streams, because mini batch size on each stream are not equivalent, scripts run into this issues.
 - BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains `Conv`, `Matmul`, `Linear`, and `BatchNormalization`
-- Runtime extension of MultiStreamModule doesn't support DLRM inference, since the input of DLRM (EmbeddingBag specifically) can't be simplely batch split.
+- Runtime extension of MultiStreamModule doesn't support DLRM inference, since the input of DLRM (EmbeddingBag specifically) can't be simply batch split.
 - Runtime extension of MultiStreamModule has poor performance of RNNT Inference comparing with native throughput mode. Only part of the RNNT models (joint_net specifically) can be jit traced into graph. However, in one batch inference, `joint_net` is invoked multi times. It increases the overhead of MultiStreamModule as input batch split, thread synchronization and output concat.
 - Incorrect Conv and Linear result if the number of OMP threads is changed at runtime
   The oneDNN memory layout depends on the number of OMP threads, which requires the caller to detect the changes for the # of OMP threads while this release has not implemented it yet.
@@ -788,7 +788,7 @@ libintel-ext-pt-cxx11-abi-1.11.0+cpu.run (13.5M)
 
 This release is meant to fix the following issues:
 - Resolve the issue that the PyTorch Tensor Expression(TE) did not work after importing the extension.
-- Wraps the BactchNorm(BN) as another operator to break the TE's BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN.
+- Wraps the BatchNorm(BN) as another operator to break the TE's BN-related fusions. Because the BatchNorm performance of PyTorch Tensor Expression can not achieve the same performance as PyTorch ATen BN.
 - Update the [documentation](https://intel.github.io/intel-extension-for-pytorch/)
     - Fix the INT8 quantization example issue #205
     - Polish the installation guide

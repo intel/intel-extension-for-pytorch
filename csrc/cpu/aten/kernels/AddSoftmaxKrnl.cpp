@@ -26,23 +26,23 @@ inline int64_t _calc_element_offset(
 
 inline std::vector<int64_t> _adjust_strides(
     const at::Tensor& src,
-    std::vector<int64_t>& infered_size) {
+    std::vector<int64_t>& inferred_size) {
   // We does NOT support broadcasting last dim which mean last_dim = 1
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(src.stride(src.ndimension() - 1) == 1);
 
   auto original_shape = src.sizes();
   auto original_stride = src.strides();
-  auto offset = infered_size.size() - original_shape.size();
+  auto offset = inferred_size.size() - original_shape.size();
 
   std::vector<int64_t> adjusted_stride;
   if (offset > 0)
-    adjusted_stride.resize(infered_size.size(), 0);
+    adjusted_stride.resize(inferred_size.size(), 0);
   else
-    adjusted_stride.resize(infered_size.size());
+    adjusted_stride.resize(inferred_size.size());
 
   for (size_t i = 0; i < original_shape.size(); i++) {
     // see NOTE: [Computing output strides]
-    if (original_shape[i] == 1 && infered_size[offset + i] != 1) {
+    if (original_shape[i] == 1 && inferred_size[offset + i] != 1) {
       adjusted_stride[offset + i] = 0;
     } else {
       adjusted_stride[offset + i] = original_stride[i];
@@ -54,7 +54,7 @@ inline std::vector<int64_t> _adjust_strides(
 
 /**
  * @brief Fuse the div (div scalar or mul 1/scalar) add operator and softmax
- * operator. softmax(alpah * a + b)
+ * operator. softmax(alpha * a + b)
  *
  * @attention
  * There are some assumptions for this operator.
@@ -64,7 +64,7 @@ inline std::vector<int64_t> _adjust_strides(
  * - The input tensors are contiguous
  * - The number of the input tensor dimension should be >=2
  * - Only the second input tensor is brodcastable
- * - The datatype for inpusts(a,b) and output are same.
+ * - The datatype for inputs(a,b) and output are same.
  *
  * @param[in] a a contiguous tensor to be added
  * @param[in] b a tensor to be added while it should be broadcastable
@@ -79,30 +79,30 @@ at::Tensor dil_div_add_softmax(
   scalar_t* b_data_base = b.data_ptr<scalar_t>();
 
   // Check if the tensor needs to be broadcasted
-  auto infered_size = a.sizes().vec();
-  auto need_broadcast = (infered_size != b.sizes());
+  auto inferred_size = a.sizes().vec();
+  auto need_broadcast = (inferred_size != b.sizes());
   if (need_broadcast) {
-    infered_size = at::infer_size(a.sizes(), b.sizes());
+    inferred_size = at::infer_size(a.sizes(), b.sizes());
   }
   at::Tensor output = at::empty_like(a);
   // Create an new tensor to store the output
   scalar_t* output_data_base = output.data_ptr<scalar_t>();
 
   // Calculate the strides for the input tensor
-  std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, infered_size);
+  std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, inferred_size);
 
   std::vector<int64_t> outer_size_per_dim;
-  int64_t dim_size = infered_size[infered_size.size() - 1];
+  int64_t dim_size = inferred_size[inferred_size.size() - 1];
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim_size != 1);
 
   int64_t outer_size = 1;
   // The last dim is the loop unit. We need to minus 2 to exclude the last dim.
-  // infered_size.size() - 2 is the -2th dimension.
-  for (int64_t i = infered_size.size() - 2; i >= 0; i--) {
+  // inferred_size.size() - 2 is the -2th dimension.
+  for (int64_t i = inferred_size.size() - 2; i >= 0; i--) {
     // Record outer dimensions
     outer_size_per_dim.insert(outer_size_per_dim.begin(), outer_size);
     // Calculate outer loop number;
-    outer_size *= infered_size[i];
+    outer_size *= inferred_size[i];
   }
 
   int64_t grain_size = at::internal::GRAIN_SIZE / (16 * dim_size);
@@ -138,7 +138,7 @@ at::Tensor dil_div_add_softmax(
       //    val = sum(output_data)
       _dil_exp_reduce_sum_fusion_kernel(
           tmp_out_ptr, dim_size, tmp_out_ptr, val);
-      // Calculat the normalization [e^x / sum(e^x)]:
+      // Calculate the normalization [e^x / sum(e^x)]:
       //    output_data = output_data / sum(output_data)
       _dil_normalization_kernel<scalar_t>(
           tmp_out_ptr, val, dim_size, output_data_base + i * dim_size);
@@ -170,27 +170,27 @@ at::Tensor& dil_add_softmax_(at::Tensor& a, const at::Tensor& b) {
   float* b_data_base = b.data_ptr<float>();
 
   // Check if the tensor needs to be broadcasted
-  auto infered_size = a.sizes().vec();
-  auto need_broadcast = (infered_size != b.sizes());
+  auto inferred_size = a.sizes().vec();
+  auto need_broadcast = (inferred_size != b.sizes());
   if (need_broadcast) {
-    infered_size = at::infer_size(a.sizes(), b.sizes());
+    inferred_size = at::infer_size(a.sizes(), b.sizes());
   }
 
   // Calculate the strides for the input tensor
-  std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, infered_size);
+  std::vector<int64_t> b_adjusted_strides = _adjust_strides(b, inferred_size);
 
   std::vector<int64_t> outer_size_per_dim;
-  int64_t dim_size = infered_size[infered_size.size() - 1];
+  int64_t dim_size = inferred_size[inferred_size.size() - 1];
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(dim_size != 1);
 
   int64_t outer_size = 1;
   // The last dim is the loop unit. We need to minus 2 to exclude the last dim.
-  // infered_size.size() - 2 is the -2th dimension.
-  for (int64_t i = infered_size.size() - 2; i >= 0; i--) {
+  // inferred_size.size() - 2 is the -2th dimension.
+  for (int64_t i = inferred_size.size() - 2; i >= 0; i--) {
     // Record outer dimensions
     outer_size_per_dim.insert(outer_size_per_dim.begin(), outer_size);
     // Calculate outer loop number;
-    outer_size *= infered_size[i];
+    outer_size *= inferred_size[i];
   }
 
   int64_t grain_size = at::internal::GRAIN_SIZE / (16 * dim_size);
@@ -227,7 +227,7 @@ at::Tensor& dil_add_softmax_(at::Tensor& a, const at::Tensor& b) {
           dim_size,
           a_data_base + i * dim_size,
           val);
-      // Calculat the normalization [e^x / sum(e^x)]:
+      // Calculate the normalization [e^x / sum(e^x)]:
       //  output_data = output_data / sum(output_data)
 
       _dil_normalization_kernel<float>(

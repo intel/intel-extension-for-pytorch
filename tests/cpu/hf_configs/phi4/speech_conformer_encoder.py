@@ -375,16 +375,16 @@ class GLUPointWiseConv(nn.Module):
         return x
 
 
-class DepthWiseSeperableConv1d(nn.Module):
-    """DepthWiseSeperableConv1d module used in Convnet module
+class DepthWiseSeparableConv1d(nn.Module):
+    """DepthWiseSeparableConv1d module used in Convnet module
     for the conformer, for more details see:
     https://arxiv.org/pdf/2005.08100v1.pdf
 
     Args:
         input_dim: int
             input channel size.
-        depthwise_seperable_out_channel: int
-            if set different to 0, the number of depthwise_seperable_out_channel
+        depthwise_separable_out_channel: int
+            if set different to 0, the number of depthwise_separable_out_channel
              will be used as a channel_out of the second conv1d layer.
              otherwise, it equal to 0, the second conv1d layer is skipped.
         kernel_size: int
@@ -401,7 +401,7 @@ class DepthWiseSeperableConv1d(nn.Module):
     def __init__(
         self,
         input_dim,
-        depthwise_seperable_out_channel,
+        depthwise_separable_out_channel,
         kernel_size,
         depthwise_multiplier,
         padding=0,
@@ -417,17 +417,17 @@ class DepthWiseSeperableConv1d(nn.Module):
             groups=input_dim,
         )
 
-        if depthwise_seperable_out_channel != 0:
+        if depthwise_separable_out_channel != 0:
             self.pw_conv = nn.Conv1d(
                 input_dim * depthwise_multiplier,
-                depthwise_seperable_out_channel,
+                depthwise_separable_out_channel,
                 1,
                 1,
                 0,
             )
         else:
             self.pw_conv = nn.Identity()
-        self.depthwise_seperable_out_channel = depthwise_seperable_out_channel
+        self.depthwise_separable_out_channel = depthwise_separable_out_channel
 
     def forward(self, x):
         """
@@ -437,7 +437,7 @@ class DepthWiseSeperableConv1d(nn.Module):
                 input tensor
         """
         x = self.dw_conv(x)
-        if self.depthwise_seperable_out_channel != 0:
+        if self.depthwise_separable_out_channel != 0:
             x = self.pw_conv(x)
         return x
 
@@ -453,8 +453,8 @@ class ConvModule(nn.Module):
         ext_pw_out_channel: int
             if > 0, ext_pw_out_channel is a dim channel size
              for the last pointwise conv after swish activation.
-        depthwise_seperable_out_channel: int
-            if set different to 0, the number of depthwise_seperable_out_channel
+        depthwise_separable_out_channel: int
+            if set different to 0, the number of depthwise_separable_out_channel
              will be used as a channel_out of the second conv1d layer.
              otherwise, it equal to 0, the second conv1d layer is skipped.
         ext_pw_kernel_size: int
@@ -504,7 +504,7 @@ class ConvModule(nn.Module):
         self,
         input_dim,
         ext_pw_out_channel,
-        depthwise_seperable_out_channel,
+        depthwise_separable_out_channel,
         ext_pw_kernel_size,
         kernel_size,
         depthwise_multiplier,
@@ -524,7 +524,7 @@ class ConvModule(nn.Module):
         self.input_dim = input_dim
         self.ext_pw_out_channel = ext_pw_out_channel
         self.ext_pw_kernel_size = ext_pw_kernel_size
-        self.depthwise_seperable_out_channel = depthwise_seperable_out_channel
+        self.depthwise_separable_out_channel = depthwise_separable_out_channel
         self.glu_type = glu_type
         self.bias_in_glu = bias_in_glu
         self.linear_glu_in_convm = linear_glu_in_convm
@@ -554,17 +554,17 @@ class ConvModule(nn.Module):
         else:
             padding = (kernel_size - 1) // 2
 
-        self.dw_sep_conv_1d = DepthWiseSeperableConv1d(
+        self.dw_sep_conv_1d = DepthWiseSeparableConv1d(
             input_dim,
-            depthwise_seperable_out_channel,
+            depthwise_separable_out_channel,
             kernel_size,
             depthwise_multiplier,
             padding=padding,
         )
 
-        if depthwise_seperable_out_channel != 0:
-            if input_dim != depthwise_seperable_out_channel:
-                self.ln2 = nn.Linear(depthwise_seperable_out_channel, input_dim)
+        if depthwise_separable_out_channel != 0:
+            if input_dim != depthwise_separable_out_channel:
+                self.ln2 = nn.Linear(depthwise_separable_out_channel, input_dim)
         else:
             if depthwise_multiplier != 1:
                 self.ln2 = nn.Linear(input_dim * depthwise_multiplier, input_dim)
@@ -996,7 +996,7 @@ def np_loadtxt_with_retry(filepath):
 class MeanVarianceNormLayer(nn.Module):
     """Mean/variance normalization layer.
 
-    Will substract mean and multiply input by inverted standard deviation.
+    Will subtract mean and multiply input by inverted standard deviation.
     Typically used as a very first layer in a model.
 
     Args:
@@ -2066,8 +2066,8 @@ class ConformerEncoderLayer(nn.Module):
         ext_pw_out_channel: int
             if > 0, ext_pw_out_channel is a dim channel size
              for the last pointwise conv after swish activation.
-        depthwise_seperable_out_channel: int
-            if set different to 0, the number of depthwise_seperable_out_channel
+        depthwise_separable_out_channel: int
+            if set different to 0, the number of depthwise_separable_out_channel
              will be used as a channel_out of the second conv1d layer.
              otherwise, it equal to 0, the second conv1d layer is skipped.
         depthwise_multiplier: int
@@ -2118,9 +2118,9 @@ class ConformerEncoderLayer(nn.Module):
             if set to True, use GLULinear module,
              otherwise, used GLUPointWiseConv module.
               default to False.
-        attention_innner_dim: int, otional
+        attention_inner_dim: int, otional
             if equal to -1, attention dim for linears k/q/v is
-            equal to d_model. otherwise attention_innner_dim is used.
+            equal to d_model. otherwise attention_inner_dim is used.
             default -1.
         attention_glu_type: str, optional
             activation function for glu used in the multihead attention,
@@ -2157,7 +2157,7 @@ class ConformerEncoderLayer(nn.Module):
         self,
         d_model=512,
         ext_pw_out_channel=0,
-        depthwise_seperable_out_channel=256,
+        depthwise_separable_out_channel=256,
         depthwise_multiplier=1,
         n_head=4,
         d_ffn=2048,
@@ -2173,7 +2173,7 @@ class ConformerEncoderLayer(nn.Module):
         conv_glu_type="sigmoid",
         bias_in_glu=True,
         linear_glu_in_convm=False,
-        attention_innner_dim=-1,
+        attention_inner_dim=-1,
         attention_glu_type="swish",
         activation_checkpointing="",
         export=False,
@@ -2198,7 +2198,7 @@ class ConformerEncoderLayer(nn.Module):
                 n_head,
                 d_model,
                 dropout_rate,
-                attention_innner_dim,
+                attention_inner_dim,
                 attention_glu_type,
                 bias_in_glu,
                 use_pt_scaled_dot_product_attention=use_pt_scaled_dot_product_attention,
@@ -2208,7 +2208,7 @@ class ConformerEncoderLayer(nn.Module):
         self.conv = ConvModule(
             d_model,
             ext_pw_out_channel,
-            depthwise_seperable_out_channel,
+            depthwise_separable_out_channel,
             ext_pw_kernel_size,
             kernel_size,
             depthwise_multiplier,
@@ -2719,19 +2719,19 @@ class ConformerEncoder(TransformerEncoderBase):
             default False.
         ext_pw_out_channel: int, optional
             the number of channel for CNN
-            before depthwise_seperable_CNN.
+            before depthwise_separable_CNN.
             If 0 then use linear. default 0.
         ext_pw_kernel_size: int, optional
-            kernel size of N before depthwise_seperable_CNN.
+            kernel size of N before depthwise_separable_CNN.
             only work for ext_pw_out_channel > 0.
             default 1
-        depthwise_seperable_out_channel: int, optional
+        depthwise_separable_out_channel: int, optional
             the number of channel for
-            depthwise_seperable_CNN.
+            depthwise_separable_CNN.
             default 256.
         depthwise_multiplier: int, optional
             the number of multiplier for
-            depthwise_seperable_CNN.
+            depthwise_separable_CNN.
             default 1.
         chunk_se: int, optional
             0 for offline SE.
@@ -2741,7 +2741,7 @@ class ConformerEncoder(TransformerEncoderBase):
              by only the current chunk.
             default 0.
         kernel_size: int, optional
-            the number of kernels for depthwise_seperable_CNN.
+            the number of kernels for depthwise_separable_CNN.
             default 3.
         activation: str, optional
             FeedForward block activation.
@@ -2751,7 +2751,7 @@ class ConformerEncoder(TransformerEncoderBase):
             activation function used in ConvModule part
             of the conformer, default "relu".
         conv_glu_type: str, otional
-            activation used use glu in depthwise_seperable_CNN,
+            activation used use glu in depthwise_separable_CNN,
             default "sigmoid"
         bias_in_glu: bool, optional
             if set to True, use additive bias in the weight module
@@ -2840,7 +2840,7 @@ class ConformerEncoder(TransformerEncoderBase):
         cnn_layer_norm=False,
         ext_pw_out_channel=0,
         ext_pw_kernel_size=1,
-        depthwise_seperable_out_channel=256,
+        depthwise_separable_out_channel=256,
         depthwise_multiplier=1,
         chunk_se=0,
         kernel_size=3,
@@ -2901,7 +2901,7 @@ class ConformerEncoder(TransformerEncoderBase):
                 ConformerEncoderLayer(
                     d_model=attention_dim,
                     ext_pw_out_channel=ext_pw_out_channel,
-                    depthwise_seperable_out_channel=depthwise_seperable_out_channel,
+                    depthwise_separable_out_channel=depthwise_separable_out_channel,
                     depthwise_multiplier=depthwise_multiplier,
                     n_head=attention_heads,
                     d_ffn=linear_units,
@@ -2973,7 +2973,7 @@ class ConformerEncoder(TransformerEncoderBase):
 
         unfolded = False
         ori_bz, seq_len, D = input_tensor.shape
-        max_seq_len = 500  # maxium position for absolute positional encoding
+        max_seq_len = 500  # maximum position for absolute positional encoding
         if seq_len > max_seq_len:
             # audio sequence is longer than max_seq_len, unfold it into chunks of max_seq_len
             unfolded = True

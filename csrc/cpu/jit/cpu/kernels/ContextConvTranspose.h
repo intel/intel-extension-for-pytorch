@@ -25,7 +25,7 @@ struct ContextConvTranspose final {
   std::vector<int64_t> dilation_;
   std::vector<int64_t> input_size_;
   int64_t groups_;
-  // The originin weight != weight_packed_.get_dims() since there is a tranpose
+  // The originin weight != weight_packed_.get_dims() since there is a transpose
   // for weight, We directly store origin_weight_dims_ here to avoid compute it.
   std::vector<int64_t> origin_weight_dims_;
   bool weight_is_channels_last_;

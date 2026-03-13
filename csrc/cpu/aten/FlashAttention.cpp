@@ -20,7 +20,7 @@ bool use_ipex_flash_attention(
 }
 
 /*
- *Caculate the flash attention SDPA with attention mask.
+ *Calculate the flash attention SDPA with attention mask.
  */
 std::tuple<at::Tensor, at::Tensor> flash_attention_forward_cpu(
     const at::Tensor& query,

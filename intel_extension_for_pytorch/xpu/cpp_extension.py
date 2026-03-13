@@ -94,7 +94,7 @@ def _get_exec_path(module_name, path):
     return os.path.join(path, f"{module_name}{EXEC_EXT}")
 
 
-def get_dpcpp_complier():
+def get_dpcpp_compiler():
     # build cxx via dpcpp
     dpcpp_cmp = shutil.which("icpx")
     if dpcpp_cmp is None:
@@ -105,7 +105,7 @@ def get_dpcpp_complier():
     return dpcpp_cmp
 
 
-def get_icx_complier():
+def get_icx_compiler():
     # build cc via icx
     icx_cmp = shutil.which("icx")
     if icx_cmp is None:
@@ -246,7 +246,7 @@ class DpcppBuildExtension(build_ext, object):
             original_spawn = self.compiler.spawn
         else:
             original_compile = self.compiler._compile
-            # save origin function for passthough
+            # save origin function for passthrough
             original_link_shared_object = self.compiler.link_shared_object
             original_spawn = self.compiler.spawn
 
@@ -278,14 +278,14 @@ class DpcppBuildExtension(build_ext, object):
             try:
                 original_compiler = self.compiler.compiler_so
                 if _is_cpp_file(src):
-                    _cxxbin = get_dpcpp_complier()
+                    _cxxbin = get_dpcpp_compiler()
                     self.compiler.set_executable("compiler_so", _cxxbin)
                     if isinstance(cflags, dict):
                         cflags = cflags["cxx"]
                     else:
                         cflags = unix_dpcpp_flags(cflags)
                 elif _is_c_file(src):
-                    _ccbin = get_icx_complier()
+                    _ccbin = get_icx_compiler()
                     self.compiler.set_executable("compiler_so", _ccbin)
                     if isinstance(cflags, dict):
                         cflags = cflags["cxx"]
@@ -365,7 +365,7 @@ class DpcppBuildExtension(build_ext, object):
             # create output directories avoid linker error.
             create_parent_dirs_by_path(output_libname)
 
-            _cxxbin = get_dpcpp_complier()
+            _cxxbin = get_dpcpp_compiler()
             cmd = _gen_link_lib_cmd_line(
                 _cxxbin,
                 objects,
@@ -705,7 +705,7 @@ def _write_ninja_file_and_compile_objects(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
     get_compiler_abi_compatibility_and_version(compiler)
 
     build_file_path = os.path.join(build_directory, "build.ninja")
@@ -745,7 +745,7 @@ def _write_ninja_file_and_build_library(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
     check_compiler_abi_compatibility(compiler)
 
     extra_ldflags = _prepare_ldflags(extra_ldflags or [], verbose, is_standalone)
@@ -908,7 +908,7 @@ def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> 
         # subprocess.run assumes that sys.__stdout__ has not been modified and
         # attempts to write to it by default.  However, when we call _run_ninja_build
         # from ahead-of-time cpp extensions, the following happens:
-        # 1) If the stdout encoding is not utf-8, setuptools detachs __stdout__.
+        # 1) If the stdout encoding is not utf-8, setuptools detaches __stdout__.
         #    https://github.com/pypa/setuptools/blob/7e97def47723303fafabe48b22168bbc11bb4821/setuptools/dist.py#L1110
         #    (it probably shouldn't do this)
         # 2) subprocess.run (on POSIX, with no stdout override) relies on
@@ -991,7 +991,7 @@ def _write_ninja_file_to_build_library(
     # include_paths() gives us the location of torch/extension.h
     system_includes = include_paths()
     # sysconfig.get_path('include') gives us the location of Python.h
-    # Explicitly specify 'posix_prefix' scheme on non-Windows platforms to workaround error on some MacOS
+    # Explicitly specify 'posix_prefix' scheme on non-Windows platforms to workaround error on some macOS
     # installations where default `get_path` points to non-existing `/Library/Python/M.m/include` folder
     python_include_path = sysconfig.get_path(
         "include", scheme="nt" if IS_WINDOWS else "posix_prefix"
@@ -1013,7 +1013,7 @@ def _write_ninja_file_to_build_library(
     #
     # Pybind11 before 2.4 used to build an ABI strings using the following pattern:
     # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_BUILD_TYPE}__"
-    # Since 2.4 compier type, stdlib and build abi parameters are also encoded like this:
+    # Since 2.4 compiler type, stdlib and build abi parameters are also encoded like this:
     # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_COMPILER_TYPE}
     # {PYBIND11_STDLIB}{PYBIND11_BUILD_ABI}{PYBIND11_BUILD_TYPE}__"
     #
@@ -1259,7 +1259,7 @@ def _write_ninja_file(
     if IS_WINDOWS:
         compiler = os.environ.get("CXX", "cl")
     else:
-        compiler = get_dpcpp_complier()
+        compiler = get_dpcpp_compiler()
 
     # Version 1.3 is required for the `deps` directive.
     config = ["ninja_required_version = 1.3"]

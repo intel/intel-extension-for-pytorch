@@ -258,7 +258,7 @@ You can also specify the cores to be utilized using `--cores-list` argument. For
 ipexrun --ncores-per-instance 10 --cores-list "11-20" --log-dir ./logs resnet50.py
 ```
 
-Please notice that when specifying `--cores-list`, a correspondant `--ncores-per-instance` argument is required for instance number deduction.
+Please notice that when specifying `--cores-list`, a correspondent `--ncores-per-instance` argument is required for instance number deduction.
 
 In this case the log directory should be like
 ```

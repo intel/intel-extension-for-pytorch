@@ -29,7 +29,7 @@ if [ ! -f ${WHEELFOLDER}/lm_eval*.whl ]; then
     (( MODE |= 0x02 ))
 fi
 
-# Check existance of required Linux commands
+# Check existence of required Linux commands
 for CMD in gcc g++; do
     command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 1;)
 done
@@ -57,7 +57,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX parent dir
     cd ..
 
-    # Check existance of required Linux commands
+    # Check existence of required Linux commands
     for CMD in make git; do
         command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 3;)
     done

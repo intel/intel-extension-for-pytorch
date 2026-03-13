@@ -148,8 +148,8 @@ at::Tensor embedding_bag(
 } // namespace torch_ipex
 
 /*
-A namespace wrapper to keep API compatiable to callers.
-And also compatiable to new dyndisp.
+A namespace wrapper to keep API compatible to callers.
+And also compatible to new dyndisp.
 */
 namespace torch_ipex {
 

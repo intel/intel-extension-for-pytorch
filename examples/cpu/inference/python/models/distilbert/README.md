@@ -54,13 +54,13 @@
   #by default they are downloaded in current path
   #note that you should do this after you prepared model (transformers repo)
 
-  (2) make following changes in the scirpts to run:
+  (2) make following changes in the scripts to run:
   delete: --task_name sst2  ==>  add: --train_file {path/to/data_file}/SST-2/train.csv --validation_file {path/to/data_file}/SST-2/dev.csv
 
   (3) export model path
   export FINETUNED_MODEL={path/to/model_file}/distilbert-base-uncased-finetuned-sst-2-english
 
-  (4) run scirpt with HF_DATASETS_OFFLINE=1 flag, like:
+  (4) run script with HF_DATASETS_OFFLINE=1 flag, like:
   HF_DATASETS_OFFLINE=1 bash run_multi_instance_throughput.sh fp32
 
   ```
@@ -96,7 +96,7 @@ export FINETUNED_MODEL=$(pwd)/distilbert-base-uncased-finetuned-sst-2-english
   ./setup.sh
   ```
 
-5. Setup required environment paramaters
+5. Setup required environment parameters
 
 # Custom mode
  Run in custom mode by export TEST_MODE="" and export BATCH_SIZE to set the batch_size, export CORES_PER_INSTANCE to set the number of cores per instance and export INSTANCES to set the number of instances.

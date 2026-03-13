@@ -25,7 +25,7 @@ struct TypeSelector {
     extract_type(args...);
   }
 
-  at::ArrayRef<T> retrive_types() {
+  at::ArrayRef<T> retrieve_types() {
     return at::ArrayRef<T>(container_.begin(), container_.end());
   }
 
@@ -101,7 +101,7 @@ functions:
 ***************************************************************************
 IPEX_OP_REGISTER | IPEX_OP_REGISTER_TO_PLAIN
 This macro is used to register ops into torch_ipex library. Through this macro,
-function schema and signature will automatically be infered from function
+function schema and signature will automatically be inferred from function
 prototype. However, it is worth to note that this macro will not works on
 overload functions(see IPEX_OP_REGISTER_OVERLOAD). Here is some examples for
 register ipex operators:
@@ -117,7 +117,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mul_add", mul_add);
 }
 And if this op does not support oneDNN's block format memory layout for tensor.
-It would be necessary for developer to register it specificly by adopting the
+It would be necessary for developer to register it specifically by adopting the
 macro IPEX_OP_REGISTER_NEED_PLAIN. In this way, all the tensor passed to this
 operator will automatically convert to normal tensor layout when execution.
 

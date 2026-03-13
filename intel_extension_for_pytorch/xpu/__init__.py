@@ -64,7 +64,7 @@ def init():
 
 
 # This API call _prefetchDeviceCount() if _lazy_init() has not been called such that
-# this API can be used before forking proces.
+# this API can be used before forking process.
 def device_count() -> int:
     r"""Returns the number of XPUs device available."""
     if hasattr(intel_extension_for_pytorch._C, "_getDeviceCount"):

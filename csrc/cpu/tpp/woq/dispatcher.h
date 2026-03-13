@@ -205,17 +205,17 @@ struct product_dispatcher_helper<
 
 template <
     typename... IntegralTypeProcessed,
-    typename... IntegeralTypeToProcess,
+    typename... IntegralTypeToProcess,
     typename... Dispatcher>
 struct product_dispatcher_helper<
     std::tuple<IntegralTypeProcessed...>,
-    std::tuple<IntegeralTypeToProcess...>,
+    std::tuple<IntegralTypeToProcess...>,
     std::tuple<Dispatcher...>> {
   template <typename Lambda1, typename Lambda2, typename... Args>
   inline static void call(
       std::tuple<Dispatcher...> dispatchers,
       std::tuple<IntegralTypeProcessed...> constants,
-      std::tuple<IntegeralTypeToProcess...> integrals,
+      std::tuple<IntegralTypeToProcess...> integrals,
       const Lambda1& function,
       const Lambda2& fallback,
       Args... args) {
@@ -252,20 +252,20 @@ template <typename IntegralTypes, typename Dispatchers>
 struct product_dispatcher;
 
 // dispatch to a carsian product of a list of integers to a lambda function
-template <typename... IntegeralType, typename... Dispatcher>
+template <typename... IntegralType, typename... Dispatcher>
 struct product_dispatcher<
-    std::tuple<IntegeralType...>,
+    std::tuple<IntegralType...>,
     std::tuple<Dispatcher...>> {
   template <typename Lambda1, typename Lambda2, typename... Args>
   inline static void call(
-      std::tuple<IntegeralType...> integrals,
+      std::tuple<IntegralType...> integrals,
       const Lambda1& function,
       const Lambda2& fallback,
       Args... args) {
     static auto dispatchers = std::tuple<Dispatcher...>{};
     product_dispatcher_helper<
         std::tuple<>,
-        std::tuple<IntegeralType...>,
+        std::tuple<IntegralType...>,
         std::tuple<Dispatcher...>>::
         call(
             dispatchers,

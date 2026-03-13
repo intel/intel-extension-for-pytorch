@@ -32,5 +32,5 @@ if [ $? -gt 0 ]; then
     exit 23
 fi
 
-echo "Successfully generate self-extacting package at ${LIBIPEX_INSTALL_SCRIPT}"
+echo "Successfully generate self-extracting package at ${LIBIPEX_INSTALL_SCRIPT}"
 exit

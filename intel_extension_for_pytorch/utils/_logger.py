@@ -38,7 +38,7 @@ class _Logger(logging.Logger):
     """
     An IPEX wrapper for logging.logger
     We use this wrapper for two purpose:
-    (1) Unified the usage for warnings.warn and logging.warning: Accroding to
+    (1) Unified the usage for warnings.warn and logging.warning: According to
     https://docs.python.org/3/howto/logging.html, we use warnings.warn if the
     issue is avoidable and logging.warn if there is nothing the client
     application can do about the situation.

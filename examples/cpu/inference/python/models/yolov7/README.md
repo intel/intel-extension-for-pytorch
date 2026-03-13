@@ -64,7 +64,7 @@
     ./setup.sh
     ```
 
-3. Setup required environment paramaters
+3. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|

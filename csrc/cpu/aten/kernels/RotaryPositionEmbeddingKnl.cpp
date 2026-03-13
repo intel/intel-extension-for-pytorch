@@ -34,7 +34,7 @@ bool is_fused_qkv(at::Tensor& t_in, int64_t hidden_size) {
  * @param t_pos The tensor containing the positions. t_pos should be [B][S]
  * where B is the batch size and S is the sequence length. In some cases, there
  * is only one element which the past_kv_length.In this case, position id can
- * construced by past_kv_length + current_position
+ * constructed by past_kv_length + current_position
  * @param N The number of heads.
  * @param H The head size.
  * @param offset The offset value. For GPT-J 6B/ChatGLM, cos/sin is applied to

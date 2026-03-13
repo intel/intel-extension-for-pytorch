@@ -493,7 +493,7 @@ deepspeed --bind_cores_to_rank run.py -m <DEEPSEEK_INT8_CKPT_SAVE_PATH> --benchm
 - Notes
 
 (1) Since the hugeness of the model size as well as the cache based optimizations, it is recommended to use a server with 1.5TB
-or larger memory amount. The memory comsumption optimizations are in progress.
+or larger memory amount. The memory consumption optimizations are in progress.
 
 (2) Please add `--num_accelerators` and `--bind_core_list` arguments for `deepspeed` command based on your SNC configurations.
 For example, for a server having 2 sockets, 128 physical cores per socket with a total number of 6 sub-numa clusters,

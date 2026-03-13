@@ -12,7 +12,7 @@ To start using the Intel® Extension for PyTorch\* in your code, you need to mak
 
 **Important:** It is highly recommended to `import intel_extension_for_pytorch` right after `import torch`, prior to importing other packages.
 
-The example below demostrates how to use the Intel® Extension for PyTorch\* with TorchScript:
+The example below demonstrates how to use the Intel® Extension for PyTorch\* with TorchScript:
 
 ```python
 import torch
@@ -34,7 +34,7 @@ with torch.no_grad(), torch.cpu.amp.autocast():
 ##########################################
 ```
 
-The example below demostrates how to use the Intel® Extension for PyTorch\* with TorchDynamo:
+The example below demonstrates how to use the Intel® Extension for PyTorch\* with TorchDynamo:
 
 ```python
 import torch

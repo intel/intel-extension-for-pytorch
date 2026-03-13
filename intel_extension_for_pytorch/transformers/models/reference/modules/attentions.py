@@ -379,7 +379,7 @@ def _OPTAttention_forward(
     attn_output = attn_output.transpose(1, 2)
 
     # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
-    # partitioned aross GPUs when using tensor-parallelism.
+    # partitioned across GPUs when using tensor-parallelism.
     attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
     return attn_output, attn_weights_reshaped, past_key_value
 
@@ -2849,7 +2849,7 @@ class _IPEXAttentionRef(nn.Module):
                     self.hidden_size = self.d_k
                 else:
                     raise ValueError(
-                        "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
+                        "Your transformers version does not support GQA feature, please upgrade (>= 4.31.0)"
                     )
             else:
                 self.num_key_value_heads = self.num_attention_heads

@@ -50,7 +50,7 @@ At the runtime, **Dispatch Stub implementation** will check CPUIDs and OS status
 >#### **Dispatch Stub implementation:** `csrc/cpu/dyndisp/DispatchStub.cpp` and `csrc/cpu/dyndisp/DispatchStub.h`
 
 ### CodeGen Process
-IPEX build system will generate code for each ISA level with specifiy complier parameters. The CodeGen script is located at `cmake/cpu/IsaCodegen.cmake`.
+IPEX build system will generate code for each ISA level with specifiy compiler parameters. The CodeGen script is located at `cmake/cpu/IsaCodegen.cmake`.
 
 The CodeGen will copy each cpp files from **Kernel implementation**, and then add ISA level as new file suffix.
 
@@ -376,7 +376,7 @@ Here are three ISA-related private APIs that can help debugging::
 >**Note:**
 >
 >1. Max CPU supported ISA level only depends on CPU features.
->2. Max binary supported ISA level only depends on built complier version.
+>2. Max binary supported ISA level only depends on built compiler version.
 >3. Current ISA level, it is the smaller of `max CPU ISA level` and `max binary ISA level`.
 
 ### Example:

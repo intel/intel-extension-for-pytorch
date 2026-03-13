@@ -52,7 +52,7 @@ typedef struct {
   int n_loops;
   loop_param_t* loop_params;
   int n_logical_loops;
-  char occurence_map[256];
+  char occurrence_map[256];
   int jit_loop_spec;
   int use_2d_par;
   int n_row_teams;
@@ -350,7 +350,7 @@ void emit_loop_body(loop_code* i_code, char* body_func_name) {
         sizeof(tmp_buf),
         "%c%d",
         'a' + i,
-        i_code->occurence_map['a' + i] - 1);
+        i_code->occurrence_map['a' + i] - 1);
     align_line(i_code);
     snprintf(tmp_buf, sizeof(tmp_buf), "idx[%d] = %s;\n", i, str_idx);
     add_buf_to_code(i_code, tmp_buf);
@@ -607,7 +607,7 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
   char term_func_name[64] = "term_func";
   char spec_func_name[64] = "loop_rt_spec";
   char loop_map[256];
-  char occurence_map[256];
+  char occurrence_map[256];
   loop_code l_code;
   char* result_code;
   loop_param_t loop_params[256], cur_loop, loop_params_map[256];
@@ -699,12 +699,12 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
   }
 
   /* Set up loop properties */
-  std::fill_n(occurence_map, 256, 0);
+  std::fill_n(occurrence_map, 256, 0);
   for (i = 0; i < n_loops; i++) {
     int is_blocked = (loop_map[tolower(loop_nest_desc[i])] > 1) ? 1 : 0;
     int is_parallelizable =
         (tolower(loop_nest_desc[i]) != loop_nest_desc[i]) ? 1 : 0;
-    int occurence_id, is_blocked_outer;
+    int occurrence_id, is_blocked_outer;
     char idx_name[16];
     char spec_array_name[512];
     char start_var_name[512];
@@ -712,9 +712,9 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
     char step_var_name[512];
     int loop_abs_index = tolower(loop_nest_desc[i]) - 'a';
 
-    occurence_id = occurence_map[tolower(loop_nest_desc[i])];
-    is_blocked_outer = (occurence_id == 0) ? 1 : 0;
-    occurence_map[tolower(loop_nest_desc[i])]++;
+    occurrence_id = occurrence_map[tolower(loop_nest_desc[i])];
+    is_blocked_outer = (occurrence_id == 0) ? 1 : 0;
+    occurrence_map[tolower(loop_nest_desc[i])]++;
 
     snprintf(spec_array_name, sizeof(spec_array_name), "%s", spec_func_name);
 
@@ -723,9 +723,9 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
         sizeof(idx_name),
         "%c%d",
         tolower(loop_nest_desc[i]),
-        occurence_id);
+        occurrence_id);
 
-    if (occurence_id == 0) {
+    if (occurrence_id == 0) {
       if (loop_params_map[loop_abs_index].jit_start > 0) {
         snprintf(
             start_var_name,
@@ -746,10 +746,10 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
           sizeof(start_var_name),
           "%c%d",
           tolower(loop_nest_desc[i]),
-          occurence_id - 1);
+          occurrence_id - 1);
     }
 
-    if (occurence_id == 0) {
+    if (occurrence_id == 0) {
       if (loop_params_map[loop_abs_index].jit_end > 0) {
         snprintf(
             end_var_name,
@@ -771,23 +771,23 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
             sizeof(end_var_name),
             "%c%d + %d",
             tolower(loop_nest_desc[i]),
-            occurence_id - 1,
-            loop_params_map[loop_abs_index].block_size[occurence_id - 1]);
+            occurrence_id - 1,
+            loop_params_map[loop_abs_index].block_size[occurrence_id - 1]);
       } else {
         snprintf(
             end_var_name,
             sizeof(end_var_name),
             "%c%d + %s[%d].block_size[%d]",
             tolower(loop_nest_desc[i]),
-            occurence_id - 1,
+            occurrence_id - 1,
             spec_array_name,
             loop_abs_index,
-            occurence_id - 1);
+            occurrence_id - 1);
       }
     }
 
     if (is_blocked) {
-      if (occurence_id == loop_map[tolower(loop_nest_desc[i])] - 1) {
+      if (occurrence_id == loop_map[tolower(loop_nest_desc[i])] - 1) {
         if (loop_params_map[loop_abs_index].jit_step > 0) {
           snprintf(
               step_var_name,
@@ -808,7 +808,7 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
               step_var_name,
               sizeof(step_var_name),
               "%d",
-              loop_params_map[loop_abs_index].block_size[occurence_id]);
+              loop_params_map[loop_abs_index].block_size[occurrence_id]);
         } else {
           snprintf(
               step_var_name,
@@ -816,7 +816,7 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
               "%s[%d].block_size[%d]",
               spec_array_name,
               loop_abs_index,
-              occurence_id);
+              occurrence_id);
         }
       }
     } else {
@@ -851,13 +851,13 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
   /* Setup number of logical loops and the ocurence map */
   n_logical_loops = 0;
   for (i = 0; i < 256; i++) {
-    if (occurence_map[i] > 0) {
+    if (occurrence_map[i] > 0) {
       n_logical_loops++;
     }
   }
   l_code.n_logical_loops = n_logical_loops;
 
-  memcpy(&l_code.occurence_map[0], occurence_map, 256);
+  memcpy(&l_code.occurrence_map[0], occurrence_map, 256);
 
   /* Emit function signature  */
   emit_func_signature(

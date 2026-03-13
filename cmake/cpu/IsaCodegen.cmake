@@ -141,7 +141,7 @@ endif(CXX_AVX2_FOUND)
 list(LENGTH CPU_CAPABILITY_NAMES NUM_CPU_CAPABILITY_NAMES)
 math(EXPR NUM_CPU_CAPABILITY_NAMES "${NUM_CPU_CAPABILITY_NAMES}-1")
 
-# The sources list might get reordered later based on the capabilites.
+# The sources list might get reordered later based on the capabilities.
 # See NOTE [ Linking AVX and non-AVX files ]
 foreach(i RANGE ${NUM_CPU_CAPABILITY_NAMES})
   foreach(IMPL ${cpu_kernel_cpp_in})

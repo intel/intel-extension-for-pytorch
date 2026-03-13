@@ -21,7 +21,7 @@ from ._utils import (
     quantized_modules_has_weights,
     load_qconf_summary_to_model,
     get_fqn_valid_for_module_dict_key,
-    check_model_obsever_has_run,
+    check_model_observer_has_run,
 )
 from ._quantization_state import (
     AutoQuantizationState,
@@ -459,7 +459,7 @@ def auto_prepare(
                 sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
                 get_default_recipe(nodes)
             else:
-                if check_model_obsever_has_run(model):
+                if check_model_observer_has_run(model):
                     # re-compute the scales and zp if user load a json file and re-do the calibration step.
                     attach_scale_zp_values_to_model(model)
                 else:
@@ -562,7 +562,7 @@ def auto_convert(
         """
         An override of `torch.Tensor` to enable dynamic dispatch for
         quantization inference.
-        For each function with a `__torch_fuction__` override, this proxy does
+        For each function with a `__torch_function__` override, this proxy does
         the following for functions which need quantization:
         1. calls `_auto_quant_state.validate_cur_op` to validate that
            the currently seen op is the same as what was recorded during tracing
@@ -769,7 +769,7 @@ def auto_convert(
         sync_pool_and_lstm_input_output_scale_zp(quant_state_map, nodes)
         get_default_recipe(nodes)
     else:
-        if check_model_obsever_has_run(module):
+        if check_model_observer_has_run(module):
             # re-compute the scales and zp if user load a json file and re-do the calibration step.
             attach_scale_zp_values_to_model(module)
         else:

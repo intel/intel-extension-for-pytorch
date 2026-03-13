@@ -156,7 +156,7 @@ static void index_select_gather_impl(
       outer_size,
       grain_size / (index_size * inner_size),
       [&](int64_t begin, int64_t end) {
-        // create the offset stencil for each row in outer dimenson,
+        // create the offset stencil for each row in outer dimension,
         // shared across {outer_size}
         std::unique_ptr<integer_t[]> index_buffer(
             new integer_t[index_size * inner_size]);
@@ -213,7 +213,7 @@ void cpu_index_select_dispatch(
 
   check_indexarray_range<index_t>(index_data, index_size, dim_size);
 
-  // Note on index_select implementation choosen:
+  // Note on index_select implementation chosen:
   //
   // 1. `index_select_gather_impl`: used when inner_size == 1 or 2.
   //   inner_size == 1 indicates a gather across {index_size}, here

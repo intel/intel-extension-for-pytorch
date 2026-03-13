@@ -67,9 +67,9 @@ Below are some useful `cpu_launcher_args` to note. Italic values are default if 
 Refer to [Launch Script Usage Guide](./launch_script.md) for a full list of tunable configuration of launcher. And refer to [Performance Tuning Guide](./tuning_guide.md) for more details.
 
 ### Launcher Core Pinning to Boost Performance of TorchServe Multi Worker Inference
-When running [multi-worker inference](https://pytorch.org/serve/management_api.html#scale-workers) with Torchserve (Required torchserve>=0.6.1), launcher pin cores to workers to boost performance. Internally, launcher equally divides the number of cores by the number of workers such that each worker is pinned to assigned cores. Doing so avoids core overlap among workers which can signficantly boost performance for TorchServe multi-worker inference. For example, assume running 4 workers on a machine with Intel(R) Xeon(R) Platinum 8180 CPU, 2 sockets, 28 cores per socket, 2 threads per core. Launcher will bind worker 0 to cores 0-13, worker 1 to cores 14-27, worker 2 to cores 28-41, and worker 3 to cores 42-55.
+When running [multi-worker inference](https://pytorch.org/serve/management_api.html#scale-workers) with Torchserve (Required torchserve>=0.6.1), launcher pin cores to workers to boost performance. Internally, launcher equally divides the number of cores by the number of workers such that each worker is pinned to assigned cores. Doing so avoids core overlap among workers which can significantly boost performance for TorchServe multi-worker inference. For example, assume running 4 workers on a machine with Intel(R) Xeon(R) Platinum 8180 CPU, 2 sockets, 28 cores per socket, 2 threads per core. Launcher will bind worker 0 to cores 0-13, worker 1 to cores 14-27, worker 2 to cores 28-41, and worker 3 to cores 42-55.
 
-CPU usage is shown below. 4 main worker threads were launched, each launching 14 threads affinitized to the assigned physical cores.
+CPU usage is shown below. 4 main worker threads were launched, each launching 14 threads affinities to the assigned physical cores.
 ![26](https://user-images.githubusercontent.com/93151422/170373651-fd8a0363-febf-4528-bbae-e1ddef119358.gif)
 
 
@@ -78,7 +78,7 @@ Additionally when dynamically [scaling the number of workers](https://pytorch.or
 
 Continuing with the above example with 4 workers, assume killing workers 2 and 3. If cores were not re-distributed after the scale down, cores 28-55 would be left unutilized. Instead, launcher re-distributes cores 28-55 to workers 0 and 1 such that now worker 0 binds to cores 0-27 and worker 1 binds to cores 28-55.<sup>2</sup>
 
-CPU usage is shown below. 4 main worker threads were initially launched. Then after scaling down the number of workers from 4 to 2, 2 main worker threads were launched, each launching 28 threads affinitized to the assigned physical cores.
+CPU usage is shown below. 4 main worker threads were initially launched. Then after scaling down the number of workers from 4 to 2, 2 main worker threads were launched, each launching 28 threads affinities to the assigned physical cores.
 ![worker_scaling](https://user-images.githubusercontent.com/93151422/170374697-7497c2d5-4c17-421b-9993-1434d1f722f6.gif)
 
 <sup>2. Serving is interrupted for few seconds while re-distributing cores to scaled workers.</sup>
@@ -171,7 +171,7 @@ torch.jit.save(model, 'rn50_int8_jit.pt')
 ```
 
 ### 2. Creating a Model Archive
-Once the serialized file ( `.pt`) is created, it can be used with `torch-model-archiver` as ususal.
+Once the serialized file ( `.pt`) is created, it can be used with `torch-model-archiver` as usual.
 
 Use the following command to package `rn50_int8_jit.pt` into `rn50_ipex_int8.mar`.
 ```
@@ -255,7 +255,7 @@ cpu_launcher_enable=true
 CPU usage is shown as below:
 ![launcher_core_pinning](https://user-images.githubusercontent.com/93151422/159063975-e7e8d4b0-e083-4733-bdb6-4d92bdc10556.gif)
 
-4 main worker threads were launched, then each launched a num_physical_cores/num_workers number (14) of threads affinitized to the assigned physical cores.
+4 main worker threads were launched, then each launched a num_physical_cores/num_workers number (14) of threads affinities to the assigned physical cores.
 
 <pre><code>
 $ cat logs/model_log.log

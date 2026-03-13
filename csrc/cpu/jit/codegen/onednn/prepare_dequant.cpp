@@ -18,7 +18,7 @@ class OpSplitter {
 
   bool analyzeNode(Node* node) {
     // If node->kind() matches the NodeKind, the node will be a candidate to be
-    // splitted. If the input to the current node matches with InputKind, will
+    // split. If the input to the current node matches with InputKind, will
     // split the node
     static std::unordered_map<Symbol, std::set<Symbol>> NodeKindToInputKind{
         {aten::to, {Symbol::aten("dequantize")}},

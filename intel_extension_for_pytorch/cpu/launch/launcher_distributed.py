@@ -9,7 +9,7 @@ from ...utils._logger import WarningType
 
 class DistributedTrainingLauncher(Launcher):
     """
-    Launcher for distributed traning with MPI launcher
+    Launcher for distributed training with MPI launcher
     """
 
     def add_params(self, parser):
@@ -92,7 +92,7 @@ class DistributedTrainingLauncher(Launcher):
            CCL_WORKER_AFFINITY="0,1,2,3,28,29,30,31"
            I_MPI_PIN_DOMAIN=[0xffffff0,0xffffff00000000]
         2) use logical core oneccl
-           The first ccl_worker_count logical cores which is correponding to the
+           The first ccl_worker_count logical cores which is corresponding to the
            first ccl_worker_count physical cores are used as the ccl cores.
            For example: on CascadeLake 8280 CPU, 2 ranks on one node. ccl_worker_count=4
            CCL_WORKER_COUNT=4

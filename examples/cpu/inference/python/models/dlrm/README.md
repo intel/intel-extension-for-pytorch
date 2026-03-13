@@ -58,7 +58,7 @@ After you loading the raw dataset `day_*.gz` and unzip them to RAW_DIR.
 ```bash
 cd intel-extension-for-pytorch/examples/cpu/inference/python/models/dlrm/
 export MODEL_DIR=$(pwd)
-export RAW_DIR=<the unziped raw dataset>
+export RAW_DIR=<the unzipped raw dataset>
 export TEMP_DIR=<where you choose the put the temp file during preprocess>
 export PREPROCESSED_DIR=<where you choose the put the one-hot dataset>
 export MULTI_HOT_DIR=<where you choose the put the multi-hot dataset>
@@ -82,14 +82,14 @@ https://github.com/mlcommons/inference/tree/master/recommendation/dlrm_v2/pytorc
     ./setup.sh
     ```
 
-5. Setup required environment paramaters
+5. Setup required environment parameters
 
 | **Parameter**                |                                  **export command**                                  |
 |:---------------------------:|:------------------------------------------------------------------------------------:|
 | **TEST_MODE** (THROUGHPUT, ACCURACY)              | `export TEST_MODE=THROUGHPUT`                  |
 | **DATASET_DIR**             |                               `export DATASET_DIR=<multi-hot dataset dir>`                                  |
 | **EVAL_BATCH**             |                               `export EVAL_BATCH=20000`                                  |
-| **WEIGHT_DIR** (ONLY FOR ACCURACY)     |                 `export WEIGHT_DIR=<offical released checkpoint>`        |
+| **WEIGHT_DIR** (ONLY FOR ACCURACY)     |                 `export WEIGHT_DIR=<official released checkpoint>`        |
 | **PRECISION**    |                               `export PRECISION=int8 <specify the precision to run: int8, fp32, bf32, bf16 or tf32>`                             |
 | **OUTPUT_DIR**    |                               `export OUTPUT_DIR=$PWD`                               |
 | **BATCH_SIZE** (optional) |                               `export BATCH_SIZE=<set a value for batch size, else it will run with default batch size>`                                |

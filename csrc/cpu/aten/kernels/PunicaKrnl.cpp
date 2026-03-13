@@ -32,7 +32,7 @@ namespace {
 
 template <typename T1, typename T2>
 void _dot(
-    const T1* intput,
+    const T1* input,
     const T2* weight,
     T1* out,
     int64_t len,
@@ -45,7 +45,7 @@ void _dot(
   int64_t vec_size = 16; // 512/32
   auto qk_sum_vec = _mm512_setzero_ps();
   for (hsi = 0; hsi <= len - vec_size; hsi += vec_size) {
-    auto q_vec = _loadu(intput + hsi);
+    auto q_vec = _loadu(input + hsi);
     auto k_vec = _loadu(weight + hsi);
     qk_sum_vec = _mm512_fmadd_ps(q_vec, k_vec, qk_sum_vec);
   }
@@ -68,7 +68,7 @@ void punica_bgmv_expand_slice_kernel(
         out, // [bs, output_size1] output_size1 >= slice_offset + slice_size
     at::Tensor& input, // [bs, max_rank]
     at::Tensor& weights, // [num_lora, hidden_size, max_rank]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     int64_t slice_offset,
     int64_t slice_size,
     bool add_inputs) {
@@ -82,14 +82,14 @@ void punica_bgmv_expand_slice_kernel(
   TORCH_CHECK(slice_offset >= 0)
   TORCH_CHECK(slice_size == hidden_size)
   TORCH_CHECK(output_size1 >= slice_offset + slice_size);
-  TORCH_CHECK(batch_size == indicies.size(0));
+  TORCH_CHECK(batch_size == indices.size(0));
   TORCH_CHECK(batch_size == input.size(0));
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
 
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -100,7 +100,7 @@ void punica_bgmv_expand_slice_kernel(
     for (int64_t h = 0; h < hidden_size; h++) {
       int64_t input_bs = limit ? 0 : bs;
       int64_t weights_offset =
-          indicies_ptr[bs] * max_rank * hidden_size + h * max_rank;
+          indices_ptr[bs] * max_rank * hidden_size + h * max_rank;
       T* weight_start = weights_ptr + weights_offset;
       T* input_start = input_ptr + input_bs * input_size1;
       T* out_start = out_ptr + bs * output_size1 + h + slice_offset;
@@ -115,7 +115,7 @@ void punica_sgmv_expand_slice_kernel(
         out, // [bs, output_size1] output_size1 >= slice_offset + slice_size
     at::Tensor& input, // [bs, max_rank]
     at::Tensor& weights, // [num_lora, hidden_size, max_rank]
-    at::Tensor& indicies, // [num_seq]
+    at::Tensor& indices, // [num_seq]
     at::Tensor& seq_lens, // [num_seq]
     int64_t slice_offset,
     int64_t slice_size,
@@ -130,14 +130,14 @@ void punica_sgmv_expand_slice_kernel(
   TORCH_CHECK(slice_offset >= 0)
   TORCH_CHECK(slice_size == hidden_size)
   TORCH_CHECK(output_size1 >= slice_offset + slice_size);
-  TORCH_CHECK(seq_lens.size(0) == indicies.size(0));
+  TORCH_CHECK(seq_lens.size(0) == indices.size(0));
   TORCH_CHECK(batch_size == input.size(0));
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
 
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -159,7 +159,7 @@ void punica_sgmv_expand_slice_kernel(
         int64_t bs = offset + s;
         int64_t input_bs = limit ? 0 : bs;
         int64_t weights_offset =
-            indicies_ptr[seq_id] * max_rank * hidden_size + h * max_rank;
+            indices_ptr[seq_id] * max_rank * hidden_size + h * max_rank;
         T* weight_start = weights_ptr + weights_offset;
         T* input_start = input_ptr + input_bs * input_size1;
         T* out_start = out_ptr + bs * output_size1 + h + slice_offset;
@@ -175,7 +175,7 @@ void punica_bgmv_shrink_kernel(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     const double scale) {
   int64_t num_lora = weights.size(0);
   int64_t max_rank = weights.size(1);
@@ -186,12 +186,12 @@ void punica_bgmv_shrink_kernel(
   TORCH_CHECK(input_size1 >= hidden_size);
   TORCH_CHECK(output_size1 >= max_rank);
   TORCH_CHECK(batch_size == input.size(0));
-  TORCH_CHECK(batch_size == indicies.size(0));
+  TORCH_CHECK(batch_size == indices.size(0));
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -200,7 +200,7 @@ void punica_bgmv_shrink_kernel(
   for (int64_t bs = 0; bs < batch_size; bs++) {
     for (int64_t r = 0; r < max_rank; r++) {
       int64_t weights_offset =
-          indicies_ptr[bs] * max_rank * hidden_size + r * hidden_size;
+          indices_ptr[bs] * max_rank * hidden_size + r * hidden_size;
       T* weight_start = weights_ptr + weights_offset;
       T* input_start = input_ptr + bs * input_size1;
       T* out_start = out_ptr + bs * output_size1 + r;
@@ -215,7 +215,7 @@ void punica_sgmv_shrink_kernel(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [num_seq]
+    at::Tensor& indices, // [num_seq]
     at::Tensor& seq_lens, // [num_seq]
     const double scale) {
   int64_t num_lora = weights.size(0);
@@ -227,12 +227,12 @@ void punica_sgmv_shrink_kernel(
   TORCH_CHECK(input_size1 >= hidden_size);
   TORCH_CHECK(output_size1 >= max_rank);
   TORCH_CHECK(batch_size == input.size(0));
-  TORCH_CHECK(seq_lens.size(0) == indicies.size(0));
+  TORCH_CHECK(seq_lens.size(0) == indices.size(0));
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -252,7 +252,7 @@ void punica_sgmv_shrink_kernel(
         int64_t offset = seq_id == 0 ? 0 : offsets_ptr[seq_id - 1];
         int64_t bs = offset + s;
         int64_t weights_offset =
-            indicies_ptr[seq_id] * max_rank * hidden_size + r * hidden_size;
+            indices_ptr[seq_id] * max_rank * hidden_size + r * hidden_size;
         T* weight_start = weights_ptr + weights_offset;
         T* input_start = input_ptr + bs * input_size1;
         T* out_start = out_ptr + bs * output_size1 + r;
@@ -268,7 +268,7 @@ void punica_bgmv_expand_kernel(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     bool add_inputs) {
   int64_t num_lora = weights.size(0);
   int64_t max_rank = weights.size(1);
@@ -278,13 +278,13 @@ void punica_bgmv_expand_kernel(
   int64_t input_size1 = input.size(1);
   TORCH_CHECK(input_size1 >= hidden_size);
   TORCH_CHECK(output_size1 >= max_rank);
-  TORCH_CHECK(batch_size == indicies.size(0));
+  TORCH_CHECK(batch_size == indices.size(0));
   TORCH_CHECK(batch_size == input.size(0) || input.size(0) == 1);
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -295,7 +295,7 @@ void punica_bgmv_expand_kernel(
     for (int64_t r = 0; r < max_rank; r++) {
       int64_t input_bs = limit ? 0 : bs;
       int64_t weights_offset =
-          indicies_ptr[bs] * max_rank * hidden_size + r * hidden_size;
+          indices_ptr[bs] * max_rank * hidden_size + r * hidden_size;
       T* weight_start = weights_ptr + weights_offset;
       T* input_start = input_ptr + input_bs * input_size1;
       T* out_start = out_ptr + bs * output_size1 + r;
@@ -310,7 +310,7 @@ void punica_sgmv_expand_kernel(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [num_seq]
+    at::Tensor& indices, // [num_seq]
     at::Tensor& seq_lens, // [num_seq]
     bool add_inputs) {
   int64_t num_lora = weights.size(0);
@@ -321,13 +321,13 @@ void punica_sgmv_expand_kernel(
   int64_t input_size1 = input.size(1);
   TORCH_CHECK(input_size1 >= hidden_size);
   TORCH_CHECK(output_size1 >= max_rank);
-  TORCH_CHECK(seq_lens.size(0) == indicies.size(0));
+  TORCH_CHECK(seq_lens.size(0) == indices.size(0));
   TORCH_CHECK(batch_size == input.size(0) || input.size(0) == 1);
   TORCH_CHECK(input.is_contiguous());
   TORCH_CHECK(weights.is_contiguous());
-  TORCH_CHECK(indicies.is_contiguous());
+  TORCH_CHECK(indices.is_contiguous());
   TORCH_CHECK(out.is_contiguous());
-  int64_t* indicies_ptr = indicies.data_ptr<int64_t>();
+  int64_t* indices_ptr = indices.data_ptr<int64_t>();
   T* out_ptr = out.data_ptr<T>();
   T* input_ptr = input.data_ptr<T>();
   T* weights_ptr = weights.data_ptr<T>();
@@ -349,7 +349,7 @@ void punica_sgmv_expand_kernel(
         int64_t bs = offset + s;
         int64_t input_bs = limit ? 0 : bs;
         int64_t weights_offset =
-            indicies_ptr[seq_id] * max_rank * hidden_size + r * hidden_size;
+            indices_ptr[seq_id] * max_rank * hidden_size + r * hidden_size;
         T* weight_start = weights_ptr + weights_offset;
         T* input_start = input_ptr + input_bs * input_size1;
         T* out_start = out_ptr + bs * output_size1 + r;
@@ -364,7 +364,7 @@ void punica_bgmv_shrink_kernel_impl(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     const double scale) {
   RECORD_FUNCTION(
       "ipex::punica_bgmv_shrink_kernel_impl", c10::ArrayRef<c10::IValue>({}));
@@ -377,12 +377,12 @@ void punica_bgmv_shrink_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_bgmv_shrink_kernel<at::BFloat16>(
-        out, input, weights, indicies, scale);
+        out, input, weights, indices, scale);
   } else if (out.scalar_type() == at::kHalf) {
-    punica_bgmv_shrink_kernel<at::Half>(out, input, weights, indicies, scale);
+    punica_bgmv_shrink_kernel<at::Half>(out, input, weights, indices, scale);
   }
 }
 
@@ -390,7 +390,7 @@ void punica_sgmv_shrink_kernel_impl(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [num_seq]
+    at::Tensor& indices, // [num_seq]
     at::Tensor& seq_lens, // [num_seq]
     const double scale) {
   RECORD_FUNCTION(
@@ -404,14 +404,14 @@ void punica_sgmv_shrink_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
-  TORCH_CHECK(seq_lens.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
+  TORCH_CHECK(seq_lens.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_sgmv_shrink_kernel<at::BFloat16>(
-        out, input, weights, indicies, seq_lens, scale);
+        out, input, weights, indices, seq_lens, scale);
   } else if (out.scalar_type() == at::kHalf) {
     punica_sgmv_shrink_kernel<at::Half>(
-        out, input, weights, indicies, seq_lens, scale);
+        out, input, weights, indices, seq_lens, scale);
   }
 }
 
@@ -420,7 +420,7 @@ void punica_bgmv_expand_kernel_impl(
     at::Tensor& input, // [bs, input_size1] or [1, input_size1] input_size1  >=
                        // hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     bool add_inputs) {
   RECORD_FUNCTION(
       "ipex::punica_bgmv_expand_kernel_impl", c10::ArrayRef<c10::IValue>({}));
@@ -433,13 +433,13 @@ void punica_bgmv_expand_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_bgmv_expand_kernel<at::BFloat16>(
-        out, input, weights, indicies, add_inputs);
+        out, input, weights, indices, add_inputs);
   } else if (out.scalar_type() == at::kHalf) {
     punica_bgmv_expand_kernel<at::Half>(
-        out, input, weights, indicies, add_inputs);
+        out, input, weights, indices, add_inputs);
   }
 }
 
@@ -448,7 +448,7 @@ void punica_sgmv_expand_kernel_impl(
     at::Tensor& input, // [bs, input_size1] or [1, input_size1] input_size1  >=
                        // hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     at::Tensor& seq_lens, // [bs]
     bool add_inputs) {
   RECORD_FUNCTION(
@@ -462,14 +462,14 @@ void punica_sgmv_expand_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
-  TORCH_CHECK(seq_lens.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
+  TORCH_CHECK(seq_lens.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_sgmv_expand_kernel<at::BFloat16>(
-        out, input, weights, indicies, seq_lens, add_inputs);
+        out, input, weights, indices, seq_lens, add_inputs);
   } else if (out.scalar_type() == at::kHalf) {
     punica_sgmv_expand_kernel<at::Half>(
-        out, input, weights, indicies, seq_lens, add_inputs);
+        out, input, weights, indices, seq_lens, add_inputs);
   }
 }
 
@@ -477,7 +477,7 @@ void punica_bgmv_expand_slice_kernel_impl(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [bs]
+    at::Tensor& indices, // [bs]
     int64_t slice_offset,
     int64_t slice_size,
     bool add_inputs) {
@@ -493,13 +493,13 @@ void punica_bgmv_expand_slice_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_bgmv_expand_slice_kernel<at::BFloat16>(
-        out, input, weights, indicies, slice_offset, slice_size, add_inputs);
+        out, input, weights, indices, slice_offset, slice_size, add_inputs);
   } else if (out.scalar_type() == at::kHalf) {
     punica_bgmv_expand_slice_kernel<at::Half>(
-        out, input, weights, indicies, slice_offset, slice_size, add_inputs);
+        out, input, weights, indices, slice_offset, slice_size, add_inputs);
   }
 }
 
@@ -507,7 +507,7 @@ void punica_sgmv_expand_slice_kernel_impl(
     at::Tensor& out, // [bs, output_size1] output_size1 >= max_rank
     at::Tensor& input, // [bs, input_size1]  input_size1  >= hidden_size
     at::Tensor& weights, // [num_lora, max_rank, hidden_size]
-    at::Tensor& indicies, // [num_seq]
+    at::Tensor& indices, // [num_seq]
     at::Tensor& seq_lens, // [num_seq]
     int64_t slice_offset,
     int64_t slice_size,
@@ -524,14 +524,14 @@ void punica_sgmv_expand_slice_kernel_impl(
   TORCH_CHECK(out.dim() == 2, "out must be 2D");
   TORCH_CHECK(input.dim() == 2, "input must be 2D");
   TORCH_CHECK(weights.dim() == 3, "weights must be 3D");
-  TORCH_CHECK(indicies.dim() == 1, "indicies must be 1D");
-  TORCH_CHECK(seq_lens.dim() == 1, "indicies must be 1D");
+  TORCH_CHECK(indices.dim() == 1, "indices must be 1D");
+  TORCH_CHECK(seq_lens.dim() == 1, "indices must be 1D");
   if (out.scalar_type() == at::kBFloat16) {
     punica_sgmv_expand_slice_kernel<at::BFloat16>(
         out,
         input,
         weights,
-        indicies,
+        indices,
         seq_lens,
         slice_offset,
         slice_size,
@@ -541,7 +541,7 @@ void punica_sgmv_expand_slice_kernel_impl(
         out,
         input,
         weights,
-        indicies,
+        indices,
         seq_lens,
         slice_offset,
         slice_size,

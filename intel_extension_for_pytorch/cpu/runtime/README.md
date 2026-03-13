@@ -205,7 +205,7 @@ at::Tensor input_tensor = at::rand({100, 8276});
 // Submit task into TaskExecutor
 auto res_future = task(std::move(input_tensor));
 
-// Block until finish executation and get the result
+// Block until finish execution and get the result
 auto res = res_future.get();
 
 ```

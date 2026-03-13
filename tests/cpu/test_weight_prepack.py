@@ -773,7 +773,7 @@ class TestPrepackCases(TestCase):
             loss.backward()
             origin_optimizer.step()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                # traing second step for ipex model.
+                # training second step for ipex model.
                 y3 = ipex_model(ipex_x)
                 loss3 = y3.sum()
                 ipex_optimizer.zero_grad()
@@ -825,7 +825,7 @@ class TestPrepackCases(TestCase):
                 y2 = ipex_model2(x)
 
             self.assertEqual(y1, y2.float(), rtol=1e-2, atol=5e-2)
-            # traing case.
+            # training case.
             origin_model = copy.deepcopy(model).train()
             origin_optimizer = ASGD(origin_model.parameters(), lr=0.01)
             # do weight prepack for 'O1'
@@ -2098,7 +2098,7 @@ class TestPrepackCases(TestCase):
                 loss1_hy1_1.backward(retain_graph=True)
             origin_optimizer.step()
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                # traing second step for ipex model.
+                # training second step for ipex model.
                 if empty_state:
                     torch.manual_seed(rand_seed)
                     y3, hy3 = ipex_model(x2)

@@ -44,7 +44,7 @@ class single_card_dist:
             i). device: get the xpu information used in model training
             >>> xpu = "xpu:{}".format(local_rank)
             >>> print("DDP Use XPU: {} for training".format(xpu))
-            ii). model: use the model warpped by DDP in the following training
+            ii). model: use the model wrapped by DDP in the following training
             iii). train_sampler: use the train_sampler to get the train_loader
             >>> train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                                            shuffle=(train_sampler is None),

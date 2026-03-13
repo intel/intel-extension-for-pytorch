@@ -50,7 +50,7 @@ imagenet
 The folder that contains the `val` directory should be set as the `DATASET_DIR` (for example: `export DATASET_DIR=/home/<user>/imagenet`).
 
 ### Inference
-1. Setup required environment paramaters
+1. Setup required environment parameters
 
 | **Parameter**                                    |                **export command**                                 |
 |:------------------------------------------------:|:-----------------------------------------------------------------:|

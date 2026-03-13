@@ -102,7 +102,7 @@ class TestFunction(TestCase):
                 scaler.step(optimizer)
                 scaler.update()
 
-    def test_nested_useage(self):
+    def test_nested_usage(self):
         rand_seed = int(get_rand_seed())
         print("{} rand sed: {}".format(sys._getframe().f_code.co_name, rand_seed))
         torch.manual_seed(rand_seed)

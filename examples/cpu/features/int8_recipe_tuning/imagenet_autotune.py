@@ -107,13 +107,13 @@ def validate(val_loader, model, criterion, args):
 
         return top1.avg.item()
 
-    print(".........runing autotuning step.........")
+    print(".........running autotuning step.........")
     tuned_model = ipex.quantization.autotune(
         model, val_loader, eval_func=eval_func, sampling_sizes=[300]
     )
     print(".........autotuning step done.........")
 
-    print(".........runing int8 inference.........")
+    print(".........running int8 inference.........")
     converted_model = ipex.quantization.convert(tuned_model)
     with torch.no_grad():
         for i, (images, target) in enumerate(val_loader):

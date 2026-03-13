@@ -519,7 +519,7 @@ class Phi3FlashAttention2(Phi3Attention):
         super().__init__(*args, **kwargs)
 
         # TODO: Should be removed once Flash Attention for RoCm is bumped to 2.1.
-        # flash_attn<2.1 generates top-left aligned causal mask, while what is needed here is bottom-right alignement,
+        # flash_attn<2.1 generates top-left aligned causal mask, while what is needed here is bottom-right alignment,
         # that was made default for flash_attn>=2.1. This attribute is used to handle this difference.
         # Reference: https://github.com/Dao-AILab/flash-attention/releases/tag/v2.1.0.
         # Beware that with flash_attn<2.1, using q_seqlen != k_seqlen (except for the case q_seqlen == 1)

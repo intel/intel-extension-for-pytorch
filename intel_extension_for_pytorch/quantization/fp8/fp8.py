@@ -1,4 +1,4 @@
-"""FP8 utilies for IPEX"""
+"""FP8 utilities for IPEX"""
 
 from contextlib import contextmanager
 from typing import Optional, Dict, Any, Tuple

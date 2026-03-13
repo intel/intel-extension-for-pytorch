@@ -74,7 +74,7 @@ def _beam_sample(
     ).to(input_ids.device)
     model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
     latency_list = []
-    # (joao) feature lost in the refactor. Probably won't implement, hurts readbility with minimal gains (there
+    # (joao) feature lost in the refactor. Probably won't implement, hurts readability with minimal gains (there
     # are newer low-memory alternatives like the offloaded cache)
     sequential = generation_config.low_memory
     if sequential:

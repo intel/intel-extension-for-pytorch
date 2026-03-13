@@ -70,7 +70,7 @@ parser.add_argument(
     "--model-id",
     type=str,
     default="EleutherAI/gpt-j-6b",
-    help="the huggingface mdoel id",
+    help="the huggingface model id",
 )
 parser.add_argument(
     "--vision-text-model",
@@ -619,7 +619,7 @@ if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
     )
 
 tp_grain_size = 64
-# Need to check if this attr is available. Old DeepSpeep does not have it.
+# Need to check if this attr is available. Old DeepSpeed does not have it.
 assert "tp_grain_size" in dir(
     deepspeed.inference.config.DeepSpeedTPConfig()
 ), "Old DeepSpeed version detected. Please update to the recommended version."
@@ -871,7 +871,7 @@ for test_bs in [args.batch_size]:
                 ]
             prompt = current_prompt
         else:
-            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+            raise SystemExit("[ERROR] Please use --prompt if want to use custom input.")
 
         raw_image = load_image(args.image_url)
         raw_image = [raw_image] * test_bs
@@ -948,7 +948,7 @@ for test_bs in [args.batch_size]:
             else:
                 input_sentences.append(prompt_pool[model_type][args.input_tokens])
         else:
-            raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+            raise SystemExit("[ERROR] Please use --prompt if want to use custom input.")
         if test_bs > len(input_sentences):
             # dynamically extend to support larger bs by repetition
             input_sentences *= math.ceil(test_bs / len(input_sentences))
@@ -1064,7 +1064,7 @@ if not args.benchmark:
     generated, _ = generate()
     t_generate_span = time.time() - t_generate_start
     for i, o, _ in generated:
-        print_rank0(f"{'-'*60}\nin={i}\nout={o}\n")
+        print_rank0(f"{'-' * 60}\nin={i}\nout={o}\n")
 
 # benchmark it!
 else:

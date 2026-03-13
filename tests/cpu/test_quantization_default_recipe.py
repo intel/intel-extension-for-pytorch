@@ -187,7 +187,7 @@ class TestDefaultRecipe(JitLlgaTestCase):
         assert hasattr(converted_model, "linear")
         assert isinstance(converted_model.linear, nn.quantized.dynamic.Linear)
 
-    def test_check_model_obsever_has_run(self):
+    def test_check_model_observer_has_run(self):
         class Block(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
@@ -208,28 +208,28 @@ class TestDefaultRecipe(JitLlgaTestCase):
                     x = b(x)
                 return x
 
-        check_model_obsever_has_run = (
-            ipex.quantization._utils.check_model_obsever_has_run
+        check_model_observer_has_run = (
+            ipex.quantization._utils.check_model_observer_has_run
         )
         m = Mod().eval()
         x = torch.rand(4, 4)
         qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
         prepared_model = ipex.quantization.prepare(m, qconfig_mapping, x)
-        assert not check_model_obsever_has_run(prepared_model)
+        assert not check_model_observer_has_run(prepared_model)
         for _ in range(5):
             prepared_model(torch.rand(4, 4))
-        assert check_model_obsever_has_run(prepared_model)
+        assert check_model_observer_has_run(prepared_model)
         with tempfile.NamedTemporaryFile() as fp:
             qconf_filename = fp.name
             prepared_model.save_qconf_summary(qconf_filename)
             # Observers are removed after save_qconf_summary
-            assert not check_model_obsever_has_run(prepared_model)
+            assert not check_model_observer_has_run(prepared_model)
             prepared_model.load_qconf_summary(qconf_filename)
             # Observers are added but not run yet after load_qconf_summary
-            assert not check_model_obsever_has_run(prepared_model)
+            assert not check_model_observer_has_run(prepared_model)
             for _ in range(5):
                 prepared_model(torch.rand(4, 4))
-            assert check_model_obsever_has_run(prepared_model)
+            assert check_model_observer_has_run(prepared_model)
 
     def test_none_example_input_for_quantization(self):
         class M(nn.Module):

@@ -247,7 +247,7 @@ def get_low_precision_checkpoint(args, model_config):
 
 def maybe_set_tp_grain_size(quant_config, ds_init_inf_kwargs):
     tp_grain_size = 64
-    # Need to check if this attr is available. Old DeepSpeep does not have it.
+    # Need to check if this attr is available. Old DeepSpeed does not have it.
     assert "tp_grain_size" in dir(
         deepspeed.inference.config.DeepSpeedTPConfig()
     ), "Old DeepSpeed version detected. Please update to the recommended version."
@@ -1714,7 +1714,7 @@ class LMMS(lmms):
                 and DEFAULT_IMAGE_TOKEN not in prompts_input
             ):
                 """
-                Three senarios:
+                Three scenarios:
                 1. No image, and there for, no image token should be added.
                 2. image token is already specified in the context, so we don't need to add it.
                 3. image token is not specified in the context and there is image inputs, so we need to add it.
@@ -1857,7 +1857,7 @@ class LMMS(lmms):
                         and DEFAULT_IMAGE_TOKEN not in context
                     ):
                         """
-                        Three senarios:
+                        Three scenarios:
                         1. No image, and there for, no image token should be added.
                         2. image token is already specified in the context, so we don't need to add it.
                         3. image token is not specified in the context and there is image inputs,

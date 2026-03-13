@@ -33,7 +33,7 @@ class BrgemmExtTPP {
     auto dt_out = XsmmDtype<Tout>();
     if (dt_out == LIBXSMM_DATATYPE_F32 && c_trans == XformTPP::XFORM_N2V_TPP) {
       printf(
-          "Warning: reseting c_trans flag from N2V to None for FP32 output\n");
+          "Warning: resetting c_trans flag from N2V to None for FP32 output\n");
       c_trans = XformTPP::XFORM_NONE_TPP;
     }
     auto beta_ = beta;

@@ -423,7 +423,7 @@ def iterate_and_apply_convert(
                     args = torch.quantize_per_channel(args, scale, zp, ch_axis, dtype)
                     args = args.dequantize()
             else:
-                # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then inser q+dq
+                # white list, conv, linear, matmul, we always convert it's input to bflat16 firstly, and then insert q+dq
                 if (
                     str(op)
                     in conv_linear_ops

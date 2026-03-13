@@ -119,7 +119,7 @@ if [[ ${COMMAND} == "install" ]]; then
         echo "f|${comp}" >> ${LIBTORCH_PATH}/${LOGFILE}
     done
 
-    echo "Installation successed!"
+    echo "Installation succeeded!"
 
 # LIBIPEX Uninstallation
 elif [[ ${COMMAND} == "uninstall" ]]; then
@@ -144,7 +144,7 @@ elif [[ ${COMMAND} == "uninstall" ]]; then
         rm -f ${LIBTORCH_PATH}/${LOGFILE}
     fi
 
-    echo "Uninstallation successed!"
+    echo "Uninstallation succeeded!"
 fi
 
 exit

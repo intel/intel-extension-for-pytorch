@@ -100,7 +100,7 @@ std::vector<int32_t> init_process_available_cores() {
   if (is_runtime_ext_enabled()) {
     // When IOMP preloaded.
     // Step1: Get the main thread affinity information:
-    // 2 knowning external command may change it during process starts up:
+    // 2 knowing external command may change it during process starts up:
     //   * External Numactl.
     //   * Preload IOMP with KMP_AFFINITY settings.
     // We need to save this information firstly and restore it later.
@@ -299,7 +299,7 @@ void set_mask_affinity_from_cpu_pool(const CPUPool& cpu_pool) {
   omp_set_num_threads(threads_mask.size());
 #pragma omp parallel num_threads(threads_mask.size())
   {
-    // we will destory the mask inside the CPUPool deconstructor
+    // we will destroy the mask inside the CPUPool deconstructor
     int thread_id = omp_get_thread_num();
     kmp_affinity_mask_t mask = threads_mask[thread_id];
     kmp_set_affinity_ext(&mask);

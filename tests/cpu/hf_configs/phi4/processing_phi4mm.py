@@ -371,7 +371,7 @@ def speechlib_mel(sample_rate, n_fft, n_mels, fmin=None, fmax=None):
         fmax = sample_rate / 2
     if fmin is None:
         fmin = 0
-    assert fmin >= 0, "fmin cannot be negtive"
+    assert fmin >= 0, "fmin cannot be negative"
     assert fmin < fmax <= sample_rate / 2, "fmax must be between (fmin, samplerate / 2]"
 
     def mel(f):
@@ -389,7 +389,7 @@ def speechlib_mel(sample_rate, n_fft, n_mels, fmin=None, fmax=None):
 
     khi = max(khi, klo)
 
-    # Spec 2: SpeechLib uses trianges in Mel space
+    # Spec 2: SpeechLib uses triangles in Mel space
     mlo = mel(fmin)
     mhi = mel(fmax)
     m_centers = np.linspace(mlo, mhi, n_mels + 2)
@@ -533,7 +533,7 @@ class Phi4MMAudioFeatureExtractor(SequenceFeatureExtractor):
         n_batch = (wav.shape[0] - win_length) // hop_length + 1
         # Here we don't use stride_tricks since the input array may not satisfy
         # memory layout requirement and we need writeable output
-        # Here we only use list of views before copy to desination
+        # Here we only use list of views before copy to destination
         # so it is more efficient than broadcasting
         y_frames = np.array(
             [
@@ -699,7 +699,7 @@ class Phi4MMProcessor(ProcessorMixin):
             return_tensors=return_tensors,
         )
 
-        # idenfity the input mode
+        # identify the input mode
         if len(image_inputs) > 0 and len(audio_inputs) > 0:
             input_mode = InputMode.VISION_SPEECH
         elif len(image_inputs) > 0:

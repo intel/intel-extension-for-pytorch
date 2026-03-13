@@ -4,8 +4,8 @@
 #include <immintrin.h>
 #include "aten/utils/utils.h"
 
-// This helper aims to provide a set of lambda function to manully unroll
-// vectorized intrisics with compile_time_for
+// This helper aims to provide a set of lambda function to manually unroll
+// vectorized intrinsics with compile_time_for
 // https://github.com/intel/intel-extension-for-pytorch/blob/05aeaf4b675f15c68fcde5b575b4fd5151971129/csrc/cpu/aten/utils/utils.h#L68
 // For example,
 // auto load_fp32 = [](auto i, __m512* in_vset, auto* basic_ptr) {

@@ -82,7 +82,7 @@ inline constexpr uint32_t pack_u16(uint16_t a, uint16_t b) {
 #define CHECK_LAST_DIM_CONTIGUOUS(x)            \
   TORCH_CHECK(                                  \
       x.strides()[x.strides().size() - 1] == 1, \
-      #x "must be contiguous at last dimention")
+      #x "must be contiguous at last dimension")
 
 #define CHECK_INPUT(x) \
   CHECK_CPU(x);        \
@@ -1409,7 +1409,7 @@ void decode_attention_kernel_impl(
         s_prime += at::vec::reduce_all<float>(
             [](Vec& x, Vec& y) { return x + y; }, s_delta, n_size);
         m_prime = m_i;
-        // caculate V' <- s_delta @ V + V' * m_delta
+        // calculate V' <- s_delta @ V + V' * m_delta
         index_gemm_kernel_nn(
             /* A   */ s_delta,
             /* B   */ kv_cache + head_id * stride_kv1,
@@ -1560,7 +1560,7 @@ void decode_attention_opt_kernel_impl(
         s_prime += at::vec::reduce_all<float>(
             [](Vec& x, Vec& y) { return x + y; }, s_delta, n_size);
         m_prime = m_i;
-        // caculate V' <- s_delta @ V + V' * m_delta
+        // calculate V' <- s_delta @ V + V' * m_delta
         gemm_kernel_nn(
             /* A   */ s_delta,
             /* B   */ kv_cache + head_id * stride_kv1 + n * stride_kv0,
@@ -1736,7 +1736,7 @@ void decode_attention_grouped_kernel_impl(
               n_size);
           m_prime[h] = m_i;
         }
-        // caculate V' <- s_delta @ V + V' * m_delta
+        // calculate V' <- s_delta @ V + V' * m_delta
         index_gemm_kernel_nn(
             /* A   */ s_delta,
             /* B   */ kv_cache + head_kv_id * stride_kv1,
@@ -1914,7 +1914,7 @@ void decode_attention_grouped_opt_kernel_impl(
               n_size);
           m_prime[h] = m_i;
         }
-        // caculate V' <- s_delta @ V + V' * m_delta
+        // calculate V' <- s_delta @ V + V' * m_delta
         gemm_kernel_nn(
             /* A   */ s_delta,
             /* B   */ kv_cache + head_kv_id * stride_kv2 + n * stride_kv0 +

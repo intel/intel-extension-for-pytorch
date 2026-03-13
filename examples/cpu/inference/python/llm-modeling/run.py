@@ -94,7 +94,7 @@ parser.add_argument(
     "--model-id",
     type=str,
     default="EleutherAI/gpt-j-6B",
-    help="the huggingface mdoel id",
+    help="the huggingface model id",
 )
 parser.add_argument(
     "--dtype",
@@ -230,7 +230,7 @@ elif int(args.input_tokens) > 8192:
 elif args.input_tokens in prompt_pool[model_type]:
     prompt = prompt_pool[model_type][args.input_tokens]
 else:
-    raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+    raise SystemExit("[ERROR] Please use --prompt if want to use custom input.")
 
 input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
 print("---- Prompt size:", input_size)

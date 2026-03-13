@@ -10,7 +10,7 @@ IPEX_DEFINE_DISPATCH(deepseekv2_mla_kernel_stub);
 IPEX_DEFINE_DISPATCH(prepare_4d_causal_attention_mask_kernel_stub);
 
 /*
- *Caculate the masked multihead attention for decoder layer in decoder only
+ *Calculate the masked multihead attention for decoder layer in decoder only
  *model.
  *@param query
  *@param key

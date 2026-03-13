@@ -104,7 +104,7 @@ at::Tensor convolution_kernel(
     at::MemoryFormat memory_format) {
   // Base convolution kernel, this base kernel will not change input's format,
   // so make sure you has make process the input's format before call this
-  // function, the output wil has same format with input.
+  // function, the output will has same format with input.
   // TODO: the input will be actively converted to channels last format
   // after the 5-D tensor supports channels last format.
   TORCH_CHECK(

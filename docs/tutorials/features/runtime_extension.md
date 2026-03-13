@@ -120,7 +120,7 @@ Thus, `MultiStreamModule` may benefit performance for inference in throughput mo
 2. The overhead of inputs' auto split and outputs' auto concat for each stream.
 3. The overhead of pthread (stream async execution) wakes up and threads' synchronization after stream execution.
 
-Here are some performance receipes that we recommend for better multi-stream performance.
+Here are some performance recipes that we recommend for better multi-stream performance.
 
 * When creating `MultiStreamModule` with `torch.nn.Module` as imperative path module, each stream inside `MultiStreamModule` suffers the GIL issue when doing inference together. This hurts end-to-end performance. We recommend creating `MultiStreamModule` with the `torch.jit.ScriptModule`.
 

@@ -24,7 +24,7 @@ cd transformers
 pip install -e ./
 cd ..
 
-# Get prompt.json for gneration inference
+# Get prompt.json for generation inference
 wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
 
 export EVAL_SCRIPT="run_llm_inductor_greedy.py"

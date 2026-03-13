@@ -7,7 +7,7 @@ namespace xpu {
 // This is a temp solution. We will submit a PR to stock-PyTorch
 //  and make XPU backend supported in torch.Generator() API.
 // TO DO: remove this file and submit a PR to stock-PyTorch. We should move
-// struct Generator from aten to c10. Then unify front-end torch.Geneator with
+// struct Generator from aten to c10. Then unify front-end torch.Generator with
 // VirtualGuardImpl
 PyObject* THPGenerator_New(PyObject* _self, PyObject* args, PyObject* kwargs) {
   HANDLE_TH_ERRORS

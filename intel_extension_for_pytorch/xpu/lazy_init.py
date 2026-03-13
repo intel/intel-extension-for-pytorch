@@ -74,7 +74,7 @@ def _lazy_init():
         _C._initExtension()
         # Some of the queued calls in _queued_calls[] may reentrantly call
         # _lazy_init(). We must prevent multiple initializations. In that case
-        # just return early without initializeing to avoid a deadlock.
+        # just return early without initializing to avoid a deadlock.
         _tls.is_initializing = True
 
         for calls in _lazy_seed_tracker.get_calls():

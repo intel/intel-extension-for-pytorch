@@ -55,7 +55,7 @@
 # USE_PERSIST_STREAM    - to use persistent oneDNN stream
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_QUEUE_BARRIER     - to use queue submit_barrier API
-# USE_SCRATCHPAD_MODE   - to trun on oneDNN scratchpad user mode
+# USE_SCRATCHPAD_MODE   - to turn on oneDNN scratchpad user mode
 # USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
@@ -469,7 +469,7 @@ def get_xpu_project_build_dir():
     return xpu_build_dir
 
 
-def get_xpu_compliers():
+def get_xpu_compilers():
     if shutil.which("icx") is None or shutil.which("icpx") is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     if IS_WINDOWS:
@@ -478,7 +478,7 @@ def get_xpu_compliers():
         return "icx", "icpx"
 
 
-def get_cpu_compliers():
+def get_cpu_compilers():
     if shutil.which("icx") is None or shutil.which("icpx") is None:
         # For CPU build, Intel Compiler is optional.
         return None, None
@@ -750,7 +750,7 @@ class IPEXCPPLibBuild(build_clib, object):
                     "It maybe CPU only branch, and it is not contains XPU code."
                 )
 
-            gpu_cc, gpu_cxx = get_xpu_compliers()
+            gpu_cc, gpu_cxx = get_xpu_compilers()
             build_option_gpu = {
                 **build_option_common,
                 "BUILD_MODULE_TYPE": "GPU",
@@ -780,7 +780,7 @@ class IPEXCPPLibBuild(build_clib, object):
 
         if build_with_cpu:
             # Generate cmake for CPU module:
-            cpu_cc, cpu_cxx = get_cpu_compliers()
+            cpu_cc, cpu_cxx = get_cpu_compilers()
             if cpu_cc is not None and cpu_cxx is not None:
                 build_option_cpu = {
                     **build_option_common,

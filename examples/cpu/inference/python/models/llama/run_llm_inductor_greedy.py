@@ -390,7 +390,7 @@ else:
         prompt = prompt_pool[model_type][args.input_tokens]
     else:
         raise SystemExit(
-            "[ERROR] No such input_tokens prompt in prompt.json, Plese use --prompt if want to use custom input."
+            "[ERROR] No such input_tokens prompt in prompt.json, Please use --prompt if want to use custom input."
         )
 
 input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
