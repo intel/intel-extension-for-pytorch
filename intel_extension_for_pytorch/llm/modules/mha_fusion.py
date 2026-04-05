@@ -553,12 +553,12 @@ class PagedAttention:
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
         softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
-    [class method]: flash_atten_varlen
+    [class method]: flash_attn_varlen_func
 
     .. highlight:: python
     .. code-block:: python
 
-        ipex.llm.modules.PagedAttention.flash_atten_varlen(
+        ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
             out,
             query,
             key_cache,
@@ -573,8 +573,8 @@ class PagedAttention:
             alibi_slopes,
             window_size_left,
             window_size_right,
-            k_scale,
-            v_scale
+            k_scale=k_scale,
+            v_scale=v_scale
         )
 
     Args:
